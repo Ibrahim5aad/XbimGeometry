@@ -138,21 +138,28 @@ if(XBIM_BUILD_TESTS)
     foreach(_test_src ${TEST_SOURCES})
         get_filename_component(_test_name ${_test_src} NAME_WE)
         add_executable(${_test_name} ${_test_src})
-        target_link_libraries(${_test_name} PRIVATE xbim_geometry_native)
-        # Give tests access to internal headers and OCCT for creating test shapes
-        target_include_directories(${_test_name} PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/src
-            ${OCCT_INCLUDE_DIR}
-        )
-        target_compile_definitions(${_test_name} PRIVATE OCCT_NO_PLUGINS)
-        # Link OCCT libraries for tests that use OCCT types directly
-        foreach(_lib ${OCCT_LIBRARIES})
-            if(WIN32)
-                target_link_libraries(${_test_name} PRIVATE "${OCCT_LIB_DIR}/${_lib}.lib")
-            else()
-                target_link_libraries(${_test_name} PRIVATE "${OCCT_LIB_DIR}/lib${_lib}.so")
-            endif()
-        endforeach()
+
+        # test_dynamic_load uses LoadLibrary/GetProcAddress at runtime,
+        # so it must NOT link the native library or OCCT at build time.
+        if(_test_name STREQUAL "test_dynamic_load")
+            add_dependencies(${_test_name} xbim_geometry_native)
+        else()
+            target_link_libraries(${_test_name} PRIVATE xbim_geometry_native)
+            # Give tests access to internal headers and OCCT for creating test shapes
+            target_include_directories(${_test_name} PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}/src
+                ${OCCT_INCLUDE_DIR}
+            )
+            target_compile_definitions(${_test_name} PRIVATE OCCT_NO_PLUGINS)
+            # Link OCCT libraries for tests that use OCCT types directly
+            foreach(_lib ${OCCT_LIBRARIES})
+                if(WIN32)
+                    target_link_libraries(${_test_name} PRIVATE "${OCCT_LIB_DIR}/${_lib}.lib")
+                else()
+                    target_link_libraries(${_test_name} PRIVATE "${OCCT_LIB_DIR}/lib${_lib}.so")
+                endif()
+            endforeach()
+        endif()
     endforeach()
 endif()
 
