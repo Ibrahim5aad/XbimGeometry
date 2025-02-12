@@ -38,18 +38,56 @@ Before using this library you should register the Geometry Engine with the xbim 
 **Visual Studio 2022 is recommended.**
 Prior versions of Visual Studio are unlikely to work on this solution.
 
-The [free VS 2022 Community Edition](https://visualstudio.microsoft.com/downloads/) will be fine. 
+The [free VS 2022 Community Edition](https://visualstudio.microsoft.com/downloads/) will be fine.
 
-In order to compile this solution which includes C++ projects you'll need the following additional 
+In order to compile this solution which includes C++ projects you'll need the following additional
 components installed:
 
 - Visual C++ Core desktop features
 - VC++ 2022 v143 tools
-- Windows 10 SDK (10.0.17134.0) 
+- Windows 10 SDK (10.0.17134.0)
 
 The XBIM toolkit [uses the NuGet](https://www.nuget.org/packages/Xbim.Geometry/) for the management of our published packages.
 We have custom MyGet feeds for the *master* and *develop* branches of the solution which are automatically
 updated during our CI builds. The [nuget.config](nuget.config) file should automatically add these feeds for you.
+
+### Building the Native Library (cross-platform)
+
+The `Xbim.Geometry.Engine.Native` project is a standalone CMake-based C/C++ shared library that uses
+[vcpkg](https://github.com/microsoft/vcpkg) for dependency management (OpenCASCADE, FreeType, etc.).
+
+**Prerequisites:**
+
+1. Install [vcpkg](https://github.com/microsoft/vcpkg):
+   ```bash
+   git clone https://github.com/microsoft/vcpkg.git
+   cd vcpkg && bootstrap-vcpkg.bat   # Windows
+   cd vcpkg && ./bootstrap-vcpkg.sh  # Linux
+   ```
+2. Set the `VCPKG_ROOT` environment variable to your vcpkg installation directory.
+3. CMake 3.20+ and a C++17 compiler (MSVC 2022 on Windows, GCC/Clang on Linux).
+
+**Windows (x64):**
+
+```bash
+cd Xbim.Geometry.Engine.Native
+cmake --preset win-x64-release
+cmake --build build-vcpkg --config Release
+```
+
+**Linux (x64):**
+
+```bash
+cd Xbim.Geometry.Engine.Native
+cmake --preset linux-x64-release
+cmake --build build-vcpkg --config Release
+```
+
+On Linux, you can also use system-installed OCCT packages (e.g. `apt install libocct-*-dev` on Ubuntu)
+instead of vcpkg. The `find_package(OpenCASCADE)` call works with both vcpkg and system installs.
+
+On first configure, vcpkg will automatically download and build OpenCASCADE and its dependencies. This
+can take 30+ minutes on the first run but is cached for subsequent builds.
 
 
 ## Acknowledgements

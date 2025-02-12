@@ -18,9 +18,14 @@ global.json
 x64/
 x86/
 build/
+build-*/
 bld/
 [Bb]in/
 [Oo]bj/
+
+# vcpkg
+vcpkg_installed/
+CMakeUserPresets.json
 
 # Roslyn cache directories
 *.ide/

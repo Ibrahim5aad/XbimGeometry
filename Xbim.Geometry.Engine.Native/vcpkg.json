@@ -1,0 +1,13 @@
+{
+  "name": "xbim-geometry-native",
+  "version-string": "7.0.0",
+  "description": "Cross-platform native geometry library for xBIM, wrapping OpenCASCADE",
+  "dependencies": [
+    {
+      "name": "opencascade",
+      "features": [
+        "freetype"
+      ]
+    }
+  ]
+}
