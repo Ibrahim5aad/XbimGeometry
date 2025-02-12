@@ -1,5 +1,10 @@
 using System.Runtime.CompilerServices;
 
+// In SDK-style projects such as this one, several assembly attributes that were historically
+// defined in this file are now automatically added during build and populated with
+// values defined in project properties. For details of which attributes are included
+// and how to customise this process see: https://aka.ms/assembly-info-properties
+
 [assembly:
     InternalsVisibleTo("Xbim.Geometry.Engine.Tests, PublicKey=002400000480000094000000060200000024000052534131000400000100010029a3c6da60efcb3ebe48c3ce14a169b5fa08ffbf5f276392ffb2006a9a2d596f5929cf0e68568d14ac7cbe334440ca0b182be7fa6896d2a73036f24bca081b2427a8dec5689a97f3d62547acd5d471ee9f379540f338bbb0ae6a165b44b1ae34405624baa4388404bce6d3e30de128cec379147af363ce9c5845f4f92d405ed0"),
     InternalsVisibleTo("Xbim.ModelGeometry.Scene, PublicKey=002400000480000094000000060200000024000052534131000400000100010029a3c6da60efcb3ebe48c3ce14a169b5fa08ffbf5f276392ffb2006a9a2d596f5929cf0e68568d14ac7cbe334440ca0b182be7fa6896d2a73036f24bca081b2427a8dec5689a97f3d62547acd5d471ee9f379540f338bbb0ae6a165b44b1ae34405624baa4388404bce6d3e30de128cec379147af363ce9c5845f4f92d405ed0")]

@@ -5,7 +5,7 @@
 		<SignAssembly>False</SignAssembly>
 		<AssemblyOriginatorKeyFile>..\XbimOpenSourceKeyFile.snk</AssemblyOriginatorKeyFile>
 		<LangVersion>8.0</LangVersion>
-		<GeometryInteropDirectory>../Xbim.Geometry.Engine.Interop/bin/$(Configuration)/</GeometryInteropDirectory>
+		<GeometryInteropDirectory>../Xbim.Geometry.Engine.Interop.Legacy/bin/$(Configuration)/</GeometryInteropDirectory>
 		<Platforms>AnyCPU;x64;x86</Platforms>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -23,7 +23,7 @@
 		<PackageReference Include="NReco.Logging.File" Version="1.2.2" />	
 	</ItemGroup>
 	<ItemGroup>
-		<ProjectReference Include="..\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj">
+		<ProjectReference Include="..\Xbim.Geometry.Engine.Interop.Legacy\Xbim.Geometry.Engine.Interop.Legacy.csproj">
 		  <Private>True</Private>
 		</ProjectReference>
 		<ProjectReference Include="..\Xbim.ModelGeometry.Scene\Xbim.ModelGeometry.Scene.csproj" />

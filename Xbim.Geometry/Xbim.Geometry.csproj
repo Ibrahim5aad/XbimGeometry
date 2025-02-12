@@ -34,7 +34,7 @@ Currently this library supports IFC2x2, IFC2x3, IFC4 Addendum 2 TC1 and IFC4.3 A
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Xbim.Geometry.Abstractions\Xbim.Geometry.Abstractions.csproj" />
-    <ProjectReference Include="..\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj" />
+    <ProjectReference Include="..\Xbim.Geometry.Engine.Interop.Legacy\Xbim.Geometry.Engine.Interop.Legacy.csproj" />
     <ProjectReference Include="..\Xbim.ModelGeometry.Scene\Xbim.ModelGeometry.Scene.csproj" />
     <ProjectReference Include="..\Xbim.Tessellator\Xbim.Tessellator.csproj" />
   </ItemGroup>

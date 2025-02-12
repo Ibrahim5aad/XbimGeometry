@@ -32,7 +32,7 @@
     <RunSettingsFilePath>$(MSBuildProjectDirectory)\test.x86.runsettings</RunSettingsFilePath>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj" />
+    <ProjectReference Include="..\Xbim.Geometry.Engine.Interop.Legacy\Xbim.Geometry.Engine.Interop.Legacy.csproj" />
     <ProjectReference Include="..\Xbim.Tessellator\Xbim.Tessellator.csproj" />
   </ItemGroup>
 

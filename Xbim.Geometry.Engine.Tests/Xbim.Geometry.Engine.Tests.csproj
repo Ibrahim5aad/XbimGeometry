@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
 		<IsPackable>false</IsPackable>
 		<Platforms>AnyCPU;x64;x86</Platforms>
-		<GeometryInteropDirectory>../Xbim.Geometry.Engine.Interop/bin/$(Configuration)/</GeometryInteropDirectory>
+		<GeometryInteropDirectory>../Xbim.Geometry.Engine.Interop.Legacy/bin/$(Configuration)/</GeometryInteropDirectory>
 	</PropertyGroup>
 
   <PropertyGroup Condition="'$(Platform)' == 'x64' Or '$(Platform)' == 'AnyCPU'">

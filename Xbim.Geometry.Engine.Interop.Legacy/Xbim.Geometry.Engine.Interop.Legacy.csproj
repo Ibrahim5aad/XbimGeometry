@@ -1,0 +1,121 @@
+﻿<Project DefaultTargets="Build" Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFrameworks>net472;net8.0</TargetFrameworks>
+		<Title>Xbim Geometry Engine (Legacy C++/CLI Interop)</Title>
+		<Description>Legacy C++/CLI interop layer for the Xbim Geometry Engine. Being replaced by P/Invoke-based Xbim.Geometry.Engine.Interop.</Description>
+		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+		<PackageId>Xbim.Geometry.Engine.Interop.Legacy</PackageId>
+		<RootNamespace>Xbim.Geometry.Engine.Interop</RootNamespace>
+		<AssemblyName>Xbim.Geometry.Engine.Interop.Legacy</AssemblyName>
+		<Platforms>AnyCPU;x64;x86</Platforms>
+    <PackageReadmeFile>Readme.md</PackageReadmeFile>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<GeometryEnginePath>../Xbim.Geometry.Engine/bin/$(Configuration)/</GeometryEnginePath>
+	</PropertyGroup>
+
+
+	<!--This creates the nuget package-->
+	<PropertyGroup>
+		<TargetsForTfmSpecificContentInPackage>GetGeometryEngineFiles;GetIjwHostFiles</TargetsForTfmSpecificContentInPackage>
+	</PropertyGroup>
+
+	<Target Name="GetGeometryEngineFiles">
+		<ItemGroup>
+			<GeomEngine64 Condition="'$(Platform)' == 'x64' Or '$(Platform)' == 'AnyCPU'" Include="$(GeometryEnginePath)$(TargetFramework)\win-x64\Xbim.Geometry.Engine.dll;$(GeometryEnginePath)$(TargetFramework)\win-x64\Xbim.Geometry.Engine.pdb">
+				<WinPlatform>lib/$(TargetFramework)/win-x64</WinPlatform>
+			</GeomEngine64>
+			<GeomEngine86 Condition="'$(Platform)' == 'x86' Or '$(Platform)' == 'AnyCPU'" Include="$(GeometryEnginePath)$(TargetFramework)\win-x86\Xbim.Geometry.Engine.dll;$(GeometryEnginePath)$(TargetFramework)\win-x86\Xbim.Geometry.Engine.pdb">
+				<WinPlatform>lib/$(TargetFramework)/win-x86</WinPlatform>
+			</GeomEngine86>
+
+			<BuildTransitives Include="buildTransitive\$(TargetFramework)\Xbim.Geometry.Engine.Interop.targets">
+				<WinPlatform>buildTransitive/$(TargetFramework)</WinPlatform>
+			</BuildTransitives>
+
+			<GeomEnginePackageFile Include="@(GeomEngine64);@(GeomEngine86);@(BuildTransitives)">
+				<PackagePath>%(WinPlatform)/@(GeomEnginePackageFile->'%(Filename)%(Extension)')</PackagePath>
+			</GeomEnginePackageFile>
+			<TfmSpecificPackageFile Include="@(GeomEnginePackageFile)"></TfmSpecificPackageFile>
+		</ItemGroup>
+	</Target>
+
+
+
+	<Target Name="GetIjwHostFiles" Condition="'$(TargetFramework)'!='net472' and '$(TargetFramework)'!=''">
+		<ItemGroup>
+			<IjwHost64Files Condition="'$(Platform)' == 'x64' Or '$(Platform)' == 'AnyCPU'" Include="$(GeometryEnginePath)$(TargetFramework)\win-x64\Ijwhost.dll">
+				<WinPlatform>lib/$(TargetFramework)/win-x64</WinPlatform>
+			</IjwHost64Files>
+			<IjwHost86Files Condition="'$(Platform)' == 'x86' Or '$(Platform)' == 'AnyCPU'" Include="$(GeometryEnginePath)$(TargetFramework)\win-x86\Ijwhost.dll">
+				<WinPlatform>lib/$(TargetFramework)/win-x86</WinPlatform>
+			</IjwHost86Files>
+			<IjwHostPackageFile Include="@(IjwHost64Files);@(IjwHost86Files)">
+				<PackagePath>%(WinPlatform)/@(IjwHostPackageFile->'%(Filename)%(Extension)')</PackagePath>
+			</IjwHostPackageFile>
+			<TfmSpecificPackageFile Include="@(IjwHostPackageFile)"></TfmSpecificPackageFile>
+		</ItemGroup>
+	</Target>
+
+	<!--<Target Name="TouchFiles" BeforeTargets="GenerateTargetFrameworkMonikerAttribute">
+		<Touch Files="XbimGeometryEngine.cs">
+			<Output TaskParameter="TouchedFiles" ItemName="FilesTouched" />
+		</Touch>
+	</Target>-->
+	<ItemGroup>
+		<None Include="$(GeometryEnginePath)$(TargetFramework)\win-x64\Ijwhost.dll" Visible="true" Condition="'$(TargetFramework)' != 'net472' And ('$(Platform)' == 'x64' Or '$(Platform)' == 'AnyCPU')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>win-x64\%(Filename)%(Extension)</Link>
+		</None>
+		<None Include="$(GeometryEnginePath)$(TargetFramework)\win-x86\Ijwhost.dll" Visible="true" Condition="'$(TargetFramework)' != 'net472' And ('$(Platform)' == 'x86' Or '$(Platform)' == 'AnyCPU')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>win-x86\%(Filename)%(Extension)</Link>
+		</None>
+		<None Include="$(GeometryEnginePath)$(TargetFramework)\win-x64\Xbim.Geometry.Engine.dll" Visible="true" Condition="'$(Platform)' == 'x64' Or '$(Platform)' == 'AnyCPU'">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>win-x64\%(Filename)%(Extension)</Link>
+		</None>
+		<None Include="$(GeometryEnginePath)$(TargetFramework)\win-x86\Xbim.Geometry.Engine.dll" Visible="true" Condition="'$(Platform)' == 'x86' Or '$(Platform)' == 'AnyCPU'">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>win-x86\%(Filename)%(Extension)</Link>
+		</None>
+		<None Include="$(GeometryEnginePath)$(TargetFramework)\win-x64\Xbim.Geometry.Engine.pdb" Visible="true" Condition="'$(Platform)' == 'x64' Or '$(Platform)' == 'AnyCPU'">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>win-x64\%(Filename)%(Extension)</Link>
+		</None>
+		<None Include="$(GeometryEnginePath)$(TargetFramework)\win-x86\Xbim.Geometry.Engine.pdb" Visible="true" Condition="'$(Platform)' == 'x86' Or '$(Platform)' == 'AnyCPU'">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>win-x86\%(Filename)%(Extension)</Link>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="..\xbim-toolkit-icon.png" Pack="True" PackagePath="\" />
+	</ItemGroup>
+
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0' ">
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net472' ">
+    <PackageReference Include="Microsoft.Extensions.Options" Version="2.1.1" />
+  </ItemGroup>
+  
+  <ItemGroup>
+		<PackageReference Include="Xbim.Geometry.Occt" Version="7.8.1" />
+	</ItemGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="..\Xbim.Geometry.Abstractions\Xbim.Geometry.Abstractions.csproj" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <None Include="Readme.md">
+      <PackagePath>\</PackagePath>
+      <Pack>True</Pack>
+    </None>
+  </ItemGroup>
+
+</Project>
