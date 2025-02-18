@@ -113,6 +113,53 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeShapeHandle shapeHandle,
             NativeLocationHandle locationHandle,
             out NativeShapeHandle outHandle);
+
+        // ── CSG solid primitives ─────────────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_solid_build_block(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double xLen, double yLen, double zLen,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_solid_build_sphere(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double radius,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_solid_build_right_circular_cylinder(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double radius, double height,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_solid_build_right_circular_cone(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double radius, double height,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_solid_build_rectangular_pyramid(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double xLen, double yLen, double height,
+            out NativeShapeHandle outHandle);
     }
 
     /// <summary>

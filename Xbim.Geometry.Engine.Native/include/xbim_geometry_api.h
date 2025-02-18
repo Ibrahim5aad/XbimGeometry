@@ -298,6 +298,113 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_moved(
     XbimLocationHandle  locationHandle,
     XbimShapeHandle*    outHandle);
 
+/* ── CSG solid primitives ────────────────────────────────────────────────── */
+
+/*
+ * Build a rectangular block (box) solid.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin
+ *   zDirX/Y/Z        – placement Z direction (normal)
+ *   xDirX/Y/Z        – placement X direction (reference)
+ *   xLen, yLen, zLen  – box dimensions (must be > 0)
+ *   outHandle         – receives the new solid shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_block(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double xLen,    double yLen,    double zLen,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Build a sphere solid.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin (center of the sphere)
+ *   zDirX/Y/Z        – placement Z direction
+ *   xDirX/Y/Z        – placement X direction
+ *   radius            – sphere radius (must be > 0)
+ *   outHandle         – receives the new solid shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_sphere(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double radius,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Build a right circular cylinder solid.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin (center of base circle)
+ *   zDirX/Y/Z        – placement Z direction (cylinder axis)
+ *   xDirX/Y/Z        – placement X direction
+ *   radius            – cylinder radius (must be > 0)
+ *   height            – cylinder height (must be > 0)
+ *   outHandle         – receives the new solid shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_right_circular_cylinder(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double radius,  double height,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Build a right circular cone solid with apex at top.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin (center of base circle)
+ *   zDirX/Y/Z        – placement Z direction (cone axis)
+ *   xDirX/Y/Z        – placement X direction
+ *   radius            – base circle radius (must be > 0)
+ *   height            – cone height (must be > 0)
+ *   outHandle         – receives the new solid shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_right_circular_cone(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double radius,  double height,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Build a rectangular pyramid solid.
+ * The pyramid has a rectangular base (xLen x yLen) and an apex at height
+ * centered above the base.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin
+ *   zDirX/Y/Z        – placement Z direction (pyramid axis)
+ *   xDirX/Y/Z        – placement X direction
+ *   xLen, yLen        – base rectangle dimensions (must be > 0)
+ *   height            – pyramid height (must be > 0)
+ *   outHandle         – receives the new solid shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_rectangular_pyramid(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double xLen,    double yLen,    double height,
+    XbimShapeHandle* outHandle);
+
 #ifdef __cplusplus
 }
 #endif
