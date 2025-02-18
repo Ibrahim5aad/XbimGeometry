@@ -159,9 +159,10 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_bounding_box(
         box.Get(*minX, *minY, *minZ, *maxX, *maxY, *maxZ);
         return XBIM_OK;
     }
-    catch (Standard_Failure&)
+    catch (const Standard_Failure& e)
     {
-        xbim_set_error("xbim_shape_bounding_box: OCCT exception");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_shape_bounding_box: OCCT exception");
         return XBIM_ERROR;
     }
 }
@@ -195,9 +196,10 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_volume(
         *outVolume = props.Mass();
         return XBIM_OK;
     }
-    catch (Standard_Failure&)
+    catch (const Standard_Failure& e)
     {
-        xbim_set_error("xbim_shape_volume: OCCT exception");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_shape_volume: OCCT exception");
         return XBIM_ERROR;
     }
 }
@@ -231,9 +233,10 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_surface_area(
         *outArea = props.Mass();
         return XBIM_OK;
     }
-    catch (Standard_Failure&)
+    catch (const Standard_Failure& e)
     {
-        xbim_set_error("xbim_shape_surface_area: OCCT exception");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_shape_surface_area: OCCT exception");
         return XBIM_ERROR;
     }
 }
