@@ -160,6 +160,44 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double xDirX, double xDirY, double xDirZ,
             double xLen, double yLen, double height,
             out NativeShapeHandle outHandle);
+
+        // ── Parametric profile primitives ────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_rectangle(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double xDim, double yDim,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_circle(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double radius,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_ellipse(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double semiAxis1, double semiAxis2,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_rounded_rectangle(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double xDim, double yDim, double roundingRadius,
+            out NativeShapeHandle outHandle);
     }
 
     /// <summary>

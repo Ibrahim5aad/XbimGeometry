@@ -405,6 +405,96 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_rectangular_pyramid(
     double xLen,    double yLen,    double height,
     XbimShapeHandle* outHandle);
 
+/* ── Parametric profile primitives ────────────────────────────────────────── */
+
+/*
+ * Build a rectangular profile face.
+ * The rectangle is centered at the placement origin in the XY plane.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin
+ *   zDirX/Y/Z        – placement Z direction (face normal)
+ *   xDirX/Y/Z        – placement X direction (reference)
+ *   xDim, yDim        – rectangle dimensions (must be > 0)
+ *   outHandle         – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rectangle(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double xDim,    double yDim,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Build a circular profile face.
+ * The circle is centered at the placement origin in the XY plane.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin (center of the circle)
+ *   zDirX/Y/Z        – placement Z direction (face normal)
+ *   xDirX/Y/Z        – placement X direction (reference)
+ *   radius            – circle radius (must be > 0)
+ *   outHandle         – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_circle(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double radius,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Build an elliptical profile face.
+ * The ellipse is centered at the placement origin in the XY plane.
+ * semiAxis1 is along the X direction, semiAxis2 along the Y direction.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin (center of the ellipse)
+ *   zDirX/Y/Z        – placement Z direction (face normal)
+ *   xDirX/Y/Z        – placement X direction (reference)
+ *   semiAxis1         – semi-axis along X (must be > 0)
+ *   semiAxis2         – semi-axis along Y (must be > 0)
+ *   outHandle         – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ellipse(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double semiAxis1, double semiAxis2,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Build a rounded rectangle profile face.
+ * The rectangle is centered at the placement origin in the XY plane,
+ * with fillets applied at each corner.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin
+ *   zDirX/Y/Z        – placement Z direction (face normal)
+ *   xDirX/Y/Z        – placement X direction (reference)
+ *   xDim, yDim        – rectangle dimensions (must be > 0)
+ *   roundingRadius    – corner rounding radius (must be >= 0; 0 = no rounding)
+ *   outHandle         – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rounded_rectangle(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double xDim,    double yDim,    double roundingRadius,
+    XbimShapeHandle* outHandle);
+
 #ifdef __cplusplus
 }
 #endif
