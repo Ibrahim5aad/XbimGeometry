@@ -87,6 +87,11 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeShapeHandle handle,
             out double outArea);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_write_brep(
+            NativeShapeHandle handle,
+            [MarshalAs(UnmanagedType.LPStr)] string filePath);
+
         // ── Location lifecycle ────────────────────────────────────────────
 
         [DllImport(Lib, CallingConvention = CC)]

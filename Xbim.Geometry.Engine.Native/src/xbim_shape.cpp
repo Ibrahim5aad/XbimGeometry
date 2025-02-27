@@ -21,6 +21,7 @@
 #include <GProp_GProps.hxx>
 #include <Bnd_Box.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <BRepTools.hxx>
 
 /* ── Internal helper ──────────────────────────────────────────────────────── */
 
@@ -237,6 +238,46 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_surface_area(
     {
         const char* msg = e.GetMessageString();
         xbim_set_error(msg ? msg : "xbim_shape_surface_area: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_write_brep(
+    XbimShapeHandle handle,
+    const char*     filePath)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_shape_write_brep: handle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!filePath)
+    {
+        xbim_set_error("xbim_shape_write_brep: filePath is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    if (handle->shape.IsNull())
+    {
+        xbim_set_error("xbim_shape_write_brep: shape is null");
+        return XBIM_NULL_SHAPE;
+    }
+
+    try
+    {
+        Standard_Boolean ok = BRepTools::Write(handle->shape, filePath);
+        if (!ok)
+        {
+            xbim_set_error("xbim_shape_write_brep: BRepTools::Write failed");
+            return XBIM_ERROR;
+        }
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_shape_write_brep: OCCT exception");
         return XBIM_ERROR;
     }
 }

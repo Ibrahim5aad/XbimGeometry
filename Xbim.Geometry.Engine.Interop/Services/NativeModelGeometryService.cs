@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Xbim.Common;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Abstractions.Extensions;
+using Xbim.Geometry.Engine.Interop.Factories;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Ifc4.Interfaces;
@@ -27,6 +28,10 @@ namespace Xbim.Geometry.Engine.Interop.Services
         private double _minimumGap;
         private double _timeout = 60;
         private bool _upgradeFaceSets = true;
+
+        private NativeSolidFactory? _solidFactory;
+        private NativeProfileFactory? _profileFactory;
+        private NativeGeometryFactory? _geometryFactory;
 
         public NativeModelGeometryService(IModel model, ILoggerFactory loggerFactory)
         {
@@ -96,18 +101,18 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         // Factory stubs — will be wired up in INTEG-004
         public IXVertexFactory VertexFactory => throw new NotImplementedException("VertexFactory not yet implemented in P/Invoke layer.");
-        public IXGeometryFactory GeometryFactory => throw new NotImplementedException("GeometryFactory not yet implemented in P/Invoke layer.");
+        public IXGeometryFactory GeometryFactory => _geometryFactory ??= new NativeGeometryFactory(this, _logger);
         public IXCurveFactory CurveFactory => throw new NotImplementedException("CurveFactory not yet implemented in P/Invoke layer.");
         public IXSurfaceFactory SurfaceFactory => throw new NotImplementedException("SurfaceFactory not yet implemented in P/Invoke layer.");
         public IXEdgeFactory EdgeFactory => throw new NotImplementedException("EdgeFactory not yet implemented in P/Invoke layer.");
         public IXWireFactory WireFactory => throw new NotImplementedException("WireFactory not yet implemented in P/Invoke layer.");
         public IXFaceFactory FaceFactory => throw new NotImplementedException("FaceFactory not yet implemented in P/Invoke layer.");
         public IXShellFactory ShellFactory => throw new NotImplementedException("ShellFactory not yet implemented in P/Invoke layer.");
-        public IXSolidFactory SolidFactory => throw new NotImplementedException("SolidFactory not yet implemented in P/Invoke layer.");
+        public IXSolidFactory SolidFactory => _solidFactory ??= new NativeSolidFactory(this, _logger);
         public IXCompoundFactory CompoundFactory => throw new NotImplementedException("CompoundFactory not yet implemented in P/Invoke layer.");
         public IXBooleanFactory BooleanFactory => throw new NotImplementedException("BooleanFactory not yet implemented in P/Invoke layer.");
         public IXShapeFactory ShapeFactory => throw new NotImplementedException("ShapeFactory not yet implemented in P/Invoke layer.");
-        public IXProfileFactory ProfileFactory => throw new NotImplementedException("ProfileFactory not yet implemented in P/Invoke layer.");
+        public IXProfileFactory ProfileFactory => _profileFactory ??= new NativeProfileFactory(this, _logger);
         public IXMaterialFactory MaterialFactory => throw new NotImplementedException("MaterialFactory not yet implemented in P/Invoke layer.");
         public IXProjectionFactory ProjectionFactory => throw new NotImplementedException("ProjectionFactory not yet implemented in P/Invoke layer.");
         public IXWexBimMeshFactory WexBimMeshFactory => throw new NotImplementedException("WexBimMeshFactory not yet implemented in P/Invoke layer.");

@@ -495,6 +495,23 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rounded_rectangle(
     double xDim,    double yDim,    double roundingRadius,
     XbimShapeHandle* outHandle);
 
+/* ── BRep serialization ────────────────────────────────────────────────── */
+
+/*
+ * Write a shape to a file in OCCT BRep ASCII format.
+ * Useful for debugging and test validation — the resulting .brep file
+ * can be opened in CAD Assistant, FreeCAD, or read back via BRepTools::Read.
+ *
+ *   handle   – a valid shape handle
+ *   filePath – null-terminated path to the output file (UTF-8 / ASCII)
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if handle is NULL;
+ * XBIM_NULL_SHAPE if the shape is null; XBIM_ERROR on I/O or OCCT failure.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_write_brep(
+    XbimShapeHandle handle,
+    const char*     filePath);
+
 #ifdef __cplusplus
 }
 #endif

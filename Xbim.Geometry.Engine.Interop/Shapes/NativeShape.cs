@@ -56,9 +56,21 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         public string BrepString()
         {
-            // BRep serialization not yet available in native API (MESH-002)
+            // BRep string serialization not yet available in native API (MESH-002)
             throw new NotImplementedException(
                 "BRep string serialization will be available after MESH-002.");
+        }
+
+        /// <summary>
+        /// Writes this shape to a .brep file in OCCT ASCII BRep format.
+        /// Useful for debugging and visual inspection in CAD Assistant or FreeCAD.
+        /// </summary>
+        public void WriteBrep(string filePath)
+        {
+            int result = NativeMethods.xbim_shape_write_brep(Handle, filePath);
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to write BRep file '{filePath}': {NativeMethods.GetLastError()}");
         }
 
         public bool IsValidShape()
