@@ -17,6 +17,7 @@ public class CsgSolidTests : IDisposable
 {
     private readonly NativeModelGeometryService _service;
     private readonly IXSolidFactory _solidFactory;
+    private readonly IXProfileFactory _profileFactory;
     private readonly string _brepOutputDir;
 
     public CsgSolidTests()
@@ -25,6 +26,7 @@ public class CsgSolidTests : IDisposable
         var model = IfcMoq.ModelMock();
         _service = new NativeModelGeometryService(model, loggerFactory);
         _solidFactory = _service.SolidFactory;
+        _profileFactory = _service.ProfileFactory;
 
         _brepOutputDir = Path.Combine(
             Path.GetDirectoryName(typeof(CsgSolidTests).Assembly.Location)!,
@@ -34,9 +36,9 @@ public class CsgSolidTests : IDisposable
 
     public void Dispose() => _service.Dispose();
 
-    private void SaveBrep(IXSolid solid, string name)
+    private void SaveBrep(IXShape shape, string name)
     {
-        if (solid is NativeShape ns)
+        if (shape is NativeShape ns)
         {
             var path = Path.Combine(_brepOutputDir, $"{name}.brep");
             ns.WriteBrep(path);
@@ -185,5 +187,40 @@ public class CsgSolidTests : IDisposable
         ((IDisposable)cylinder).Dispose();
         ((IDisposable)cone).Dispose();
         ((IDisposable)pyramid).Dispose();
+    }
+
+    // ── Profile tests ─────────────────────────────────────────────────
+
+    [Fact]
+    public void RectangleProfile_HasCorrectArea()
+    {
+        // Arrange: 10 x 20 rectangle → area = 200
+        var ifcProfile = IfcMoq.RectangleProfile(xDim: 10, yDim: 20);
+
+        // Act
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        // Assert
+        face.Should().NotBeNull();
+        face.Should().BeAssignableTo<IXFace>();
+        face.Area.Should().BeApproximately(200, 0.1);
+
+        SaveBrep(face, "profile_rect_10x20");
+    }
+
+    [Fact]
+    public void CircleProfile_HasCorrectArea()
+    {
+        // Arrange: circle r=5 → area = π * 25 ≈ 78.54
+        var ifcProfile = IfcMoq.CircleProfile(radius: 5);
+
+        // Act
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        // Assert
+        face.Should().NotBeNull();
+        face.Area.Should().BeApproximately(Math.PI * 25, 0.1);
+
+        SaveBrep(face, "profile_circle_r5");
     }
 }
