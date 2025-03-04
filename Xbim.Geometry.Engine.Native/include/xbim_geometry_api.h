@@ -495,6 +495,180 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rounded_rectangle(
     double xDim,    double yDim,    double roundingRadius,
     XbimShapeHandle* outHandle);
 
+/* ── Structural profile primitives ───────────────────────────────────────── */
+
+/*
+ * Build a symmetric I-shape (wide-flange) profile face.
+ * The profile is centered at the placement origin in the XY plane.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin
+ *   zDirX/Y/Z        – placement Z direction (face normal)
+ *   xDirX/Y/Z        – placement X direction (reference)
+ *   overallWidth      – total flange width (must be > 0)
+ *   overallDepth      – total section depth (must be > 0)
+ *   webThickness      – thickness of the web (must be > 0)
+ *   flangeThickness   – thickness of each flange (must be > 0)
+ *   filletRadius      – fillet radius at web/flange junction (0 = no fillet)
+ *   outHandle         – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ishape(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double overallWidth, double overallDepth,
+    double webThickness, double flangeThickness,
+    double filletRadius,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Build an L-shape (angle) profile face.
+ * The profile is centered at the placement origin in the XY plane.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin
+ *   zDirX/Y/Z        – placement Z direction (face normal)
+ *   xDirX/Y/Z        – placement X direction (reference)
+ *   depth             – vertical leg length (must be > 0)
+ *   width             – horizontal leg length (0 = same as depth)
+ *   thickness         – leg thickness (must be > 0)
+ *   filletRadius      – fillet at the internal corner (0 = no fillet)
+ *   edgeRadius        – fillet at the outer leg corners (0 = no fillet)
+ *   legSlope          – slope angle of the legs in radians (0 = no slope)
+ *   outHandle         – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_lshape(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double depth, double width, double thickness,
+    double filletRadius, double edgeRadius, double legSlope,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Build a T-shape profile face.
+ * The profile is centered at the placement origin in the XY plane.
+ *
+ *   ctx               – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z       – placement origin
+ *   zDirX/Y/Z         – placement Z direction (face normal)
+ *   xDirX/Y/Z         – placement X direction (reference)
+ *   depth              – overall section depth (must be > 0)
+ *   flangeWidth        – width of the top flange (must be > 0)
+ *   webThickness       – thickness of the web (must be > 0)
+ *   flangeThickness    – thickness of the flange (must be > 0)
+ *   filletRadius       – fillet at web/flange junction (0 = no fillet)
+ *   flangeEdgeRadius   – fillet at outer flange corners (0 = no fillet)
+ *   webEdgeRadius      – fillet at web bottom corners (0 = no fillet)
+ *   flangeSlope        – slope angle on flange in radians (0 = no slope)
+ *   webSlope           – slope angle on web in radians (0 = no slope)
+ *   outHandle          – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_tshape(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double depth, double flangeWidth,
+    double webThickness, double flangeThickness,
+    double filletRadius, double flangeEdgeRadius, double webEdgeRadius,
+    double flangeSlope, double webSlope,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Build a U-shape (channel) profile face.
+ * The profile is centered at the placement origin in the XY plane.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin
+ *   zDirX/Y/Z        – placement Z direction (face normal)
+ *   xDirX/Y/Z        – placement X direction (reference)
+ *   depth             – overall section depth (must be > 0)
+ *   flangeWidth       – width of the flanges (must be > 0)
+ *   webThickness      – thickness of the web (must be > 0)
+ *   flangeThickness   – thickness of the flanges (must be > 0)
+ *   filletRadius      – fillet at web/flange junction (0 = no fillet)
+ *   edgeRadius        – fillet at outer flange corners (0 = no fillet)
+ *   flangeSlope       – slope angle on flanges in radians (0 = no slope)
+ *   outHandle         – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ushape(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double depth, double flangeWidth,
+    double webThickness, double flangeThickness,
+    double filletRadius, double edgeRadius, double flangeSlope,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Build a Z-shape profile face.
+ * The profile is centered at the placement origin in the XY plane.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin
+ *   zDirX/Y/Z        – placement Z direction (face normal)
+ *   xDirX/Y/Z        – placement X direction (reference)
+ *   depth             – overall section depth (must be > 0)
+ *   flangeWidth       – width of each flange (must be > 0)
+ *   webThickness      – thickness of the web (must be > 0)
+ *   flangeThickness   – thickness of flanges (must be > 0)
+ *   filletRadius      – fillet at web/flange junction (0 = no fillet)
+ *   edgeRadius        – fillet at outer web corners (0 = no fillet)
+ *   outHandle         – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_zshape(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double depth, double flangeWidth,
+    double webThickness, double flangeThickness,
+    double filletRadius, double edgeRadius,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Build a C-shape profile face.
+ * The profile is centered at the placement origin in the XY plane.
+ * The girth parameter controls the horizontal return at the top/bottom
+ * of the channel opening. When girth <= 0, a simplified 8-vertex C-shape
+ * is built without returns.
+ *
+ *   ctx                  – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z          – placement origin
+ *   zDirX/Y/Z            – placement Z direction (face normal)
+ *   xDirX/Y/Z            – placement X direction (reference)
+ *   depth                 – overall section depth (must be > 0)
+ *   width                 – overall section width (must be > 0)
+ *   wallThickness         – wall thickness (must be > 0)
+ *   girth                 – girth/return dimension (0 = no return)
+ *   internalFilletRadius  – fillet at internal corners (0 = no fillet)
+ *   outHandle             – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_cshape(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double depth, double width, double wallThickness,
+    double girth, double internalFilletRadius,
+    XbimShapeHandle* outHandle);
+
 /* ── BRep serialization ────────────────────────────────────────────────── */
 
 /*

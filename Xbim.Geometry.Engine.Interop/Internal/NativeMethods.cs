@@ -203,6 +203,73 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double xDirX, double xDirY, double xDirZ,
             double xDim, double yDim, double roundingRadius,
             out NativeShapeHandle outHandle);
+
+        // ── Structural profile primitives ──────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_ishape(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double overallWidth, double overallDepth,
+            double webThickness, double flangeThickness,
+            double filletRadius,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_lshape(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double depth, double width, double thickness,
+            double filletRadius, double edgeRadius, double legSlope,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_tshape(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double depth, double flangeWidth,
+            double webThickness, double flangeThickness,
+            double filletRadius, double flangeEdgeRadius, double webEdgeRadius,
+            double flangeSlope, double webSlope,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_ushape(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double depth, double flangeWidth,
+            double webThickness, double flangeThickness,
+            double filletRadius, double edgeRadius, double flangeSlope,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_zshape(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double depth, double flangeWidth,
+            double webThickness, double flangeThickness,
+            double filletRadius, double edgeRadius,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_cshape(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double depth, double width, double wallThickness,
+            double girth, double internalFilletRadius,
+            out NativeShapeHandle outHandle);
     }
 
     /// <summary>
