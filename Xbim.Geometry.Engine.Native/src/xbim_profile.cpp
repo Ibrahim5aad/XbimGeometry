@@ -1180,3 +1180,256 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_cshape(
         return XBIM_ERROR;
     }
 }
+
+/* ── Rectangle hollow profile ────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rectangle_hollow(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double xDim,    double yDim,    double wallThickness,
+    double innerFilletRadius, double outerFilletRadius,
+    XbimShapeHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_profile_build_rectangle_hollow: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (xDim <= 0.0 || yDim <= 0.0 || wallThickness <= 0.0)
+    {
+        xbim_set_error("xbim_profile_build_rectangle_hollow: dimensions must be positive");
+        return XBIM_INVALID_ARG;
+    }
+
+    if (wallThickness >= xDim / 2.0 || wallThickness >= yDim / 2.0)
+    {
+        xbim_set_error("xbim_profile_build_rectangle_hollow: wall thickness too large for given dimensions");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        double precision = Precision::Confusion();
+        double xOff = xDim / 2.0;
+        double yOff = yDim / 2.0;
+
+        /* Build outer rectangle wire */
+        gp_Pnt bl(-xOff, -yOff, 0);
+        gp_Pnt br( xOff, -yOff, 0);
+        gp_Pnt tr( xOff,  yOff, 0);
+        gp_Pnt tl(-xOff,  yOff, 0);
+
+        BRep_Builder builder;
+        TopoDS_Vertex vbl, vbr, vtr, vtl;
+        builder.MakeVertex(vbl, bl, precision);
+        builder.MakeVertex(vbr, br, precision);
+        builder.MakeVertex(vtr, tr, precision);
+        builder.MakeVertex(vtl, tl, precision);
+
+        TopoDS_Wire outerWire;
+        builder.MakeWire(outerWire);
+        builder.Add(outerWire, BRepBuilderAPI_MakeEdge(vbl, vbr));
+        builder.Add(outerWire, BRepBuilderAPI_MakeEdge(vbr, vtr));
+        builder.Add(outerWire, BRepBuilderAPI_MakeEdge(vtr, vtl));
+        builder.Add(outerWire, BRepBuilderAPI_MakeEdge(vtl, vbl));
+        outerWire.Closed(Standard_True);
+
+        /* Apply outer fillets if specified */
+        if (outerFilletRadius > 0.0)
+        {
+            BRepBuilderAPI_MakeFace outerFaceMaker(gp_Pln(), outerWire, Standard_True);
+            BRepFilletAPI_MakeFillet2d filleter(outerFaceMaker.Face());
+            for (BRepTools_WireExplorer exp(outerWire); exp.More(); exp.Next())
+            {
+                filleter.AddFillet(exp.CurrentVertex(), outerFilletRadius);
+            }
+            filleter.Build();
+            if (filleter.IsDone())
+            {
+                TopoDS_Shape shape = filleter.Shape();
+                for (TopExp_Explorer exp(shape, TopAbs_WIRE); exp.More(); )
+                {
+                    outerWire = TopoDS::Wire(exp.Current());
+                    break;
+                }
+            }
+        }
+
+        /* Make face from outer wire */
+        BRepBuilderAPI_MakeFace faceMaker(gp_Pln(), outerWire, Standard_True);
+
+        /* Build inner rectangle wire (inset by wallThickness) */
+        double t = wallThickness;
+        gp_Pnt ibl(-xOff + t, -yOff + t, 0);
+        gp_Pnt ibr( xOff - t, -yOff + t, 0);
+        gp_Pnt itr( xOff - t,  yOff - t, 0);
+        gp_Pnt itl(-xOff + t,  yOff - t, 0);
+
+        TopoDS_Vertex vibl, vibr, vitr, vitl;
+        builder.MakeVertex(vibl, ibl, precision);
+        builder.MakeVertex(vibr, ibr, precision);
+        builder.MakeVertex(vitr, itr, precision);
+        builder.MakeVertex(vitl, itl, precision);
+
+        TopoDS_Wire innerWire;
+        builder.MakeWire(innerWire);
+        builder.Add(innerWire, BRepBuilderAPI_MakeEdge(vibl, vibr));
+        builder.Add(innerWire, BRepBuilderAPI_MakeEdge(vibr, vitr));
+        builder.Add(innerWire, BRepBuilderAPI_MakeEdge(vitr, vitl));
+        builder.Add(innerWire, BRepBuilderAPI_MakeEdge(vitl, vibl));
+
+        /* Apply inner fillets if specified */
+        if (innerFilletRadius > 0.0)
+        {
+            BRepBuilderAPI_MakeFace innerFaceMaker(gp_Pln(), innerWire, Standard_True);
+            BRepFilletAPI_MakeFillet2d filleter(innerFaceMaker.Face());
+            for (BRepTools_WireExplorer exp(innerWire); exp.More(); exp.Next())
+            {
+                filleter.AddFillet(exp.CurrentVertex(), innerFilletRadius);
+            }
+            filleter.Build();
+            if (filleter.IsDone())
+            {
+                TopoDS_Shape shape = filleter.Shape();
+                for (TopExp_Explorer exp(shape, TopAbs_WIRE); exp.More(); )
+                {
+                    innerWire = TopoDS::Wire(exp.Current());
+                    break;
+                }
+            }
+        }
+
+        /* Reverse inner wire so it forms a hole, then add to face */
+        innerWire.Reverse();
+        innerWire.Closed(Standard_True);
+        faceMaker.Add(innerWire);
+
+        if (!faceMaker.IsDone())
+        {
+            xbim_set_error("xbim_profile_build_rectangle_hollow: face construction failed");
+            xbim_log_error(ctx, "Could not build rectangle hollow profile face");
+            return XBIM_ERROR;
+        }
+
+        TopoDS_Face face = faceMaker.Face();
+
+        /* Apply placement transform */
+        TopLoc_Location loc = make_placement(
+            originX, originY, originZ,
+            zDirX, zDirY, zDirZ,
+            xDirX, xDirY, xDirZ);
+        if (!loc.IsIdentity())
+            face.Move(loc);
+
+        *outHandle = xbim_shape_create_from(face);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_profile_build_rectangle_hollow: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_profile_build_rectangle_hollow");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_profile_build_rectangle_hollow: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── Circle hollow profile ───────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_circle_hollow(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double radius,  double wallThickness,
+    XbimShapeHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_profile_build_circle_hollow: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (radius <= 0.0 || wallThickness <= 0.0)
+    {
+        xbim_set_error("xbim_profile_build_circle_hollow: dimensions must be positive");
+        return XBIM_INVALID_ARG;
+    }
+
+    if (wallThickness >= radius)
+    {
+        xbim_set_error("xbim_profile_build_circle_hollow: wall thickness must be less than radius");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        /* Build outer circle */
+        gp_Ax2 ax2(gp_Pnt(0, 0, 0), gp::DZ(), gp::DX());
+        Handle(Geom_Circle) outerCircle = GC_MakeCircle(ax2, radius);
+        TopoDS_Edge outerEdge = BRepBuilderAPI_MakeEdge(outerCircle);
+        TopoDS_Wire outerWire = BRepBuilderAPI_MakeWire(outerEdge);
+        outerWire.Closed(true);
+
+        /* Make face from outer wire */
+        BRepBuilderAPI_MakeFace faceMaker(gp_Pln(), outerWire, Standard_True);
+
+        /* Build inner circle */
+        double innerRadius = radius - wallThickness;
+        Handle(Geom_Circle) innerCircle = GC_MakeCircle(ax2, innerRadius);
+        TopoDS_Edge innerEdge = BRepBuilderAPI_MakeEdge(innerCircle);
+        TopoDS_Wire innerWire = BRepBuilderAPI_MakeWire(innerEdge);
+        innerWire.Closed(true);
+
+        /* Reverse inner wire so it forms a hole, then add to face */
+        innerWire.Reverse();
+        faceMaker.Add(innerWire);
+
+        if (!faceMaker.IsDone())
+        {
+            xbim_set_error("xbim_profile_build_circle_hollow: face construction failed");
+            xbim_log_error(ctx, "Could not build circle hollow profile face");
+            return XBIM_ERROR;
+        }
+
+        TopoDS_Face face = faceMaker.Face();
+
+        /* Apply placement transform */
+        TopLoc_Location loc = make_placement(
+            originX, originY, originZ,
+            zDirX, zDirY, zDirZ,
+            xDirX, xDirY, xDirZ);
+        if (!loc.IsIdentity())
+            face.Move(loc);
+
+        *outHandle = xbim_shape_create_from(face);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_profile_build_circle_hollow: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_profile_build_circle_hollow");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_profile_build_circle_hollow: OCCT exception");
+        return XBIM_ERROR;
+    }
+}

@@ -42,10 +42,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             {
                 XProfileDefType.IfcRectangleProfileDef => BuildRectangleFace((IIfcRectangleProfileDef)profileDef),
                 XProfileDefType.IfcRoundedRectangleProfileDef => BuildRoundedRectangleFace((IIfcRoundedRectangleProfileDef)profileDef),
+                XProfileDefType.IfcRectangleHollowProfileDef => BuildRectangleHollowFace((IIfcRectangleHollowProfileDef)profileDef),
                 XProfileDefType.IfcCircleProfileDef => BuildCircleFace((IIfcCircleProfileDef)profileDef),
+                XProfileDefType.IfcCircleHollowProfileDef => BuildCircleHollowFace((IIfcCircleHollowProfileDef)profileDef),
                 XProfileDefType.IfcEllipseProfileDef => BuildEllipseFace((IIfcEllipseProfileDef)profileDef),
                 _ => throw new NotSupportedException(
-                    $"Profile type {profileType} requires additional native support (PROFILE-001..PROFILE-004).")
+                    $"Profile type {profileType} requires additional native support (PROFILE-003..PROFILE-004).")
             };
         }
 
@@ -171,6 +173,72 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (result != 0)
                 throw new InvalidOperationException(
                     $"Failed to build EllipseProfileDef #{ellipseProfile.EntityLabel}: {NativeMethods.GetLastError()}");
+
+            return NativeShapeFactory.WrapFace(shapeHandle);
+        }
+
+        #endregion
+
+        #region Hollow Profiles
+
+        private IXFace BuildRectangleHollowFace(IIfcRectangleHollowProfileDef hollowProfile)
+        {
+            if (hollowProfile.XDim <= 0 || hollowProfile.YDim <= 0)
+                throw new InvalidOperationException(
+                    $"RectangleHollowProfileDef #{hollowProfile.EntityLabel} has zero or negative dimensions.");
+
+            if (hollowProfile.WallThickness <= 0)
+                throw new InvalidOperationException(
+                    $"RectangleHollowProfileDef #{hollowProfile.EntityLabel} has zero or negative wall thickness.");
+
+            BuildProfilePlacement(hollowProfile.Position,
+                out double ox, out double oy, out double oz,
+                out double zx, out double zy, out double zz,
+                out double xx, out double xy, out double xz);
+
+            double innerFillet = hollowProfile.InnerFilletRadius.HasValue
+                ? (double)hollowProfile.InnerFilletRadius.Value : 0.0;
+            double outerFillet = hollowProfile.OuterFilletRadius.HasValue
+                ? (double)hollowProfile.OuterFilletRadius.Value : 0.0;
+
+            int result = NativeMethods.xbim_profile_build_rectangle_hollow(
+                ContextHandle,
+                ox, oy, oz, zx, zy, zz, xx, xy, xz,
+                hollowProfile.XDim, hollowProfile.YDim, hollowProfile.WallThickness,
+                innerFillet, outerFillet,
+                out var shapeHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build RectangleHollowProfileDef #{hollowProfile.EntityLabel}: {NativeMethods.GetLastError()}");
+
+            return NativeShapeFactory.WrapFace(shapeHandle);
+        }
+
+        private IXFace BuildCircleHollowFace(IIfcCircleHollowProfileDef hollowProfile)
+        {
+            if (hollowProfile.Radius <= 0)
+                throw new InvalidOperationException(
+                    $"CircleHollowProfileDef #{hollowProfile.EntityLabel} has zero or negative radius.");
+
+            if (hollowProfile.WallThickness <= 0)
+                throw new InvalidOperationException(
+                    $"CircleHollowProfileDef #{hollowProfile.EntityLabel} has zero or negative wall thickness.");
+
+            BuildProfilePlacement(hollowProfile.Position,
+                out double ox, out double oy, out double oz,
+                out double zx, out double zy, out double zz,
+                out double xx, out double xy, out double xz);
+
+            int result = NativeMethods.xbim_profile_build_circle_hollow(
+                ContextHandle,
+                ox, oy, oz, zx, zy, zz, xx, xy, xz,
+                hollowProfile.Radius, hollowProfile.WallThickness,
+                out var shapeHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build CircleHollowProfileDef #{hollowProfile.EntityLabel}: {NativeMethods.GetLastError()}");
 
             return NativeShapeFactory.WrapFace(shapeHandle);
         }

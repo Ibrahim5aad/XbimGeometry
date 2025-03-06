@@ -270,6 +270,27 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double depth, double width, double wallThickness,
             double girth, double internalFilletRadius,
             out NativeShapeHandle outHandle);
+
+        // ── Hollow profile primitives ─────────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_rectangle_hollow(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double xDim, double yDim, double wallThickness,
+            double innerFilletRadius, double outerFilletRadius,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_circle_hollow(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double radius, double wallThickness,
+            out NativeShapeHandle outHandle);
     }
 
     /// <summary>

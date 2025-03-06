@@ -223,4 +223,78 @@ public class CsgSolidTests : IDisposable
 
         SaveBrep(face, "profile_circle_r5");
     }
+
+    // ── Hollow profile tests ─────────────────────────────────────────
+
+    [Fact]
+    public void RectangleHollowProfile_HasCorrectArea()
+    {
+        // Arrange: 200 x 100 outer, wall=10
+        // Outer area = 200 * 100 = 20000
+        // Inner = (200-20) x (100-20) = 180 x 80 = 14400
+        // Hollow area = 20000 - 14400 = 5600
+        var ifcProfile = IfcMoq.RectangleHollowProfile(xDim: 200, yDim: 100, wallThickness: 10);
+
+        // Act
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        // Assert
+        face.Should().NotBeNull();
+        face.Should().BeAssignableTo<IXFace>();
+        face.Area.Should().BeApproximately(5600, 1.0);
+
+        SaveBrep(face, "profile_rect_hollow_200x100_t10");
+    }
+
+    [Fact]
+    public void RectangleHollowProfile_WithFillets_IsValid()
+    {
+        // Arrange: 200 x 100 outer, wall=10, inner fillet=3, outer fillet=5
+        var ifcProfile = IfcMoq.RectangleHollowProfile(
+            xDim: 200, yDim: 100, wallThickness: 10,
+            innerFilletRadius: 3, outerFilletRadius: 5);
+
+        // Act
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        // Assert
+        face.Should().NotBeNull();
+
+        SaveBrep(face, "profile_rect_hollow_filleted");
+    }
+
+    [Fact]
+    public void CircleHollowProfile_HasCorrectArea()
+    {
+        // Arrange: outer r=50, wall=10 → inner r=40
+        // Area = π * (50² - 40²) = π * (2500 - 1600) = π * 900 ≈ 2827.43
+        var ifcProfile = IfcMoq.CircleHollowProfile(radius: 50, wallThickness: 10);
+
+        // Act
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        // Assert
+        face.Should().NotBeNull();
+        face.Should().BeAssignableTo<IXFace>();
+        face.Area.Should().BeApproximately(Math.PI * 900, 1.0);
+
+        SaveBrep(face, "profile_circle_hollow_r50_t10");
+    }
+
+    [Fact]
+    public void CircleHollowProfile_SmallWall_IsValid()
+    {
+        // Arrange: outer r=100, wall=2 → very thin tube cross-section
+        var ifcProfile = IfcMoq.CircleHollowProfile(radius: 100, wallThickness: 2);
+
+        // Act
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        // Assert
+        face.Should().NotBeNull();
+        // Area = π * (100² - 98²) = π * (10000 - 9604) = π * 396 ≈ 1243.94
+        face.Area.Should().BeApproximately(Math.PI * 396, 1.0);
+
+        SaveBrep(face, "profile_circle_hollow_r100_t2");
+    }
 }

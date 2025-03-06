@@ -669,6 +669,59 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_cshape(
     double girth, double internalFilletRadius,
     XbimShapeHandle* outHandle);
 
+/* ── Hollow profile primitives ────────────────────────────────────────── */
+
+/*
+ * Build a rectangle hollow profile face (rectangle with a rectangular hole).
+ * The outer rectangle is centered at the placement origin in the XY plane.
+ * The inner rectangle is inset by wallThickness on each side.
+ * Optional inner/outer fillet radii apply rounded corners.
+ *
+ *   ctx                – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z        – placement origin
+ *   zDirX/Y/Z          – placement Z direction (face normal)
+ *   xDirX/Y/Z          – placement X direction (reference)
+ *   xDim               – overall X dimension (must be > 0)
+ *   yDim               – overall Y dimension (must be > 0)
+ *   wallThickness      – wall thickness (must be > 0, < xDim/2 and < yDim/2)
+ *   innerFilletRadius  – fillet at inner corners (0 = no fillet)
+ *   outerFilletRadius  – fillet at outer corners (0 = no fillet)
+ *   outHandle          – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rectangle_hollow(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double xDim,    double yDim,    double wallThickness,
+    double innerFilletRadius, double outerFilletRadius,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Build a circle hollow profile face (annular ring / tube cross-section).
+ * The outer circle is centered at the placement origin in the XY plane.
+ * The inner circle has radius = radius - wallThickness.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin
+ *   zDirX/Y/Z        – placement Z direction (face normal)
+ *   xDirX/Y/Z        – placement X direction (reference)
+ *   radius            – outer radius (must be > 0)
+ *   wallThickness     – wall thickness (must be > 0, < radius)
+ *   outHandle         – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_circle_hollow(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double radius,  double wallThickness,
+    XbimShapeHandle* outHandle);
+
 /* ── BRep serialization ────────────────────────────────────────────────── */
 
 /*

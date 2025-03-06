@@ -220,4 +220,44 @@ internal static class IfcMoq
         moq.SetupGet(x => x.ExpressType).Returns(MetaData.ExpressType(typeof(IfcEllipseProfileDef)));
         return obj;
     }
+
+    // ── Hollow profile mocks ────────────────────────────────────────
+
+    public static IIfcRectangleHollowProfileDef RectangleHollowProfile(
+        double xDim = 200, double yDim = 100, double wallThickness = 10,
+        double? innerFilletRadius = null, double? outerFilletRadius = null,
+        IIfcAxis2Placement2D? position = null)
+    {
+        var moq = MakeMoq<IIfcRectangleHollowProfileDef>();
+        var obj = moq.Object;
+        obj.ProfileType = IfcProfileTypeEnum.AREA;
+        obj.XDim = xDim;
+        obj.YDim = yDim;
+        obj.WallThickness = wallThickness;
+        if (innerFilletRadius.HasValue)
+            moq.SetupGet(x => x.InnerFilletRadius)
+                .Returns(new IfcNonNegativeLengthMeasure(innerFilletRadius.Value));
+        if (outerFilletRadius.HasValue)
+            moq.SetupGet(x => x.OuterFilletRadius)
+                .Returns(new IfcNonNegativeLengthMeasure(outerFilletRadius.Value));
+        obj.Position = position ?? Axis2Placement2d();
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcRectangleHollowProfileDef)));
+        return obj;
+    }
+
+    public static IIfcCircleHollowProfileDef CircleHollowProfile(
+        double radius = 50, double wallThickness = 5,
+        IIfcAxis2Placement2D? position = null)
+    {
+        var moq = MakeMoq<IIfcCircleHollowProfileDef>();
+        var obj = moq.Object;
+        obj.ProfileType = IfcProfileTypeEnum.AREA;
+        obj.Radius = radius;
+        obj.WallThickness = wallThickness;
+        obj.Position = position ?? Axis2Placement2d();
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcCircleHollowProfileDef)));
+        return obj;
+    }
 }
