@@ -1,21 +1,10 @@
 #ifndef XBIM_GEOMETRY_NATIVE_H
 #define XBIM_GEOMETRY_NATIVE_H
 
+#include "xbim_geometry_api.h"
+
 #ifdef __cplusplus
 extern "C" {
-#endif
-
-/* Export/import macro */
-#if defined(_WIN32) || defined(_WIN64)
-    #ifdef XBIM_BUILD_DLL
-        #define XBIM_EXPORT __declspec(dllexport)
-    #else
-        #define XBIM_EXPORT __declspec(dllimport)
-    #endif
-    #define XBIM_CALL __stdcall
-#else
-    #define XBIM_EXPORT __attribute__((visibility("default")))
-    #define XBIM_CALL
 #endif
 
 /* Returns the library version as a null-terminated string. */
