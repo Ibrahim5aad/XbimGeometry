@@ -75,6 +75,41 @@ XBIM_EXPORT const char* XBIM_CALL xbim_get_last_error(void);
  */
 typedef void (XBIM_CALL *XbimLogCallback)(int level, const char* msg);
 
+/* ── Context lifecycle ─────────────────────────────────────────────────────── */
+
+/*
+ * Create a geometry context wrapping model-level parameters.
+ * All geometry operations require a valid context handle.
+ *
+ *   precision      – model precision tolerance (must be > 0)
+ *   oneMeter       – length of one meter in model units (must be > 0)
+ *   oneFoot        – length of one foot in model units
+ *   oneMillimeter  – length of one millimetre in model units
+ *   radianFactor   – angle-to-radians conversion factor
+ *   timeout        – operation timeout in seconds (0 = no timeout)
+ *   minimumGap     – minimum gap distance in model units
+ *   logCallback    – optional logging callback (may be NULL)
+ *   outHandle      – receives the new context handle on success
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if parameters are invalid.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_context_create(
+    double              precision,
+    double              oneMeter,
+    double              oneFoot,
+    double              oneMillimeter,
+    double              radianFactor,
+    double              timeout,
+    double              minimumGap,
+    XbimLogCallback     logCallback,
+    XbimContextHandle*  outHandle);
+
+/*
+ * Destroy a context handle and free its resources.
+ * Passing NULL is a safe no-op.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_context_destroy(XbimContextHandle handle);
+
 /* ── Shape type enumeration ────────────────────────────────────────────────── */
 
 /*
