@@ -156,6 +156,79 @@ typedef enum XbimShapeType
     XBIM_SHAPE_COMPOUND = 6
 } XbimShapeType;
 
+/* ── Shape handle lifecycle ───────────────────────────────────────────────── */
+
+/*
+ * Destroy a shape handle and free its resources.
+ * Passing NULL is a safe no-op.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_destroy(XbimShapeHandle handle);
+
+/*
+ * Get the topological type of a shape.
+ *
+ *   handle  – a valid shape handle
+ *   outType – receives the shape type on success
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if handle is NULL;
+ * XBIM_NULL_SHAPE if the underlying shape is null.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_type(
+    XbimShapeHandle handle,
+    XbimShapeType*  outType);
+
+/*
+ * Check whether a shape is valid (non-null and passes BRepCheck).
+ * Returns 1 if valid, 0 otherwise. NULL handles return 0.
+ */
+XBIM_EXPORT int XBIM_CALL xbim_shape_is_valid(XbimShapeHandle handle);
+
+/*
+ * Check whether a shape is topologically closed.
+ * Returns 1 if closed, 0 otherwise. NULL handles return 0.
+ */
+XBIM_EXPORT int XBIM_CALL xbim_shape_is_closed(XbimShapeHandle handle);
+
+/*
+ * Compute the axis-aligned bounding box of a shape.
+ *
+ *   handle       – a valid shape handle
+ *   minX..maxZ   – output pointers for the bounding box corners
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if handle is NULL;
+ * XBIM_NULL_SHAPE if the shape is null; XBIM_ERROR on OCCT failure.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_bounding_box(
+    XbimShapeHandle handle,
+    double* minX, double* minY, double* minZ,
+    double* maxX, double* maxY, double* maxZ);
+
+/*
+ * Compute the volume of a shape using GProp_GProps.
+ * Meaningful for solids and closed shells.
+ *
+ *   handle    – a valid shape handle
+ *   outVolume – receives the volume on success
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_volume(
+    XbimShapeHandle handle,
+    double*         outVolume);
+
+/*
+ * Compute the surface area of a shape using GProp_GProps.
+ * Meaningful for faces, shells, and solids.
+ *
+ *   handle  – a valid shape handle
+ *   outArea – receives the surface area on success
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_surface_area(
+    XbimShapeHandle handle,
+    double*         outArea);
+
 #ifdef __cplusplus
 }
 #endif

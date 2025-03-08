@@ -139,6 +139,20 @@ if(XBIM_BUILD_TESTS)
         get_filename_component(_test_name ${_test_src} NAME_WE)
         add_executable(${_test_name} ${_test_src})
         target_link_libraries(${_test_name} PRIVATE xbim_geometry_native)
+        # Give tests access to internal headers and OCCT for creating test shapes
+        target_include_directories(${_test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${OCCT_INCLUDE_DIR}
+        )
+        target_compile_definitions(${_test_name} PRIVATE OCCT_NO_PLUGINS)
+        # Link OCCT libraries for tests that use OCCT types directly
+        foreach(_lib ${OCCT_LIBRARIES})
+            if(WIN32)
+                target_link_libraries(${_test_name} PRIVATE "${OCCT_LIB_DIR}/${_lib}.lib")
+            else()
+                target_link_libraries(${_test_name} PRIVATE "${OCCT_LIB_DIR}/lib${_lib}.so")
+            endif()
+        endforeach()
     endforeach()
 endif()
 
