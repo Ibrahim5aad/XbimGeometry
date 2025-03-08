@@ -32,10 +32,4 @@ struct XbimContext_
     XbimLogCallback logCallback;
 };
 
-/*
- * Internal helper: send a log message through the context's callback.
- * No-op if the context is NULL or the callback is not set.
- */
-void xbim_context_log(const XbimContext_* ctx, int level, const char* msg);
-
 #endif /* XBIM_CONTEXT_H */

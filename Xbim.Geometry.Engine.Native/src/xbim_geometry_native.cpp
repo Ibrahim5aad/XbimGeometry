@@ -8,7 +8,7 @@
 #include <TopoDS_Compound.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
 
-static const char* XBIM_NATIVE_VERSION = "0.2.0";
+static const char* XBIM_NATIVE_VERSION = "0.3.0";
 
 XBIM_EXPORT const char* XBIM_CALL xbim_native_version(void)
 {

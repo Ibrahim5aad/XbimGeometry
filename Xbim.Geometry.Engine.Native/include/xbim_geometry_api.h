@@ -110,6 +110,35 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_context_create(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_context_destroy(XbimContextHandle handle);
 
+/* ── Context logging ──────────────────────────────────────────────────────── */
+
+/*
+ * Replace the logging callback on an existing context.
+ * Pass NULL to disable logging. This matches the NLoggingService::SetLogger
+ * pattern from the original C++/CLI engine.
+ *
+ * Returns XBIM_INVALID_HANDLE if handle is NULL.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_context_set_logger(
+    XbimContextHandle  handle,
+    XbimLogCallback    logCallback);
+
+/*
+ * Send a log message through the context's callback.
+ * No-op if the callback is not set or message is NULL.
+ * This allows managed code to verify the callback round-trip.
+ *
+ *   handle  – a valid context handle
+ *   level   – one of the XBIM_LOG_* constants
+ *   message – null-terminated UTF-8 string (valid for the call duration)
+ *
+ * Returns XBIM_INVALID_HANDLE if handle is NULL; XBIM_OK otherwise.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_context_log(
+    XbimContextHandle  handle,
+    int                level,
+    const char*        message);
+
 /* ── Shape type enumeration ────────────────────────────────────────────────── */
 
 /*

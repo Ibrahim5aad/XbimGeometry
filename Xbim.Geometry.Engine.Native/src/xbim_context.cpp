@@ -83,10 +83,4 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_context_destroy(XbimContextHandle handle)
     return XBIM_OK;
 }
 
-/* ── Internal helper ───────────────────────────────────────────────────────── */
-
-void xbim_context_log(const XbimContext_* ctx, int level, const char* msg)
-{
-    if (ctx && ctx->logCallback && msg)
-        ctx->logCallback(level, msg);
-}
+/* Logging helpers are now in xbim_logging.h / xbim_logging.cpp */

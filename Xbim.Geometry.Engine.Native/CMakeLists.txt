@@ -130,6 +130,18 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     )
 endif()
 
+# ── Tests ────────────────────────────────────────────────────────────────────
+option(XBIM_BUILD_TESTS "Build native API tests" ON)
+
+if(XBIM_BUILD_TESTS)
+    file(GLOB TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
+    foreach(_test_src ${TEST_SOURCES})
+        get_filename_component(_test_name ${_test_src} NAME_WE)
+        add_executable(${_test_name} ${_test_src})
+        target_link_libraries(${_test_name} PRIVATE xbim_geometry_native)
+    endforeach()
+endif()
+
 # Copy OCCT DLLs to output directory for runtime loading
 if(WIN32)
     file(GLOB OCCT_DLLS "${OCCT_LIB_DIR}/*.dll")
