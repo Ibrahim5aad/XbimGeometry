@@ -229,6 +229,75 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_surface_area(
     XbimShapeHandle handle,
     double*         outArea);
 
+/* ── Location handle lifecycle ────────────────────────────────────────────── */
+
+/*
+ * Create a location (transform) from an axis-2 placement.
+ * The axis-2 placement is defined by an origin point, Z direction (normal),
+ * and X direction (reference direction).
+ *
+ *   originX/Y/Z  – coordinates of the placement origin
+ *   zDirX/Y/Z    – normal direction (must be a valid non-zero direction)
+ *   xDirX/Y/Z    – reference direction (must be a valid non-zero direction)
+ *   outHandle     – receives the new location handle on success
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if outHandle is NULL;
+ * XBIM_ERROR on OCCT failure (e.g., zero-length direction).
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_location_create_from_axis2(
+    double originX, double originY, double originZ,
+    double zDirX, double zDirY, double zDirZ,
+    double xDirX, double xDirY, double xDirZ,
+    XbimLocationHandle* outHandle);
+
+/*
+ * Create an identity location (no transformation).
+ *
+ *   outHandle – receives the new location handle on success
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if outHandle is NULL.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_location_create_identity(
+    XbimLocationHandle* outHandle);
+
+/*
+ * Compose two locations into a single combined transform: result = loc1 * loc2.
+ * Neither input location is modified; a new handle is allocated.
+ *
+ *   loc1      – first location (applied second geometrically)
+ *   loc2      – second location (applied first geometrically)
+ *   outHandle – receives the composed location handle on success
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if loc1 or loc2 is NULL;
+ * XBIM_INVALID_ARG if outHandle is NULL.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_location_compose(
+    XbimLocationHandle  loc1,
+    XbimLocationHandle  loc2,
+    XbimLocationHandle* outHandle);
+
+/*
+ * Destroy a location handle and free its resources.
+ * Passing NULL is a safe no-op.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_location_destroy(XbimLocationHandle handle);
+
+/*
+ * Apply a location transform to a shape, producing a new shape at the
+ * transformed position. The original shape is not modified.
+ *
+ *   shapeHandle    – a valid shape handle (source shape)
+ *   locationHandle – a valid location handle (transform to apply)
+ *   outHandle      – receives the new transformed shape handle on success
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if shapeHandle or
+ * locationHandle is NULL; XBIM_NULL_SHAPE if the source shape is null.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_moved(
+    XbimShapeHandle     shapeHandle,
+    XbimLocationHandle  locationHandle,
+    XbimShapeHandle*    outHandle);
+
 #ifdef __cplusplus
 }
 #endif
