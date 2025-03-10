@@ -722,6 +722,129 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_circle_hollow(
     double radius,  double wallThickness,
     XbimShapeHandle* outHandle);
 
+/* ── Arbitrary / composite / derived profile primitives ────────────────── */
+
+/*
+ * Build a closed face from an arbitrary 2D polyline.
+ * The points define a closed polygon in the XY plane. The first and last
+ * points are connected automatically. Winding is normalized to
+ * counter-clockwise (face normal = +Z).
+ *
+ *   ctx          – a valid context handle (used for logging; may be NULL)
+ *   pointsX      – array of X coordinates (must have pointCount elements)
+ *   pointsY      – array of Y coordinates (must have pointCount elements)
+ *   pointCount   – number of points (must be >= 3)
+ *   outHandle    – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_arbitrary_closed(
+    XbimContextHandle ctx,
+    const double*     pointsX,
+    const double*     pointsY,
+    int               pointCount,
+    XbimShapeHandle*  outHandle);
+
+/*
+ * Build an open wire from an arbitrary 2D polyline.
+ * The points define an open polyline in the XY plane.
+ * Adjacent points within tolerance are merged.
+ *
+ *   ctx          – a valid context handle (used for logging; may be NULL)
+ *   pointsX      – array of X coordinates (must have pointCount elements)
+ *   pointsY      – array of Y coordinates (must have pointCount elements)
+ *   pointCount   – number of points (must be >= 2)
+ *   outHandle    – receives the new wire shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_arbitrary_open(
+    XbimContextHandle ctx,
+    const double*     pointsX,
+    const double*     pointsY,
+    int               pointCount,
+    XbimShapeHandle*  outHandle);
+
+/*
+ * Build a face with voids from an outer face and inner wire holes.
+ * The outer face provides the outer boundary. Each inner wire defines
+ * a hole to cut from the face. Inner wires are automatically reversed
+ * to clockwise orientation. ShapeFix is applied to fix any winding issues.
+ *
+ *   ctx               – a valid context handle (used for logging; may be NULL)
+ *   outerFaceHandle   – a face shape handle providing the outer boundary
+ *   innerWireHandles  – array of shape handles for inner wire/face holes
+ *   numInnerWires     – number of inner wire handles (must be >= 1)
+ *   outHandle         – receives the new face shape handle with voids
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_with_voids(
+    XbimContextHandle      ctx,
+    XbimShapeHandle        outerFaceHandle,
+    const XbimShapeHandle* innerWireHandles,
+    int                    numInnerWires,
+    XbimShapeHandle*       outHandle);
+
+/*
+ * Build a composite profile by combining multiple profile shapes into
+ * a TopoDS_Compound. Each input profile is added as-is to the compound.
+ *
+ *   ctx             – a valid context handle (used for logging; may be NULL)
+ *   profileHandles  – array of shape handles to combine
+ *   numProfiles     – number of profiles (must be >= 1)
+ *   outHandle       – receives the new compound shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_composite(
+    XbimContextHandle      ctx,
+    const XbimShapeHandle* profileHandles,
+    int                    numProfiles,
+    XbimShapeHandle*       outHandle);
+
+/*
+ * Build a derived profile by applying a 2D affine transform to a parent
+ * shape. The transform is specified as a 2x3 matrix:
+ *   [[m00, m01, m02],    (X' = m00*X + m01*Y + m02)
+ *    [m10, m11, m12]]    (Y' = m10*X + m11*Y + m12)
+ *
+ * When isNonUniformScale is non-zero, gp_GTrsf (general transform) is
+ * used to allow non-uniform X/Y scaling. Otherwise, gp_Trsf (rigid +
+ * uniform scale) is used for better performance.
+ *
+ *   ctx                – a valid context handle (used for logging; may be NULL)
+ *   parentHandle       – the parent profile shape to transform
+ *   m00..m12           – 2x3 affine transform matrix coefficients
+ *   isNonUniformScale  – non-zero to use general transform (supports non-uniform scaling)
+ *   outHandle          – receives the new transformed shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_derived(
+    XbimContextHandle ctx,
+    XbimShapeHandle   parentHandle,
+    double m00, double m01, double m02,
+    double m10, double m11, double m12,
+    int               isNonUniformScale,
+    XbimShapeHandle*  outHandle);
+
+/*
+ * Build a mirrored profile by reflecting a parent shape about the Y axis.
+ * This matches the IFC IIfcMirroredProfileDef semantics.
+ * The result is reversed to maintain correct face normal orientation.
+ *
+ *   ctx           – a valid context handle (used for logging; may be NULL)
+ *   parentHandle  – the parent profile shape to mirror
+ *   outHandle     – receives the new mirrored shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_mirrored(
+    XbimContextHandle ctx,
+    XbimShapeHandle   parentHandle,
+    XbimShapeHandle*  outHandle);
+
 /* ── BRep serialization ────────────────────────────────────────────────── */
 
 /*

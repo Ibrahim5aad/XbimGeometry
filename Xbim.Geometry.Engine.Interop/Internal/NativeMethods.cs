@@ -291,6 +291,54 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double xDirX, double xDirY, double xDirZ,
             double radius, double wallThickness,
             out NativeShapeHandle outHandle);
+
+        // ── Arbitrary / composite / derived profile primitives ──────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_arbitrary_closed(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] double[] pointsX,
+            [MarshalAs(UnmanagedType.LPArray)] double[] pointsY,
+            int pointCount,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_arbitrary_open(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] double[] pointsX,
+            [MarshalAs(UnmanagedType.LPArray)] double[] pointsY,
+            int pointCount,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_with_voids(
+            NativeContextHandle ctx,
+            NativeShapeHandle outerFaceHandle,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] innerWireHandles,
+            int numInnerWires,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_composite(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] profileHandles,
+            int numProfiles,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_derived(
+            NativeContextHandle ctx,
+            NativeShapeHandle parentHandle,
+            double m00, double m01, double m02,
+            double m10, double m11, double m12,
+            int isNonUniformScale,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_mirrored(
+            NativeContextHandle ctx,
+            NativeShapeHandle parentHandle,
+            out NativeShapeHandle outHandle);
     }
 
     /// <summary>

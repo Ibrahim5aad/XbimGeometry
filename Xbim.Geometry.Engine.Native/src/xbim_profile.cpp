@@ -17,6 +17,13 @@
  *
  * Each function builds a wire in the XY plane, creates a face from it,
  * then applies the requested axis2 placement transform.
+ *
+ * Arbitrary/composite/derived profiles:
+ *   - Arbitrary closed profile (polyline -> face)
+ *   - Arbitrary open profile (polyline -> wire)
+ *   - Arbitrary profile with voids (outer face + inner wire holes)
+ *   - Composite profile (merge multiple face shapes into compound)
+ *   - Derived profile (apply 2D transform to parent face)
  */
 
 #include "xbim_profile.h"
@@ -56,6 +63,14 @@
 #include <gp_Pnt2d.hxx>
 #include <gp_Dir2d.hxx>
 #include <Standard_Failure.hxx>
+#include <ShapeFix_Face.hxx>
+#include <BRepBuilderAPI_Transform.hxx>
+#include <BRepBuilderAPI_GTransform.hxx>
+#include <gp_GTrsf.hxx>
+#include <gp_Mat.hxx>
+#include <TopoDS_Compound.hxx>
+#include <GProp_GProps.hxx>
+#include <BRepGProp.hxx>
 
 /* ── Helper: build placement transform from 9 doubles ────────────────────── */
 
@@ -1430,6 +1445,548 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_circle_hollow(
         xbim_log_occt_failure(ctx, e, "xbim_profile_build_circle_hollow");
         const char* msg = e.GetMessageString();
         xbim_set_error(msg ? msg : "xbim_profile_build_circle_hollow: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── Arbitrary closed profile ──────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_arbitrary_closed(
+    XbimContextHandle ctx,
+    const double* pointsX,
+    const double* pointsY,
+    int pointCount,
+    XbimShapeHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_profile_build_arbitrary_closed: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!pointsX || !pointsY)
+    {
+        xbim_set_error("xbim_profile_build_arbitrary_closed: point arrays are NULL");
+        return XBIM_INVALID_ARG;
+    }
+
+    if (pointCount < 3)
+    {
+        xbim_set_error("xbim_profile_build_arbitrary_closed: need at least 3 points");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        /* Build a closed polygon wire from the 2D point array */
+        BRepBuilderAPI_MakePolygon polyMaker;
+        for (int i = 0; i < pointCount; i++)
+        {
+            polyMaker.Add(gp_Pnt(pointsX[i], pointsY[i], 0.0));
+        }
+        polyMaker.Close();
+
+        if (!polyMaker.IsDone())
+        {
+            xbim_set_error("xbim_profile_build_arbitrary_closed: polygon construction failed");
+            xbim_log_error(ctx, "Could not build arbitrary closed profile polygon");
+            return XBIM_ERROR;
+        }
+
+        TopoDS_Wire wire = polyMaker.Wire();
+
+        /* Ensure counter-clockwise winding by checking face area sign */
+        BRepBuilderAPI_MakeFace faceMaker(gp_Pln(), wire, Standard_True);
+        if (!faceMaker.IsDone())
+        {
+            xbim_set_error("xbim_profile_build_arbitrary_closed: face construction failed");
+            xbim_log_error(ctx, "Could not build arbitrary closed profile face");
+            return XBIM_ERROR;
+        }
+
+        TopoDS_Face face = faceMaker.Face();
+
+        /* Check area - if negative, the wire is clockwise and we need to reverse */
+        GProp_GProps props;
+        BRepGProp::SurfaceProperties(face, props);
+        if (props.Mass() < 0.0)
+        {
+            wire.Reverse();
+            BRepBuilderAPI_MakeFace faceMaker2(gp_Pln(), wire, Standard_True);
+            if (!faceMaker2.IsDone())
+            {
+                xbim_set_error("xbim_profile_build_arbitrary_closed: face reconstruction failed after reversal");
+                return XBIM_ERROR;
+            }
+            face = faceMaker2.Face();
+        }
+
+        *outHandle = xbim_shape_create_from(face);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_profile_build_arbitrary_closed: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_profile_build_arbitrary_closed");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_profile_build_arbitrary_closed: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── Arbitrary open profile (wire, not face) ─────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_arbitrary_open(
+    XbimContextHandle ctx,
+    const double* pointsX,
+    const double* pointsY,
+    int pointCount,
+    XbimShapeHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_profile_build_arbitrary_open: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!pointsX || !pointsY)
+    {
+        xbim_set_error("xbim_profile_build_arbitrary_open: point arrays are NULL");
+        return XBIM_INVALID_ARG;
+    }
+
+    if (pointCount < 2)
+    {
+        xbim_set_error("xbim_profile_build_arbitrary_open: need at least 2 points");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        /* Build an open polyline wire from the 2D point array */
+        BRepBuilderAPI_MakeWire wireMaker;
+        for (int i = 0; i < pointCount - 1; i++)
+        {
+            gp_Pnt p1(pointsX[i], pointsY[i], 0.0);
+            gp_Pnt p2(pointsX[i + 1], pointsY[i + 1], 0.0);
+
+            if (p1.Distance(p2) < Precision::Confusion())
+                continue;
+
+            wireMaker.Add(BRepBuilderAPI_MakeEdge(p1, p2));
+        }
+
+        if (!wireMaker.IsDone())
+        {
+            xbim_set_error("xbim_profile_build_arbitrary_open: wire construction failed");
+            xbim_log_error(ctx, "Could not build arbitrary open profile wire");
+            return XBIM_ERROR;
+        }
+
+        TopoDS_Wire wire = wireMaker.Wire();
+
+        *outHandle = xbim_shape_create_from(wire);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_profile_build_arbitrary_open: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_profile_build_arbitrary_open");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_profile_build_arbitrary_open: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── Profile with voids (outer face + inner wire holes) ──────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_with_voids(
+    XbimContextHandle ctx,
+    XbimShapeHandle outerFaceHandle,
+    const XbimShapeHandle* innerWireHandles,
+    int numInnerWires,
+    XbimShapeHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_profile_build_with_voids: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!outerFaceHandle)
+    {
+        xbim_set_error("xbim_profile_build_with_voids: outerFaceHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    if (!innerWireHandles || numInnerWires < 1)
+    {
+        xbim_set_error("xbim_profile_build_with_voids: need at least 1 inner wire");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        /* Get the outer face */
+        const TopoDS_Shape& outerShape = outerFaceHandle->shape;
+        if (outerShape.IsNull() || outerShape.ShapeType() != TopAbs_FACE)
+        {
+            xbim_set_error("xbim_profile_build_with_voids: outer handle is not a face");
+            return XBIM_INVALID_ARG;
+        }
+
+        /* Extract the outer wire from the face */
+        TopoDS_Wire outerWire;
+        for (TopExp_Explorer exp(outerShape, TopAbs_WIRE); exp.More(); exp.Next())
+        {
+            outerWire = TopoDS::Wire(exp.Current());
+            break;  /* Take the first (outer) wire */
+        }
+
+        if (outerWire.IsNull())
+        {
+            xbim_set_error("xbim_profile_build_with_voids: could not extract outer wire from face");
+            return XBIM_ERROR;
+        }
+
+        /* Build a new face from the outer wire */
+        BRepBuilderAPI_MakeFace faceMaker(gp_Pln(), outerWire, Standard_True);
+
+        /* Add each inner wire as a hole */
+        for (int i = 0; i < numInnerWires; i++)
+        {
+            if (!innerWireHandles[i])
+            {
+                xbim_log_warning(ctx, "xbim_profile_build_with_voids: inner wire %d is NULL, skipping", i);
+                continue;
+            }
+
+            const TopoDS_Shape& innerShape = innerWireHandles[i]->shape;
+            if (innerShape.IsNull())
+            {
+                xbim_log_warning(ctx, "xbim_profile_build_with_voids: inner wire %d shape is null, skipping", i);
+                continue;
+            }
+
+            /* Inner shape can be a wire or a face (extract wire from face) */
+            TopoDS_Wire innerWire;
+            if (innerShape.ShapeType() == TopAbs_WIRE)
+            {
+                innerWire = TopoDS::Wire(innerShape);
+            }
+            else if (innerShape.ShapeType() == TopAbs_FACE)
+            {
+                for (TopExp_Explorer exp(innerShape, TopAbs_WIRE); exp.More(); exp.Next())
+                {
+                    innerWire = TopoDS::Wire(exp.Current());
+                    break;
+                }
+            }
+            else
+            {
+                xbim_log_warning(ctx, "xbim_profile_build_with_voids: inner shape %d is not a wire or face, skipping", i);
+                continue;
+            }
+
+            if (innerWire.IsNull())
+                continue;
+
+            /* Ensure inner wire is reversed (clockwise = hole) */
+            innerWire.Reverse();
+            faceMaker.Add(innerWire);
+        }
+
+        if (!faceMaker.IsDone())
+        {
+            xbim_set_error("xbim_profile_build_with_voids: face construction with voids failed");
+            xbim_log_error(ctx, "Could not build profile face with voids");
+            return XBIM_ERROR;
+        }
+
+        /* Fix orientation to handle any winding issues */
+        ShapeFix_Face fixFace(faceMaker.Face());
+        fixFace.FixOrientation();
+        TopoDS_Face face = fixFace.Face();
+
+        *outHandle = xbim_shape_create_from(face);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_profile_build_with_voids: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_profile_build_with_voids");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_profile_build_with_voids: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── Composite profile (multiple profiles merged into a compound) ── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_composite(
+    XbimContextHandle ctx,
+    const XbimShapeHandle* profileHandles,
+    int numProfiles,
+    XbimShapeHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_profile_build_composite: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!profileHandles || numProfiles < 1)
+    {
+        xbim_set_error("xbim_profile_build_composite: need at least 1 profile");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        BRep_Builder builder;
+        TopoDS_Compound compound;
+        builder.MakeCompound(compound);
+
+        int addedCount = 0;
+        for (int i = 0; i < numProfiles; i++)
+        {
+            if (!profileHandles[i])
+            {
+                xbim_log_warning(ctx, "xbim_profile_build_composite: profile %d is NULL, skipping", i);
+                continue;
+            }
+
+            const TopoDS_Shape& shape = profileHandles[i]->shape;
+            if (shape.IsNull())
+            {
+                xbim_log_warning(ctx, "xbim_profile_build_composite: profile %d shape is null, skipping", i);
+                continue;
+            }
+
+            builder.Add(compound, shape);
+            addedCount++;
+        }
+
+        if (addedCount == 0)
+        {
+            xbim_set_error("xbim_profile_build_composite: no valid profiles to combine");
+            return XBIM_NULL_SHAPE;
+        }
+
+        *outHandle = xbim_shape_create_from(compound);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_profile_build_composite: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_profile_build_composite");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_profile_build_composite: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── Derived profile (apply 2D transform to parent face) ─────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_derived(
+    XbimContextHandle ctx,
+    XbimShapeHandle parentHandle,
+    double m00, double m01, double m02,
+    double m10, double m11, double m12,
+    int isNonUniformScale,
+    XbimShapeHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_profile_build_derived: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!parentHandle)
+    {
+        xbim_set_error("xbim_profile_build_derived: parentHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        const TopoDS_Shape& parentShape = parentHandle->shape;
+        if (parentShape.IsNull())
+        {
+            xbim_set_error("xbim_profile_build_derived: parent shape is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        TopoDS_Shape resultShape;
+
+        if (isNonUniformScale)
+        {
+            /* Non-uniform scaling: use gp_GTrsf */
+            gp_GTrsf gtrsf;
+            /* Set 2D transform in the XY plane (Z row stays identity) */
+            gtrsf.SetValue(1, 1, m00);
+            gtrsf.SetValue(1, 2, m01);
+            gtrsf.SetValue(1, 3, m02);
+            gtrsf.SetValue(2, 1, m10);
+            gtrsf.SetValue(2, 2, m11);
+            gtrsf.SetValue(2, 3, m12);
+            /* Row 3 defaults to (0, 0, 1, 0) = identity in Z */
+
+            BRepBuilderAPI_GTransform gTransform(parentShape, gtrsf, Standard_True);
+            if (!gTransform.IsDone())
+            {
+                xbim_set_error("xbim_profile_build_derived: non-uniform transform failed");
+                xbim_log_error(ctx, "Could not apply non-uniform transform to derived profile");
+                return XBIM_ERROR;
+            }
+            resultShape = gTransform.Shape();
+        }
+        else
+        {
+            /* Uniform transform: use gp_Trsf for better performance */
+            gp_Trsf trsf;
+
+            /* Build the 2D affine transform as a 3D transform in the XY plane.
+             * The matrix [[m00, m01, m02], [m10, m11, m12]] maps to:
+             *   rotation + scale + translation in XY
+             * with Z left unchanged.
+             */
+            gp_Mat mat(
+                m00, m01, 0.0,
+                m10, m11, 0.0,
+                0.0, 0.0, 1.0);
+            gp_XYZ trans(m02, m12, 0.0);
+            trsf.SetValues(
+                mat.Value(1, 1), mat.Value(1, 2), mat.Value(1, 3), trans.X(),
+                mat.Value(2, 1), mat.Value(2, 2), mat.Value(2, 3), trans.Y(),
+                mat.Value(3, 1), mat.Value(3, 2), mat.Value(3, 3), trans.Z());
+
+            BRepBuilderAPI_Transform brepTransform(parentShape, trsf, Standard_True);
+            if (!brepTransform.IsDone())
+            {
+                xbim_set_error("xbim_profile_build_derived: uniform transform failed");
+                xbim_log_error(ctx, "Could not apply uniform transform to derived profile");
+                return XBIM_ERROR;
+            }
+            resultShape = brepTransform.Shape();
+        }
+
+        *outHandle = xbim_shape_create_from(resultShape);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_profile_build_derived: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_profile_build_derived");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_profile_build_derived: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── Mirrored profile (mirror parent face about Y axis) ──────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_mirrored(
+    XbimContextHandle ctx,
+    XbimShapeHandle parentHandle,
+    XbimShapeHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_profile_build_mirrored: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!parentHandle)
+    {
+        xbim_set_error("xbim_profile_build_mirrored: parentHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        const TopoDS_Shape& parentShape = parentHandle->shape;
+        if (parentShape.IsNull())
+        {
+            xbim_set_error("xbim_profile_build_mirrored: parent shape is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        /* Mirror about Y axis (matching original NProfileFactory::BuildMirrored):
+         * axis origin = (0,0,0), axis direction = (0,1,0) */
+        gp_Ax1 mirrorAxis(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0));
+
+        gp_Trsf mirrorTrsf;
+        mirrorTrsf.SetMirror(mirrorAxis);
+
+        BRepBuilderAPI_Transform brepTransform(parentShape, mirrorTrsf, Standard_True);
+        if (!brepTransform.IsDone())
+        {
+            xbim_set_error("xbim_profile_build_mirrored: mirror transform failed");
+            xbim_log_error(ctx, "Could not apply mirror transform to profile");
+            return XBIM_ERROR;
+        }
+
+        /* Reverse the result to fix face normal orientation after mirror */
+        TopoDS_Shape resultShape = brepTransform.Shape().Reversed();
+
+        *outHandle = xbim_shape_create_from(resultShape);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_profile_build_mirrored: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_profile_build_mirrored");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_profile_build_mirrored: OCCT exception");
         return XBIM_ERROR;
     }
 }
