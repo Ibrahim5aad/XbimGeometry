@@ -271,6 +271,31 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double girth, double internalFilletRadius,
             out NativeShapeHandle outHandle);
 
+        // ── Trapezium and asymmetric I-shape profiles ───────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_trapezium(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double bottomXDim, double topXDim, double yDim, double topXOffset,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_profile_build_asymmetric_ishape(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double bottomFlangeWidth, double overallDepth,
+            double webThickness, double bottomFlangeThickness,
+            double topFlangeWidth, double topFlangeThickness,
+            double bottomFlangeFilletRadius, double topFlangeFilletRadius,
+            double bottomFlangeEdgeRadius, double topFlangeEdgeRadius,
+            double bottomFlangeSlope, double topFlangeSlope,
+            out NativeShapeHandle outHandle);
+
         // ── Hollow profile primitives ─────────────────────────────────────
 
         [DllImport(Lib, CallingConvention = CC)]

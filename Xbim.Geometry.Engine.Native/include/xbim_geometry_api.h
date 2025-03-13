@@ -669,6 +669,69 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_cshape(
     double girth, double internalFilletRadius,
     XbimShapeHandle* outHandle);
 
+/*
+ * Build a trapezium (trapezoid) profile face.
+ * The profile is defined by a bottom edge, a top edge, and height.
+ * TopXOffset shifts the top edge relative to the bottom left corner.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin
+ *   zDirX/Y/Z        – placement Z direction (face normal)
+ *   xDirX/Y/Z        – placement X direction (reference)
+ *   bottomXDim        – width of the bottom edge (must be > 0)
+ *   topXDim           – width of the top edge (must be > 0)
+ *   yDim              – height of the trapezium (must be > 0)
+ *   topXOffset        – horizontal offset of the top-left corner from the bottom-left
+ *   outHandle         – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_trapezium(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double bottomXDim, double topXDim, double yDim, double topXOffset,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Build an asymmetric I-shape profile face.
+ * This supports different top and bottom flange widths, thicknesses,
+ * fillet radii, edge radii, and slope angles.
+ *
+ *   ctx                    – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z            – placement origin
+ *   zDirX/Y/Z              – placement Z direction (face normal)
+ *   xDirX/Y/Z              – placement X direction (reference)
+ *   bottomFlangeWidth       – width of the bottom flange (must be > 0)
+ *   overallDepth            – total section depth (must be > 0)
+ *   webThickness            – thickness of the web (must be > 0)
+ *   bottomFlangeThickness   – thickness of the bottom flange (must be > 0)
+ *   topFlangeWidth          – width of the top flange (must be > 0)
+ *   topFlangeThickness      – thickness of the top flange (0 = same as bottom)
+ *   bottomFlangeFilletRadius – fillet at bottom web/flange junction (0 = no fillet)
+ *   topFlangeFilletRadius   – fillet at top web/flange junction (0 = no fillet)
+ *   bottomFlangeEdgeRadius  – edge radius on bottom flange (0 = no fillet)
+ *   topFlangeEdgeRadius     – edge radius on top flange (0 = no fillet)
+ *   bottomFlangeSlope       – slope angle on bottom flange in radians (0 = no slope)
+ *   topFlangeSlope          – slope angle on top flange in radians (0 = no slope)
+ *   outHandle               – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_asymmetric_ishape(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double bottomFlangeWidth, double overallDepth,
+    double webThickness, double bottomFlangeThickness,
+    double topFlangeWidth, double topFlangeThickness,
+    double bottomFlangeFilletRadius, double topFlangeFilletRadius,
+    double bottomFlangeEdgeRadius, double topFlangeEdgeRadius,
+    double bottomFlangeSlope, double topFlangeSlope,
+    XbimShapeHandle* outHandle);
+
 /* ── Hollow profile primitives ────────────────────────────────────────── */
 
 /*

@@ -26,6 +26,7 @@
  *   - Derived profile (apply 2D transform to parent face)
  */
 
+#include <cmath>
 #include "xbim_profile.h"
 #include "xbim_shape.h"
 #include "xbim_context.h"
@@ -1192,6 +1193,216 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_cshape(
         xbim_log_occt_failure(ctx, e, "xbim_profile_build_cshape");
         const char* msg = e.GetMessageString();
         xbim_set_error(msg ? msg : "xbim_profile_build_cshape: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── Trapezium profile ────────────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_trapezium(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double bottomXDim, double topXDim, double yDim, double topXOffset,
+    XbimShapeHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_profile_build_trapezium: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (bottomXDim <= 0.0 || topXDim <= 0.0 || yDim <= 0.0)
+    {
+        xbim_set_error("xbim_profile_build_trapezium: dimensions must be positive");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        /* Build trapezium in local coordinates, centered at origin.
+         * Bottom edge from (-bottomXDim/2, -yDim/2) to (bottomXDim/2, -yDim/2)
+         * Top edge offset by topXOffset from bottom-left:
+         *   top-left  = (-bottomXDim/2 + topXOffset, yDim/2)
+         *   top-right = (-bottomXDim/2 + topXOffset + topXDim, yDim/2) */
+        double halfBX = bottomXDim / 2.0;
+        double halfY  = yDim / 2.0;
+
+        gp_Pnt p1(-halfBX, -halfY, 0);
+        gp_Pnt p2( halfBX, -halfY, 0);
+        gp_Pnt p3(-halfBX + topXOffset + topXDim,  halfY, 0);
+        gp_Pnt p4(-halfBX + topXOffset,  halfY, 0);
+
+        BRepBuilderAPI_MakePolygon polyMaker;
+        polyMaker.Add(p1);
+        polyMaker.Add(p2);
+        polyMaker.Add(p3);
+        polyMaker.Add(p4);
+        polyMaker.Close();
+
+        if (!polyMaker.IsDone())
+        {
+            xbim_set_error("xbim_profile_build_trapezium: polygon construction failed");
+            return XBIM_ERROR;
+        }
+
+        TopoDS_Wire wire = polyMaker.Wire();
+        wire.Closed(Standard_True);
+
+        return make_profile_face(ctx, wire,
+            originX, originY, originZ,
+            zDirX, zDirY, zDirZ,
+            xDirX, xDirY, xDirZ,
+            outHandle, "xbim_profile_build_trapezium");
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_profile_build_trapezium");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_profile_build_trapezium: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── Asymmetric I-shape profile ──────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_asymmetric_ishape(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double bottomFlangeWidth, double overallDepth,
+    double webThickness, double bottomFlangeThickness,
+    double topFlangeWidth, double topFlangeThickness,
+    double bottomFlangeFilletRadius, double topFlangeFilletRadius,
+    double bottomFlangeEdgeRadius, double topFlangeEdgeRadius,
+    double bottomFlangeSlope, double topFlangeSlope,
+    XbimShapeHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_profile_build_asymmetric_ishape: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (bottomFlangeWidth <= 0.0 || overallDepth <= 0.0 ||
+        webThickness <= 0.0 || bottomFlangeThickness <= 0.0 ||
+        topFlangeWidth <= 0.0)
+    {
+        xbim_set_error("xbim_profile_build_asymmetric_ishape: dimensions must be positive");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        double bfW = bottomFlangeWidth / 2.0;
+        double tfW = topFlangeWidth / 2.0;
+        double dY  = overallDepth / 2.0;
+        double bfT = bottomFlangeThickness;
+        double tfT = (topFlangeThickness > 0.0) ? topFlangeThickness : bfT;
+        double tW  = webThickness / 2.0;
+
+        /* 12-vertex asymmetric I-shape profile:
+         * Top flange: p1-p2 (top), p3-p12 (bottom of top flange)
+         * Web: p4-p5 (right), p10-p11 (left)
+         * Bottom flange: p6-p7 (top of bottom flange), p8-p9 (bottom) */
+        gp_Pnt p1(-tfW,  dY, 0);
+        gp_Pnt p2( tfW,  dY, 0);
+        gp_Pnt p3( tfW,  dY - tfT, 0);
+        gp_Pnt p4( tW,   dY - tfT, 0);
+        gp_Pnt p5( tW,  -dY + bfT, 0);
+        gp_Pnt p6( bfW, -dY + bfT, 0);
+        gp_Pnt p7( bfW, -dY, 0);
+        gp_Pnt p8(-bfW, -dY, 0);
+        gp_Pnt p9(-bfW, -dY + bfT, 0);
+        gp_Pnt p10(-tW, -dY + bfT, 0);
+        gp_Pnt p11(-tW,  dY - tfT, 0);
+        gp_Pnt p12(-tfW, dY - tfT, 0);
+
+        /* Apply top flange slope if specified */
+        if (topFlangeSlope > 0.0)
+        {
+            double fTan = tan(topFlangeSlope);
+            double slopeAdj = (tfW / 2.0) * fTan;
+            p3.SetY(p3.Y() + slopeAdj);
+            p12.SetY(p12.Y() + slopeAdj);
+        }
+
+        /* Apply bottom flange slope if specified */
+        if (bottomFlangeSlope > 0.0)
+        {
+            double fTan = tan(bottomFlangeSlope);
+            double slopeAdj = (bfW / 2.0) * fTan;
+            p6.SetY(p6.Y() - slopeAdj);
+            p9.SetY(p9.Y() - slopeAdj);
+        }
+
+        double t = Precision::Confusion();
+        BRep_Builder b;
+        TopoDS_Vertex v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12;
+        b.MakeVertex(v1,  p1, t);
+        b.MakeVertex(v2,  p2, t);
+        b.MakeVertex(v3,  p3, t);
+        b.MakeVertex(v4,  p4, t);
+        b.MakeVertex(v5,  p5, t);
+        b.MakeVertex(v6,  p6, t);
+        b.MakeVertex(v7,  p7, t);
+        b.MakeVertex(v8,  p8, t);
+        b.MakeVertex(v9,  p9, t);
+        b.MakeVertex(v10, p10, t);
+        b.MakeVertex(v11, p11, t);
+        b.MakeVertex(v12, p12, t);
+
+        BRepBuilderAPI_MakePolygon polyMaker;
+        polyMaker.Add(v1);  polyMaker.Add(v2);  polyMaker.Add(v3);
+        polyMaker.Add(v4);  polyMaker.Add(v5);  polyMaker.Add(v6);
+        polyMaker.Add(v7);  polyMaker.Add(v8);  polyMaker.Add(v9);
+        polyMaker.Add(v10); polyMaker.Add(v11); polyMaker.Add(v12);
+        polyMaker.Close();
+
+        if (!polyMaker.IsDone())
+        {
+            xbim_set_error("xbim_profile_build_asymmetric_ishape: polygon construction failed");
+            return XBIM_ERROR;
+        }
+
+        TopoDS_Wire wire = polyMaker.Wire();
+
+        /* Apply fillets:
+         * Top flange: 4,11 = topFlangeFilletRadius; 3,12 = topFlangeEdgeRadius
+         * Bottom flange: 5,10 = bottomFlangeFilletRadius; 6,9 = bottomFlangeEdgeRadius */
+        if (topFlangeFilletRadius > 0.0 || topFlangeEdgeRadius > 0.0 ||
+            bottomFlangeFilletRadius > 0.0 || bottomFlangeEdgeRadius > 0.0)
+        {
+            FilletSpec specs[] = {
+                {3, topFlangeEdgeRadius},     {4, topFlangeFilletRadius},
+                {5, bottomFlangeFilletRadius}, {6, bottomFlangeEdgeRadius},
+                {9, bottomFlangeEdgeRadius},   {10, bottomFlangeFilletRadius},
+                {11, topFlangeFilletRadius},   {12, topFlangeEdgeRadius}
+            };
+            wire = apply_fillets(wire, specs, 8);
+        }
+
+        wire.Closed(Standard_True);
+
+        return make_profile_face(ctx, wire,
+            originX, originY, originZ,
+            zDirX, zDirY, zDirZ,
+            xDirX, xDirY, xDirZ,
+            outHandle, "xbim_profile_build_asymmetric_ishape");
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_profile_build_asymmetric_ishape");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_profile_build_asymmetric_ishape: OCCT exception");
         return XBIM_ERROR;
     }
 }
