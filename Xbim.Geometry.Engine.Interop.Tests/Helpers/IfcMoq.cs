@@ -7,6 +7,7 @@ using Xbim.Ifc4.GeometryResource;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4.MeasureResource;
 using Xbim.Ifc4.ProfileResource;
+using Xbim.Ifc4.TopologyResource;
 
 namespace Xbim.Geometry.Engine.Interop.Tests.Helpers;
 
@@ -258,6 +259,295 @@ internal static class IfcMoq
         obj.Position = position ?? Axis2Placement2d();
         moq.SetupGet(x => x.ExpressType)
             .Returns(MetaData.ExpressType(typeof(IfcCircleHollowProfileDef)));
+        return obj;
+    }
+
+    // ── Structural profile mocks ─────────────────────────────────────
+
+    public static IIfcIShapeProfileDef IShapeProfile(
+        double overallWidth = 100, double overallDepth = 200,
+        double webThickness = 10, double flangeThickness = 15,
+        double? filletRadius = null,
+        IIfcAxis2Placement2D? position = null)
+    {
+        var moq = MakeMoq<IIfcIShapeProfileDef>();
+        var obj = moq.Object;
+        obj.ProfileType = IfcProfileTypeEnum.AREA;
+        obj.OverallWidth = overallWidth;
+        obj.OverallDepth = overallDepth;
+        obj.WebThickness = webThickness;
+        obj.FlangeThickness = flangeThickness;
+        if (filletRadius.HasValue)
+            moq.SetupGet(x => x.FilletRadius)
+                .Returns(new IfcNonNegativeLengthMeasure(filletRadius.Value));
+        obj.Position = position ?? Axis2Placement2d();
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcIShapeProfileDef)));
+        return obj;
+    }
+
+    public static IIfcLShapeProfileDef LShapeProfile(
+        double depth = 100, double thickness = 10,
+        double? width = null, double? filletRadius = null,
+        double? edgeRadius = null, double? legSlope = null,
+        IIfcAxis2Placement2D? position = null)
+    {
+        var moq = MakeMoq<IIfcLShapeProfileDef>();
+        var obj = moq.Object;
+        obj.ProfileType = IfcProfileTypeEnum.AREA;
+        obj.Depth = depth;
+        obj.Thickness = thickness;
+        if (width.HasValue)
+            moq.SetupGet(x => x.Width).Returns(new IfcPositiveLengthMeasure(width.Value));
+        if (filletRadius.HasValue)
+            moq.SetupGet(x => x.FilletRadius)
+                .Returns(new IfcNonNegativeLengthMeasure(filletRadius.Value));
+        if (edgeRadius.HasValue)
+            moq.SetupGet(x => x.EdgeRadius)
+                .Returns(new IfcNonNegativeLengthMeasure(edgeRadius.Value));
+        if (legSlope.HasValue)
+            moq.SetupGet(x => x.LegSlope)
+                .Returns(new IfcPlaneAngleMeasure(legSlope.Value));
+        obj.Position = position ?? Axis2Placement2d();
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcLShapeProfileDef)));
+        return obj;
+    }
+
+    public static IIfcTShapeProfileDef TShapeProfile(
+        double depth = 100, double flangeWidth = 100,
+        double webThickness = 10, double flangeThickness = 15,
+        double? filletRadius = null, double? flangeEdgeRadius = null,
+        double? webEdgeRadius = null,
+        IIfcAxis2Placement2D? position = null)
+    {
+        var moq = MakeMoq<IIfcTShapeProfileDef>();
+        var obj = moq.Object;
+        obj.ProfileType = IfcProfileTypeEnum.AREA;
+        obj.Depth = depth;
+        obj.FlangeWidth = flangeWidth;
+        obj.WebThickness = webThickness;
+        obj.FlangeThickness = flangeThickness;
+        if (filletRadius.HasValue)
+            moq.SetupGet(x => x.FilletRadius)
+                .Returns(new IfcNonNegativeLengthMeasure(filletRadius.Value));
+        if (flangeEdgeRadius.HasValue)
+            moq.SetupGet(x => x.FlangeEdgeRadius)
+                .Returns(new IfcNonNegativeLengthMeasure(flangeEdgeRadius.Value));
+        if (webEdgeRadius.HasValue)
+            moq.SetupGet(x => x.WebEdgeRadius)
+                .Returns(new IfcNonNegativeLengthMeasure(webEdgeRadius.Value));
+        obj.Position = position ?? Axis2Placement2d();
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcTShapeProfileDef)));
+        return obj;
+    }
+
+    public static IIfcUShapeProfileDef UShapeProfile(
+        double depth = 100, double flangeWidth = 50,
+        double webThickness = 8, double flangeThickness = 12,
+        double? filletRadius = null, double? edgeRadius = null,
+        double? flangeSlope = null,
+        IIfcAxis2Placement2D? position = null)
+    {
+        var moq = MakeMoq<IIfcUShapeProfileDef>();
+        var obj = moq.Object;
+        obj.ProfileType = IfcProfileTypeEnum.AREA;
+        obj.Depth = depth;
+        obj.FlangeWidth = flangeWidth;
+        obj.WebThickness = webThickness;
+        obj.FlangeThickness = flangeThickness;
+        if (filletRadius.HasValue)
+            moq.SetupGet(x => x.FilletRadius)
+                .Returns(new IfcNonNegativeLengthMeasure(filletRadius.Value));
+        if (edgeRadius.HasValue)
+            moq.SetupGet(x => x.EdgeRadius)
+                .Returns(new IfcNonNegativeLengthMeasure(edgeRadius.Value));
+        if (flangeSlope.HasValue)
+            moq.SetupGet(x => x.FlangeSlope)
+                .Returns(new IfcPlaneAngleMeasure(flangeSlope.Value));
+        obj.Position = position ?? Axis2Placement2d();
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcUShapeProfileDef)));
+        return obj;
+    }
+
+    public static IIfcZShapeProfileDef ZShapeProfile(
+        double depth = 100, double flangeWidth = 50,
+        double webThickness = 8, double flangeThickness = 12,
+        double? filletRadius = null, double? edgeRadius = null,
+        IIfcAxis2Placement2D? position = null)
+    {
+        var moq = MakeMoq<IIfcZShapeProfileDef>();
+        var obj = moq.Object;
+        obj.ProfileType = IfcProfileTypeEnum.AREA;
+        obj.Depth = depth;
+        obj.FlangeWidth = flangeWidth;
+        obj.WebThickness = webThickness;
+        obj.FlangeThickness = flangeThickness;
+        if (filletRadius.HasValue)
+            moq.SetupGet(x => x.FilletRadius)
+                .Returns(new IfcNonNegativeLengthMeasure(filletRadius.Value));
+        if (edgeRadius.HasValue)
+            moq.SetupGet(x => x.EdgeRadius)
+                .Returns(new IfcNonNegativeLengthMeasure(edgeRadius.Value));
+        obj.Position = position ?? Axis2Placement2d();
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcZShapeProfileDef)));
+        return obj;
+    }
+
+    public static IIfcCShapeProfileDef CShapeProfile(
+        double depth = 100, double width = 50,
+        double wallThickness = 8, double girth = 20,
+        double? internalFilletRadius = null,
+        IIfcAxis2Placement2D? position = null)
+    {
+        var moq = MakeMoq<IIfcCShapeProfileDef>();
+        var obj = moq.Object;
+        obj.ProfileType = IfcProfileTypeEnum.AREA;
+        obj.Depth = depth;
+        obj.Width = width;
+        obj.WallThickness = wallThickness;
+        obj.Girth = girth;
+        if (internalFilletRadius.HasValue)
+            moq.SetupGet(x => x.InternalFilletRadius)
+                .Returns(new IfcNonNegativeLengthMeasure(internalFilletRadius.Value));
+        obj.Position = position ?? Axis2Placement2d();
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcCShapeProfileDef)));
+        return obj;
+    }
+
+    public static IIfcTrapeziumProfileDef TrapeziumProfile(
+        double bottomXDim = 100, double topXDim = 60,
+        double yDim = 80, double topXOffset = 20,
+        IIfcAxis2Placement2D? position = null)
+    {
+        var moq = MakeMoq<IIfcTrapeziumProfileDef>();
+        var obj = moq.Object;
+        obj.ProfileType = IfcProfileTypeEnum.AREA;
+        obj.BottomXDim = bottomXDim;
+        obj.TopXDim = topXDim;
+        obj.YDim = yDim;
+        obj.TopXOffset = topXOffset;
+        obj.Position = position ?? Axis2Placement2d();
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcTrapeziumProfileDef)));
+        return obj;
+    }
+
+    // ── Arbitrary profile mocks ──────────────────────────────────────
+
+    /// <summary>
+    /// Creates an IIfcArbitraryClosedProfileDef with a polyline outer curve.
+    /// Points are 2D coordinates given as (x,y) pairs.
+    /// </summary>
+    public static IIfcArbitraryClosedProfileDef ArbitraryClosedProfile(
+        (double x, double y)[] points)
+    {
+        var moq = MakeMoq<IIfcArbitraryClosedProfileDef>();
+        var obj = moq.Object;
+        obj.ProfileType = IfcProfileTypeEnum.AREA;
+
+        // Build polyline from points
+        var polyMoq = MakeMoq<IIfcPolyline>();
+        var poly = polyMoq.Object;
+        foreach (var (x, y) in points)
+            poly.Points.Add(CartesianPoint2d(x, y));
+
+        moq.SetupGet(x => x.OuterCurve).Returns(poly);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcArbitraryClosedProfileDef)));
+        return obj;
+    }
+
+    /// <summary>
+    /// Creates an IIfcArbitraryProfileDefWithVoids: outer polyline with inner polyline voids.
+    /// </summary>
+    public static IIfcArbitraryProfileDefWithVoids ArbitraryProfileWithVoids(
+        (double x, double y)[] outerPoints,
+        (double x, double y)[][] innerCurves)
+    {
+        var moq = MakeMoq<IIfcArbitraryProfileDefWithVoids>();
+        var obj = moq.Object;
+        obj.ProfileType = IfcProfileTypeEnum.AREA;
+
+        // Outer curve
+        var polyMoq = MakeMoq<IIfcPolyline>();
+        var poly = polyMoq.Object;
+        foreach (var (x, y) in outerPoints)
+            poly.Points.Add(CartesianPoint2d(x, y));
+        moq.SetupGet(x => x.OuterCurve).Returns(poly);
+
+        // Inner curves
+        var innerList = new ItemListMoq<IIfcCurve>();
+        foreach (var innerPts in innerCurves)
+        {
+            var iPoly = MakeMoq<IIfcPolyline>();
+            var ip = iPoly.Object;
+            foreach (var (x, y) in innerPts)
+                ip.Points.Add(CartesianPoint2d(x, y));
+            innerList.Add(ip);
+        }
+        moq.SetupGet(x => x.InnerCurves).Returns(innerList);
+
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcArbitraryProfileDefWithVoids)));
+        return obj;
+    }
+
+    // ── Composite / Derived / Mirrored profile mocks ─────────────────
+
+    public static IIfcCompositeProfileDef CompositeProfile(
+        params IIfcProfileDef[] profiles)
+    {
+        var moq = MakeMoq<IIfcCompositeProfileDef>();
+        var obj = moq.Object;
+        obj.ProfileType = IfcProfileTypeEnum.AREA;
+        var profileSet = new ItemListMoq<IIfcProfileDef>();
+        profileSet.AddRange(profiles);
+        moq.SetupGet(x => x.Profiles).Returns(profileSet);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcCompositeProfileDef)));
+        return obj;
+    }
+
+    public static IIfcDerivedProfileDef DerivedProfile(
+        IIfcProfileDef parent,
+        double translateX = 0, double translateY = 0,
+        double scale = 1.0)
+    {
+        var moq = MakeMoq<IIfcDerivedProfileDef>();
+        var obj = moq.Object;
+        obj.ProfileType = IfcProfileTypeEnum.AREA;
+        moq.SetupGet(x => x.ParentProfile).Returns(parent);
+
+        // Build a CartesianTransformationOperator2D
+        var opMoq = MakeMoq<IIfcCartesianTransformationOperator2D>();
+        var op = opMoq.Object;
+        op.LocalOrigin = CartesianPoint2d(translateX, translateY);
+        op.Scale = scale;
+        opMoq.SetupGet(x => x.Scl).Returns(scale);
+        // Also set up Scl on the base interface to handle explicit interface implementation
+        opMoq.As<IIfcCartesianTransformationOperator>()
+            .SetupGet(x => x.Scl).Returns(scale);
+        // Axis1 and Axis2 remain null → identity rotation
+        moq.SetupGet(x => x.Operator).Returns(op);
+
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcDerivedProfileDef)));
+        return obj;
+    }
+
+    public static IIfcMirroredProfileDef MirroredProfile(IIfcProfileDef parent)
+    {
+        var moq = MakeMoq<IIfcMirroredProfileDef>();
+        var obj = moq.Object;
+        obj.ProfileType = IfcProfileTypeEnum.AREA;
+        moq.SetupGet(x => x.ParentProfile).Returns(parent);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcMirroredProfileDef)));
         return obj;
     }
 }

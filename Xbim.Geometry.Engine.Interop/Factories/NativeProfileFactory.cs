@@ -816,8 +816,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build CompositeProfileDef #{compositeProfile.EntityLabel}: {NativeMethods.GetLastError()}");
 
-                // The composite wraps the sub-shapes, so we return it as a face (it's actually a compound)
-                return NativeShapeFactory.WrapFace(shapeHandle);
+                // Composite profiles produce a compound of faces, not a single face.
+                // We wrap directly as NativeFace since the P/Invoke surface_area call
+                // works on compounds (it sums all face areas via BRepGProp).
+                return new NativeFace(shapeHandle);
             }
             finally
             {

@@ -297,4 +297,308 @@ public class CsgSolidTests : IDisposable
 
         SaveBrep(face, "profile_circle_hollow_r100_t2");
     }
+
+    // ── Structural profile tests ──────────────────────────────────────
+
+    [Fact]
+    public void IShapeProfile_HasCorrectArea()
+    {
+        // Arrange: I-beam with overallWidth=100, overallDepth=200,
+        //          webThickness=10, flangeThickness=15, no fillets
+        // Area = 2 flanges + web = 2*(100*15) + (200-2*15)*10 = 3000 + 1700 = 4700
+        var ifcProfile = IfcMoq.IShapeProfile(
+            overallWidth: 100, overallDepth: 200,
+            webThickness: 10, flangeThickness: 15);
+
+        // Act
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        // Assert
+        face.Should().NotBeNull();
+        face.Should().BeAssignableTo<IXFace>();
+        face.Area.Should().BeApproximately(4700, 1.0);
+
+        SaveBrep(face, "profile_ishape_100x200");
+    }
+
+    [Fact]
+    public void IShapeProfile_WithFillets_IsValid()
+    {
+        var ifcProfile = IfcMoq.IShapeProfile(
+            overallWidth: 100, overallDepth: 200,
+            webThickness: 10, flangeThickness: 15,
+            filletRadius: 5);
+
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        face.Should().NotBeNull();
+        // With fillets, area should be slightly larger than without (fillets fill corners)
+        face.Area.Should().BeGreaterThan(4700);
+
+        SaveBrep(face, "profile_ishape_filleted");
+    }
+
+    [Fact]
+    public void LShapeProfile_IsValid()
+    {
+        // Arrange: L-angle with depth=100, width=80, thickness=10
+        var ifcProfile = IfcMoq.LShapeProfile(
+            depth: 100, thickness: 10, width: 80);
+
+        // Act
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        // Assert
+        face.Should().NotBeNull();
+        face.Should().BeAssignableTo<IXFace>();
+        // Area = depth*thickness + (width-thickness)*thickness = 100*10 + 70*10 = 1700
+        face.Area.Should().BeApproximately(1700, 1.0);
+
+        SaveBrep(face, "profile_lshape_100x80");
+    }
+
+    [Fact]
+    public void TShapeProfile_IsValid()
+    {
+        // Arrange: T-shape depth=100, flangeWidth=100, web=10, flangeThk=15
+        var ifcProfile = IfcMoq.TShapeProfile(
+            depth: 100, flangeWidth: 100,
+            webThickness: 10, flangeThickness: 15);
+
+        // Act
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        // Assert
+        face.Should().NotBeNull();
+        // Area = flange + web = 100*15 + (100-15)*10 = 1500 + 850 = 2350
+        face.Area.Should().BeApproximately(2350, 1.0);
+
+        SaveBrep(face, "profile_tshape_100x100");
+    }
+
+    [Fact]
+    public void UShapeProfile_IsValid()
+    {
+        // Arrange: U-channel depth=100, flangeWidth=50, web=8, flangeThk=12
+        var ifcProfile = IfcMoq.UShapeProfile(
+            depth: 100, flangeWidth: 50,
+            webThickness: 8, flangeThickness: 12);
+
+        // Act
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        // Assert
+        face.Should().NotBeNull();
+        face.Area.Should().BeGreaterThan(0);
+
+        SaveBrep(face, "profile_ushape_100x50");
+    }
+
+    [Fact]
+    public void ZShapeProfile_IsValid()
+    {
+        // Arrange: Z-shape depth=100, flangeWidth=50, web=8, flangeThk=12
+        var ifcProfile = IfcMoq.ZShapeProfile(
+            depth: 100, flangeWidth: 50,
+            webThickness: 8, flangeThickness: 12);
+
+        // Act
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        // Assert
+        face.Should().NotBeNull();
+        face.Area.Should().BeGreaterThan(0);
+
+        SaveBrep(face, "profile_zshape_100x50");
+    }
+
+    [Fact]
+    public void CShapeProfile_IsValid()
+    {
+        // Arrange: C-shape depth=100, width=50, wallThickness=8, girth=20
+        var ifcProfile = IfcMoq.CShapeProfile(
+            depth: 100, width: 50,
+            wallThickness: 8, girth: 20);
+
+        // Act
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        // Assert
+        face.Should().NotBeNull();
+        face.Area.Should().BeGreaterThan(0);
+
+        SaveBrep(face, "profile_cshape_100x50");
+    }
+
+    [Fact]
+    public void TrapeziumProfile_HasCorrectArea()
+    {
+        // Arrange: trapezium bottom=100, top=60, height=80, offset=20
+        // Area = 0.5 * (100 + 60) * 80 = 6400
+        var ifcProfile = IfcMoq.TrapeziumProfile(
+            bottomXDim: 100, topXDim: 60, yDim: 80, topXOffset: 20);
+
+        // Act
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        // Assert
+        face.Should().NotBeNull();
+        face.Area.Should().BeApproximately(6400, 1.0);
+
+        SaveBrep(face, "profile_trapezium_100x60x80");
+    }
+
+    // ── Arbitrary profile tests ───────────────────────────────────────
+
+    [Fact]
+    public void ArbitraryClosedProfile_QuadFace()
+    {
+        // Arrange: 4-point polygon (rectangle-ish) → area = 20 * 10 = 200
+        var ifcProfile = IfcMoq.ArbitraryClosedProfile(new[]
+        {
+            (0.0, 0.0), (20.0, 0.0), (20.0, 10.0), (0.0, 10.0)
+        });
+
+        // Act
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        // Assert
+        face.Should().NotBeNull();
+        face.Should().BeAssignableTo<IXFace>();
+        face.Area.Should().BeApproximately(200, 0.1);
+
+        SaveBrep(face, "profile_arbitrary_quad");
+    }
+
+    [Fact]
+    public void ArbitraryClosedProfile_Triangle()
+    {
+        // Arrange: triangle with base=10, height=10 → area = 50
+        var ifcProfile = IfcMoq.ArbitraryClosedProfile(new[]
+        {
+            (0.0, 0.0), (10.0, 0.0), (5.0, 10.0)
+        });
+
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        face.Should().NotBeNull();
+        face.Area.Should().BeApproximately(50, 0.1);
+
+        SaveBrep(face, "profile_arbitrary_triangle");
+    }
+
+    [Fact]
+    public void ArbitraryProfileWithVoids_HasReducedArea()
+    {
+        // Arrange: outer 20x10 rectangle with inner 10x5 rectangle void
+        // Outer area = 200, inner area = 50, net = 150
+        var ifcProfile = IfcMoq.ArbitraryProfileWithVoids(
+            outerPoints: new[] { (0.0, 0.0), (20.0, 0.0), (20.0, 10.0), (0.0, 10.0) },
+            innerCurves: new[]
+            {
+                new[] { (5.0, 2.5), (15.0, 2.5), (15.0, 7.5), (5.0, 7.5) }
+            });
+
+        // Act
+        var face = _profileFactory.BuildFace(ifcProfile);
+
+        // Assert
+        face.Should().NotBeNull();
+        face.Area.Should().BeApproximately(150, 1.0);
+
+        SaveBrep(face, "profile_arbitrary_with_void");
+    }
+
+    // ── Composite / Derived / Mirrored profile tests ──────────────────
+
+    [Fact]
+    public void CompositeProfile_MergesTwoRectangles()
+    {
+        // Arrange: two non-overlapping rectangle profiles
+        var rect1 = IfcMoq.RectangleProfile(xDim: 10, yDim: 20);
+        var rect2 = IfcMoq.RectangleProfile(xDim: 10, yDim: 20);
+        var composite = IfcMoq.CompositeProfile(rect1, rect2);
+
+        // Act
+        var face = _profileFactory.BuildFace(composite);
+
+        // Assert
+        face.Should().NotBeNull();
+        // Composite returns a compound, so area should be sum of both rectangles
+        // Since both are at origin, they overlap but the compound just contains them
+        face.Area.Should().BeGreaterThan(0);
+
+        SaveBrep(face, "profile_composite_two_rects");
+    }
+
+    [Fact]
+    public void DerivedProfile_AppliesTransform()
+    {
+        // Arrange: rectangle 10x20 with identity transform (scale=1, no translation)
+        var parent = IfcMoq.RectangleProfile(xDim: 10, yDim: 20);
+        var derived = IfcMoq.DerivedProfile(parent, scale: 1.0);
+
+        // Act
+        var face = _profileFactory.BuildFace(derived);
+
+        // Assert
+        face.Should().NotBeNull();
+        face.Should().BeAssignableTo<IXFace>();
+        // Identity transform preserves area
+        face.Area.Should().BeGreaterThan(0);
+
+        SaveBrep(face, "profile_derived_identity");
+    }
+
+    [Fact]
+    public void DerivedProfile_WithTranslation()
+    {
+        // Arrange: rectangle 10x20 translated to (50, 30)
+        var parent = IfcMoq.RectangleProfile(xDim: 10, yDim: 20);
+        var derived = IfcMoq.DerivedProfile(parent, translateX: 50, translateY: 30, scale: 1.0);
+
+        // Act
+        var face = _profileFactory.BuildFace(derived);
+
+        // Assert
+        face.Should().NotBeNull();
+        face.Area.Should().BeGreaterThan(0);
+
+        SaveBrep(face, "profile_derived_translated");
+    }
+
+    [Fact]
+    public void MirroredProfile_PreservesArea()
+    {
+        // Arrange: L-shape mirrored about Y axis
+        var parent = IfcMoq.LShapeProfile(depth: 100, thickness: 10, width: 80);
+        var mirrored = IfcMoq.MirroredProfile(parent);
+
+        // Act
+        var face = _profileFactory.BuildFace(mirrored);
+
+        // Assert
+        face.Should().NotBeNull();
+        // Mirroring preserves area = 1700
+        face.Area.Should().BeApproximately(1700, 1.0);
+
+        SaveBrep(face, "profile_mirrored_lshape");
+    }
+
+    [Fact]
+    public void AllProfileTypes_DisposeProperly()
+    {
+        // Verify no crashes on dispose for various profile types
+        var ishape = _profileFactory.BuildFace(IfcMoq.IShapeProfile());
+        var lshape = _profileFactory.BuildFace(IfcMoq.LShapeProfile(width: 80));
+        var trapezium = _profileFactory.BuildFace(IfcMoq.TrapeziumProfile());
+        var arbitrary = _profileFactory.BuildFace(IfcMoq.ArbitraryClosedProfile(
+            new[] { (0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0) }));
+
+        ishape.Should().BeAssignableTo<IDisposable>();
+        ((IDisposable)ishape).Dispose();
+        ((IDisposable)lshape).Dispose();
+        ((IDisposable)trapezium).Dispose();
+        ((IDisposable)arbitrary).Dispose();
+    }
 }
