@@ -1,17 +1,20 @@
 /*
  * xbim_solid.cpp
  *
- * Implements CSG solid primitive construction via the flat C API.
- * Ports the NSolidFactory CSG methods from the C++/CLI engine:
+ * Implements CSG solid primitive construction and sweep operations
+ * via the flat C API. Ports the NSolidFactory methods from the C++/CLI engine:
  *   - Block (box)
  *   - Sphere
  *   - Right circular cylinder
  *   - Right circular cone
  *   - Rectangular pyramid
+ *   - Extruded area solid (linear sweep / prism)
+ *   - Extruded area solid tapered (ThruSections loft)
  */
 
 #include "xbim_solid.h"
 #include "xbim_shape.h"
+#include "xbim_location.h"
 #include "xbim_context.h"
 #include "xbim_error.h"
 #include "xbim_logging.h"
@@ -19,6 +22,8 @@
 #include <gp_Ax2.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Dir.hxx>
+#include <gp_Vec.hxx>
+#include <gp_Trsf.hxx>
 #include <gp_Pln.hxx>
 #include <Precision.hxx>
 #include <BRep_Builder.hxx>
@@ -26,13 +31,20 @@
 #include <BRepPrimAPI_MakeSphere.hxx>
 #include <BRepPrimAPI_MakeCylinder.hxx>
 #include <BRepPrimAPI_MakeCone.hxx>
+#include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeSolid.hxx>
+#include <BRepOffsetAPI_ThruSections.hxx>
+#include <BRepAlgoAPI_Cut.hxx>
+#include <BRepTools.hxx>
+#include <TopExp_Explorer.hxx>
+#include <TopTools_ListOfShape.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Vertex.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Wire.hxx>
+#include <TopoDS_Face.hxx>
 #include <TopoDS_Shell.hxx>
 #include <TopoDS_Solid.hxx>
 #include <Standard_Failure.hxx>
@@ -447,6 +459,228 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_rectangular_pyramid(
         xbim_log_occt_failure(ctx, e, "xbim_solid_build_rectangular_pyramid");
         const char* msg = e.GetMessageString();
         xbim_set_error(msg ? msg : "xbim_solid_build_rectangular_pyramid: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── Extruded area solid (linear sweep / prism) ──────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_extruded(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     faceHandle,
+    double dirX, double dirY, double dirZ,
+    double depth,
+    XbimLocationHandle  locationHandle,
+    XbimShapeHandle*    outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_solid_build_extruded: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!faceHandle)
+    {
+        xbim_set_error("xbim_solid_build_extruded: faceHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    if (depth <= 0.0)
+    {
+        xbim_set_error("xbim_solid_build_extruded: depth must be positive");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        const TopoDS_Shape& faceShape = faceHandle->shape;
+        if (faceShape.IsNull())
+        {
+            xbim_set_error("xbim_solid_build_extruded: face shape is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        gp_Vec extrusionVec(gp_Dir(dirX, dirY, dirZ));
+        extrusionVec.Multiply(depth);
+
+        BRepPrimAPI_MakePrism prismMaker(faceShape, extrusionVec);
+        if (!prismMaker.IsDone())
+        {
+            xbim_set_error("xbim_solid_build_extruded: prism extrusion failed");
+            xbim_log_error(ctx, "Could not build ExtrudedAreaSolid");
+            return XBIM_ERROR;
+        }
+
+        TopoDS_Shape result = prismMaker.Shape();
+        if (result.IsNull())
+        {
+            xbim_set_error("xbim_solid_build_extruded: resulting shape is null");
+            xbim_log_error(ctx, "Could not build ExtrudedAreaSolid");
+            return XBIM_NULL_SHAPE;
+        }
+
+        /* Apply optional location transform */
+        if (locationHandle && !locationHandle->location.IsIdentity())
+            result.Move(locationHandle->location);
+
+        *outHandle = xbim_shape_create_from(result);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_solid_build_extruded: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_solid_build_extruded");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_solid_build_extruded: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── Extruded area solid tapered (ThruSections loft) ─────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_extruded_tapered(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     startFaceHandle,
+    XbimShapeHandle     endFaceHandle,
+    double dirX, double dirY, double dirZ,
+    double depth,
+    double precision,
+    XbimLocationHandle  locationHandle,
+    XbimShapeHandle*    outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_solid_build_extruded_tapered: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!startFaceHandle)
+    {
+        xbim_set_error("xbim_solid_build_extruded_tapered: startFaceHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    if (!endFaceHandle)
+    {
+        xbim_set_error("xbim_solid_build_extruded_tapered: endFaceHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    if (depth <= 0.0)
+    {
+        xbim_set_error("xbim_solid_build_extruded_tapered: depth must be positive");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        const TopoDS_Shape& startShape = startFaceHandle->shape;
+        const TopoDS_Shape& endShape = endFaceHandle->shape;
+
+        if (startShape.IsNull() || endShape.IsNull())
+        {
+            xbim_set_error("xbim_solid_build_extruded_tapered: one or both face shapes are null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        TopoDS_Face startFace = TopoDS::Face(startShape);
+        TopoDS_Face endFace = TopoDS::Face(endShape);
+
+        /* Translate the end face to its position along the extrusion direction */
+        gp_Vec vec(gp_Dir(dirX, dirY, dirZ));
+        vec *= depth;
+        gp_Trsf t;
+        t.SetTranslation(vec);
+        TopoDS_Face placedEndFace = TopoDS::Face(endFace.Moved(TopLoc_Location(t)));
+
+        /* Build the outer body by lofting between start and end outer wires */
+        BRepOffsetAPI_ThruSections pipeMaker(Standard_True, Standard_True, precision);
+        TopoDS_Wire outerBoundStart = BRepTools::OuterWire(startFace);
+        TopoDS_Wire outerBoundEnd = BRepTools::OuterWire(placedEndFace);
+        pipeMaker.AddWire(outerBoundStart);
+        pipeMaker.AddWire(outerBoundEnd);
+        pipeMaker.Build();
+
+        if (!pipeMaker.IsDone())
+        {
+            xbim_set_error("xbim_solid_build_extruded_tapered: failed to loft outer body");
+            xbim_log_error(ctx, "Could not build ExtrudedAreaSolidTapered outer body");
+            return XBIM_ERROR;
+        }
+
+        TopoDS_Shape taperedOuterBody = pipeMaker.Shape();
+        taperedOuterBody.Closed(Standard_True);
+
+        /* Build void solids from inner wires (holes) and cut them from the outer body */
+        TopTools_ListOfShape voids;
+        TopExp_Explorer startExplorer(startFace, TopAbs_WIRE);
+        TopExp_Explorer endExplorer(placedEndFace, TopAbs_WIRE);
+
+        for (; startExplorer.More() && endExplorer.More();
+               startExplorer.Next(), endExplorer.Next())
+        {
+            if (!startExplorer.Current().IsEqual(outerBoundStart))
+            {
+                BRepOffsetAPI_ThruSections voidPipeMaker(Standard_True, Standard_True, precision);
+                voidPipeMaker.AddWire(TopoDS::Wire(startExplorer.Current().Reversed()));
+                voidPipeMaker.AddWire(TopoDS::Wire(endExplorer.Current().Reversed()));
+                voidPipeMaker.Build();
+
+                if (!voidPipeMaker.IsDone())
+                {
+                    xbim_log_warning(ctx, "Failed to loft a tapered void — skipping");
+                    continue;
+                }
+                voids.Append(voidPipeMaker.Shape());
+            }
+        }
+
+        if (voids.Size() > 0)
+        {
+            for (auto it = voids.cbegin(); it != voids.cend(); ++it)
+            {
+                BRepAlgoAPI_Cut cutter(taperedOuterBody, *it);
+                cutter.Build();
+                if (cutter.IsDone())
+                {
+                    taperedOuterBody = cutter.Shape();
+                }
+                else
+                {
+                    xbim_log_warning(ctx, "Boolean cut of tapered void failed — skipping");
+                }
+            }
+        }
+
+        /* Apply optional location transform */
+        if (locationHandle && !locationHandle->location.IsIdentity())
+            taperedOuterBody.Move(locationHandle->location);
+
+        *outHandle = xbim_shape_create_from(taperedOuterBody);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_solid_build_extruded_tapered: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_solid_build_extruded_tapered");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_solid_build_extruded_tapered: OCCT exception");
         return XBIM_ERROR;
     }
 }

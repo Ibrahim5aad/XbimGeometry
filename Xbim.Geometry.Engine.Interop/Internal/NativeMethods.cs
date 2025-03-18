@@ -166,6 +166,28 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double xLen, double yLen, double height,
             out NativeShapeHandle outHandle);
 
+        // ── Sweep operations (extruded area solids) ────────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_solid_build_extruded(
+            NativeContextHandle ctx,
+            NativeShapeHandle faceHandle,
+            double dirX, double dirY, double dirZ,
+            double depth,
+            NativeLocationHandle? locationHandle,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_solid_build_extruded_tapered(
+            NativeContextHandle ctx,
+            NativeShapeHandle startFaceHandle,
+            NativeShapeHandle endFaceHandle,
+            double dirX, double dirY, double dirZ,
+            double depth,
+            double precision,
+            NativeLocationHandle? locationHandle,
+            out NativeShapeHandle outHandle);
+
         // ── Parametric profile primitives ────────────────────────────────
 
         [DllImport(Lib, CallingConvention = CC)]

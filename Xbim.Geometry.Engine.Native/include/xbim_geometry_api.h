@@ -405,6 +405,57 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_rectangular_pyramid(
     double xLen,    double yLen,    double height,
     XbimShapeHandle* outHandle);
 
+/* ── Sweep operations (extruded area solids) ─────────────────────────────── */
+
+/*
+ * Build an extruded area solid (linear sweep / prism).
+ * Extrudes a face along a direction vector by the given depth.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   faceHandle       – a face shape handle (the profile to extrude)
+ *   dirX/Y/Z         – extrusion direction (unit vector)
+ *   depth            – extrusion distance (must be > 0)
+ *   locationHandle   – optional location transform (may be NULL for identity)
+ *   outHandle        – receives the new solid shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_extruded(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     faceHandle,
+    double dirX, double dirY, double dirZ,
+    double depth,
+    XbimLocationHandle  locationHandle,
+    XbimShapeHandle*    outHandle);
+
+/*
+ * Build a tapered extruded area solid via ThruSections loft.
+ * Lofts between a start profile face and an end profile face placed
+ * at depth along the extrusion direction. Inner wires (voids) in
+ * the profiles are handled by lofting each void pair and cutting
+ * from the outer body.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   startFaceHandle  – start profile face handle
+ *   endFaceHandle    – end profile face handle (may differ from start)
+ *   dirX/Y/Z         – extrusion direction (unit vector)
+ *   depth            – extrusion distance (must be > 0)
+ *   precision        – surface generation tolerance (from model precision)
+ *   locationHandle   – optional location transform (may be NULL for identity)
+ *   outHandle        – receives the new shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_extruded_tapered(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     startFaceHandle,
+    XbimShapeHandle     endFaceHandle,
+    double dirX, double dirY, double dirZ,
+    double depth,
+    double precision,
+    XbimLocationHandle  locationHandle,
+    XbimShapeHandle*    outHandle);
+
 /* ── Parametric profile primitives ────────────────────────────────────────── */
 
 /*
