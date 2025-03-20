@@ -456,6 +456,59 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_extruded_tapered(
     XbimLocationHandle  locationHandle,
     XbimShapeHandle*    outHandle);
 
+/* ── Sweep operations (revolved area solids) ──────────────────────────────── */
+
+/*
+ * Build a revolved area solid.
+ * Revolves a face around an axis by the given angle using BRepPrimAPI_MakeRevol.
+ *
+ *   ctx                – a valid context handle (used for logging; may be NULL)
+ *   faceHandle         – a face shape handle (the profile to revolve)
+ *   axisOriginX/Y/Z    – revolution axis origin point
+ *   axisDirX/Y/Z       – revolution axis direction (unit vector)
+ *   angle              – revolution angle in radians (must be > 0)
+ *   locationHandle     – optional location transform (may be NULL for identity)
+ *   outHandle          – receives the new solid shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_revolved(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     faceHandle,
+    double axisOriginX, double axisOriginY, double axisOriginZ,
+    double axisDirX,    double axisDirY,    double axisDirZ,
+    double angle,
+    XbimLocationHandle  locationHandle,
+    XbimShapeHandle*    outHandle);
+
+/*
+ * Build a tapered revolved area solid via MakePipeShell along an arc.
+ * Sweeps between start and end profile faces along a circular arc path
+ * around the revolution axis. Supports hollow profiles with inner wires.
+ *
+ *   ctx                – a valid context handle (used for logging; may be NULL)
+ *   faceHandle         – start profile face handle
+ *   endFaceHandle      – end profile face handle (may differ from start)
+ *   axisOriginX/Y/Z    – revolution axis origin point
+ *   axisDirX/Y/Z       – revolution axis direction (unit vector)
+ *   angle              – revolution angle in radians (must be > 0; clamped to 2*PI)
+ *   precision          – surface generation tolerance (from model precision)
+ *   locationHandle     – optional location transform (may be NULL for identity)
+ *   outHandle          – receives the new shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_revolved_tapered(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     faceHandle,
+    XbimShapeHandle     endFaceHandle,
+    double axisOriginX, double axisOriginY, double axisOriginZ,
+    double axisDirX,    double axisDirY,    double axisDirZ,
+    double angle,
+    double precision,
+    XbimLocationHandle  locationHandle,
+    XbimShapeHandle*    outHandle);
+
 /* ── Parametric profile primitives ────────────────────────────────────────── */
 
 /*

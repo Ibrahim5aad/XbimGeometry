@@ -188,6 +188,30 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeLocationHandle? locationHandle,
             out NativeShapeHandle outHandle);
 
+        // ── Sweep operations (revolved area solids) ───────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_solid_build_revolved(
+            NativeContextHandle ctx,
+            NativeShapeHandle faceHandle,
+            double axisOriginX, double axisOriginY, double axisOriginZ,
+            double axisDirX, double axisDirY, double axisDirZ,
+            double angle,
+            NativeLocationHandle? locationHandle,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_solid_build_revolved_tapered(
+            NativeContextHandle ctx,
+            NativeShapeHandle faceHandle,
+            NativeShapeHandle endFaceHandle,
+            double axisOriginX, double axisOriginY, double axisOriginZ,
+            double axisDirX, double axisDirY, double axisDirZ,
+            double angle,
+            double precision,
+            NativeLocationHandle? locationHandle,
+            out NativeShapeHandle outHandle);
+
         // ── Parametric profile primitives ────────────────────────────────
 
         [DllImport(Lib, CallingConvention = CC)]
