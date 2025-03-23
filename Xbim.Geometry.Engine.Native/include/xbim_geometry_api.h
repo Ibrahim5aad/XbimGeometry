@@ -509,6 +509,61 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_revolved_tapered(
     XbimLocationHandle  locationHandle,
     XbimShapeHandle*    outHandle);
 
+/*
+ * Build a swept disk solid by sweeping a circular cross-section along a wire directrix.
+ * Ports NSolidFactory::BuildSweptDiskSolid from the C++/CLI engine.
+ *
+ * The directrix is a wire (shape handle of type Wire). A circle of the given
+ * radius is swept along the wire using BRepOffsetAPI_MakePipeShell.
+ * If innerRadius > 0, a hollow tube is created.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   directrixHandle  – a shape handle containing a TopoDS_Wire (the sweep path)
+ *   radius           – outer radius of the circular cross-section (must be > 0)
+ *   innerRadius      – inner radius for hollow tubes (use NaN or <= 0 for solid)
+ *   outHandle        – receives the new solid shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_swept_disk(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     directrixHandle,
+    double              radius,
+    double              innerRadius,
+    XbimShapeHandle*    outHandle);
+
+/*
+ * Build a fixed reference swept area solid.
+ * Sweeps a planar face along a wire directrix, maintaining orientation relative
+ * to a reference surface. Ports NSolidFactory::BuildSurfaceCurveSweptAreaSolid.
+ *
+ * The reference surface is defined as a plane (origin + normal). The swept area
+ * is repositioned to the start of the directrix with its normal tangent to the
+ * sweep path and its X direction perpendicular to the reference surface.
+ *
+ *   ctx                       – a valid context handle (used for logging; may be NULL)
+ *   faceHandle                – the planar swept area face to sweep
+ *   directrixHandle           – a shape handle containing a TopoDS_Wire (the sweep path)
+ *   refSurfaceOriginX/Y/Z    – reference surface plane origin point
+ *   refSurfaceNormalX/Y/Z    – reference surface plane normal direction
+ *   isPlanarReferenceSurface  – 1 if reference surface is planar, 0 otherwise
+ *   precision                 – model precision tolerance (> 0)
+ *   locationHandle            – optional location transform (may be NULL for identity)
+ *   outHandle                 – receives the new solid shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_fixed_reference_swept(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     faceHandle,
+    XbimShapeHandle     directrixHandle,
+    double refSurfaceOriginX, double refSurfaceOriginY, double refSurfaceOriginZ,
+    double refSurfaceNormalX, double refSurfaceNormalY, double refSurfaceNormalZ,
+    int    isPlanarReferenceSurface,
+    double precision,
+    XbimLocationHandle  locationHandle,
+    XbimShapeHandle*    outHandle);
+
 /* ── Parametric profile primitives ────────────────────────────────────────── */
 
 /*

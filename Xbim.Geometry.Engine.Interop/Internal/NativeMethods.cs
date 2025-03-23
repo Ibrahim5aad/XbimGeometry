@@ -212,6 +212,28 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeLocationHandle? locationHandle,
             out NativeShapeHandle outHandle);
 
+        // ── Sweep operations (swept disk and fixed reference swept) ────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_solid_build_swept_disk(
+            NativeContextHandle ctx,
+            NativeShapeHandle directrixHandle,
+            double radius,
+            double innerRadius,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_solid_build_fixed_reference_swept(
+            NativeContextHandle ctx,
+            NativeShapeHandle faceHandle,
+            NativeShapeHandle directrixHandle,
+            double refSurfaceOriginX, double refSurfaceOriginY, double refSurfaceOriginZ,
+            double refSurfaceNormalX, double refSurfaceNormalY, double refSurfaceNormalZ,
+            int isPlanarReferenceSurface,
+            double precision,
+            NativeLocationHandle? locationHandle,
+            out NativeShapeHandle outHandle);
+
         // ── Parametric profile primitives ────────────────────────────────
 
         [DllImport(Lib, CallingConvention = CC)]
