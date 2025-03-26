@@ -550,4 +550,95 @@ internal static class IfcMoq
             .Returns(MetaData.ExpressType(typeof(IfcMirroredProfileDef)));
         return obj;
     }
+
+    // ── Axis1Placement mock ─────────────────────────────────────────
+
+    public static IIfcAxis1Placement Axis1Placement(
+        IIfcCartesianPoint? loc = null, IIfcDirection? axis = null)
+    {
+        var moq = MakeMoq<IIfcAxis1Placement>();
+        moq.SetupGet(x => x.Location).Returns(loc ?? CartesianPoint3d());
+        moq.SetupGet(x => x.Axis).Returns(axis ?? Direction3d(1, 0, 0));
+        return moq.Object;
+    }
+
+    // ── Sweep solid mocks ───────────────────────────────────────────
+
+    public static IIfcExtrudedAreaSolid ExtrudedAreaSolid(
+        IIfcProfileDef? sweptArea = null,
+        IIfcDirection? direction = null,
+        double depth = 100,
+        IIfcAxis2Placement3D? position = null)
+    {
+        var moq = MakeMoq<IIfcExtrudedAreaSolid>();
+        var obj = moq.Object;
+        moq.SetupGet(x => x.SweptArea).Returns(sweptArea ?? RectangleProfile());
+        moq.SetupGet(x => x.ExtrudedDirection).Returns(direction ?? Direction3d(0, 0, 1));
+        obj.Depth = depth;
+        if (position != null)
+            moq.SetupGet(x => x.Position).Returns(position);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcExtrudedAreaSolid)));
+        return obj;
+    }
+
+    public static IIfcExtrudedAreaSolidTapered ExtrudedAreaSolidTapered(
+        IIfcProfileDef? sweptArea = null,
+        IIfcProfileDef? endSweptArea = null,
+        IIfcDirection? direction = null,
+        double depth = 100,
+        IIfcAxis2Placement3D? position = null)
+    {
+        var moq = MakeMoq<IIfcExtrudedAreaSolidTapered>();
+        var obj = moq.Object;
+        moq.SetupGet(x => x.SweptArea).Returns(sweptArea ?? RectangleProfile(100, 200));
+        moq.SetupGet(x => x.EndSweptArea).Returns(endSweptArea ?? RectangleProfile(50, 100));
+        moq.SetupGet(x => x.ExtrudedDirection).Returns(direction ?? Direction3d(0, 0, 1));
+        obj.Depth = depth;
+        if (position != null)
+            moq.SetupGet(x => x.Position).Returns(position);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcExtrudedAreaSolidTapered)));
+        return obj;
+    }
+
+    public static IIfcRevolvedAreaSolid RevolvedAreaSolid(
+        IIfcProfileDef? sweptArea = null,
+        IIfcAxis1Placement? axis = null,
+        double angle = 360,
+        IIfcAxis2Placement3D? position = null)
+    {
+        var moq = MakeMoq<IIfcRevolvedAreaSolid>();
+        var obj = moq.Object;
+        moq.SetupGet(x => x.SweptArea).Returns(sweptArea ?? RectangleProfile(10, 20));
+        moq.SetupGet(x => x.Axis).Returns(axis ?? Axis1Placement(
+            CartesianPoint3d(-50, 0, 0), Direction3d(0, 0, 1)));
+        obj.Angle = angle;
+        if (position != null)
+            moq.SetupGet(x => x.Position).Returns(position);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcRevolvedAreaSolid)));
+        return obj;
+    }
+
+    public static IIfcRevolvedAreaSolidTapered RevolvedAreaSolidTapered(
+        IIfcProfileDef? sweptArea = null,
+        IIfcProfileDef? endSweptArea = null,
+        IIfcAxis1Placement? axis = null,
+        double angle = 360,
+        IIfcAxis2Placement3D? position = null)
+    {
+        var moq = MakeMoq<IIfcRevolvedAreaSolidTapered>();
+        var obj = moq.Object;
+        moq.SetupGet(x => x.SweptArea).Returns(sweptArea ?? RectangleProfile(10, 20));
+        moq.SetupGet(x => x.EndSweptArea).Returns(endSweptArea ?? RectangleProfile(5, 10));
+        moq.SetupGet(x => x.Axis).Returns(axis ?? Axis1Placement(
+            CartesianPoint3d(-50, 0, 0), Direction3d(0, 0, 1)));
+        obj.Angle = angle;
+        if (position != null)
+            moq.SetupGet(x => x.Position).Returns(position);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcRevolvedAreaSolidTapered)));
+        return obj;
+    }
 }

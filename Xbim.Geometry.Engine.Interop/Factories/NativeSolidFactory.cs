@@ -171,13 +171,236 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         #endregion
 
-        #region Not Yet Implemented (future features)
+        #region Swept Area Solids
 
         public IXShape Build(IIfcSolidModel ifcSolid)
         {
-            throw new NotImplementedException(
-                "Build(IIfcSolidModel) requires sweep and boolean support (SWEEP-004, BOOL-003).");
+            if (!Enum.TryParse<XSolidModelType>(ifcSolid.ExpressType.ExpressName, out var solidType))
+                throw new NotSupportedException(
+                    $"Unsupported solid model type: {ifcSolid.ExpressType.ExpressName}");
+
+            return solidType switch
+            {
+                XSolidModelType.IfcExtrudedAreaSolid => BuildExtrudedAreaSolid((IIfcExtrudedAreaSolid)ifcSolid),
+                XSolidModelType.IfcExtrudedAreaSolidTapered => BuildExtrudedAreaSolidTapered((IIfcExtrudedAreaSolidTapered)ifcSolid),
+                XSolidModelType.IfcRevolvedAreaSolid => BuildRevolvedAreaSolid((IIfcRevolvedAreaSolid)ifcSolid),
+                XSolidModelType.IfcRevolvedAreaSolidTapered => BuildRevolvedAreaSolidTapered((IIfcRevolvedAreaSolidTapered)ifcSolid),
+                XSolidModelType.IfcSweptDiskSolid => BuildSweptDiskSolid((IIfcSweptDiskSolid)ifcSolid),
+                XSolidModelType.IfcSweptDiskSolidPolygonal => BuildSweptDiskSolid((IIfcSweptDiskSolid)ifcSolid),
+                XSolidModelType.IfcFixedReferenceSweptAreaSolid => BuildFixedReferenceSweptAreaSolid((IIfcFixedReferenceSweptAreaSolid)ifcSolid),
+                XSolidModelType.IfcSurfaceCurveSweptAreaSolid => BuildSurfaceCurveSweptAreaSolid((IIfcSurfaceCurveSweptAreaSolid)ifcSolid),
+                _ => throw new NotSupportedException(
+                    $"Solid model type {solidType} is not yet implemented in the P/Invoke layer.")
+            };
         }
+
+        private IXShape BuildExtrudedAreaSolid(IIfcExtrudedAreaSolid extrudedSolid)
+        {
+            if (extrudedSolid.Depth <= 0)
+                throw new InvalidOperationException(
+                    $"Extruded area solid #{extrudedSolid.EntityLabel} has depth <= 0.");
+
+            if (!NativeGeometryFactory.BuildDirection3d(extrudedSolid.ExtrudedDirection,
+                    out double dirX, out double dirY, out double dirZ))
+                throw new InvalidOperationException(
+                    $"Extruded area solid #{extrudedSolid.EntityLabel} has invalid extrusion direction.");
+
+            // Build the swept profile face
+            var profileFace = (NativeFace)_modelService.ProfileFactory.BuildFace(extrudedSolid.SweptArea);
+
+            // Build optional position location (IntPtr.Zero = identity)
+            IntPtr locationPtr = IntPtr.Zero;
+            if (extrudedSolid.Position != null)
+            {
+                var location = ((NativeGeometryFactory)_modelService.GeometryFactory)
+                    .BuildLocationFromAxis3D(extrudedSolid.Position);
+                locationPtr = location.Handle.DangerousGetHandle();
+            }
+
+            int result = NativeMethods.xbim_solid_build_extruded(
+                ContextHandle,
+                profileFace.Handle,
+                dirX, dirY, dirZ,
+                extrudedSolid.Depth,
+                locationPtr,
+                out var shapeHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build extruded area solid #{extrudedSolid.EntityLabel}: {NativeMethods.GetLastError()}");
+
+            return NativeShapeFactory.WrapSolid(shapeHandle);
+        }
+
+        private IXShape BuildExtrudedAreaSolidTapered(IIfcExtrudedAreaSolidTapered extrudedTapered)
+        {
+            if (extrudedTapered.Depth <= 0)
+                throw new InvalidOperationException(
+                    $"Extruded area solid tapered #{extrudedTapered.EntityLabel} has depth <= 0.");
+
+            if (!NativeGeometryFactory.BuildDirection3d(extrudedTapered.ExtrudedDirection,
+                    out double dirX, out double dirY, out double dirZ))
+                throw new InvalidOperationException(
+                    $"Extruded area solid tapered #{extrudedTapered.EntityLabel} has invalid extrusion direction.");
+
+            // Build start and end profile faces
+            var startFace = (NativeFace)_modelService.ProfileFactory.BuildFace(extrudedTapered.SweptArea);
+            var endFace = (NativeFace)_modelService.ProfileFactory.BuildFace(extrudedTapered.EndSweptArea);
+
+            // Build optional position location (IntPtr.Zero = identity)
+            IntPtr locationPtr = IntPtr.Zero;
+            if (extrudedTapered.Position != null)
+            {
+                var location = ((NativeGeometryFactory)_modelService.GeometryFactory)
+                    .BuildLocationFromAxis3D(extrudedTapered.Position);
+                locationPtr = location.Handle.DangerousGetHandle();
+            }
+
+            int result = NativeMethods.xbim_solid_build_extruded_tapered(
+                ContextHandle,
+                startFace.Handle,
+                endFace.Handle,
+                dirX, dirY, dirZ,
+                extrudedTapered.Depth,
+                _modelService.Precision,
+                locationPtr,
+                out var shapeHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build extruded area solid tapered #{extrudedTapered.EntityLabel}: {NativeMethods.GetLastError()}");
+
+            return NativeShapeFactory.WrapSolid(shapeHandle);
+        }
+
+        private IXShape BuildRevolvedAreaSolid(IIfcRevolvedAreaSolid revolvedSolid)
+        {
+            if (revolvedSolid.Angle <= 0)
+                throw new InvalidOperationException(
+                    $"Revolved area solid #{revolvedSolid.EntityLabel} has angle <= 0.");
+
+            // Build the swept profile face
+            var profileFace = (NativeFace)_modelService.ProfileFactory.BuildFace(revolvedSolid.SweptArea);
+
+            // Extract axis: origin + direction from the Axis placement
+            var axisPoint = NativeGeometryFactory.BuildPoint3d(revolvedSolid.Axis.Location);
+            double axisOriginX = axisPoint.X, axisOriginY = axisPoint.Y, axisOriginZ = axisPoint.Z;
+
+            if (!NativeGeometryFactory.BuildDirection3d(revolvedSolid.Axis.Axis,
+                    out double axisDirX, out double axisDirY, out double axisDirZ))
+                throw new InvalidOperationException(
+                    $"Revolved area solid #{revolvedSolid.EntityLabel} has invalid revolution axis direction.");
+
+            // Convert angle to radians
+            double angleRadians = revolvedSolid.Angle * _modelService.RadianFactor;
+
+            // Build optional position location (IntPtr.Zero = identity)
+            IntPtr locationPtr = IntPtr.Zero;
+            if (revolvedSolid.Position != null)
+            {
+                var location = ((NativeGeometryFactory)_modelService.GeometryFactory)
+                    .BuildLocationFromAxis3D(revolvedSolid.Position);
+                locationPtr = location.Handle.DangerousGetHandle();
+            }
+
+            int result = NativeMethods.xbim_solid_build_revolved(
+                ContextHandle,
+                profileFace.Handle,
+                axisOriginX, axisOriginY, axisOriginZ,
+                axisDirX, axisDirY, axisDirZ,
+                angleRadians,
+                locationPtr,
+                out var shapeHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build revolved area solid #{revolvedSolid.EntityLabel}: {NativeMethods.GetLastError()}");
+
+            return NativeShapeFactory.WrapSolid(shapeHandle);
+        }
+
+        private IXShape BuildRevolvedAreaSolidTapered(IIfcRevolvedAreaSolidTapered revolvedTapered)
+        {
+            if (revolvedTapered.Angle <= 0)
+                throw new InvalidOperationException(
+                    $"Revolved area solid tapered #{revolvedTapered.EntityLabel} has angle <= 0.");
+
+            // Build start and end profile faces
+            var startFace = (NativeFace)_modelService.ProfileFactory.BuildFace(revolvedTapered.SweptArea);
+            var endFace = (NativeFace)_modelService.ProfileFactory.BuildFace(revolvedTapered.EndSweptArea);
+
+            // Extract axis
+            var axisPoint = NativeGeometryFactory.BuildPoint3d(revolvedTapered.Axis.Location);
+            double axisOriginX = axisPoint.X, axisOriginY = axisPoint.Y, axisOriginZ = axisPoint.Z;
+
+            if (!NativeGeometryFactory.BuildDirection3d(revolvedTapered.Axis.Axis,
+                    out double axisDirX, out double axisDirY, out double axisDirZ))
+                throw new InvalidOperationException(
+                    $"Revolved area solid tapered #{revolvedTapered.EntityLabel} has invalid revolution axis direction.");
+
+            double angleRadians = revolvedTapered.Angle * _modelService.RadianFactor;
+
+            // Build optional position location (IntPtr.Zero = identity)
+            IntPtr locationPtr = IntPtr.Zero;
+            if (revolvedTapered.Position != null)
+            {
+                var location = ((NativeGeometryFactory)_modelService.GeometryFactory)
+                    .BuildLocationFromAxis3D(revolvedTapered.Position);
+                locationPtr = location.Handle.DangerousGetHandle();
+            }
+
+            int result = NativeMethods.xbim_solid_build_revolved_tapered(
+                ContextHandle,
+                startFace.Handle,
+                endFace.Handle,
+                axisOriginX, axisOriginY, axisOriginZ,
+                axisDirX, axisDirY, axisDirZ,
+                angleRadians,
+                _modelService.Precision,
+                locationPtr,
+                out var shapeHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build revolved area solid tapered #{revolvedTapered.EntityLabel}: {NativeMethods.GetLastError()}");
+
+            return NativeShapeFactory.WrapSolid(shapeHandle);
+        }
+
+        private IXShape BuildSweptDiskSolid(IIfcSweptDiskSolid sweptDisk)
+        {
+            if (sweptDisk.Radius <= 0)
+                throw new InvalidOperationException(
+                    $"Swept disk solid #{sweptDisk.EntityLabel} has radius <= 0.");
+
+            if (sweptDisk.InnerRadius.HasValue && sweptDisk.InnerRadius.Value >= sweptDisk.Radius)
+                throw new InvalidOperationException(
+                    $"Swept disk solid #{sweptDisk.EntityLabel} has inner radius >= outer radius.");
+
+            // Build the directrix wire from the Directrix curve
+            // The directrix is an IIfcCurve — we need to build a wire from it.
+            // This requires WireFactory which delegates to native wire building.
+            throw new NotImplementedException(
+                $"SweptDiskSolid #{sweptDisk.EntityLabel} requires WireFactory/CurveFactory support (TOPO-002/TOPO-006).");
+        }
+
+        private IXShape BuildFixedReferenceSweptAreaSolid(IIfcFixedReferenceSweptAreaSolid fixedRefSwept)
+        {
+            // This requires both WireFactory (for directrix) and SurfaceFactory (for reference surface)
+            throw new NotImplementedException(
+                $"FixedReferenceSweptAreaSolid #{fixedRefSwept.EntityLabel} requires WireFactory and SurfaceFactory support (TOPO-002/TOPO-006).");
+        }
+
+        private IXShape BuildSurfaceCurveSweptAreaSolid(IIfcSurfaceCurveSweptAreaSolid surfaceCurveSwept)
+        {
+            // This requires WireFactory (for directrix) and SurfaceFactory (for reference surface)
+            throw new NotImplementedException(
+                $"SurfaceCurveSweptAreaSolid #{surfaceCurveSwept.EntityLabel} requires WireFactory and SurfaceFactory support (TOPO-002/TOPO-006).");
+        }
+
+        #endregion
+
+        #region Not Yet Implemented (future features)
 
         public IXShape Build(IIfcFacetedBrep ifcBrep)
         {
@@ -212,7 +435,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         public IXShape Build(IIfcSectionedSpine ifcSectionedSpine)
         {
             throw new NotImplementedException(
-                "Build(IIfcSectionedSpine) requires sweep factory support (SWEEP-003).");
+                "Build(IIfcSectionedSpine) requires sweep factory support.");
         }
 
         #endregion
