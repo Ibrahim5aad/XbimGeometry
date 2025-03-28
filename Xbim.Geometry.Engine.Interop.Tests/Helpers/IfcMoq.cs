@@ -641,4 +641,21 @@ internal static class IfcMoq
             .Returns(MetaData.ExpressType(typeof(IfcRevolvedAreaSolidTapered)));
         return obj;
     }
+
+    public static IIfcSweptDiskSolid SweptDiskSolid(
+        double radius = 20, double innerRadius = 0,
+        IIfcCurve? directrix = null)
+    {
+        var moq = MakeMoq<IIfcSweptDiskSolid>();
+        var obj = moq.Object;
+        obj.Radius = radius;
+        if (innerRadius > 0)
+            obj.InnerRadius = innerRadius;
+        // Directrix is a simple line mock — just needs to exist for validation
+        if (directrix != null)
+            moq.SetupGet(x => x.Directrix).Returns(directrix);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcSweptDiskSolid)));
+        return obj;
+    }
 }
