@@ -208,13 +208,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             // Build the swept profile face
             var profileFace = (NativeFace)_modelService.ProfileFactory.BuildFace(extrudedSolid.SweptArea);
 
-            // Build optional position location (IntPtr.Zero = identity)
-            IntPtr locationPtr = IntPtr.Zero;
+            // Build optional position location (NullHandle = identity)
+            var locationHandle = NativeLocationHandle.NullHandle;
             if (extrudedSolid.Position != null)
             {
-                var location = ((NativeGeometryFactory)_modelService.GeometryFactory)
-                    .BuildLocationFromAxis3D(extrudedSolid.Position);
-                locationPtr = location.Handle.DangerousGetHandle();
+                locationHandle = ((NativeGeometryFactory)_modelService.GeometryFactory)
+                    .BuildLocationFromAxis3D(extrudedSolid.Position).Handle;
             }
 
             int result = NativeMethods.xbim_solid_build_extruded(
@@ -222,7 +221,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 profileFace.Handle,
                 dirX, dirY, dirZ,
                 extrudedSolid.Depth,
-                locationPtr,
+                locationHandle,
                 out var shapeHandle);
 
             if (result != 0)
@@ -247,13 +246,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var startFace = (NativeFace)_modelService.ProfileFactory.BuildFace(extrudedTapered.SweptArea);
             var endFace = (NativeFace)_modelService.ProfileFactory.BuildFace(extrudedTapered.EndSweptArea);
 
-            // Build optional position location (IntPtr.Zero = identity)
-            IntPtr locationPtr = IntPtr.Zero;
+            // Build optional position location (NullHandle = identity)
+            var locationHandle = NativeLocationHandle.NullHandle;
             if (extrudedTapered.Position != null)
             {
-                var location = ((NativeGeometryFactory)_modelService.GeometryFactory)
-                    .BuildLocationFromAxis3D(extrudedTapered.Position);
-                locationPtr = location.Handle.DangerousGetHandle();
+                locationHandle = ((NativeGeometryFactory)_modelService.GeometryFactory)
+                    .BuildLocationFromAxis3D(extrudedTapered.Position).Handle;
             }
 
             int result = NativeMethods.xbim_solid_build_extruded_tapered(
@@ -263,7 +261,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 dirX, dirY, dirZ,
                 extrudedTapered.Depth,
                 _modelService.Precision,
-                locationPtr,
+                locationHandle,
                 out var shapeHandle);
 
             if (result != 0)
@@ -294,13 +292,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             // Convert angle to radians
             double angleRadians = revolvedSolid.Angle * _modelService.RadianFactor;
 
-            // Build optional position location (IntPtr.Zero = identity)
-            IntPtr locationPtr = IntPtr.Zero;
+            // Build optional position location (NullHandle = identity)
+            var locationHandle = NativeLocationHandle.NullHandle;
             if (revolvedSolid.Position != null)
             {
-                var location = ((NativeGeometryFactory)_modelService.GeometryFactory)
-                    .BuildLocationFromAxis3D(revolvedSolid.Position);
-                locationPtr = location.Handle.DangerousGetHandle();
+                locationHandle = ((NativeGeometryFactory)_modelService.GeometryFactory)
+                    .BuildLocationFromAxis3D(revolvedSolid.Position).Handle;
             }
 
             int result = NativeMethods.xbim_solid_build_revolved(
@@ -309,7 +306,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 axisOriginX, axisOriginY, axisOriginZ,
                 axisDirX, axisDirY, axisDirZ,
                 angleRadians,
-                locationPtr,
+                locationHandle,
                 out var shapeHandle);
 
             if (result != 0)
@@ -340,13 +337,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             double angleRadians = revolvedTapered.Angle * _modelService.RadianFactor;
 
-            // Build optional position location (IntPtr.Zero = identity)
-            IntPtr locationPtr = IntPtr.Zero;
+            // Build optional position location (NullHandle = identity)
+            var locationHandle = NativeLocationHandle.NullHandle;
             if (revolvedTapered.Position != null)
             {
-                var location = ((NativeGeometryFactory)_modelService.GeometryFactory)
-                    .BuildLocationFromAxis3D(revolvedTapered.Position);
-                locationPtr = location.Handle.DangerousGetHandle();
+                locationHandle = ((NativeGeometryFactory)_modelService.GeometryFactory)
+                    .BuildLocationFromAxis3D(revolvedTapered.Position).Handle;
             }
 
             int result = NativeMethods.xbim_solid_build_revolved_tapered(
@@ -357,7 +353,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 axisDirX, axisDirY, axisDirZ,
                 angleRadians,
                 _modelService.Precision,
-                locationPtr,
+                locationHandle,
                 out var shapeHandle);
 
             if (result != 0)

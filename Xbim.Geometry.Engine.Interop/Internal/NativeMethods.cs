@@ -174,7 +174,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeShapeHandle faceHandle,
             double dirX, double dirY, double dirZ,
             double depth,
-            IntPtr locationHandle,
+            NativeLocationHandle locationHandle,
             out NativeShapeHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
@@ -185,7 +185,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double dirX, double dirY, double dirZ,
             double depth,
             double precision,
-            IntPtr locationHandle,
+            NativeLocationHandle locationHandle,
             out NativeShapeHandle outHandle);
 
         // ── Sweep operations (revolved area solids) ───────────────────────
@@ -197,7 +197,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double axisOriginX, double axisOriginY, double axisOriginZ,
             double axisDirX, double axisDirY, double axisDirZ,
             double angle,
-            IntPtr locationHandle,
+            NativeLocationHandle locationHandle,
             out NativeShapeHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
@@ -209,7 +209,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double axisDirX, double axisDirY, double axisDirZ,
             double angle,
             double precision,
-            IntPtr locationHandle,
+            NativeLocationHandle locationHandle,
             out NativeShapeHandle outHandle);
 
         // ── Sweep operations (swept disk and fixed reference swept) ────────
@@ -231,7 +231,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double refSurfaceNormalX, double refSurfaceNormalY, double refSurfaceNormalZ,
             int isPlanarReferenceSurface,
             double precision,
-            IntPtr locationHandle,
+            NativeLocationHandle locationHandle,
             out NativeShapeHandle outHandle);
 
         // ── Parametric profile primitives ────────────────────────────────

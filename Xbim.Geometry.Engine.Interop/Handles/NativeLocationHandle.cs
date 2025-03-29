@@ -9,12 +9,21 @@ namespace Xbim.Geometry.Engine.Interop.Handles
     /// </summary>
     internal sealed class NativeLocationHandle : SafeHandle
     {
+        /// <summary>
+        /// Sentinel handle representing "no location" (identity transform).
+        /// Passed to native functions that accept an optional location parameter.
+        /// Uses <c>ownsHandle: false</c> so the GC never tries to release it.
+        /// </summary>
+        internal static readonly NativeLocationHandle NullHandle = new NativeLocationHandle(ownsHandle: false);
+
         static NativeLocationHandle()
         {
             NativeLibraryLoader.EnsureLoaded();
         }
 
         public NativeLocationHandle() : base(IntPtr.Zero, ownsHandle: true) { }
+
+        private NativeLocationHandle(bool ownsHandle) : base(IntPtr.Zero, ownsHandle) { }
 
         public override bool IsInvalid => handle == IntPtr.Zero;
 
