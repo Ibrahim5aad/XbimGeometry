@@ -364,7 +364,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_rectangular_pyramid(
          */
         double xOff = xLen / 2.0;
         double yOff = yLen / 2.0;
-        double precision = Precision::Confusion();
+        double precision = ctx->precision;
 
         /* Base rectangle corners + apex */
         gp_Pnt bl(0, 0, 0);
@@ -787,7 +787,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_revolved(
 
         /* Apply tolerance fixing */
         ShapeFix_ShapeTolerance tolFixer;
-        tolFixer.LimitTolerance(result, Precision::Confusion());
+        tolFixer.LimitTolerance(result, ctx->precision);
 
         *outHandle = xbim_shape_create_from(result);
         if (!*outHandle)
@@ -881,7 +881,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_revolved_tapered(
         gp_Vec v(origin, faceCentre);
         double radius = v.Magnitude();
 
-        if (radius < Precision::Confusion())
+        if (radius < ctx->precision)
         {
             xbim_set_error("xbim_solid_build_revolved_tapered: profile centre is on the revolution axis");
             return XBIM_INVALID_ARG;
@@ -990,7 +990,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_revolved_tapered(
 
         /* Check solid orientation; reverse if inside-out */
         BRepClass3d_SolidClassifier sc(solid);
-        sc.PerformInfinitePoint(Precision::Confusion());
+        sc.PerformInfinitePoint(ctx->precision);
         if (sc.State() == TopAbs_IN)
         {
             bs.MakeSolid(solid);
@@ -1005,7 +1005,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_revolved_tapered(
 
         /* Apply tolerance fixing */
         ShapeFix_ShapeTolerance tolFixer;
-        tolFixer.LimitTolerance(solid, precision > 0.0 ? precision : Precision::Confusion());
+        tolFixer.LimitTolerance(solid, precision > 0.0 ? precision : ctx->precision);
 
         *outHandle = xbim_shape_create_from(solid);
         if (!*outHandle)
@@ -1271,7 +1271,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_fixed_reference_swept(
 
         TopoDS_Face sweptArea = TopoDS::Face(faceShape);
         TopoDS_Wire directrixWire = TopoDS::Wire(directrixShape);
-        double prec = (precision > 0.0) ? precision : Precision::Confusion();
+        double prec = (precision > 0.0) ? precision : ctx->precision;
 
         /* Build the reference surface (a plane through the given origin with given normal) */
         gp_Pnt refOrigin(refSurfaceOriginX, refSurfaceOriginY, refSurfaceOriginZ);

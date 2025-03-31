@@ -445,7 +445,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rounded_rectangle(
     {
         double xOff = xDim / 2.0;
         double yOff = yDim / 2.0;
-        double precision = Precision::Confusion();
+        double precision = ctx->precision;
 
         gp_Pnt bl(-xOff, -yOff, 0);
         gp_Pnt br( xOff, -yOff, 0);
@@ -577,7 +577,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ishape(
         gp_Pnt p11(-tW / 2.0, dY - tF, 0);
         gp_Pnt p12(-dX, dY - tF, 0);
 
-        double t = Precision::Confusion();
+        double t = ctx->precision;
         BRep_Builder b;
         TopoDS_Vertex v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12;
         b.MakeVertex(v1, p1, t);
@@ -1054,7 +1054,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_cshape(
 
         if (dG > 0.0)
         {
-            if (fabs(tW - dG) < Precision::Confusion())
+            if (fabs(tW - dG) < ctx->precision)
             {
                 /* Girth == wall thickness: 10-vertex variant */
                 gp_Pnt p1(-dX, dY, 0);
@@ -1153,7 +1153,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_cshape(
                     {11, oRad}, {12, oRad}
                 };
 
-                if (fabs(tW - dG) < Precision::Confusion())
+                if (fabs(tW - dG) < ctx->precision)
                 {
                     /* 10-vertex: numbering is sequential 1-10 */
                     FilletSpec specs10[] = {
@@ -1344,7 +1344,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_asymmetric_ishape(
             p9.SetY(p9.Y() - slopeAdj);
         }
 
-        double t = Precision::Confusion();
+        double t = ctx->precision;
         BRep_Builder b;
         TopoDS_Vertex v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12;
         b.MakeVertex(v1,  p1, t);
@@ -1441,7 +1441,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rectangle_hollow(
 
     try
     {
-        double precision = Precision::Confusion();
+        double precision = ctx->precision;
         double xOff = xDim / 2.0;
         double yOff = yDim / 2.0;
 
@@ -1792,7 +1792,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_arbitrary_open(
             gp_Pnt p1(pointsX[i], pointsY[i], 0.0);
             gp_Pnt p2(pointsX[i + 1], pointsY[i + 1], 0.0);
 
-            if (p1.Distance(p2) < Precision::Confusion())
+            if (p1.Distance(p2) < ctx->precision)
                 continue;
 
             wireMaker.Add(BRepBuilderAPI_MakeEdge(p1, p2));
