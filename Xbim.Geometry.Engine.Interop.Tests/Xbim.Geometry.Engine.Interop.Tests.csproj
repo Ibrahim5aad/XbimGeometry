@@ -26,4 +26,21 @@
     <ProjectReference Include="..\Xbim.Geometry.Abstractions\Xbim.Geometry.Abstractions.csproj" />
   </ItemGroup>
 
+  <!-- Copy native DLLs from CMake build output to runtimes/win-x64/native/ after build -->
+  <PropertyGroup>
+    <NativeBuildDir>$(MSBuildThisFileDirectory)..\Xbim.Geometry.Engine.Native\build-vcpkg\Release\</NativeBuildDir>
+  </PropertyGroup>
+
+  <Target Name="CopyNativeDlls" AfterTargets="Build" Condition="Exists('$(NativeBuildDir)xbim_geometry_native.dll')">
+    <PropertyGroup>
+      <NativeOutputDir>$(TargetDir)runtimes\win-x64\native\</NativeOutputDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <NativeDlls Include="$(NativeBuildDir)*.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(NativeOutputDir)" />
+    <Copy SourceFiles="@(NativeDlls)" DestinationFolder="$(NativeOutputDir)" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Copied native DLLs to $(NativeOutputDir)" />
+  </Target>
+
 </Project>
