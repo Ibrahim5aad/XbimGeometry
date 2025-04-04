@@ -1067,6 +1067,77 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_mirrored(
     XbimShapeHandle   parentHandle,
     XbimShapeHandle*  outHandle);
 
+/* ── Boolean operations ────────────────────────────────────────────────── */
+
+/*
+ * Perform a boolean union (fuse) of two shapes.
+ * Combines the body and tool shapes into a single shape containing
+ * the volume of both. Handles empty shapes gracefully.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   bodyHandle       – the first operand shape (must not be NULL)
+ *   toolHandle       – the second operand shape (must not be NULL)
+ *   fuzzyTolerance   – tolerance for the boolean operation (use model precision)
+ *   outHasWarnings   – receives 1 if warnings were generated, 0 otherwise
+ *   outHandle        – receives the resulting shape handle on success
+ *
+ * Returns XBIM_OK on success; XBIM_NULL_SHAPE if both inputs are empty
+ * or the operation produces a null result.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_union(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     bodyHandle,
+    XbimShapeHandle     toolHandle,
+    double              fuzzyTolerance,
+    int*                outHasWarnings,
+    XbimShapeHandle*    outHandle);
+
+/*
+ * Perform a boolean cut (difference) of two shapes.
+ * Subtracts the tool shape from the body shape. If the body is empty,
+ * an empty shape is returned. If the tool is empty, the body is returned.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   bodyHandle       – the shape to cut from (must not be NULL)
+ *   toolHandle       – the shape to subtract (must not be NULL)
+ *   fuzzyTolerance   – tolerance for the boolean operation (use model precision)
+ *   outHasWarnings   – receives 1 if warnings were generated, 0 otherwise
+ *   outHandle        – receives the resulting shape handle on success
+ *
+ * Returns XBIM_OK on success; XBIM_NULL_SHAPE if both inputs are empty
+ * or the operation produces a null result.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_cut(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     bodyHandle,
+    XbimShapeHandle     toolHandle,
+    double              fuzzyTolerance,
+    int*                outHasWarnings,
+    XbimShapeHandle*    outHandle);
+
+/*
+ * Perform a boolean intersection (common) of two shapes.
+ * Returns the volume common to both shapes. If either shape is empty,
+ * returns XBIM_NULL_SHAPE since there can be no intersection.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   bodyHandle       – the first operand shape (must not be NULL)
+ *   toolHandle       – the second operand shape (must not be NULL)
+ *   fuzzyTolerance   – tolerance for the boolean operation (use model precision)
+ *   outHasWarnings   – receives 1 if warnings were generated, 0 otherwise
+ *   outHandle        – receives the resulting shape handle on success
+ *
+ * Returns XBIM_OK on success; XBIM_NULL_SHAPE if either input is empty
+ * or the operation produces a null result.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_intersect(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     bodyHandle,
+    XbimShapeHandle     toolHandle,
+    double              fuzzyTolerance,
+    int*                outHasWarnings,
+    XbimShapeHandle*    outHandle);
+
 /* ── BRep serialization ────────────────────────────────────────────────── */
 
 /*

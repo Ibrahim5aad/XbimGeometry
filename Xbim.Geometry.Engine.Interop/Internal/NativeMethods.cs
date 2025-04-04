@@ -432,6 +432,35 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeContextHandle ctx,
             NativeShapeHandle parentHandle,
             out NativeShapeHandle outHandle);
+
+        // ── Boolean operations ──────────────────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_boolean_union(
+            NativeContextHandle ctx,
+            NativeShapeHandle bodyHandle,
+            NativeShapeHandle toolHandle,
+            double fuzzyTolerance,
+            out int outHasWarnings,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_boolean_cut(
+            NativeContextHandle ctx,
+            NativeShapeHandle bodyHandle,
+            NativeShapeHandle toolHandle,
+            double fuzzyTolerance,
+            out int outHasWarnings,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_boolean_intersect(
+            NativeContextHandle ctx,
+            NativeShapeHandle bodyHandle,
+            NativeShapeHandle toolHandle,
+            double fuzzyTolerance,
+            out int outHasWarnings,
+            out NativeShapeHandle outHandle);
     }
 
     /// <summary>
