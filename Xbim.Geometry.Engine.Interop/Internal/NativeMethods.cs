@@ -461,6 +461,51 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double fuzzyTolerance,
             out int outHasWarnings,
             out NativeShapeHandle outHandle);
+
+        // ── Half-space operations ──────────────────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_halfspace_build(
+            NativeContextHandle ctx,
+            int surfaceType,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double radius,
+            int agreementFlag,
+            double oneMeter,
+            double precision,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_halfspace_build_polygonal_bounded(
+            NativeContextHandle ctx,
+            double surfaceOriginX, double surfaceOriginY, double surfaceOriginZ,
+            double surfaceZDirX, double surfaceZDirY, double surfaceZDirZ,
+            double surfaceXDirX, double surfaceXDirY, double surfaceXDirZ,
+            int agreementFlag,
+            [MarshalAs(UnmanagedType.LPArray)] double[] boundaryPointsX,
+            [MarshalAs(UnmanagedType.LPArray)] double[] boundaryPointsY,
+            int boundaryPointCount,
+            double boundaryOriginX, double boundaryOriginY, double boundaryOriginZ,
+            double boundaryZDirX, double boundaryZDirY, double boundaryZDirZ,
+            double boundaryXDirX, double boundaryXDirY, double boundaryXDirZ,
+            double oneMeter,
+            double precision,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_halfspace_build_boxed(
+            NativeContextHandle ctx,
+            int surfaceType,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double radius,
+            int agreementFlag,
+            double oneMeter,
+            double precision,
+            out NativeShapeHandle outHandle);
     }
 
     /// <summary>

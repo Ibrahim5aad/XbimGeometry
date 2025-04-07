@@ -1138,6 +1138,119 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_intersect(
     int*                outHasWarnings,
     XbimShapeHandle*    outHandle);
 
+/* ── Half-space operations ─────────────────────────────────────────────── */
+
+/*
+ * Surface type for half-space construction.
+ */
+typedef enum XbimSurfaceType
+{
+    XBIM_SURFACE_PLANE       = 0,
+    XBIM_SURFACE_CYLINDRICAL = 1,
+    XBIM_SURFACE_SPHERICAL   = 2
+} XbimSurfaceType;
+
+/*
+ * Build a half-space solid from an elementary surface.
+ * The half-space is an infinite (or very large) solid on one side of
+ * the surface, determined by the agreement flag.
+ *
+ * For planar surfaces: the normal direction is the Z axis of the placement.
+ *   agreementFlag = false → material is on the positive-normal side
+ *   agreementFlag = true  → material is on the negative-normal side
+ *
+ * For cylindrical/spherical surfaces: the surface centre is always in the material.
+ *   agreementFlag = false → material is inside the surface
+ *   agreementFlag = true  → material is outside the surface
+ *
+ *   ctx              – a valid context handle (used for logging/precision; may be NULL)
+ *   surfaceType      – one of XBIM_SURFACE_PLANE/CYLINDRICAL/SPHERICAL
+ *   originX/Y/Z      – surface placement origin
+ *   zDirX/Y/Z        – surface placement Z direction (normal for planes, axis for cylinders/spheres)
+ *   xDirX/Y/Z        – surface placement X direction (reference)
+ *   radius           – radius for cylindrical/spherical surfaces (ignored for plane)
+ *   agreementFlag    – IFC agreement flag (0 = false, non-zero = true)
+ *   oneMeter         – model unit conversion for "one meter" (used for point-in-material offset)
+ *   precision        – model precision tolerance
+ *   outHandle        – receives the new solid shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build(
+    XbimContextHandle ctx,
+    XbimSurfaceType   surfaceType,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double radius,
+    int    agreementFlag,
+    double oneMeter,
+    double precision,
+    XbimShapeHandle*  outHandle);
+
+/*
+ * Build a polygonal bounded half-space solid.
+ * First builds the basic half-space, then intersects it with a prism
+ * created by extruding the polygonal boundary along the surface normal.
+ *
+ * The polygonal boundary is a 2D closed polygon in the XY plane of the
+ * boundary position. It is extruded along Z by ±(100 * oneMeter) to create
+ * a cutting prism, which is then intersected with the half-space.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   surfaceOriginX/Y/Z – base surface placement origin
+ *   surfaceZDirX/Y/Z   – base surface placement Z direction (must be planar)
+ *   surfaceXDirX/Y/Z   – base surface placement X direction
+ *   agreementFlag    – IFC agreement flag (0 = false, non-zero = true)
+ *   boundaryPointsX  – array of X coordinates for the boundary polygon
+ *   boundaryPointsY  – array of Y coordinates for the boundary polygon
+ *   boundaryPointCount – number of boundary points (must be >= 3)
+ *   boundaryOriginX/Y/Z – position of the boundary coordinate system
+ *   boundaryZDirX/Y/Z   – Z direction of the boundary coordinate system
+ *   boundaryXDirX/Y/Z   – X direction of the boundary coordinate system
+ *   oneMeter         – model unit conversion for "one meter"
+ *   precision        – model precision tolerance
+ *   outHandle        – receives the new solid shape handle
+ *
+ * Returns XBIM_OK on success; XBIM_NULL_SHAPE if the boundary is empty
+ * or the intersection produces an empty result.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_polygonal_bounded(
+    XbimContextHandle ctx,
+    double surfaceOriginX, double surfaceOriginY, double surfaceOriginZ,
+    double surfaceZDirX,   double surfaceZDirY,   double surfaceZDirZ,
+    double surfaceXDirX,   double surfaceXDirY,   double surfaceXDirZ,
+    int    agreementFlag,
+    const double* boundaryPointsX,
+    const double* boundaryPointsY,
+    int    boundaryPointCount,
+    double boundaryOriginX, double boundaryOriginY, double boundaryOriginZ,
+    double boundaryZDirX,   double boundaryZDirY,   double boundaryZDirZ,
+    double boundaryXDirX,   double boundaryXDirY,   double boundaryXDirZ,
+    double oneMeter,
+    double precision,
+    XbimShapeHandle*  outHandle);
+
+/*
+ * Build a boxed half-space solid.
+ * Per IFC specification, the boxed half-space is semantically identical
+ * to a basic half-space — the bounding box is only for computational
+ * efficiency hints. This function delegates directly to xbim_halfspace_build.
+ *
+ * Parameters are identical to xbim_halfspace_build.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_boxed(
+    XbimContextHandle ctx,
+    XbimSurfaceType   surfaceType,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double radius,
+    int    agreementFlag,
+    double oneMeter,
+    double precision,
+    XbimShapeHandle*  outHandle);
+
 /* ── BRep serialization ────────────────────────────────────────────────── */
 
 /*
