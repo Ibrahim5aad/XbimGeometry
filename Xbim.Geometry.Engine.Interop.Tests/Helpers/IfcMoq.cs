@@ -105,6 +105,7 @@ internal static class IfcMoq
         modelMoq.SetupGet(m => m.ModelFactors.OneMeter).Returns(millimetre * 1000);
         modelMoq.SetupGet(m => m.ModelFactors.OneFoot).Returns(millimetre * 304.8);
         modelMoq.SetupGet(m => m.ModelFactors.AngleToRadiansConversionFactor).Returns(Math.PI / 180);
+        modelMoq.SetupGet(m => m.ModelFactors.PrecisionBoolean).Returns(precision * 10);
 
         // Set up Instances so OfType<T>() returns empty enumerables (avoids NullRef)
         var instancesMoq = new Mock<IEntityCollection>();
@@ -657,5 +658,61 @@ internal static class IfcMoq
         moq.SetupGet(x => x.ExpressType)
             .Returns(MetaData.ExpressType(typeof(IfcSweptDiskSolid)));
         return obj;
+    }
+
+    // ── Boolean operation mocks ────────────────────────────────────
+
+    public static IIfcBooleanResult BooleanResult(
+        IIfcBooleanOperand firstOperand,
+        IIfcBooleanOperand secondOperand,
+        IfcBooleanOperator op = IfcBooleanOperator.DIFFERENCE,
+        int entityLabel = 100)
+    {
+        var moq = MakeMoq<IIfcBooleanResult>();
+        moq.SetupGet(x => x.FirstOperand).Returns(firstOperand);
+        moq.SetupGet(x => x.SecondOperand).Returns(secondOperand);
+        moq.SetupGet(x => x.Operator).Returns(op);
+        moq.SetupGet(x => x.EntityLabel).Returns(entityLabel);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcBooleanResult)));
+        return moq.Object;
+    }
+
+    public static IIfcBooleanClippingResult BooleanClippingResult(
+        IIfcBooleanOperand firstOperand,
+        IIfcBooleanOperand secondOperand,
+        int entityLabel = 200)
+    {
+        var moq = MakeMoq<IIfcBooleanClippingResult>();
+        moq.SetupGet(x => x.FirstOperand).Returns(firstOperand);
+        moq.SetupGet(x => x.SecondOperand).Returns(secondOperand);
+        moq.SetupGet(x => x.Operator).Returns(IfcBooleanOperator.DIFFERENCE);
+        moq.SetupGet(x => x.EntityLabel).Returns(entityLabel);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcBooleanClippingResult)));
+        return moq.Object;
+    }
+
+    public static IIfcHalfSpaceSolid HalfSpaceSolid(
+        IIfcSurface? baseSurface = null,
+        bool agreementFlag = false,
+        int entityLabel = 300)
+    {
+        var moq = MakeMoq<IIfcHalfSpaceSolid>();
+        moq.SetupGet(x => x.BaseSurface).Returns(baseSurface ?? Plane());
+        moq.SetupGet(x => x.AgreementFlag).Returns(agreementFlag);
+        moq.SetupGet(x => x.EntityLabel).Returns(entityLabel);
+        return moq.Object;
+    }
+
+    public static IIfcPlane Plane(
+        IIfcAxis2Placement3D? position = null)
+    {
+        var moq = MakeMoq<IIfcPlane>();
+        moq.SetupGet(x => x.Position).Returns(position ?? Axis2Placement3d(
+            axis: Direction3d(0, 0, 1),
+            refDir: Direction3d(1, 0, 0),
+            loc: CartesianPoint3d(0, 0, 5)));
+        return moq.Object;
     }
 }

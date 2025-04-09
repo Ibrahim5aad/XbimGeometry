@@ -23,6 +23,7 @@
     <RepositoryUrl>https://github.com/xBimTeam/XbimGeometry/tree/master</RepositoryUrl>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NuGetAudit>false</NuGetAudit>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\XbimOpenSourceKeyFile.snk</AssemblyOriginatorKeyFile>
     <DelaySign>false</DelaySign><DelaySign>false</DelaySign>

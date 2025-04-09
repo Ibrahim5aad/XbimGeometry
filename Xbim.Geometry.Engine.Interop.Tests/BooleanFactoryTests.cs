@@ -1,0 +1,232 @@
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Xbim.Geometry.Abstractions;
+using Xbim.Geometry.Engine.Interop.Services;
+using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Engine.Interop.Tests.Helpers;
+using Xbim.Ifc4.Interfaces;
+using Xunit;
+
+namespace Xbim.Geometry.Engine.Interop.Tests;
+
+public class BooleanFactoryTests : IDisposable
+{
+    private readonly NativeModelGeometryService _service;
+    private readonly IXBooleanFactory _booleanFactory;
+    private readonly IXSolidFactory _solidFactory;
+    private readonly string _brepOutputDir;
+
+    public BooleanFactoryTests()
+    {
+        var loggerFactory = LoggerFactory.Create(b => b.AddConsole().SetMinimumLevel(LogLevel.Debug));
+        var model = IfcMoq.ModelMock();
+        _service = new NativeModelGeometryService(model, loggerFactory);
+        _booleanFactory = _service.BooleanFactory;
+        _solidFactory = _service.SolidFactory;
+
+        _brepOutputDir = Path.Combine(
+            Path.GetDirectoryName(typeof(BooleanFactoryTests).Assembly.Location)!,
+            "BrepOutput");
+        Directory.CreateDirectory(_brepOutputDir);
+    }
+
+    public void Dispose() => _service.Dispose();
+
+    private void SaveBrep(IXShape shape, string name)
+    {
+        if (shape is NativeShape ns)
+        {
+            var path = Path.Combine(_brepOutputDir, $"{name}.brep");
+            ns.WriteBrep(path);
+        }
+    }
+
+    [Fact]
+    public void BooleanCut_TwoBlocks_ProducesValidSolid()
+    {
+        // Arrange: cut a 5x5x5 block (at origin) from a 10x10x10 block
+        var bigBlock = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
+        var smallBlock = IfcMoq.Block(xLen: 5, yLen: 5, zLen: 5);
+
+        var boolResult = IfcMoq.BooleanResult(
+            bigBlock, smallBlock, IfcBooleanOperator.DIFFERENCE);
+
+        // Act
+        var shape = _booleanFactory.Build(boolResult);
+
+        // Assert
+        shape.Should().NotBeNull();
+        SaveBrep(shape, "BooleanCut_TwoBlocks");
+
+        // Volume should be 10*10*10 - 5*5*5 = 1000 - 125 = 875
+        if (shape is IXSolid solid)
+            solid.Volume.Should().BeApproximately(875, 1.0);
+    }
+
+    [Fact]
+    public void BooleanUnion_TwoBlocks_ProducesValidSolid()
+    {
+        // Arrange: union of two identical blocks at same position → should be same volume
+        var block1 = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
+        var block2 = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
+
+        var boolResult = IfcMoq.BooleanResult(
+            block1, block2, IfcBooleanOperator.UNION);
+
+        // Act
+        var shape = _booleanFactory.Build(boolResult);
+
+        // Assert
+        shape.Should().NotBeNull();
+        SaveBrep(shape, "BooleanUnion_TwoBlocks");
+
+        // Union of coincident blocks → volume = 1000
+        if (shape is IXSolid solid)
+            solid.Volume.Should().BeApproximately(1000, 1.0);
+    }
+
+    [Fact]
+    public void BooleanIntersect_TwoBlocks_ProducesValidSolid()
+    {
+        // Arrange: intersection of two identical blocks → same block
+        var block1 = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
+        var block2 = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
+
+        var boolResult = IfcMoq.BooleanResult(
+            block1, block2, IfcBooleanOperator.INTERSECTION);
+
+        // Act
+        var shape = _booleanFactory.Build(boolResult);
+
+        // Assert
+        shape.Should().NotBeNull();
+        SaveBrep(shape, "BooleanIntersect_TwoBlocks");
+
+        // Intersection of coincident blocks → volume = 1000
+        if (shape is IXSolid solid)
+            solid.Volume.Should().BeApproximately(1000, 1.0);
+    }
+
+    [Fact]
+    public void BooleanCut_BlockMinusCylinder_ProducesValidShape()
+    {
+        // Arrange: cut a cylinder (r=3, h=10) from a 10x10x10 block
+        // Both at origin: block spans [0,10]^3, cylinder at origin only has
+        // its first-quadrant quarter inside the block.
+        var block = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
+        var cylinder = IfcMoq.Cylinder(radius: 3, height: 10);
+
+        var boolResult = IfcMoq.BooleanResult(
+            block, cylinder, IfcBooleanOperator.DIFFERENCE);
+
+        // Act
+        var shape = _booleanFactory.Build(boolResult);
+
+        // Assert
+        shape.Should().NotBeNull();
+        SaveBrep(shape, "BooleanCut_BlockMinusCylinder");
+
+        // Volume = 1000 - (pi*9*10)/4 ≈ 1000 - 70.69 ≈ 929.31
+        if (shape is IXSolid solid)
+            solid.Volume.Should().BeApproximately(1000 - Math.PI * 9 * 10 / 4, 2.0);
+    }
+
+    [Fact]
+    public void BooleanCut_NestedResult_ProducesValidShape()
+    {
+        // Arrange: nested boolean: (block - smallBlock1) - smallBlock2
+        // All at origin: 3x3x3 is fully inside the already-removed 5x5x5 region
+        var bigBlock = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
+        var smallBlock1 = IfcMoq.Block(xLen: 5, yLen: 5, zLen: 5);
+        var smallBlock2 = IfcMoq.Block(xLen: 3, yLen: 3, zLen: 3);
+
+        var innerBool = IfcMoq.BooleanResult(
+            bigBlock, smallBlock1, IfcBooleanOperator.DIFFERENCE, entityLabel: 101);
+
+        var outerBool = IfcMoq.BooleanResult(
+            innerBool, smallBlock2, IfcBooleanOperator.DIFFERENCE, entityLabel: 102);
+
+        // Act
+        var shape = _booleanFactory.Build(outerBool);
+
+        // Assert
+        shape.Should().NotBeNull();
+        SaveBrep(shape, "BooleanCut_Nested");
+
+        // Volume = 1000 - 125 = 875 (3x3x3 already inside removed 5x5x5 region)
+        if (shape is IXSolid solid)
+            solid.Volume.Should().BeApproximately(875, 1.0);
+    }
+
+    [Fact]
+    public void BooleanCut_WithHalfSpace_ProducesValidSolid()
+    {
+        // Arrange: clip a 10x10x10 block with a half-space plane at z=5
+        // The plane is at z=5, agreement=false means material below (z<5)
+        // So cutting with half-space removes material above z=5
+        var block = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
+
+        var plane = IfcMoq.Plane(IfcMoq.Axis2Placement3d(
+            axis: IfcMoq.Direction3d(0, 0, 1),
+            refDir: IfcMoq.Direction3d(1, 0, 0),
+            loc: IfcMoq.CartesianPoint3d(0, 0, 5)));
+
+        var halfSpace = IfcMoq.HalfSpaceSolid(baseSurface: plane, agreementFlag: false);
+
+        var boolResult = IfcMoq.BooleanResult(
+            block, halfSpace, IfcBooleanOperator.DIFFERENCE);
+
+        // Act
+        var shape = _booleanFactory.Build(boolResult);
+
+        // Assert
+        shape.Should().NotBeNull();
+        SaveBrep(shape, "BooleanCut_HalfSpace");
+    }
+
+    [Fact]
+    public void BooleanClippingResult_ProducesValidShape()
+    {
+        // Arrange: IIfcBooleanClippingResult is a subtype of IIfcBooleanResult
+        var block = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
+
+        var plane = IfcMoq.Plane(IfcMoq.Axis2Placement3d(
+            axis: IfcMoq.Direction3d(0, 0, 1),
+            refDir: IfcMoq.Direction3d(1, 0, 0),
+            loc: IfcMoq.CartesianPoint3d(0, 0, 5)));
+
+        var halfSpace = IfcMoq.HalfSpaceSolid(baseSurface: plane, agreementFlag: false);
+
+        var clippingResult = IfcMoq.BooleanClippingResult(block, halfSpace);
+
+        // Act
+        var shape = _booleanFactory.Build(clippingResult);
+
+        // Assert
+        shape.Should().NotBeNull();
+        SaveBrep(shape, "BooleanClippingResult");
+    }
+
+    [Fact]
+    public void BooleanCut_CSGPrimitiveOperand_ProducesValidShape()
+    {
+        // Arrange: cut a sphere from a block
+        var block = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
+        var sphere = IfcMoq.Sphere(radius: 3);
+
+        var boolResult = IfcMoq.BooleanResult(
+            block, sphere, IfcBooleanOperator.DIFFERENCE);
+
+        // Act
+        var shape = _booleanFactory.Build(boolResult);
+
+        // Assert
+        shape.Should().NotBeNull();
+        SaveBrep(shape, "BooleanCut_CSGPrimitive");
+
+        // Sphere at origin: only 1/8 (positive octant) intersects block [0,10]^3
+        // Volume = 1000 - (4/3)*pi*27/8 ≈ 1000 - 14.14 ≈ 985.86
+        if (shape is IXSolid solid)
+            solid.Volume.Should().BeApproximately(1000 - (4.0 / 3) * Math.PI * 27 / 8, 2.0);
+    }
+}

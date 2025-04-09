@@ -13,8 +13,8 @@ using Xbim.Ifc4.Interfaces;
 namespace Xbim.Geometry.Engine.Interop.Services
 {
     /// <summary>
-    /// Cross-platform implementation of <see cref="IXModelGeometryService"/> backed by
-    /// a native context handle via P/Invoke. Replaces the C++/CLI ModelGeometryService.
+    /// Manages geometry service lifecycle for an IFC model, providing access to
+    /// factory instances and model-level parameters (precision, unit factors, tolerances).
     /// </summary>
     internal class NativeModelGeometryService : IXModelGeometryService, IDisposable
     {
@@ -32,6 +32,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         private NativeSolidFactory? _solidFactory;
         private NativeProfileFactory? _profileFactory;
         private NativeGeometryFactory? _geometryFactory;
+        private NativeBooleanFactory? _booleanFactory;
 
         public NativeModelGeometryService(IModel model, ILoggerFactory loggerFactory)
         {
@@ -110,7 +111,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         public IXShellFactory ShellFactory => throw new NotImplementedException("ShellFactory not yet implemented in P/Invoke layer.");
         public IXSolidFactory SolidFactory => _solidFactory ??= new NativeSolidFactory(this, _logger);
         public IXCompoundFactory CompoundFactory => throw new NotImplementedException("CompoundFactory not yet implemented in P/Invoke layer.");
-        public IXBooleanFactory BooleanFactory => throw new NotImplementedException("BooleanFactory not yet implemented in P/Invoke layer.");
+        public IXBooleanFactory BooleanFactory => _booleanFactory ??= new NativeBooleanFactory(this, _logger);
         public IXShapeFactory ShapeFactory => throw new NotImplementedException("ShapeFactory not yet implemented in P/Invoke layer.");
         public IXProfileFactory ProfileFactory => _profileFactory ??= new NativeProfileFactory(this, _logger);
         public IXMaterialFactory MaterialFactory => throw new NotImplementedException("MaterialFactory not yet implemented in P/Invoke layer.");

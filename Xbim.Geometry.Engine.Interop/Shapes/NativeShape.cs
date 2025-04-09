@@ -24,6 +24,20 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         internal NativeShapeHandle Handle =>
             _handle ?? throw new ObjectDisposedException(nameof(NativeShape));
 
+        /// <summary>
+        /// Transfers ownership of the underlying handle out of this shape.
+        /// After calling this, the shape wrapper no longer owns or disposes the handle.
+        /// Used by <see cref="Factories.NativeBooleanFactory"/> to pass intermediate
+        /// operand handles to native boolean operations without double-free.
+        /// </summary>
+        internal NativeShapeHandle TakeHandle()
+        {
+            var h = _handle ?? throw new ObjectDisposedException(nameof(NativeShape));
+            _handle = null!;
+            _disposed = true;
+            return h;
+        }
+
         public XShapeType ShapeType
         {
             get
