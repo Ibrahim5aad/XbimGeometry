@@ -10,10 +10,9 @@ using Xbim.Ifc4x3.GeometryResource;
 namespace Xbim.Geometry.Engine.Interop.Factories
 {
     /// <summary>
-    /// Cross-platform implementation of <see cref="IXGeometryFactory"/> porting the
-    /// placement/direction/point conversion methods from the C++/CLI GeometryFactory.
-    /// IFC data extraction happens entirely in C#; native P/Invoke calls are used
-    /// only for creating location handles from axis-2 placement parameters.
+    /// Converts IFC placement, direction, and point entities into native geometry
+    /// representations. Handles axis-2 placement to location transform conversion
+    /// and provides helper methods for extracting 2D/3D direction and point data.
     /// </summary>
     internal class NativeGeometryFactory : IXGeometryFactory
     {

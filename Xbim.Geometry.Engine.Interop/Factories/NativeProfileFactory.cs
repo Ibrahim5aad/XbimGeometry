@@ -13,9 +13,9 @@ using Xbim.Ifc4.GeometryResource;
 namespace Xbim.Geometry.Engine.Interop.Factories
 {
     /// <summary>
-    /// Cross-platform implementation of <see cref="IXProfileFactory"/> porting the
-    /// IFC data extraction from the C++/CLI ProfileFactory. Extracts geometric parameters
-    /// from IFC profile entities in C# and delegates profile construction to native P/Invoke calls.
+    /// Builds 2D profile faces from IFC profile definition entities (parametric, arbitrary,
+    /// composite, derived). Extracts geometric parameters from IFC entities and delegates
+    /// profile face construction to native OCCT operations.
     /// </summary>
     internal class NativeProfileFactory : IXProfileFactory
     {

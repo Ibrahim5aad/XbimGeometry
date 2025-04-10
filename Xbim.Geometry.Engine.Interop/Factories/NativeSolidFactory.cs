@@ -10,9 +10,9 @@ using Xbim.Ifc4.Interfaces;
 namespace Xbim.Geometry.Engine.Interop.Factories
 {
     /// <summary>
-    /// Cross-platform implementation of <see cref="IXSolidFactory"/> porting the
-    /// IFC data extraction from the C++/CLI SolidFactory. Extracts geometric parameters
-    /// from IFC entities in C# and delegates solid construction to native P/Invoke calls.
+    /// Builds 3D solids from IFC solid model entities (CSG primitives, extruded/revolved
+    /// sweeps, tapered variants). Extracts geometric parameters from IFC entities and
+    /// delegates solid construction to native OCCT operations.
     /// </summary>
     internal class NativeSolidFactory : IXSolidFactory
     {
