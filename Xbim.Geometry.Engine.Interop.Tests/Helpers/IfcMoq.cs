@@ -660,6 +660,20 @@ internal static class IfcMoq
         return obj;
     }
 
+    // ── CSG solid mocks ────────────────────────────────────────────
+
+    public static IIfcCsgSolid CsgSolid(
+        IIfcCsgSelect treeRoot,
+        int entityLabel = 500)
+    {
+        var moq = MakeMoq<IIfcCsgSolid>();
+        moq.SetupGet(x => x.TreeRootExpression).Returns(treeRoot);
+        moq.SetupGet(x => x.EntityLabel).Returns(entityLabel);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcCsgSolid)));
+        return moq.Object;
+    }
+
     // ── Boolean operation mocks ────────────────────────────────────
 
     public static IIfcBooleanResult BooleanResult(

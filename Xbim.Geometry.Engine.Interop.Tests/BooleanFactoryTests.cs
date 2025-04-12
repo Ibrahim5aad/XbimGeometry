@@ -229,4 +229,66 @@ public class BooleanFactoryTests : IDisposable
         if (shape is IXSolid solid)
             solid.Volume.Should().BeApproximately(1000 - (4.0 / 3) * Math.PI * 27 / 8, 2.0);
     }
+
+    [Fact]
+    public void CsgSolid_WithBooleanTreeRoot_ProducesValidShape()
+    {
+        // Arrange: CSG solid whose tree root is a boolean result (block - cylinder)
+        var block = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
+        var cylinder = IfcMoq.Cylinder(radius: 3, height: 10);
+
+        var boolResult = IfcMoq.BooleanResult(
+            block, cylinder, IfcBooleanOperator.DIFFERENCE);
+
+        var csgSolid = IfcMoq.CsgSolid(boolResult);
+
+        // Act
+        var shape = _solidFactory.Build((IIfcSolidModel)csgSolid);
+
+        // Assert
+        shape.Should().NotBeNull();
+        SaveBrep(shape, "CsgSolid_BooleanTree");
+    }
+
+    [Fact]
+    public void CsgSolid_WithPrimitiveTreeRoot_ProducesValidSolid()
+    {
+        // Arrange: CSG solid whose tree root is a single block primitive
+        var block = IfcMoq.Block(xLen: 10, yLen: 20, zLen: 30);
+        var csgSolid = IfcMoq.CsgSolid(block);
+
+        // Act
+        var shape = _solidFactory.Build((IIfcSolidModel)csgSolid);
+
+        // Assert
+        shape.Should().NotBeNull();
+        shape.Should().BeAssignableTo<IXSolid>();
+        ((IXSolid)shape).Volume.Should().BeApproximately(6000, 0.1);
+        SaveBrep(shape, "CsgSolid_Primitive");
+    }
+
+    [Fact]
+    public void CsgSolid_NestedBooleanTree_ProducesValidShape()
+    {
+        // Arrange: CSG solid with nested boolean tree:
+        // (bigBlock DIFFERENCE smallBlock) UNION sphere
+        var bigBlock = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
+        var smallBlock = IfcMoq.Block(xLen: 5, yLen: 5, zLen: 5);
+        var sphere = IfcMoq.Sphere(radius: 3);
+
+        var innerBool = IfcMoq.BooleanResult(
+            bigBlock, smallBlock, IfcBooleanOperator.DIFFERENCE, entityLabel: 101);
+
+        var outerBool = IfcMoq.BooleanResult(
+            innerBool, sphere, IfcBooleanOperator.UNION, entityLabel: 102);
+
+        var csgSolid = IfcMoq.CsgSolid(outerBool);
+
+        // Act
+        var shape = _solidFactory.Build((IIfcSolidModel)csgSolid);
+
+        // Assert
+        shape.Should().NotBeNull();
+        SaveBrep(shape, "CsgSolid_NestedBooleanTree");
+    }
 }

@@ -181,6 +181,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             return solidType switch
             {
+                XSolidModelType.IfcCsgSolid => BuildCsgSolid((IIfcCsgSolid)ifcSolid),
                 XSolidModelType.IfcExtrudedAreaSolid => BuildExtrudedAreaSolid((IIfcExtrudedAreaSolid)ifcSolid),
                 XSolidModelType.IfcExtrudedAreaSolidTapered => BuildExtrudedAreaSolidTapered((IIfcExtrudedAreaSolidTapered)ifcSolid),
                 XSolidModelType.IfcRevolvedAreaSolid => BuildRevolvedAreaSolid((IIfcRevolvedAreaSolid)ifcSolid),
@@ -392,6 +393,24 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             // This requires WireFactory (for directrix) and SurfaceFactory (for reference surface)
             throw new NotImplementedException(
                 $"SurfaceCurveSweptAreaSolid #{surfaceCurveSwept.EntityLabel} requires WireFactory and SurfaceFactory support (TOPO-002/TOPO-006).");
+        }
+
+        #endregion
+
+        #region CSG Solids
+
+        private IXShape BuildCsgSolid(IIfcCsgSolid ifcCsgSolid)
+        {
+            var treeRoot = ifcCsgSolid.TreeRootExpression;
+
+            if (treeRoot is IIfcBooleanResult boolResult)
+                return _modelService.BooleanFactory.Build(boolResult);
+
+            if (treeRoot is IIfcCsgPrimitive3D csgPrimitive)
+                return Build(csgPrimitive);
+
+            throw new NotSupportedException(
+                $"CSG solid #{ifcCsgSolid.EntityLabel}: unsupported tree root expression type {treeRoot.GetType().Name}.");
         }
 
         #endregion
