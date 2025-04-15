@@ -494,6 +494,32 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double precision,
             out NativeShapeHandle outHandle);
 
+        // ── Compound operations ──────────────────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_compound_make(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] shapeHandles,
+            int numShapes,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_compound_sew(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] shapeHandles,
+            int numShapes,
+            double tolerance,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_compound_cut(
+            NativeContextHandle ctx,
+            NativeShapeHandle compoundHandle,
+            NativeShapeHandle toolHandle,
+            double fuzzyTolerance,
+            out int outHasWarnings,
+            out NativeShapeHandle outHandle);
+
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_halfspace_build_boxed(
             NativeContextHandle ctx,

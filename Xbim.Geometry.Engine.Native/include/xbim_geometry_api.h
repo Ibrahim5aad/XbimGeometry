@@ -1251,6 +1251,69 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_boxed(
     double precision,
     XbimShapeHandle*  outHandle);
 
+/* ── Compound operations ───────────────────────────────────────────────── */
+
+/*
+ * Create a compound shape from an array of child shapes.
+ * Each non-null shape handle is added to the compound using BRep_Builder.
+ * Null handles in the array are skipped with a warning.
+ *
+ *   ctx           – a valid context handle (used for logging; may be NULL)
+ *   shapeHandles  – array of shape handles to combine into the compound
+ *   numShapes     – number of shape handles (must be >= 0)
+ *   outHandle     – receives the new compound shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_make(
+    XbimContextHandle         ctx,
+    const XbimShapeHandle*    shapeHandles,
+    int                       numShapes,
+    XbimShapeHandle*          outHandle);
+
+/*
+ * Sew an array of shapes together using BRepBuilderAPI_Sewing.
+ * Joins adjacent faces/shells that share edges within the given tolerance.
+ * Useful for assembling a watertight shell from loose faces.
+ *
+ *   ctx           – a valid context handle (used for logging; may be NULL)
+ *   shapeHandles  – array of shape handles to sew together
+ *   numShapes     – number of shape handles (must be >= 1)
+ *   tolerance     – sewing tolerance (must be > 0)
+ *   outHandle     – receives the sewn shape handle
+ *
+ * Returns XBIM_OK on success; XBIM_NULL_SHAPE if the result is empty.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_sew(
+    XbimContextHandle         ctx,
+    const XbimShapeHandle*    shapeHandles,
+    int                       numShapes,
+    double                    tolerance,
+    XbimShapeHandle*          outHandle);
+
+/*
+ * Perform a boolean cut (difference) on a compound shape.
+ * Subtracts the tool shape from the compound. If the compound is empty,
+ * returns XBIM_NULL_SHAPE. If the tool is empty, the compound is returned.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   compoundHandle   – the compound shape to cut from (must not be NULL)
+ *   toolHandle       – the shape to subtract (must not be NULL)
+ *   fuzzyTolerance   – tolerance for the boolean operation (use model precision)
+ *   outHasWarnings   – receives 1 if warnings were generated, 0 otherwise
+ *   outHandle        – receives the resulting shape handle on success
+ *
+ * Returns XBIM_OK on success; XBIM_NULL_SHAPE if both inputs are empty
+ * or the operation produces a null result.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_cut(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     compoundHandle,
+    XbimShapeHandle     toolHandle,
+    double              fuzzyTolerance,
+    int*                outHasWarnings,
+    XbimShapeHandle*    outHandle);
+
 /* ── BRep serialization ────────────────────────────────────────────────── */
 
 /*
