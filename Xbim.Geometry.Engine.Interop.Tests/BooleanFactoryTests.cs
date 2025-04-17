@@ -64,11 +64,15 @@ public class BooleanFactoryTests : IDisposable
     }
 
     [Fact]
-    public void BooleanUnion_TwoBlocks_ProducesValidSolid()
+    public void BooleanUnion_TwoOverlappingBlocks_ProducesValidSolid()
     {
-        // Arrange: union of two identical blocks at same position → should be same volume
+        // Arrange: two 10x10x10 blocks, second offset by 5 along X
+        // Block1 spans [0,10] in X, Block2 spans [5,15] in X
+        // Overlap region is [5,10] = 5 units wide → overlap volume = 5*10*10 = 500
+        // Union volume = 1000 + 1000 - 500 = 1500
         var block1 = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
-        var block2 = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
+        var block2 = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10,
+            position: IfcMoq.Axis2Placement3d(loc: IfcMoq.CartesianPoint3d(5, 0, 0)));
 
         var boolResult = IfcMoq.BooleanResult(
             block1, block2, IfcBooleanOperator.UNION);
@@ -78,19 +82,21 @@ public class BooleanFactoryTests : IDisposable
 
         // Assert
         shape.Should().NotBeNull();
-        SaveBrep(shape, "BooleanUnion_TwoBlocks");
+        SaveBrep(shape, "BooleanUnion_OverlappingBlocks");
 
-        // Union of coincident blocks → volume = 1000
-        if (shape is IXSolid solid)
-            solid.Volume.Should().BeApproximately(1000, 1.0);
+        var solid = shape.Should().BeAssignableTo<IXSolid>().Subject;
+        solid.Volume.Should().BeApproximately(1500, 1.0);
     }
 
     [Fact]
-    public void BooleanIntersect_TwoBlocks_ProducesValidSolid()
+    public void BooleanIntersect_TwoOverlappingBlocks_ProducesSmallerSolid()
     {
-        // Arrange: intersection of two identical blocks → same block
+        // Arrange: two 10x10x10 blocks, second offset by 5 along X
+        // Block1 spans [0,10], Block2 spans [5,15] → overlap = [5,10] = 5x10x10
+        // Intersection volume should be 500 (smaller than either original)
         var block1 = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
-        var block2 = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
+        var block2 = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10,
+            position: IfcMoq.Axis2Placement3d(loc: IfcMoq.CartesianPoint3d(5, 0, 0)));
 
         var boolResult = IfcMoq.BooleanResult(
             block1, block2, IfcBooleanOperator.INTERSECTION);
@@ -100,15 +106,15 @@ public class BooleanFactoryTests : IDisposable
 
         // Assert
         shape.Should().NotBeNull();
-        SaveBrep(shape, "BooleanIntersect_TwoBlocks");
+        SaveBrep(shape, "BooleanIntersect_OverlappingBlocks");
 
-        // Intersection of coincident blocks → volume = 1000
-        if (shape is IXSolid solid)
-            solid.Volume.Should().BeApproximately(1000, 1.0);
+        var solid = shape.Should().BeAssignableTo<IXSolid>().Subject;
+        solid.Volume.Should().BeApproximately(500, 1.0,
+            "intersection of two overlapping blocks should produce a smaller solid");
     }
 
     [Fact]
-    public void BooleanCut_BlockMinusCylinder_ProducesValidShape()
+    public void BooleanCut_BlockMinusCylinder_ProducesValidSolidWithCorrectTopology()
     {
         // Arrange: cut a cylinder (r=3, h=10) from a 10x10x10 block
         // Both at origin: block spans [0,10]^3, cylinder at origin only has
@@ -122,13 +128,16 @@ public class BooleanFactoryTests : IDisposable
         // Act
         var shape = _booleanFactory.Build(boolResult);
 
-        // Assert
+        // Assert: shape is a valid closed solid with correct volume
         shape.Should().NotBeNull();
+        shape.IsValidShape().Should().BeTrue("result of boolean cut should be a valid shape");
+        shape.IsClosed.Should().BeTrue("boolean cut result should be topologically closed");
         SaveBrep(shape, "BooleanCut_BlockMinusCylinder");
 
         // Volume = 1000 - (pi*9*10)/4 ≈ 1000 - 70.69 ≈ 929.31
-        if (shape is IXSolid solid)
-            solid.Volume.Should().BeApproximately(1000 - Math.PI * 9 * 10 / 4, 2.0);
+        var solid = shape.Should().BeAssignableTo<IXSolid>().Subject;
+        solid.Volume.Should().BeApproximately(1000 - Math.PI * 9 * 10 / 4, 2.0,
+            "volume should equal block minus quarter-cylinder intersection");
     }
 
     [Fact]
@@ -272,6 +281,10 @@ public class BooleanFactoryTests : IDisposable
     {
         // Arrange: CSG solid with nested boolean tree:
         // (bigBlock DIFFERENCE smallBlock) UNION sphere
+        // Block 10x10x10 at origin, smallBlock 5x5x5 at origin → cut removes 125
+        // Sphere r=3 at origin → 1/8 in positive octant already inside the block
+        // OCCT boolean union with a partially-overlapping sphere may produce
+        // a compound (solid + solid) rather than a single fused solid.
         var bigBlock = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10);
         var smallBlock = IfcMoq.Block(xLen: 5, yLen: 5, zLen: 5);
         var sphere = IfcMoq.Sphere(radius: 3);
@@ -287,8 +300,12 @@ public class BooleanFactoryTests : IDisposable
         // Act
         var shape = _solidFactory.Build((IIfcSolidModel)csgSolid);
 
-        // Assert
+        // Assert: result should be a valid shape (may be solid or compound)
         shape.Should().NotBeNull();
+        shape.IsValidShape().Should().BeTrue("nested CSG tree result should be valid");
+        shape.ShapeType.Should().BeOneOf(
+            new[] { XShapeType.Solid, XShapeType.Compound },
+            "boolean union result should be a solid or compound");
         SaveBrep(shape, "CsgSolid_NestedBooleanTree");
     }
 }
