@@ -56,16 +56,12 @@
 
 /* ── Internal helpers ─────────────────────────────────────────────────────── */
 
-static bool is_empty(const TopoDS_Shape& shape)
+bool is_empty(const TopoDS_Shape& shape)
 {
     return shape.IsNull() || shape.NbChildren() == 0;
 }
 
-/*
- * Reduces a compound to its highest-level topology. If a compound
- * contains only one child, returns that child recursively.
- */
-static TopoDS_Shape trim_topology(const TopoDS_Shape& shape)
+TopoDS_Shape trim_topology(const TopoDS_Shape& shape)
 {
     if (shape.ShapeType() != TopAbs_COMPOUND || shape.NbChildren() != 1)
         return shape;
@@ -80,7 +76,7 @@ static TopoDS_Shape trim_topology(const TopoDS_Shape& shape)
  *   - Result validation and SimplifyResult
  *   - Self-intersection detection with automatic shape fixing (one retry)
  */
-static TopoDS_Shape perform_boolean(
+TopoDS_Shape perform_boolean(
     const XbimContext_* ctx,
     const TopTools_ListOfShape& arguments,
     const TopTools_ListOfShape& tools,

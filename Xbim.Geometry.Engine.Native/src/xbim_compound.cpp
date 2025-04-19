@@ -8,6 +8,7 @@
  */
 
 #include "xbim_compound.h"
+#include "xbim_boolean.h"
 #include "xbim_shape.h"
 #include "xbim_context.h"
 #include "xbim_error.h"
@@ -19,31 +20,8 @@
 #include <TopoDS_Iterator.hxx>
 #include <BRep_Builder.hxx>
 #include <BRepBuilderAPI_Sewing.hxx>
-#include <BRepAlgoAPI_BooleanOperation.hxx>
-#include <BOPAlgo_PaveFiller.hxx>
-#include <BOPAlgo_Alerts.hxx>
-#include <BRepCheck_Analyzer.hxx>
-#include <ShapeFix_Shape.hxx>
 #include <TopTools_ListOfShape.hxx>
 #include <Standard_Failure.hxx>
-#include <Precision.hxx>
-
-#include <sstream>
-
-/* ── Internal helpers ─────────────────────────────────────────────────────── */
-
-static bool is_empty(const TopoDS_Shape& shape)
-{
-    return shape.IsNull() || shape.NbChildren() == 0;
-}
-
-static TopoDS_Shape trim_topology(const TopoDS_Shape& shape)
-{
-    if (shape.ShapeType() != TopAbs_COMPOUND || shape.NbChildren() != 1)
-        return shape;
-    TopoDS_Iterator it(shape);
-    return trim_topology(it.Value());
-}
 
 /* ── Exported C API ───────────────────────────────────────────────────────── */
 
@@ -171,80 +149,22 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_cut(
         return *outHandle ? XBIM_OK : XBIM_ERROR;
     }
 
-    try
+    TopTools_ListOfShape arguments;
+    TopTools_ListOfShape tools;
+    arguments.Append(compound);
+    tools.Append(tool);
+
+    int hasWarnings = 0;
+    TopoDS_Shape result = perform_boolean(ctx, arguments, tools,
+                                                fuzzyTolerance, BOPAlgo_CUT, hasWarnings, false);
+    *outHasWarnings = hasWarnings;
+
+    if (result.IsNull())
     {
-        TopTools_ListOfShape arguments;
-        TopTools_ListOfShape tools;
-        arguments.Append(compound);
-        tools.Append(tool);
-
-        BRepAlgoAPI_BooleanOperation bop;
-        bop.SetArguments(arguments);
-        bop.SetTools(tools);
-        bop.SetOperation(BOPAlgo_CUT);
-        bop.SetRunParallel(false);
-        bop.SetNonDestructive(true);
-        bop.SetFuzzyValue(fuzzyTolerance);
-        bop.Build();
-
-        if (bop.HasErrors())
-        {
-            std::ostringstream msg;
-            auto& report = bop.GetReport();
-            report->Dump(msg);
-            xbim_log_error(ctx, "Compound cut failed: %s", msg.str().c_str());
-            xbim_set_error("Compound boolean cut failed");
-            return XBIM_ERROR;
-        }
-
-        if (!bop.IsDone())
-        {
-            xbim_set_error("Compound boolean cut did not complete");
-            return XBIM_ERROR;
-        }
-
-        TopoDS_Shape result = bop.Shape();
-        BRepCheck_Analyzer analyzer(result);
-        if (!analyzer.IsValid())
-        {
-            xbim_log_warning(ctx, "Compound cut result is invalid, skipping SimplifyResult().");
-            *outHasWarnings = 1;
-        }
-        else
-        {
-            bop.SimplifyResult(true, true, Precision::Angular());
-        }
-
-        // Check for self-intersection warning
-        if (bop.DSFiller()->HasWarning(STANDARD_TYPE(BOPAlgo_AlertAcquiredSelfIntersection)))
-        {
-            xbim_log_warning(ctx, "Compound cut result has acquired self-intersection.");
-            *outHasWarnings = 1;
-
-            // Attempt to fix
-            ShapeFix_Shape fixer(result);
-            if (fixer.Perform())
-            {
-                result = fixer.Shape();
-                xbim_log_debug(ctx, "Self-intersection in compound cut result has been fixed.");
-            }
-        }
-
-        result = trim_topology(result);
-
-        if (result.IsNull())
-        {
-            xbim_set_error("Compound cut produced a null shape");
-            return XBIM_NULL_SHAPE;
-        }
-
-        *outHandle = xbim_shape_create_from(result);
-        return *outHandle ? XBIM_OK : XBIM_ERROR;
+        xbim_set_error("Compound cut produced a null shape");
+        return XBIM_NULL_SHAPE;
     }
-    catch (const Standard_Failure& e)
-    {
-        xbim_log_occt_failure(ctx, e, "Compound cut failed");
-        xbim_set_error("Compound cut failed");
-        return XBIM_ERROR;
-    }
+
+    *outHandle = xbim_shape_create_from(result);
+    return *outHandle ? XBIM_OK : XBIM_ERROR;
 }
