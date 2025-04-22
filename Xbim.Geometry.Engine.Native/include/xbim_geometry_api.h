@@ -1314,6 +1314,120 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_cut(
     int*                outHasWarnings,
     XbimShapeHandle*    outHandle);
 
+/* ── Face construction and queries ────────────────────────────────────── */
+
+/*
+ * Build a face from an elementary surface with no boundary wires.
+ * The surface type is specified as an XbimSurfaceType enum value.
+ * Produces an unbounded (infinite-extent) face trimmed by OCCT defaults.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   surfaceType      – one of XBIM_SURFACE_PLANE/CYLINDRICAL/SPHERICAL
+ *   originX/Y/Z      – surface placement origin
+ *   zDirX/Y/Z        – surface placement Z direction
+ *   xDirX/Y/Z        – surface placement X direction
+ *   radius           – radius for cylindrical/spherical surfaces (ignored for plane)
+ *   tolerance        – geometric tolerance for face construction
+ *   outHandle        – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_surface(
+    XbimContextHandle ctx,
+    int               surfaceType,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double radius,
+    double tolerance,
+    XbimShapeHandle*  outHandle);
+
+/*
+ * Build a planar face from a closed wire.
+ * The wire must define a planar polygon; OCCT infers the plane automatically.
+ *
+ *   ctx          – a valid context handle (used for logging; may be NULL)
+ *   wireHandle   – a shape handle containing a TopoDS_Wire (must be closed and planar)
+ *   outHandle    – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if the handle is not a wire.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_wire(
+    XbimContextHandle ctx,
+    XbimShapeHandle   wireHandle,
+    XbimShapeHandle*  outHandle);
+
+/*
+ * Build an advanced face with a surface, outer wire, optional inner wires,
+ * and orientation control.
+ * Ports NFaceFactory::BuildFace(surface, outerLoop, innerLoops, tolerance, sameSense).
+ *
+ * The outer wire is oriented counter-clockwise (CCW) automatically.
+ * Inner wires are oriented clockwise (CW) to define holes.
+ * For non-planar surfaces, parametric curves (pcurves) are added to the wire
+ * edges via ShapeFix_Wire.
+ *
+ *   ctx                – a valid context handle (used for logging; may be NULL)
+ *   surfaceType        – one of XBIM_SURFACE_PLANE/CYLINDRICAL/SPHERICAL
+ *   originX/Y/Z        – surface placement origin
+ *   zDirX/Y/Z          – surface placement Z direction
+ *   xDirX/Y/Z          – surface placement X direction
+ *   radius             – radius for cylindrical/spherical (ignored for plane)
+ *   outerWireHandle    – shape handle for the outer boundary wire (or face to extract wire from)
+ *   innerWireHandles   – array of shape handles for inner boundary wires/faces (may be NULL)
+ *   numInnerWires      – number of inner wire handles (0 if no holes)
+ *   tolerance          – geometric tolerance for face and pcurve construction
+ *   sameSense          – if non-zero, face normal agrees with surface normal; if zero, reversed
+ *   outHandle          – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced(
+    XbimContextHandle        ctx,
+    int                      surfaceType,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double radius,
+    XbimShapeHandle          outerWireHandle,
+    const XbimShapeHandle*   innerWireHandles,
+    int                      numInnerWires,
+    double                   tolerance,
+    int                      sameSense,
+    XbimShapeHandle*         outHandle);
+
+/*
+ * Compute the surface area of a face shape.
+ * Uses BRepGProp::SurfaceProperties to calculate the area.
+ *
+ *   faceHandle – a valid shape handle (typically a face, but works for any shape)
+ *   outArea    – receives the surface area on success
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_area(
+    XbimShapeHandle faceHandle,
+    double*         outArea);
+
+/*
+ * Compute the outward-pointing normal of a face at a given parametric point.
+ * If u and v are NaN, the normal is evaluated at the parametric centre.
+ *
+ *   faceHandle     – a valid face shape handle
+ *   u              – parametric U coordinate (NaN for centre)
+ *   v              – parametric V coordinate (NaN for centre)
+ *   outNormalX/Y/Z – receives the normal vector components
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if the handle is not a face.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_normal(
+    XbimShapeHandle faceHandle,
+    double          u,
+    double          v,
+    double*         outNormalX,
+    double*         outNormalY,
+    double*         outNormalZ);
+
 /* ── BRep serialization ────────────────────────────────────────────────── */
 
 /*

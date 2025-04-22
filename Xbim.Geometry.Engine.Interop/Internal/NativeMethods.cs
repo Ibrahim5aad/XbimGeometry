@@ -532,6 +532,54 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double oneMeter,
             double precision,
             out NativeShapeHandle outHandle);
+
+        // ── Face construction and queries ──────────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_build_from_surface(
+            NativeContextHandle ctx,
+            int surfaceType,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double radius,
+            double tolerance,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_build_from_wire(
+            NativeContextHandle ctx,
+            NativeShapeHandle wireHandle,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_build_advanced(
+            NativeContextHandle ctx,
+            int surfaceType,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double radius,
+            NativeShapeHandle outerWireHandle,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] innerWireHandles,
+            int numInnerWires,
+            double tolerance,
+            int sameSense,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_area(
+            NativeShapeHandle faceHandle,
+            out double outArea);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_normal(
+            NativeShapeHandle faceHandle,
+            double u,
+            double v,
+            out double outNormalX,
+            out double outNormalY,
+            out double outNormalZ);
     }
 
     /// <summary>
