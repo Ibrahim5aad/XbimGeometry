@@ -580,6 +580,37 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out double outNormalX,
             out double outNormalY,
             out double outNormalZ);
+
+        // ── Wire construction and query ─────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_build_from_edges(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] edgeHandles,
+            int numEdges,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_build_polyline(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] double[] pointsXYZ,
+            int numPoints,
+            double tolerance,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_build_polygon(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] double[] pointsXYZ,
+            int numPoints,
+            int closed,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_is_closed(
+            NativeShapeHandle wireHandle,
+            double tolerance,
+            out int outClosed);
     }
 
     /// <summary>

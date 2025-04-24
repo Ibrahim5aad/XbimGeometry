@@ -1428,6 +1428,85 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_normal(
     double*         outNormalY,
     double*         outNormalZ);
 
+/* ── Wire construction and query ────────────────────────────────────────── */
+
+/*
+ * Build a wire from a sequence of edge shape handles.
+ * The edges are added to the wire in the order provided using BRep_Builder.
+ * NULL or non-edge handles are skipped with a warning.
+ *
+ *   ctx           – a valid context handle (used for logging; may be NULL)
+ *   edgeHandles   – array of shape handles containing TopoDS_Edge shapes
+ *   numEdges      – number of elements in edgeHandles (must be > 0)
+ *   outHandle     – receives the new wire shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_edges(
+    XbimContextHandle        ctx,
+    const XbimShapeHandle*   edgeHandles,
+    int                      numEdges,
+    XbimShapeHandle*         outHandle);
+
+/*
+ * Build a 3D polyline wire from an array of point coordinates.
+ * Points that are within tolerance of the previous vertex are merged.
+ * If the first and last points are within tolerance, the wire is marked closed.
+ * Ports NWireFactory::BuildPolyline3d with duplicate-point removal.
+ *
+ *   ctx         – a valid context handle (used for logging; may be NULL)
+ *   pointsXYZ   – flat array of [x0,y0,z0, x1,y1,z1, ...] coordinates
+ *   numPoints   – number of 3D points (array length / 3; must be >= 2)
+ *   tolerance   – minimum segment length; shorter segments are merged
+ *   outHandle   – receives the new wire shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polyline(
+    XbimContextHandle ctx,
+    const double*     pointsXYZ,
+    int               numPoints,
+    double            tolerance,
+    XbimShapeHandle*  outHandle);
+
+/*
+ * Build a polygon wire from an array of point coordinates.
+ * Each consecutive pair of points defines an edge. Degenerate edges
+ * (length < Precision::Confusion) are skipped.
+ * If closed is non-zero, an additional edge is added from the last point
+ * back to the first point to close the polygon.
+ *
+ *   ctx         – a valid context handle (used for logging; may be NULL)
+ *   pointsXYZ   – flat array of [x0,y0,z0, x1,y1,z1, ...] coordinates
+ *   numPoints   – number of 3D points (array length / 3; must be >= 2)
+ *   closed      – if non-zero, close the polygon (last→first edge added)
+ *   outHandle   – receives the new wire shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polygon(
+    XbimContextHandle ctx,
+    const double*     pointsXYZ,
+    int               numPoints,
+    int               closed,
+    XbimShapeHandle*  outHandle);
+
+/*
+ * Check whether a wire is closed (first and last points coincide).
+ * Uses BRepAdaptor_CompCurve to evaluate the wire endpoints and compare
+ * them within the given tolerance.
+ *
+ *   wireHandle – a valid shape handle containing a TopoDS_Wire
+ *   tolerance  – distance tolerance for comparing endpoints
+ *   outClosed  – receives 1 if closed, 0 if open
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if the handle is not a wire.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_is_closed(
+    XbimShapeHandle wireHandle,
+    double          tolerance,
+    int*            outClosed);
+
 /* ── BRep serialization ────────────────────────────────────────────────── */
 
 /*
