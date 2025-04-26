@@ -1507,6 +1507,83 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_is_closed(
     double          tolerance,
     int*            outClosed);
 
+/* ── Edge construction and query ────────────────────────────────────────── */
+
+/*
+ * Build a straight edge (line segment) between two 3D points.
+ * The points must not be coincident (distance > Precision::Confusion).
+ *
+ *   ctx                – a valid context handle (used for logging; may be NULL)
+ *   startX/Y/Z         – coordinates of the start point
+ *   endX/Y/Z           – coordinates of the end point
+ *   outHandle          – receives the new edge shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_line(
+    XbimContextHandle ctx,
+    double startX, double startY, double startZ,
+    double endX,   double endY,   double endZ,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Build an edge as a sub-range of the 3D curve from an existing edge.
+ * Extracts the Geom_Curve from curveEdgeHandle and creates a new edge
+ * bounded by the given parametric range [param1, param2].
+ * Parameters are clamped to the source curve's valid range.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   curveEdgeHandle  – a valid shape handle containing a TopoDS_Edge with a 3D curve
+ *   param1           – start parameter on the curve
+ *   param2           – end parameter on the curve
+ *   outHandle        – receives the new edge shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve(
+    XbimContextHandle ctx,
+    XbimShapeHandle   curveEdgeHandle,
+    double            param1,
+    double            param2,
+    XbimShapeHandle*  outHandle);
+
+/*
+ * Build a circular arc edge from center, axis normal, radius, and angle range.
+ * Angles are in radians. The arc spans from startAngle to endAngle around
+ * the circle defined by the given center and normal direction.
+ *
+ *   ctx                – a valid context handle (used for logging; may be NULL)
+ *   centerX/Y/Z        – center point of the circle
+ *   normalX/Y/Z        – axis normal direction (defines the plane of the circle)
+ *   radius             – radius of the circle (must be positive)
+ *   startAngle         – start angle in radians
+ *   endAngle           – end angle in radians
+ *   outHandle          – receives the new edge shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_circle_arc(
+    XbimContextHandle ctx,
+    double centerX, double centerY, double centerZ,
+    double normalX, double normalY, double normalZ,
+    double radius,
+    double startAngle,
+    double endAngle,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Compute the length of an edge.
+ * Uses GCPnts_AbscissaPoint::Length on the edge's BRepAdaptor_Curve.
+ *
+ *   edgeHandle – a valid shape handle containing a TopoDS_Edge
+ *   outLength  – receives the edge length on success
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if the handle is not an edge.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_length(
+    XbimShapeHandle edgeHandle,
+    double*         outLength);
+
 /* ── BRep serialization ────────────────────────────────────────────────── */
 
 /*

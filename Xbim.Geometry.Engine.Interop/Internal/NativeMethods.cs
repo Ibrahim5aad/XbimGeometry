@@ -611,6 +611,38 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeShapeHandle wireHandle,
             double tolerance,
             out int outClosed);
+
+        // ── Edge construction and query ─────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_edge_build_line(
+            NativeContextHandle ctx,
+            double startX, double startY, double startZ,
+            double endX, double endY, double endZ,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_edge_build_from_curve(
+            NativeContextHandle ctx,
+            NativeShapeHandle curveEdgeHandle,
+            double param1,
+            double param2,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_edge_build_circle_arc(
+            NativeContextHandle ctx,
+            double centerX, double centerY, double centerZ,
+            double normalX, double normalY, double normalZ,
+            double radius,
+            double startAngle,
+            double endAngle,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_edge_length(
+            NativeShapeHandle edgeHandle,
+            out double outLength);
     }
 
     /// <summary>
