@@ -643,6 +643,30 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         internal static extern int xbim_edge_length(
             NativeShapeHandle edgeHandle,
             out double outLength);
+
+        // ── Shell construction and repair ────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shell_build_from_faces(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] faceHandles,
+            int numFaces,
+            double tolerance,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shell_sew(
+            NativeContextHandle ctx,
+            NativeShapeHandle shellHandle,
+            double tolerance,
+            out int outIsFixed,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shell_make_solid(
+            NativeContextHandle ctx,
+            NativeShapeHandle shellHandle,
+            out NativeShapeHandle outHandle);
     }
 
     /// <summary>

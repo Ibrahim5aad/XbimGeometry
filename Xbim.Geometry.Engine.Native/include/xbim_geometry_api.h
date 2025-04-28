@@ -1584,6 +1584,65 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_length(
     XbimShapeHandle edgeHandle,
     double*         outLength);
 
+/* ── Shell construction and repair ──────────────────────────────────────── */
+
+/*
+ * Build a shell from an array of face shape handles.
+ * Each valid face handle is added to the shell using BRep_Builder.
+ * Non-face shapes are explored for sub-faces. NULL or null shapes are
+ * skipped with a warning.
+ *
+ *   ctx           – a valid context handle (used for logging; may be NULL)
+ *   faceHandles   – array of shape handles containing face shapes
+ *   numFaces      – number of elements in faceHandles (must be >= 1)
+ *   tolerance     – geometric tolerance for shell construction
+ *   outHandle     – receives the new shell shape handle
+ *
+ * Returns XBIM_OK on success; XBIM_NULL_SHAPE if no valid faces were added.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_from_faces(
+    XbimContextHandle        ctx,
+    const XbimShapeHandle*   faceHandles,
+    int                      numFaces,
+    double                   tolerance,
+    XbimShapeHandle*         outHandle);
+
+/*
+ * Validate and repair a shell's face orientation.
+ * First checks the shell with BRepCheck_Shell::Orientation. If the
+ * orientation is correct, the shell is returned as-is. Otherwise,
+ * ShapeFix_Shell is used to repair face orientations.
+ *
+ *   ctx           – a valid context handle (used for logging; may be NULL)
+ *   shellHandle   – shape handle containing a TopoDS_Shell (or a shape with a sub-shell)
+ *   tolerance     – precision for the shape fixer
+ *   outIsFixed    – receives 1 if the shell is valid (original or repaired), 0 otherwise
+ *   outHandle     – receives the resulting shell (or compound if split)
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_sew(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     shellHandle,
+    double              tolerance,
+    int*                outIsFixed,
+    XbimShapeHandle*    outHandle);
+
+/*
+ * Convert a closed shell into a solid using BRepBuilderAPI_MakeSolid.
+ * The input must contain a TopoDS_Shell (directly or as a sub-shape).
+ *
+ *   ctx           – a valid context handle (used for logging; may be NULL)
+ *   shellHandle   – shape handle containing a TopoDS_Shell
+ *   outHandle     – receives the new solid shape handle
+ *
+ * Returns XBIM_OK on success; XBIM_NULL_SHAPE if the shell cannot form a solid.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_make_solid(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     shellHandle,
+    XbimShapeHandle*    outHandle);
+
 /* ── BRep serialization ────────────────────────────────────────────────── */
 
 /*
