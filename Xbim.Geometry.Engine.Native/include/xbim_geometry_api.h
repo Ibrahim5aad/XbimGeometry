@@ -1314,6 +1314,40 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_cut(
     int*                outHasWarnings,
     XbimShapeHandle*    outHandle);
 
+/* ── Vertex construction and query ────────────────────────────────────── */
+
+/*
+ * Build a vertex at the given 3D point with the specified tolerance.
+ * Uses BRep_Builder::MakeVertex to construct a TopoDS_Vertex.
+ *
+ *   ctx         – a valid context handle (used for logging; may be NULL)
+ *   x, y, z     – 3D coordinates of the vertex point
+ *   tolerance   – geometric tolerance for the vertex (must be positive)
+ *   outHandle   – receives the new vertex shape handle
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if tolerance <= 0 or
+ * outHandle is NULL.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_build(
+    XbimContextHandle ctx,
+    double x, double y, double z,
+    double tolerance,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Retrieve the 3D coordinates of a vertex.
+ * Uses BRep_Tool::Pnt to extract the point from a TopoDS_Vertex.
+ *
+ *   vertexHandle – a shape handle containing a TopoDS_Vertex
+ *   outX, outY, outZ – receive the 3D coordinates
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if the handle is not a
+ * vertex or output pointers are NULL.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_point(
+    XbimShapeHandle vertexHandle,
+    double* outX, double* outY, double* outZ);
+
 /* ── Face construction and queries ────────────────────────────────────── */
 
 /*

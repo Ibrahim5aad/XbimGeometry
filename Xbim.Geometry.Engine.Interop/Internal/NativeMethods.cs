@@ -644,6 +644,20 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeShapeHandle edgeHandle,
             out double outLength);
 
+        // ── Vertex construction and query ─────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_vertex_build(
+            NativeContextHandle ctx,
+            double x, double y, double z,
+            double tolerance,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_vertex_point(
+            NativeShapeHandle vertexHandle,
+            out double outX, out double outY, out double outZ);
+
         // ── Shell construction and repair ────────────────────────────────
 
         [DllImport(Lib, CallingConvention = CC)]
