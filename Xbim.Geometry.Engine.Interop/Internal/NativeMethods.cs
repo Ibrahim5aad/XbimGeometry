@@ -681,6 +681,87 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeContextHandle ctx,
             NativeShapeHandle shellHandle,
             out NativeShapeHandle outHandle);
+
+        // ── Curve construction ──────────────────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_build_line_3d(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double dirX, double dirY, double dirZ,
+            out NativeCurveHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_build_circle_3d(
+            NativeContextHandle ctx,
+            double centerX, double centerY, double centerZ,
+            double normalX, double normalY, double normalZ,
+            double radius,
+            out NativeCurveHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_build_ellipse_3d(
+            NativeContextHandle ctx,
+            double centerX, double centerY, double centerZ,
+            double normalX, double normalY, double normalZ,
+            double majorRadius, double minorRadius,
+            out NativeCurveHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_build_bspline(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] double[] polesXYZ,
+            int numPoles,
+            [MarshalAs(UnmanagedType.LPArray)] double[] knots,
+            int numKnots,
+            [MarshalAs(UnmanagedType.LPArray)] int[] multiplicities,
+            int degree,
+            [MarshalAs(UnmanagedType.LPArray)] double[]? weights,
+            out NativeCurveHandle outHandle);
+
+        // ── Surface construction ────────────────────────────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_surface_build_plane(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double normalX, double normalY, double normalZ,
+            out NativeSurfaceHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_surface_build_cylindrical(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double radius,
+            out NativeSurfaceHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_surface_build_spherical(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double radius,
+            out NativeSurfaceHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_surface_build_bspline(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] double[] polesXYZ,
+            int numPolesU,
+            int numPolesV,
+            [MarshalAs(UnmanagedType.LPArray)] double[] uKnots,
+            int numUKnots,
+            [MarshalAs(UnmanagedType.LPArray)] double[] vKnots,
+            int numVKnots,
+            [MarshalAs(UnmanagedType.LPArray)] int[] uMultiplicities,
+            [MarshalAs(UnmanagedType.LPArray)] int[] vMultiplicities,
+            int uDegree,
+            int vDegree,
+            [MarshalAs(UnmanagedType.LPArray)] double[]? weights,
+            out NativeSurfaceHandle outHandle);
     }
 
     /// <summary>

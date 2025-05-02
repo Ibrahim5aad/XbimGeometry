@@ -17,5 +17,11 @@ namespace Xbim.Geometry.Engine.Interop.Internal
 
         [DllImport(NativeLibraryLoader.LibraryName, CallingConvention = CallingConvention.StdCall)]
         internal static extern int xbim_location_destroy(IntPtr handle);
+
+        [DllImport(NativeLibraryLoader.LibraryName, CallingConvention = CallingConvention.StdCall)]
+        internal static extern int xbim_curve_destroy(IntPtr handle);
+
+        [DllImport(NativeLibraryLoader.LibraryName, CallingConvention = CallingConvention.StdCall)]
+        internal static extern int xbim_surface_destroy(IntPtr handle);
     }
 }

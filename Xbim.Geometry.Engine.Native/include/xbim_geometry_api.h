@@ -1677,6 +1677,201 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_make_solid(
     XbimShapeHandle     shellHandle,
     XbimShapeHandle*    outHandle);
 
+/* ── Curve handle lifecycle ──────────────────────────────────────────── */
+
+/*
+ * Build an infinite 3D line curve from an origin point and direction.
+ *
+ *   ctx            – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z    – a point on the line
+ *   dirX/Y/Z       – direction of the line (must be non-zero)
+ *   outHandle      – receives the new curve handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_line_3d(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double dirX,    double dirY,    double dirZ,
+    XbimCurveHandle* outHandle);
+
+/*
+ * Build a 3D circle curve from center, axis normal, and radius.
+ *
+ *   ctx            – a valid context handle (used for logging; may be NULL)
+ *   centerX/Y/Z    – center point of the circle
+ *   normalX/Y/Z    – axis normal direction (defines the plane of the circle)
+ *   radius          – circle radius (must be positive)
+ *   outHandle      – receives the new curve handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_circle_3d(
+    XbimContextHandle ctx,
+    double centerX, double centerY, double centerZ,
+    double normalX, double normalY, double normalZ,
+    double radius,
+    XbimCurveHandle* outHandle);
+
+/*
+ * Build a 3D ellipse curve from center, axis normal, and semi-axes.
+ * If majorRadius < minorRadius, the values are swapped internally.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   centerX/Y/Z      – center point of the ellipse
+ *   normalX/Y/Z      – axis normal direction (defines the plane)
+ *   majorRadius      – semi-major axis length (must be positive)
+ *   minorRadius      – semi-minor axis length (must be positive)
+ *   outHandle        – receives the new curve handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_ellipse_3d(
+    XbimContextHandle ctx,
+    double centerX,  double centerY,  double centerZ,
+    double normalX,  double normalY,  double normalZ,
+    double majorRadius, double minorRadius,
+    XbimCurveHandle* outHandle);
+
+/*
+ * Build a 3D B-spline curve from control points, knots, multiplicities, and degree.
+ * Optionally weighted (rational). Ports NCurveFactory::BuildBSplineCurve3d and
+ * NCurveFactory::BuildRationalBSplineCurve3d.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   polesXYZ         – flat array [x0,y0,z0, x1,y1,z1, ...] (numPoles * 3 elements)
+ *   numPoles         – number of control points (must be >= 2)
+ *   knots            – flat array of knot values (numKnots elements)
+ *   numKnots         – number of distinct knots (must be >= 2)
+ *   multiplicities   – multiplicity for each knot (numKnots elements)
+ *   degree           – polynomial degree (must be >= 1)
+ *   weights          – optional flat array of weights (numPoles elements; NULL for non-rational)
+ *   outHandle        – receives the new curve handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_bspline(
+    XbimContextHandle ctx,
+    const double*     polesXYZ,
+    int               numPoles,
+    const double*     knots,
+    int               numKnots,
+    const int*        multiplicities,
+    int               degree,
+    const double*     weights,
+    XbimCurveHandle*  outHandle);
+
+/*
+ * Destroy a curve handle and free its resources.
+ * Passing NULL is a safe no-op.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_destroy(XbimCurveHandle handle);
+
+/* ── Surface handle lifecycle ───────────────────────────────────────── */
+
+/*
+ * Build an infinite plane surface from an origin point and normal direction.
+ *
+ *   ctx            – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z    – a point on the plane
+ *   normalX/Y/Z    – plane normal direction (must be non-zero)
+ *   outHandle      – receives the new surface handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_plane(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double normalX, double normalY, double normalZ,
+    XbimSurfaceHandle* outHandle);
+
+/*
+ * Build a cylindrical surface from an axis-2 placement and radius.
+ * The cylinder axis is the Z direction of the placement.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin
+ *   zDirX/Y/Z        – placement Z direction (cylinder axis)
+ *   xDirX/Y/Z        – placement X direction (reference)
+ *   radius           – cylinder radius (must be positive)
+ *   outHandle        – receives the new surface handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_cylindrical(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double radius,
+    XbimSurfaceHandle* outHandle);
+
+/*
+ * Build a spherical surface from an axis-2 placement and radius.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin (center of sphere)
+ *   zDirX/Y/Z        – placement Z direction
+ *   xDirX/Y/Z        – placement X direction (reference)
+ *   radius           – sphere radius (must be positive)
+ *   outHandle        – receives the new surface handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_spherical(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double radius,
+    XbimSurfaceHandle* outHandle);
+
+/*
+ * Build a B-spline surface from a grid of control points, knots, multiplicities,
+ * and degrees. Optionally weighted (rational).
+ *
+ *   ctx                – a valid context handle (used for logging; may be NULL)
+ *   polesXYZ           – flat row-major array of control points
+ *                        [u0v0.x, u0v0.y, u0v0.z, u0v1.x, ..., uN-1vM-1.z]
+ *                        (numPolesU * numPolesV * 3 elements)
+ *   numPolesU          – number of control points in U direction (must be >= 2)
+ *   numPolesV          – number of control points in V direction (must be >= 2)
+ *   uKnots             – U knot values (numUKnots elements)
+ *   numUKnots          – number of distinct U knots (must be >= 2)
+ *   vKnots             – V knot values (numVKnots elements)
+ *   numVKnots          – number of distinct V knots (must be >= 2)
+ *   uMultiplicities    – U knot multiplicities (numUKnots elements)
+ *   vMultiplicities    – V knot multiplicities (numVKnots elements)
+ *   uDegree            – polynomial degree in U (must be >= 1)
+ *   vDegree            – polynomial degree in V (must be >= 1)
+ *   weights            – optional flat row-major weight array
+ *                        (numPolesU * numPolesV elements; NULL for non-rational)
+ *   outHandle          – receives the new surface handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_bspline(
+    XbimContextHandle ctx,
+    const double*     polesXYZ,
+    int               numPolesU,
+    int               numPolesV,
+    const double*     uKnots,
+    int               numUKnots,
+    const double*     vKnots,
+    int               numVKnots,
+    const int*        uMultiplicities,
+    const int*        vMultiplicities,
+    int               uDegree,
+    int               vDegree,
+    const double*     weights,
+    XbimSurfaceHandle* outHandle);
+
+/*
+ * Destroy a surface handle and free its resources.
+ * Passing NULL is a safe no-op.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_destroy(XbimSurfaceHandle handle);
+
 /* ── BRep serialization ────────────────────────────────────────────────── */
 
 /*
