@@ -210,16 +210,20 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_sew(
             return *outHandle ? XBIM_OK : XBIM_ERROR;
         }
 
-        *outIsFixed = 1;
-
         if (result.ShapeType() == TopAbs_SHELL)
         {
+            *outIsFixed = 1;
             *outHandle = xbim_shape_create_from(shapeFixer.Shell());
+        }
+        else if (result.ShapeType() == TopAbs_COMPOUND)
+        {
+            *outIsFixed = 1;
+            *outHandle = xbim_shape_create_from(result);
         }
         else
         {
-            /* ShapeFix may return a compound if it split the shell */
-            *outHandle = xbim_shape_create_from(result);
+            /* Unknown result type — return original shell, not fixed */
+            *outHandle = xbim_shape_create_from(shell);
         }
 
         return *outHandle ? XBIM_OK : XBIM_ERROR;

@@ -143,38 +143,23 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polyline(
             if (i > 0 && vertices.Length() > 0)
             {
                 const TopoDS_Vertex& lastVtx = TopoDS::Vertex(vertices.Last());
-                double pointTol = tolerance +
-                    BRep_Tool::Tolerance(lastVtx);
+                double vtxTol = BRep_Tool::Tolerance(lastVtx);
                 gp_Pnt lastPt = BRep_Tool::Pnt(lastVtx);
                 gp_Vec edgeVec(lastPt, pt);
                 double segLen = edgeVec.Magnitude();
 
-                if (segLen < pointTol)
+                if (segLen < tolerance + vtxTol)
                 {
                     /* Merge into the previous vertex */
-                    gp_Vec displacement = edgeVec.Divided(2);
-                    gp_Pnt midPt = lastPt.Translated(displacement);
-                    double toleranceOfFound = BRep_Tool::Tolerance(lastVtx);
-                    double requiredTolerance = std::max(
-                        segLen + toleranceOfFound,
-                        segLen + Precision::Confusion());
-                    builder.UpdateVertex(lastVtx, midPt, requiredTolerance);
+                    gp_Pnt midPt = lastPt.Translated(edgeVec.Divided(2));
+                    builder.UpdateVertex(lastVtx, midPt, segLen + vtxTol);
                     continue;
                 }
             }
 
-            if (vertices.Length() == 0)
-            {
-                TopoDS_Vertex v;
-                builder.MakeVertex(v, pt, Precision::Confusion());
-                vertices.Append(v);
-            }
-            else
-            {
-                TopoDS_Vertex v;
-                builder.MakeVertex(v, pt, Precision::Confusion());
-                vertices.Append(v);
-            }
+            TopoDS_Vertex v;
+            builder.MakeVertex(v, pt, Precision::Confusion());
+            vertices.Append(v);
         }
 
         if (vertices.Length() < 2)
