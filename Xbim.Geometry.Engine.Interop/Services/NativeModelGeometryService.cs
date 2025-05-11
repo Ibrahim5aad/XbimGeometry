@@ -33,6 +33,13 @@ namespace Xbim.Geometry.Engine.Interop.Services
         private NativeProfileFactory? _profileFactory;
         private NativeGeometryFactory? _geometryFactory;
         private NativeBooleanFactory? _booleanFactory;
+        private NativeVertexFactory? _vertexFactory;
+        private NativeCurveFactory? _curveFactory;
+        private NativeSurfaceFactory? _surfaceFactory;
+        private NativeEdgeFactory? _edgeFactory;
+        private NativeWireFactory? _wireFactory;
+        private NativeFaceFactory? _faceFactory;
+        private NativeShellFactory? _shellFactory;
 
         public NativeModelGeometryService(IModel model, ILoggerFactory loggerFactory)
         {
@@ -100,15 +107,14 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXLoggingService LoggingService => _loggingService;
 
-        // Factory stubs — will be wired up in INTEG-004
-        public IXVertexFactory VertexFactory => throw new NotImplementedException("VertexFactory not yet implemented in P/Invoke layer.");
+        public IXVertexFactory VertexFactory => _vertexFactory ??= new NativeVertexFactory(this, _logger);
         public IXGeometryFactory GeometryFactory => _geometryFactory ??= new NativeGeometryFactory(this, _logger);
-        public IXCurveFactory CurveFactory => throw new NotImplementedException("CurveFactory not yet implemented in P/Invoke layer.");
-        public IXSurfaceFactory SurfaceFactory => throw new NotImplementedException("SurfaceFactory not yet implemented in P/Invoke layer.");
-        public IXEdgeFactory EdgeFactory => throw new NotImplementedException("EdgeFactory not yet implemented in P/Invoke layer.");
-        public IXWireFactory WireFactory => throw new NotImplementedException("WireFactory not yet implemented in P/Invoke layer.");
-        public IXFaceFactory FaceFactory => throw new NotImplementedException("FaceFactory not yet implemented in P/Invoke layer.");
-        public IXShellFactory ShellFactory => throw new NotImplementedException("ShellFactory not yet implemented in P/Invoke layer.");
+        public IXCurveFactory CurveFactory => _curveFactory ??= new NativeCurveFactory(this, _logger);
+        public IXSurfaceFactory SurfaceFactory => _surfaceFactory ??= new NativeSurfaceFactory(this, _logger);
+        public IXEdgeFactory EdgeFactory => _edgeFactory ??= new NativeEdgeFactory(this, _logger);
+        public IXWireFactory WireFactory => _wireFactory ??= new NativeWireFactory(this, _logger);
+        public IXFaceFactory FaceFactory => _faceFactory ??= new NativeFaceFactory(this, _logger);
+        public IXShellFactory ShellFactory => _shellFactory ??= new NativeShellFactory(this, _logger);
         public IXSolidFactory SolidFactory => _solidFactory ??= new NativeSolidFactory(this, _logger);
         public IXCompoundFactory CompoundFactory => throw new NotImplementedException("CompoundFactory not yet implemented in P/Invoke layer.");
         public IXBooleanFactory BooleanFactory => _booleanFactory ??= new NativeBooleanFactory(this, _logger);
