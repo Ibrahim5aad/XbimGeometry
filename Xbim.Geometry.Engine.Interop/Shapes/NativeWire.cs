@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 
@@ -38,9 +39,8 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                // Edge traversal not yet available in native API (TOPO-008)
-                throw new NotImplementedException(
-                    "Edge traversal will be available after TOPO-008.");
+                var handles = GetSubShapeHandles(XShapeType.Edge);
+                return handles.Select(h => (IXEdge)new NativeEdge(h)).ToArray();
             }
         }
     }

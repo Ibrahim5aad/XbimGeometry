@@ -14,7 +14,12 @@
 #include <new>
 
 #include <TopoDS.hxx>
+#include <TopoDS_Face.hxx>
+#include <TopoDS_Wire.hxx>
 #include <TopAbs_ShapeEnum.hxx>
+#include <TopExp.hxx>
+#include <TopExp_Explorer.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepGProp.hxx>
 #include <BRepBndLib.hxx>
@@ -22,6 +27,7 @@
 #include <Bnd_Box.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepTools.hxx>
+#include <ShapeAnalysis.hxx>
 
 /* ── Internal helper ──────────────────────────────────────────────────────── */
 
@@ -238,6 +244,266 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_surface_area(
     {
         const char* msg = e.GetMessageString();
         xbim_set_error(msg ? msg : "xbim_shape_surface_area: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── Topology traversal helpers ────────────────────────────────────────────── */
+
+static TopAbs_ShapeEnum xbim_to_topabs(XbimShapeType st)
+{
+    switch (st)
+    {
+        case XBIM_SHAPE_VERTEX:   return TopAbs_VERTEX;
+        case XBIM_SHAPE_EDGE:     return TopAbs_EDGE;
+        case XBIM_SHAPE_WIRE:     return TopAbs_WIRE;
+        case XBIM_SHAPE_FACE:     return TopAbs_FACE;
+        case XBIM_SHAPE_SHELL:    return TopAbs_SHELL;
+        case XBIM_SHAPE_SOLID:    return TopAbs_SOLID;
+        case XBIM_SHAPE_COMPOUND: return TopAbs_COMPOUND;
+        default:                  return TopAbs_SHAPE;
+    }
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_count_subshapes(
+    XbimShapeHandle handle,
+    XbimShapeType   subType,
+    int*            outCount)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_shape_count_subshapes: handle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!outCount)
+    {
+        xbim_set_error("xbim_shape_count_subshapes: outCount is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    if (handle->shape.IsNull())
+    {
+        xbim_set_error("xbim_shape_count_subshapes: shape is null");
+        return XBIM_NULL_SHAPE;
+    }
+
+    try
+    {
+        TopAbs_ShapeEnum topoType = xbim_to_topabs(subType);
+        TopTools_IndexedMapOfShape map;
+        TopExp::MapShapes(handle->shape, topoType, map);
+
+        *outCount = map.Extent();
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_shape_count_subshapes: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_get_subshapes(
+    XbimShapeHandle     handle,
+    XbimShapeType       subType,
+    XbimShapeHandle*    outHandles,
+    int*                count)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_shape_get_subshapes: handle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!outHandles || !count)
+    {
+        xbim_set_error("xbim_shape_get_subshapes: outHandles or count is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    if (handle->shape.IsNull())
+    {
+        xbim_set_error("xbim_shape_get_subshapes: shape is null");
+        return XBIM_NULL_SHAPE;
+    }
+
+    try
+    {
+        TopAbs_ShapeEnum topoType = xbim_to_topabs(subType);
+        TopTools_IndexedMapOfShape map;
+        TopExp::MapShapes(handle->shape, topoType, map);
+
+        int capacity = *count;
+        int numShapes = map.Extent();
+
+        if (numShapes > capacity)
+        {
+            xbim_set_error("xbim_shape_get_subshapes: array capacity too small");
+            *count = 0;
+            return XBIM_INVALID_ARG;
+        }
+
+        for (int i = 1; i <= numShapes; ++i) /* OCCT maps are 1-based */
+        {
+            XbimShapeHandle sub = xbim_shape_create_from(map.FindKey(i));
+            if (!sub)
+            {
+                xbim_set_error("xbim_shape_get_subshapes: allocation failed");
+                for (int j = 0; j < i - 1; ++j)
+                {
+                    delete outHandles[j];
+                    outHandles[j] = nullptr;
+                }
+                *count = 0;
+                return XBIM_ERROR;
+            }
+            outHandles[i - 1] = sub;
+        }
+
+        *count = numShapes;
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_shape_get_subshapes: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_outer_wire(
+    XbimShapeHandle     faceHandle,
+    XbimShapeHandle*    outHandle)
+{
+    xbim_clear_error();
+
+    if (!faceHandle)
+    {
+        xbim_set_error("xbim_face_outer_wire: faceHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_face_outer_wire: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    if (faceHandle->shape.IsNull())
+    {
+        xbim_set_error("xbim_face_outer_wire: face is null");
+        return XBIM_NULL_SHAPE;
+    }
+    if (faceHandle->shape.ShapeType() != TopAbs_FACE)
+    {
+        xbim_set_error("xbim_face_outer_wire: shape is not a face");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        const TopoDS_Face& face = TopoDS::Face(faceHandle->shape);
+        TopoDS_Wire outerWire = ShapeAnalysis::OuterWire(face);
+
+        if (outerWire.IsNull())
+        {
+            xbim_set_error("xbim_face_outer_wire: outer wire is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        *outHandle = xbim_shape_create_from(static_cast<const TopoDS_Shape&>(outerWire));
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_face_outer_wire: allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_face_outer_wire: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_inner_wires(
+    XbimShapeHandle     faceHandle,
+    XbimShapeHandle*    outHandles,
+    int*                count)
+{
+    xbim_clear_error();
+
+    if (!faceHandle)
+    {
+        xbim_set_error("xbim_face_inner_wires: faceHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!outHandles || !count)
+    {
+        xbim_set_error("xbim_face_inner_wires: outHandles or count is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    if (faceHandle->shape.IsNull())
+    {
+        xbim_set_error("xbim_face_inner_wires: face is null");
+        return XBIM_NULL_SHAPE;
+    }
+    if (faceHandle->shape.ShapeType() != TopAbs_FACE)
+    {
+        xbim_set_error("xbim_face_inner_wires: shape is not a face");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        const TopoDS_Face& face = TopoDS::Face(faceHandle->shape);
+        TopoDS_Wire outerWire = ShapeAnalysis::OuterWire(face);
+
+        int capacity = *count;
+        int idx = 0;
+
+        for (TopExp_Explorer ex(faceHandle->shape, TopAbs_WIRE); ex.More(); ex.Next())
+        {
+            /* Skip the outer wire */
+            if (ex.Current().IsSame(static_cast<const TopoDS_Shape&>(outerWire)))
+                continue;
+
+            if (idx >= capacity)
+            {
+                xbim_set_error("xbim_face_inner_wires: array capacity too small");
+                for (int i = 0; i < idx; ++i)
+                {
+                    delete outHandles[i];
+                    outHandles[i] = nullptr;
+                }
+                *count = 0;
+                return XBIM_INVALID_ARG;
+            }
+
+            XbimShapeHandle sub = xbim_shape_create_from(ex.Current());
+            if (!sub)
+            {
+                xbim_set_error("xbim_face_inner_wires: allocation failed");
+                for (int i = 0; i < idx; ++i)
+                {
+                    delete outHandles[i];
+                    outHandles[i] = nullptr;
+                }
+                *count = 0;
+                return XBIM_ERROR;
+            }
+            outHandles[idx++] = sub;
+        }
+
+        *count = idx;
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_face_inner_wires: OCCT exception");
         return XBIM_ERROR;
     }
 }

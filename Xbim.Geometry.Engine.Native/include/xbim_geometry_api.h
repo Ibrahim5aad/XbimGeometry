@@ -1872,6 +1872,80 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_bspline(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_destroy(XbimSurfaceHandle handle);
 
+/* ── Shape traversal (topology navigation) ─────────────────────────────── */
+
+/*
+ * Count the number of sub-shapes of the given type contained in a shape.
+ * Uses TopExp_Explorer to iterate over the requested topology level.
+ *
+ *   handle    – a valid shape handle
+ *   subType   – the topology level to count (e.g. XBIM_SHAPE_FACE)
+ *   outCount  – receives the count
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if handle is NULL;
+ * XBIM_NULL_SHAPE if the shape is null.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_count_subshapes(
+    XbimShapeHandle handle,
+    XbimShapeType   subType,
+    int*            outCount);
+
+/*
+ * Extract all sub-shapes of the given type from a shape.
+ * The caller must first call xbim_shape_count_subshapes to determine
+ * the required array size, then allocate an array of that size.
+ *
+ * Each returned handle is a new heap-allocated XbimShape_ that the
+ * caller owns and must eventually destroy with xbim_shape_destroy.
+ *
+ *   handle      – a valid shape handle
+ *   subType     – the topology level to extract (e.g. XBIM_SHAPE_FACE)
+ *   outHandles  – caller-allocated array of at least *count entries
+ *   count       – on input: capacity of outHandles array
+ *                 on output: actual number of sub-shapes written
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if handle is NULL;
+ * XBIM_NULL_SHAPE if the shape is null; XBIM_INVALID_ARG if outHandles
+ * or count is NULL, or if the array capacity is too small.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_get_subshapes(
+    XbimShapeHandle     handle,
+    XbimShapeType       subType,
+    XbimShapeHandle*    outHandles,
+    int*                count);
+
+/*
+ * Get the outer wire (boundary) of a face.
+ *
+ *   faceHandle  – a shape handle containing a TopoDS_Face
+ *   outHandle   – receives the new wire shape handle
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if faceHandle is NULL;
+ * XBIM_NULL_SHAPE if the face or outer wire is null.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_outer_wire(
+    XbimShapeHandle     faceHandle,
+    XbimShapeHandle*    outHandle);
+
+/*
+ * Get the inner wires (holes/voids) of a face.
+ * The caller must first determine the count (total wires minus 1 for the
+ * outer wire), or use xbim_shape_count_subshapes with XBIM_SHAPE_WIRE
+ * and subtract 1.
+ *
+ *   faceHandle  – a shape handle containing a TopoDS_Face
+ *   outHandles  – caller-allocated array for inner wire handles
+ *   count       – on input: capacity of outHandles array
+ *                 on output: actual number of inner wires written
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if faceHandle is NULL;
+ * XBIM_NULL_SHAPE if the face is null.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_inner_wires(
+    XbimShapeHandle     faceHandle,
+    XbimShapeHandle*    outHandles,
+    int*                count);
+
 /* ── BRep serialization ────────────────────────────────────────────────── */
 
 /*

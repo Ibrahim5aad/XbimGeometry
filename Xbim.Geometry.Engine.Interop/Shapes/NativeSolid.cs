@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
@@ -31,9 +32,8 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                // Shell traversal not yet available in native API (TOPO-008)
-                throw new NotImplementedException(
-                    "Shell traversal will be available after TOPO-008.");
+                var handles = GetSubShapeHandles(XShapeType.Shell);
+                return handles.Select(h => (IXShell)new NativeShell(h)).ToArray();
             }
         }
     }

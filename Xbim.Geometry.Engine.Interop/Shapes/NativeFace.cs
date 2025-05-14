@@ -41,9 +41,11 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                // Wire extraction not yet available in native API (TOPO-001)
-                throw new NotImplementedException(
-                    "OuterBound will be available after TOPO-001.");
+                int result = NativeMethods.xbim_face_outer_wire(Handle, out var wireHandle);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to get outer wire: {NativeMethods.GetLastError()}");
+                return new NativeWire(wireHandle);
             }
         }
 
@@ -51,9 +53,23 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                // Wire extraction not yet available in native API (TOPO-001)
-                throw new NotImplementedException(
-                    "InnerBounds will be available after TOPO-001.");
+                // Count total wires, subtract 1 for the outer wire
+                int countResult = NativeMethods.xbim_shape_count_subshapes(
+                    Handle, (int)XShapeType.Wire, out int totalWires);
+                if (countResult != 0 || totalWires <= 1)
+                    return Array.Empty<IXWire>();
+
+                int capacity = totalWires - 1;
+                var ptrs = new IntPtr[capacity];
+                int innerCount = capacity;
+                int getResult = NativeMethods.xbim_face_inner_wires(Handle, ptrs, ref innerCount);
+                if (getResult != 0 || innerCount == 0)
+                    return Array.Empty<IXWire>();
+
+                var wires = new IXWire[innerCount];
+                for (int i = 0; i < innerCount; i++)
+                    wires[i] = new NativeWire(NativeShapeHandle.FromIntPtr(ptrs[i]));
+                return wires;
             }
         }
 

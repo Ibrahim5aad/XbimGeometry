@@ -719,6 +719,32 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             [MarshalAs(UnmanagedType.LPArray)] double[]? weights,
             out NativeCurveHandle outHandle);
 
+        // ── Shape traversal (topology navigation) ───────────────────────────
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_count_subshapes(
+            NativeShapeHandle handle,
+            int subType,
+            out int outCount);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_get_subshapes(
+            NativeShapeHandle handle,
+            int subType,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] outHandles,
+            ref int count);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_outer_wire(
+            NativeShapeHandle faceHandle,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_inner_wires(
+            NativeShapeHandle faceHandle,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] outHandles,
+            ref int count);
+
         // ── Surface construction ────────────────────────────────────────────
 
         [DllImport(Lib, CallingConvention = CC)]

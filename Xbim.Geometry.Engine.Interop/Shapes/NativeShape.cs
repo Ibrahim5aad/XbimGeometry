@@ -129,9 +129,46 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         public IEnumerable<IXFace> AllFaces()
         {
-            // Shape traversal not yet available in native API (TOPO-008)
-            throw new NotImplementedException(
-                "Shape traversal will be available after TOPO-008.");
+            int countResult = NativeMethods.xbim_shape_count_subshapes(
+                Handle, (int)XShapeType.Face, out int count);
+            if (countResult != 0 || count == 0)
+                return Array.Empty<IXFace>();
+
+            var ptrs = new IntPtr[count];
+            int capacity = count;
+            int getResult = NativeMethods.xbim_shape_get_subshapes(
+                Handle, (int)XShapeType.Face, ptrs, ref capacity);
+            if (getResult != 0)
+                return Array.Empty<IXFace>();
+
+            var faces = new IXFace[capacity];
+            for (int i = 0; i < capacity; i++)
+                faces[i] = new NativeFace(NativeShapeHandle.FromIntPtr(ptrs[i]));
+            return faces;
+        }
+
+        /// <summary>
+        /// Extracts sub-shapes of the given type from the underlying shape handle.
+        /// Each returned handle is owned by the caller.
+        /// </summary>
+        internal NativeShapeHandle[] GetSubShapeHandles(XShapeType subType)
+        {
+            int countResult = NativeMethods.xbim_shape_count_subshapes(
+                Handle, (int)subType, out int count);
+            if (countResult != 0 || count == 0)
+                return Array.Empty<NativeShapeHandle>();
+
+            var ptrs = new IntPtr[count];
+            int capacity = count;
+            int getResult = NativeMethods.xbim_shape_get_subshapes(
+                Handle, (int)subType, ptrs, ref capacity);
+            if (getResult != 0)
+                return Array.Empty<NativeShapeHandle>();
+
+            var handles = new NativeShapeHandle[capacity];
+            for (int i = 0; i < capacity; i++)
+                handles[i] = NativeShapeHandle.FromIntPtr(ptrs[i]);
+            return handles;
         }
 
         public bool IsEqual(IXShape other)
