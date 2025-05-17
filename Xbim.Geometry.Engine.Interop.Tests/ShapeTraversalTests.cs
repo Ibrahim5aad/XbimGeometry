@@ -91,7 +91,7 @@ public class ShapeTraversalTests : IDisposable
     public void Wire_EdgeLoop_SquareWireHasFourEdges()
     {
         double[] pts = { 0, 0, 0, 10, 0, 0, 10, 10, 0, 0, 10, 0 };
-        NativeMethods.xbim_wire_build_polygon(Ctx, pts, 4, 1, out var wireHandle);
+        XbimGeometryNativeApi.xbim_wire_build_polygon(Ctx, pts, 4, 1, out var wireHandle);
         using var wire = new NativeWire(wireHandle);
 
         var edges = wire.EdgeLoop;
@@ -106,8 +106,8 @@ public class ShapeTraversalTests : IDisposable
     public void Face_OuterBound_ReturnsClosedWire()
     {
         double[] pts = { 0, 0, 0, 10, 0, 0, 10, 10, 0, 0, 10, 0 };
-        NativeMethods.xbim_wire_build_polygon(Ctx, pts, 4, 1, out var wireHandle);
-        NativeMethods.xbim_face_build_from_wire(Ctx, wireHandle, out var faceHandle);
+        XbimGeometryNativeApi.xbim_wire_build_polygon(Ctx, pts, 4, 1, out var wireHandle);
+        XbimGeometryNativeApi.xbim_face_build_from_wire(Ctx, wireHandle, out var faceHandle);
         wireHandle.Dispose();
 
         using var face = new NativeFace(faceHandle);
@@ -122,8 +122,8 @@ public class ShapeTraversalTests : IDisposable
     public void Face_InnerBounds_SimpleFaceHasNoInnerBounds()
     {
         double[] pts = { 0, 0, 0, 10, 0, 0, 10, 10, 0, 0, 10, 0 };
-        NativeMethods.xbim_wire_build_polygon(Ctx, pts, 4, 1, out var wireHandle);
-        NativeMethods.xbim_face_build_from_wire(Ctx, wireHandle, out var faceHandle);
+        XbimGeometryNativeApi.xbim_wire_build_polygon(Ctx, pts, 4, 1, out var wireHandle);
+        XbimGeometryNativeApi.xbim_face_build_from_wire(Ctx, wireHandle, out var faceHandle);
         wireHandle.Dispose();
 
         using var face = new NativeFace(faceHandle);
@@ -137,11 +137,11 @@ public class ShapeTraversalTests : IDisposable
         double[] outerPts = { 0, 0, 0, 20, 0, 0, 20, 20, 0, 0, 20, 0 };
         double[] innerPts = { 7.5, 7.5, 0, 12.5, 7.5, 0, 12.5, 12.5, 0, 7.5, 12.5, 0 };
 
-        NativeMethods.xbim_wire_build_polygon(Ctx, outerPts, 4, 1, out var outerWire);
-        NativeMethods.xbim_wire_build_polygon(Ctx, innerPts, 4, 1, out var innerWire);
+        XbimGeometryNativeApi.xbim_wire_build_polygon(Ctx, outerPts, 4, 1, out var outerWire);
+        XbimGeometryNativeApi.xbim_wire_build_polygon(Ctx, innerPts, 4, 1, out var innerWire);
 
         var innerPtrs = new[] { innerWire.DangerousGetHandle() };
-        NativeMethods.xbim_face_build_advanced(Ctx,
+        XbimGeometryNativeApi.xbim_face_build_advanced(Ctx,
             0, // plane
             0, 0, 0, 0, 0, 1, 1, 0, 0, 0, // surface placement
             outerWire, innerPtrs, 1,
@@ -165,7 +165,7 @@ public class ShapeTraversalTests : IDisposable
         using var block = (NativeSolid)_solidFactory.Build(
             IfcMoq.Block(10, 20, 30));
 
-        NativeMethods.xbim_shape_count_subshapes(
+        XbimGeometryNativeApi.xbim_shape_count_subshapes(
             block.Handle, (int)XShapeType.Edge, out int count).Should().Be(0);
         count.Should().Be(12);
     }
@@ -177,7 +177,7 @@ public class ShapeTraversalTests : IDisposable
         using var block = (NativeSolid)_solidFactory.Build(
             IfcMoq.Block(10, 20, 30));
 
-        NativeMethods.xbim_shape_count_subshapes(
+        XbimGeometryNativeApi.xbim_shape_count_subshapes(
             block.Handle, (int)XShapeType.Vertex, out int count).Should().Be(0);
         count.Should().Be(8);
     }

@@ -71,17 +71,17 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             switch (boolResult.Operator)
             {
                 case IfcBooleanOperator.UNION:
-                    result = NativeMethods.xbim_boolean_union(
+                    result = XbimGeometryNativeApi.xbim_boolean_union(
                         ContextHandle, firstHandle, secondHandle,
                         fuzzyTolerance, out hasWarnings, out outHandle);
                     break;
                 case IfcBooleanOperator.DIFFERENCE:
-                    result = NativeMethods.xbim_boolean_cut(
+                    result = XbimGeometryNativeApi.xbim_boolean_cut(
                         ContextHandle, firstHandle, secondHandle,
                         fuzzyTolerance, out hasWarnings, out outHandle);
                     break;
                 case IfcBooleanOperator.INTERSECTION:
-                    result = NativeMethods.xbim_boolean_intersect(
+                    result = XbimGeometryNativeApi.xbim_boolean_intersect(
                         ContextHandle, firstHandle, secondHandle,
                         fuzzyTolerance, out hasWarnings, out outHandle);
                     break;
@@ -101,7 +101,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Boolean {boolResult.Operator} #{boolResult.EntityLabel} failed: {NativeMethods.GetLastError()}");
+                    $"Boolean {boolResult.Operator} #{boolResult.EntityLabel} failed: {XbimGeometryNativeApi.GetLastError()}");
 
             if (outHandle == null || outHandle.IsInvalid)
                 throw new InvalidOperationException(
@@ -194,7 +194,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (halfSpace is IIfcBoxedHalfSpace)
             {
-                result = NativeMethods.xbim_halfspace_build_boxed(
+                result = XbimGeometryNativeApi.xbim_halfspace_build_boxed(
                     ContextHandle, surfaceType,
                     ox, oy, oz, zx, zy, zz, xx, xy, xz,
                     radius, agreementFlag, oneMeter, precision,
@@ -202,7 +202,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
             else
             {
-                result = NativeMethods.xbim_halfspace_build(
+                result = XbimGeometryNativeApi.xbim_halfspace_build(
                     ContextHandle, surfaceType,
                     ox, oy, oz, zx, zy, zz, xx, xy, xz,
                     radius, agreementFlag, oneMeter, precision,
@@ -211,7 +211,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build half-space #{halfSpace.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build half-space #{halfSpace.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeFactory.WrapShape(outHandle);
         }
@@ -259,7 +259,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out bXx, out bXy, out bXz);
             }
 
-            int result = NativeMethods.xbim_halfspace_build_polygonal_bounded(
+            int result = XbimGeometryNativeApi.xbim_halfspace_build_polygonal_bounded(
                 ContextHandle,
                 surfOx, surfOy, surfOz, surfZx, surfZy, surfZz, surfXx, surfXy, surfXz,
                 agreementFlag,
@@ -270,7 +270,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build polygonal bounded half-space #{polyBounded.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build polygonal bounded half-space #{polyBounded.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeFactory.WrapShape(outHandle);
         }

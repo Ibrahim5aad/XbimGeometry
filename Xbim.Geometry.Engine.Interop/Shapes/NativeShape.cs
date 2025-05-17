@@ -45,10 +45,10 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 if (_cachedType.HasValue)
                     return _cachedType.Value;
 
-                int result = NativeMethods.xbim_shape_type(Handle, out int typeVal);
+                int result = XbimGeometryNativeApi.xbim_shape_type(Handle, out int typeVal);
                 if (result != 0)
                     throw new InvalidOperationException(
-                        $"Failed to get shape type: {NativeMethods.GetLastError()}");
+                        $"Failed to get shape type: {XbimGeometryNativeApi.GetLastError()}");
 
                 _cachedType = (XShapeType)typeVal;
                 return _cachedType.Value;
@@ -57,7 +57,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         public IXAxisAlignedBoundingBox Bounds()
         {
-            int result = NativeMethods.xbim_shape_bounding_box(
+            int result = XbimGeometryNativeApi.xbim_shape_bounding_box(
                 Handle,
                 out double minX, out double minY, out double minZ,
                 out double maxX, out double maxY, out double maxZ);
@@ -81,16 +81,16 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         /// </summary>
         public void WriteBrep(string filePath)
         {
-            int result = NativeMethods.xbim_shape_write_brep(Handle, filePath);
+            int result = XbimGeometryNativeApi.xbim_shape_write_brep(Handle, filePath);
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to write BRep file '{filePath}': {NativeMethods.GetLastError()}");
+                    $"Failed to write BRep file '{filePath}': {XbimGeometryNativeApi.GetLastError()}");
         }
 
         public bool IsValidShape()
         {
             // xbim_shape_is_valid returns 1 for valid, 0 for invalid, negative for error
-            int result = NativeMethods.xbim_shape_is_valid(Handle);
+            int result = XbimGeometryNativeApi.xbim_shape_is_valid(Handle);
             return result == 1;
         }
 
@@ -99,7 +99,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             get
             {
                 // xbim_shape_is_closed returns 1 for closed, 0 for not closed, negative for error
-                int result = NativeMethods.xbim_shape_is_closed(Handle);
+                int result = XbimGeometryNativeApi.xbim_shape_is_closed(Handle);
                 return result == 1;
             }
         }
@@ -129,14 +129,14 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         public IEnumerable<IXFace> AllFaces()
         {
-            int countResult = NativeMethods.xbim_shape_count_subshapes(
+            int countResult = XbimGeometryNativeApi.xbim_shape_count_subshapes(
                 Handle, (int)XShapeType.Face, out int count);
             if (countResult != 0 || count == 0)
                 return Array.Empty<IXFace>();
 
             var ptrs = new IntPtr[count];
             int capacity = count;
-            int getResult = NativeMethods.xbim_shape_get_subshapes(
+            int getResult = XbimGeometryNativeApi.xbim_shape_get_subshapes(
                 Handle, (int)XShapeType.Face, ptrs, ref capacity);
             if (getResult != 0)
                 return Array.Empty<IXFace>();
@@ -153,14 +153,14 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         /// </summary>
         internal NativeShapeHandle[] GetSubShapeHandles(XShapeType subType)
         {
-            int countResult = NativeMethods.xbim_shape_count_subshapes(
+            int countResult = XbimGeometryNativeApi.xbim_shape_count_subshapes(
                 Handle, (int)subType, out int count);
             if (countResult != 0 || count == 0)
                 return Array.Empty<NativeShapeHandle>();
 
             var ptrs = new IntPtr[count];
             int capacity = count;
-            int getResult = NativeMethods.xbim_shape_get_subshapes(
+            int getResult = XbimGeometryNativeApi.xbim_shape_get_subshapes(
                 Handle, (int)subType, ptrs, ref capacity);
             if (getResult != 0)
                 return Array.Empty<NativeShapeHandle>();

@@ -90,7 +90,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"IIfcLine #{ifcLine.EntityLabel} has invalid direction.");
 
-            int result = NativeMethods.xbim_curve_build_line_3d(
+            int result = XbimGeometryNativeApi.xbim_curve_build_line_3d(
                 ContextHandle,
                 origin.X, origin.Y, origin.Z,
                 dirX, dirY, dirZ,
@@ -98,7 +98,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build line curve #{ifcLine.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build line curve #{ifcLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeCurve(curveHandle, XCurveType.IfcLine);
         }
@@ -115,7 +115,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out double zx, out double zy, out double zz,
                 out _, out _, out _);
 
-            int result = NativeMethods.xbim_curve_build_circle_3d(
+            int result = XbimGeometryNativeApi.xbim_curve_build_circle_3d(
                 ContextHandle,
                 ox, oy, oz,
                 zx, zy, zz,
@@ -124,7 +124,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build circle curve #{ifcCircle.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build circle curve #{ifcCircle.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeCurve(curveHandle, XCurveType.IfcCircle);
         }
@@ -141,7 +141,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out double zx, out double zy, out double zz,
                 out _, out _, out _);
 
-            int result = NativeMethods.xbim_curve_build_ellipse_3d(
+            int result = XbimGeometryNativeApi.xbim_curve_build_ellipse_3d(
                 ContextHandle,
                 ox, oy, oz,
                 zx, zy, zz,
@@ -150,7 +150,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build ellipse curve #{ifcEllipse.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build ellipse curve #{ifcEllipse.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeCurve(curveHandle, XCurveType.IfcEllipse);
         }
@@ -199,7 +199,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     weights[i] = weightValues[i];
             }
 
-            int result = NativeMethods.xbim_curve_build_bspline(
+            int result = XbimGeometryNativeApi.xbim_curve_build_bspline(
                 ContextHandle,
                 polesXYZ, numPoles,
                 knots, numKnots,
@@ -210,7 +210,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build B-spline curve #{ifcBSpline.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build B-spline curve #{ifcBSpline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             var curveType = ifcBSpline is IIfcRationalBSplineCurveWithKnots
                 ? XCurveType.IfcRationalBSplineCurveWithKnots
@@ -256,7 +256,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             multiplicities[0] = 2; // clamp start
             multiplicities[numPoles - 1] = 2; // clamp end
 
-            int result = NativeMethods.xbim_curve_build_bspline(
+            int result = XbimGeometryNativeApi.xbim_curve_build_bspline(
                 ContextHandle,
                 polesXYZ, numPoles,
                 knots, numPoles,
@@ -267,7 +267,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build polyline as B-spline #{ifcPolyline.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build polyline as B-spline #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeCurve(curveHandle, XCurveType.IfcPolyline);
         }
@@ -320,7 +320,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 multiplicities[0] = 2;
                 multiplicities[numPoints - 1] = 2;
 
-                int result = NativeMethods.xbim_curve_build_bspline(
+                int result = XbimGeometryNativeApi.xbim_curve_build_bspline(
                     ContextHandle,
                     polesXYZ, numPoints,
                     knots, numPoints,
@@ -331,7 +331,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                 if (result != 0)
                     throw new InvalidOperationException(
-                        $"Failed to build indexed poly curve #{ifcIndexed.EntityLabel}: {NativeMethods.GetLastError()}");
+                        $"Failed to build indexed poly curve #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new NativeCurve(curveHandle, XCurveType.IfcIndexedPolyCurve);
             }
@@ -360,7 +360,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 multiplicities[0] = 2;
                 multiplicities[numPoints - 1] = 2;
 
-                int result = NativeMethods.xbim_curve_build_bspline(
+                int result = XbimGeometryNativeApi.xbim_curve_build_bspline(
                     ContextHandle,
                     polesXYZ, numPoints,
                     knots, numPoints,
@@ -371,7 +371,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                 if (result != 0)
                     throw new InvalidOperationException(
-                        $"Failed to build indexed poly curve 2D #{ifcIndexed.EntityLabel}: {NativeMethods.GetLastError()}");
+                        $"Failed to build indexed poly curve 2D #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new NativeCurve(curveHandle, XCurveType.IfcIndexedPolyCurve);
             }

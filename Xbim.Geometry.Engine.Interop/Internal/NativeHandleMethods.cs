@@ -4,7 +4,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
 {
     /// <summary>
     /// P/Invoke declarations for native handle destruction functions.
-    /// These are separated from the main NativeMethods class so that
+    /// These are separated from the main XbimGeometryNativeApi class so that
     /// SafeHandle subclasses can call destroy without circular dependencies.
     /// </summary>
     internal static partial class NativeHandleMethods

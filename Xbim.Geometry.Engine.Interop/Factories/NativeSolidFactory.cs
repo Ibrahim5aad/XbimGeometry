@@ -60,7 +60,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"CSG Block #{ifcBlock.EntityLabel} has zero or negative dimensions.");
 
-            int result = NativeMethods.xbim_solid_build_block(
+            int result = XbimGeometryNativeApi.xbim_solid_build_block(
                 ContextHandle,
                 ox, oy, oz, zx, zy, zz, xx, xy, xz,
                 ifcBlock.XLength, ifcBlock.YLength, ifcBlock.ZLength,
@@ -68,7 +68,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build CSG Block #{ifcBlock.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build CSG Block #{ifcBlock.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeFactory.WrapSolid(shapeHandle);
         }
@@ -84,7 +84,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"CSG Sphere #{ifcSphere.EntityLabel} has zero or negative radius.");
 
-            int result = NativeMethods.xbim_solid_build_sphere(
+            int result = XbimGeometryNativeApi.xbim_solid_build_sphere(
                 ContextHandle,
                 ox, oy, oz, zx, zy, zz, xx, xy, xz,
                 ifcSphere.Radius,
@@ -92,7 +92,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build CSG Sphere #{ifcSphere.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build CSG Sphere #{ifcSphere.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeFactory.WrapSolid(shapeHandle);
         }
@@ -108,7 +108,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"CSG RightCircularCylinder #{ifcCylinder.EntityLabel} has zero or negative dimensions.");
 
-            int result = NativeMethods.xbim_solid_build_right_circular_cylinder(
+            int result = XbimGeometryNativeApi.xbim_solid_build_right_circular_cylinder(
                 ContextHandle,
                 ox, oy, oz, zx, zy, zz, xx, xy, xz,
                 ifcCylinder.Radius, ifcCylinder.Height,
@@ -116,7 +116,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build CSG RightCircularCylinder #{ifcCylinder.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build CSG RightCircularCylinder #{ifcCylinder.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeFactory.WrapSolid(shapeHandle);
         }
@@ -132,7 +132,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"CSG RightCircularCone #{ifcCone.EntityLabel} has zero or negative dimensions.");
 
-            int result = NativeMethods.xbim_solid_build_right_circular_cone(
+            int result = XbimGeometryNativeApi.xbim_solid_build_right_circular_cone(
                 ContextHandle,
                 ox, oy, oz, zx, zy, zz, xx, xy, xz,
                 ifcCone.BottomRadius, ifcCone.Height,
@@ -140,7 +140,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build CSG RightCircularCone #{ifcCone.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build CSG RightCircularCone #{ifcCone.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeFactory.WrapSolid(shapeHandle);
         }
@@ -156,7 +156,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"CSG RectangularPyramid #{ifcPyramid.EntityLabel} has zero or negative dimensions.");
 
-            int result = NativeMethods.xbim_solid_build_rectangular_pyramid(
+            int result = XbimGeometryNativeApi.xbim_solid_build_rectangular_pyramid(
                 ContextHandle,
                 ox, oy, oz, zx, zy, zz, xx, xy, xz,
                 ifcPyramid.XLength, ifcPyramid.YLength, ifcPyramid.Height,
@@ -164,7 +164,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build CSG RectangularPyramid #{ifcPyramid.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build CSG RectangularPyramid #{ifcPyramid.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeFactory.WrapSolid(shapeHandle);
         }
@@ -217,7 +217,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     .BuildLocationFromAxis3D(extrudedSolid.Position).Handle;
             }
 
-            int result = NativeMethods.xbim_solid_build_extruded(
+            int result = XbimGeometryNativeApi.xbim_solid_build_extruded(
                 ContextHandle,
                 profileFace.Handle,
                 dirX, dirY, dirZ,
@@ -227,7 +227,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build extruded area solid #{extrudedSolid.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build extruded area solid #{extrudedSolid.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeFactory.WrapSolid(shapeHandle);
         }
@@ -255,7 +255,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     .BuildLocationFromAxis3D(extrudedTapered.Position).Handle;
             }
 
-            int result = NativeMethods.xbim_solid_build_extruded_tapered(
+            int result = XbimGeometryNativeApi.xbim_solid_build_extruded_tapered(
                 ContextHandle,
                 startFace.Handle,
                 endFace.Handle,
@@ -267,7 +267,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build extruded area solid tapered #{extrudedTapered.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build extruded area solid tapered #{extrudedTapered.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeFactory.WrapSolid(shapeHandle);
         }
@@ -301,7 +301,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     .BuildLocationFromAxis3D(revolvedSolid.Position).Handle;
             }
 
-            int result = NativeMethods.xbim_solid_build_revolved(
+            int result = XbimGeometryNativeApi.xbim_solid_build_revolved(
                 ContextHandle,
                 profileFace.Handle,
                 axisOriginX, axisOriginY, axisOriginZ,
@@ -312,7 +312,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build revolved area solid #{revolvedSolid.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build revolved area solid #{revolvedSolid.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeFactory.WrapSolid(shapeHandle);
         }
@@ -346,7 +346,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     .BuildLocationFromAxis3D(revolvedTapered.Position).Handle;
             }
 
-            int result = NativeMethods.xbim_solid_build_revolved_tapered(
+            int result = XbimGeometryNativeApi.xbim_solid_build_revolved_tapered(
                 ContextHandle,
                 startFace.Handle,
                 endFace.Handle,
@@ -359,7 +359,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build revolved area solid tapered #{revolvedTapered.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build revolved area solid tapered #{revolvedTapered.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeFactory.WrapSolid(shapeHandle);
         }

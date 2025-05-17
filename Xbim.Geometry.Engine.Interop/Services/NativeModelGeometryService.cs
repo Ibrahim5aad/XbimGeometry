@@ -153,7 +153,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
             // Create or replace the native context
             _contextHandle?.Dispose();
 
-            int result = NativeMethods.xbim_context_create(
+            int result = XbimGeometryNativeApi.xbim_context_create(
                 precision,
                 oneMeter,
                 oneFoot,
@@ -166,7 +166,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
             if (result != 0)
             {
-                string error = NativeMethods.GetLastError();
+                string error = XbimGeometryNativeApi.GetLastError();
                 throw new InvalidOperationException(
                     $"Failed to create native geometry context: {error}");
             }

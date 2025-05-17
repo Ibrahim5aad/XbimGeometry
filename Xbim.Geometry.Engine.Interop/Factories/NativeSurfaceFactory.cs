@@ -50,7 +50,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXPlane BuildPlane(IXPoint origin, IXDirection normal)
         {
-            int result = NativeMethods.xbim_surface_build_plane(
+            int result = XbimGeometryNativeApi.xbim_surface_build_plane(
                 ContextHandle,
                 origin.X, origin.Y, origin.Z,
                 normal.X, normal.Y, normal.Z,
@@ -58,7 +58,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build plane: {NativeMethods.GetLastError()}");
+                    $"Failed to build plane: {XbimGeometryNativeApi.GetLastError()}");
 
             // Default reference direction: perpendicular to normal
             var refDir = ComputeRefDirection(normal);
@@ -74,7 +74,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out double zx, out double zy, out double zz,
                 out double xx, out double xy, out double xz);
 
-            int result = NativeMethods.xbim_surface_build_plane(
+            int result = XbimGeometryNativeApi.xbim_surface_build_plane(
                 ContextHandle,
                 ox, oy, oz,
                 zx, zy, zz,
@@ -82,7 +82,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build plane #{ifcPlane.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build plane #{ifcPlane.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             var origin = new XPoint(ox, oy, oz);
             var normal = new XDirection(zx, zy, zz);
@@ -101,7 +101,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out double zx, out double zy, out double zz,
                 out double xx, out double xy, out double xz);
 
-            int result = NativeMethods.xbim_surface_build_cylindrical(
+            int result = XbimGeometryNativeApi.xbim_surface_build_cylindrical(
                 ContextHandle,
                 ox, oy, oz,
                 zx, zy, zz,
@@ -111,7 +111,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build cylindrical surface #{ifcCylinder.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build cylindrical surface #{ifcCylinder.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeSurface(surfaceHandle, XSurfaceType.IfcCylindricalSurface);
         }
@@ -127,7 +127,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out double zx, out double zy, out double zz,
                 out double xx, out double xy, out double xz);
 
-            int result = NativeMethods.xbim_surface_build_spherical(
+            int result = XbimGeometryNativeApi.xbim_surface_build_spherical(
                 ContextHandle,
                 ox, oy, oz,
                 zx, zy, zz,
@@ -137,7 +137,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build spherical surface #{ifcSphere.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build spherical surface #{ifcSphere.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeSurface(surfaceHandle, XSurfaceType.IfcSphericalSurface);
         }
@@ -208,7 +208,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
             }
 
-            int result = NativeMethods.xbim_surface_build_bspline(
+            int result = XbimGeometryNativeApi.xbim_surface_build_bspline(
                 ContextHandle,
                 polesXYZ, numU, numV,
                 uKnots, uKnots.Length,
@@ -220,7 +220,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build B-spline surface #{ifcBSpline.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build B-spline surface #{ifcBSpline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             var surfaceType = ifcBSpline is IIfcRationalBSplineSurfaceWithKnots
                 ? XSurfaceType.IfcRationalBSplineSurfaceWithKnots

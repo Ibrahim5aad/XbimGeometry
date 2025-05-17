@@ -76,7 +76,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         /// </summary>
         internal XLocation()
         {
-            int result = NativeMethods.xbim_location_create_identity(out var handle);
+            int result = XbimGeometryNativeApi.xbim_location_create_identity(out var handle);
             if (result != 0)
                 throw new InvalidOperationException("Failed to create identity location.");
             _handle = handle;
@@ -218,9 +218,9 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             if (other == null)
                 throw new ArgumentException("Location must be an XLocation from the native interop layer.", nameof(location));
 
-            int result = NativeMethods.xbim_location_compose(other.Handle, Handle, out var composed);
+            int result = XbimGeometryNativeApi.xbim_location_compose(other.Handle, Handle, out var composed);
             if (result != 0)
-                throw new InvalidOperationException($"Failed to compose locations: {NativeMethods.GetLastError()}");
+                throw new InvalidOperationException($"Failed to compose locations: {XbimGeometryNativeApi.GetLastError()}");
 
             // Compose the matrix components: result = other * this
             return new XLocation(composed,
@@ -252,7 +252,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
 
             // Create a new native handle from the inverted transform
             // The simplest approach is to create from axis2 with the inverted basis vectors
-            int result = NativeMethods.xbim_location_create_identity(out var invHandle);
+            int result = XbimGeometryNativeApi.xbim_location_create_identity(out var invHandle);
             if (result != 0)
                 throw new InvalidOperationException("Failed to create inverted location.");
 
@@ -261,7 +261,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
 
         public IXLocation ScaledBy(double scaleFactor)
         {
-            int result = NativeMethods.xbim_location_create_identity(out var scaledHandle);
+            int result = XbimGeometryNativeApi.xbim_location_create_identity(out var scaledHandle);
             if (result != 0)
                 throw new InvalidOperationException("Failed to create scaled location.");
 
@@ -279,7 +279,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
 
         public IXLocation Translated(double x, double y, double z)
         {
-            int result = NativeMethods.xbim_location_create_identity(out var translatedHandle);
+            int result = XbimGeometryNativeApi.xbim_location_create_identity(out var translatedHandle);
             if (result != 0)
                 throw new InvalidOperationException("Failed to create translated location.");
 

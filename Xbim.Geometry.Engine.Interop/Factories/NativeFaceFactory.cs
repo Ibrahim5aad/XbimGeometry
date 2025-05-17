@@ -46,14 +46,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 // For planes, build from the wire directly
                 if (wires.Length == 1)
                 {
-                    int result = NativeMethods.xbim_face_build_from_wire(
+                    int result = XbimGeometryNativeApi.xbim_face_build_from_wire(
                         ContextHandle,
                         outerWire.Handle,
                         out var faceHandle);
 
                     if (result != 0)
                         throw new InvalidOperationException(
-                            $"Failed to build planar face from wire: {NativeMethods.GetLastError()}");
+                            $"Failed to build planar face from wire: {XbimGeometryNativeApi.GetLastError()}");
 
                     return new NativeFace(faceHandle);
                 }
@@ -104,7 +104,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 innerWireHandles = Array.Empty<IntPtr>();
             }
 
-            int result = NativeMethods.xbim_face_build_advanced(
+            int result = XbimGeometryNativeApi.xbim_face_build_advanced(
                 ContextHandle,
                 surfaceType,
                 ox, oy, oz,
@@ -120,7 +120,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build advanced face: {NativeMethods.GetLastError()}");
+                    $"Failed to build advanced face: {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeFace(faceHandle);
         }

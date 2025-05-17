@@ -20,10 +20,10 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                int result = NativeMethods.xbim_shape_volume(Handle, out double volume);
+                int result = XbimGeometryNativeApi.xbim_shape_volume(Handle, out double volume);
                 if (result != 0)
                     throw new InvalidOperationException(
-                        $"Failed to compute volume: {NativeMethods.GetLastError()}");
+                        $"Failed to compute volume: {XbimGeometryNativeApi.GetLastError()}");
                 return volume;
             }
         }

@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 using Xbim.Geometry.Engine.Interop.Handles;
 
@@ -8,17 +9,17 @@ namespace Xbim.Geometry.Engine.Interop.Internal
     /// Destroy functions live in <see cref="NativeHandleMethods"/> to avoid
     /// circular dependencies with SafeHandle subclasses.
     /// </summary>
-    internal static partial class NativeMethods
+    internal static partial class XbimGeometryNativeApi
     {
         private const string Lib = NativeLibraryLoader.LibraryName;
         private const CallingConvention CC = CallingConvention.StdCall;
 
-        static NativeMethods()
+        static XbimGeometryNativeApi()
         {
             NativeLibraryLoader.EnsureLoaded();
         }
 
-        // ── Error handling ────────────────────────────────────────────────
+        #region Error Handling
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern IntPtr xbim_get_last_error();
@@ -33,7 +34,9 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             return Marshal.PtrToStringAnsi(ptr) ?? string.Empty;
         }
 
-        // ── Context lifecycle ─────────────────────────────────────────────
+        #endregion
+
+        #region Context Lifecycle
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_context_create(
@@ -58,7 +61,9 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             int level,
             [MarshalAs(UnmanagedType.LPStr)] string message);
 
-        // ── Shape queries ─────────────────────────────────────────────────
+        #endregion
+
+        #region Shape Queries
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_shape_type(
@@ -92,7 +97,9 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeShapeHandle handle,
             [MarshalAs(UnmanagedType.LPStr)] string filePath);
 
-        // ── Location lifecycle ────────────────────────────────────────────
+        #endregion
+
+        #region Location
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_location_create_from_axis2(
@@ -111,15 +118,15 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeLocationHandle loc2,
             out NativeLocationHandle outHandle);
 
-        // ── Shape + Location ──────────────────────────────────────────────
-
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_shape_moved(
             NativeShapeHandle shapeHandle,
             NativeLocationHandle locationHandle,
             out NativeShapeHandle outHandle);
 
-        // ── CSG solid primitives ─────────────────────────────────────────
+        #endregion
+
+        #region CSG Solid Primitives
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_solid_build_block(
@@ -166,7 +173,9 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double xLen, double yLen, double height,
             out NativeShapeHandle outHandle);
 
-        // ── Sweep operations (extruded area solids) ────────────────────────
+        #endregion
+
+        #region Sweep Operations
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_solid_build_extruded(
@@ -187,8 +196,6 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double precision,
             NativeLocationHandle locationHandle,
             out NativeShapeHandle outHandle);
-
-        // ── Sweep operations (revolved area solids) ───────────────────────
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_solid_build_revolved(
@@ -212,8 +219,6 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeLocationHandle locationHandle,
             out NativeShapeHandle outHandle);
 
-        // ── Sweep operations (swept disk and fixed reference swept) ────────
-
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_solid_build_swept_disk(
             NativeContextHandle ctx,
@@ -234,7 +239,9 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeLocationHandle locationHandle,
             out NativeShapeHandle outHandle);
 
-        // ── Parametric profile primitives ────────────────────────────────
+        #endregion
+
+        #region Profiles
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_profile_build_rectangle(
@@ -271,8 +278,6 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double xDirX, double xDirY, double xDirZ,
             double xDim, double yDim, double roundingRadius,
             out NativeShapeHandle outHandle);
-
-        // ── Structural profile primitives ──────────────────────────────────
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_profile_build_ishape(
@@ -339,8 +344,6 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double girth, double internalFilletRadius,
             out NativeShapeHandle outHandle);
 
-        // ── Trapezium and asymmetric I-shape profiles ───────────────────────
-
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_profile_build_trapezium(
             NativeContextHandle ctx,
@@ -364,8 +367,6 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double bottomFlangeSlope, double topFlangeSlope,
             out NativeShapeHandle outHandle);
 
-        // ── Hollow profile primitives ─────────────────────────────────────
-
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_profile_build_rectangle_hollow(
             NativeContextHandle ctx,
@@ -384,8 +385,6 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double xDirX, double xDirY, double xDirZ,
             double radius, double wallThickness,
             out NativeShapeHandle outHandle);
-
-        // ── Arbitrary / composite / derived profile primitives ──────────────
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_profile_build_arbitrary_closed(
@@ -433,7 +432,9 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeShapeHandle parentHandle,
             out NativeShapeHandle outHandle);
 
-        // ── Boolean operations ──────────────────────────────────────────────
+        #endregion
+
+        #region Boolean Operations
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_boolean_union(
@@ -462,7 +463,9 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out int outHasWarnings,
             out NativeShapeHandle outHandle);
 
-        // ── Half-space operations ──────────────────────────────────────────────
+        #endregion
+
+        #region Half-Space Operations
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_halfspace_build(
@@ -494,7 +497,22 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double precision,
             out NativeShapeHandle outHandle);
 
-        // ── Compound operations ──────────────────────────────────────────────
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_halfspace_build_boxed(
+            NativeContextHandle ctx,
+            int surfaceType,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double radius,
+            int agreementFlag,
+            double oneMeter,
+            double precision,
+            out NativeShapeHandle outHandle);
+
+        #endregion
+
+        #region Compound Operations
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_compound_make(
@@ -520,20 +538,92 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out int outHasWarnings,
             out NativeShapeHandle outHandle);
 
+        #endregion
+
+        #region Vertex
+
         [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_halfspace_build_boxed(
+        internal static extern int xbim_vertex_build(
             NativeContextHandle ctx,
-            int surfaceType,
-            double originX, double originY, double originZ,
-            double zDirX, double zDirY, double zDirZ,
-            double xDirX, double xDirY, double xDirZ,
-            double radius,
-            int agreementFlag,
-            double oneMeter,
-            double precision,
+            double x, double y, double z,
+            double tolerance,
             out NativeShapeHandle outHandle);
 
-        // ── Face construction and queries ──────────────────────────────────────
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_vertex_point(
+            NativeShapeHandle vertexHandle,
+            out double outX, out double outY, out double outZ);
+
+        #endregion
+
+        #region Edge
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_edge_build_line(
+            NativeContextHandle ctx,
+            double startX, double startY, double startZ,
+            double endX, double endY, double endZ,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_edge_build_from_curve(
+            NativeContextHandle ctx,
+            NativeShapeHandle curveEdgeHandle,
+            double param1,
+            double param2,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_edge_build_circle_arc(
+            NativeContextHandle ctx,
+            double centerX, double centerY, double centerZ,
+            double normalX, double normalY, double normalZ,
+            double radius,
+            double startAngle,
+            double endAngle,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_edge_length(
+            NativeShapeHandle edgeHandle,
+            out double outLength);
+
+        #endregion
+
+        #region Wire
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_build_from_edges(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] edgeHandles,
+            int numEdges,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_build_polyline(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] double[] pointsXYZ,
+            int numPoints,
+            double tolerance,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_build_polygon(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] double[] pointsXYZ,
+            int numPoints,
+            int closed,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_is_closed(
+            NativeShapeHandle wireHandle,
+            double tolerance,
+            out int outClosed);
+
+        #endregion
+
+        #region Face
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_face_build_from_surface(
@@ -581,84 +671,20 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out double outNormalY,
             out double outNormalZ);
 
-        // ── Wire construction and query ─────────────────────────────────
-
         [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_wire_build_from_edges(
-            NativeContextHandle ctx,
-            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] edgeHandles,
-            int numEdges,
+        internal static extern int xbim_face_outer_wire(
+            NativeShapeHandle faceHandle,
             out NativeShapeHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_wire_build_polyline(
-            NativeContextHandle ctx,
-            [MarshalAs(UnmanagedType.LPArray)] double[] pointsXYZ,
-            int numPoints,
-            double tolerance,
-            out NativeShapeHandle outHandle);
+        internal static extern int xbim_face_inner_wires(
+            NativeShapeHandle faceHandle,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] outHandles,
+            ref int count);
 
-        [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_wire_build_polygon(
-            NativeContextHandle ctx,
-            [MarshalAs(UnmanagedType.LPArray)] double[] pointsXYZ,
-            int numPoints,
-            int closed,
-            out NativeShapeHandle outHandle);
+        #endregion
 
-        [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_wire_is_closed(
-            NativeShapeHandle wireHandle,
-            double tolerance,
-            out int outClosed);
-
-        // ── Edge construction and query ─────────────────────────────────
-
-        [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_edge_build_line(
-            NativeContextHandle ctx,
-            double startX, double startY, double startZ,
-            double endX, double endY, double endZ,
-            out NativeShapeHandle outHandle);
-
-        [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_edge_build_from_curve(
-            NativeContextHandle ctx,
-            NativeShapeHandle curveEdgeHandle,
-            double param1,
-            double param2,
-            out NativeShapeHandle outHandle);
-
-        [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_edge_build_circle_arc(
-            NativeContextHandle ctx,
-            double centerX, double centerY, double centerZ,
-            double normalX, double normalY, double normalZ,
-            double radius,
-            double startAngle,
-            double endAngle,
-            out NativeShapeHandle outHandle);
-
-        [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_edge_length(
-            NativeShapeHandle edgeHandle,
-            out double outLength);
-
-        // ── Vertex construction and query ─────────────────────────────────
-
-        [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_vertex_build(
-            NativeContextHandle ctx,
-            double x, double y, double z,
-            double tolerance,
-            out NativeShapeHandle outHandle);
-
-        [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_vertex_point(
-            NativeShapeHandle vertexHandle,
-            out double outX, out double outY, out double outZ);
-
-        // ── Shell construction and repair ────────────────────────────────
+        #region Shell
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_shell_build_from_faces(
@@ -682,7 +708,26 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeShapeHandle shellHandle,
             out NativeShapeHandle outHandle);
 
-        // ── Curve construction ──────────────────────────────────────────────
+        #endregion
+
+        #region Shape Traversal
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_count_subshapes(
+            NativeShapeHandle handle,
+            int subType,
+            out int outCount);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_get_subshapes(
+            NativeShapeHandle handle,
+            int subType,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] outHandles,
+            ref int count);
+
+        #endregion
+
+        #region Curve Construction
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_curve_build_line_3d(
@@ -719,33 +764,9 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             [MarshalAs(UnmanagedType.LPArray)] double[]? weights,
             out NativeCurveHandle outHandle);
 
-        // ── Shape traversal (topology navigation) ───────────────────────────
+        #endregion
 
-        [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_shape_count_subshapes(
-            NativeShapeHandle handle,
-            int subType,
-            out int outCount);
-
-        [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_shape_get_subshapes(
-            NativeShapeHandle handle,
-            int subType,
-            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] outHandles,
-            ref int count);
-
-        [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_face_outer_wire(
-            NativeShapeHandle faceHandle,
-            out NativeShapeHandle outHandle);
-
-        [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_face_inner_wires(
-            NativeShapeHandle faceHandle,
-            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] outHandles,
-            ref int count);
-
-        // ── Surface construction ────────────────────────────────────────────
+        #region Surface Construction
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_surface_build_plane(
@@ -788,6 +809,8 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             int vDegree,
             [MarshalAs(UnmanagedType.LPArray)] double[]? weights,
             out NativeSurfaceHandle outHandle);
+
+        #endregion
     }
 
     /// <summary>

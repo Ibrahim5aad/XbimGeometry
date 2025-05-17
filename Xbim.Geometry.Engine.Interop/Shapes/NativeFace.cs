@@ -19,10 +19,10 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                int result = NativeMethods.xbim_shape_surface_area(Handle, out double area);
+                int result = XbimGeometryNativeApi.xbim_shape_surface_area(Handle, out double area);
                 if (result != 0)
                     throw new InvalidOperationException(
-                        $"Failed to compute face area: {NativeMethods.GetLastError()}");
+                        $"Failed to compute face area: {XbimGeometryNativeApi.GetLastError()}");
                 return area;
             }
         }
@@ -41,10 +41,10 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                int result = NativeMethods.xbim_face_outer_wire(Handle, out var wireHandle);
+                int result = XbimGeometryNativeApi.xbim_face_outer_wire(Handle, out var wireHandle);
                 if (result != 0)
                     throw new InvalidOperationException(
-                        $"Failed to get outer wire: {NativeMethods.GetLastError()}");
+                        $"Failed to get outer wire: {XbimGeometryNativeApi.GetLastError()}");
                 return new NativeWire(wireHandle);
             }
         }
@@ -54,7 +54,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             get
             {
                 // Count total wires, subtract 1 for the outer wire
-                int countResult = NativeMethods.xbim_shape_count_subshapes(
+                int countResult = XbimGeometryNativeApi.xbim_shape_count_subshapes(
                     Handle, (int)XShapeType.Wire, out int totalWires);
                 if (countResult != 0 || totalWires <= 1)
                     return Array.Empty<IXWire>();
@@ -62,7 +62,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 int capacity = totalWires - 1;
                 var ptrs = new IntPtr[capacity];
                 int innerCount = capacity;
-                int getResult = NativeMethods.xbim_face_inner_wires(Handle, ptrs, ref innerCount);
+                int getResult = XbimGeometryNativeApi.xbim_face_inner_wires(Handle, ptrs, ref innerCount);
                 if (getResult != 0 || innerCount == 0)
                     return Array.Empty<IXWire>();
 

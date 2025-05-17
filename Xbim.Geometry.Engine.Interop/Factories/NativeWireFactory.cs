@@ -44,7 +44,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 pointsXYZ[i * 3 + 2] = points[i].Z;
             }
 
-            int result = NativeMethods.xbim_wire_build_polyline(
+            int result = XbimGeometryNativeApi.xbim_wire_build_polyline(
                 ContextHandle,
                 pointsXYZ, points.Length,
                 _modelService.Precision,
@@ -52,7 +52,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build wire from {points.Length} points: {NativeMethods.GetLastError()}");
+                    $"Failed to build wire from {points.Length} points: {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeWire(wireHandle);
         }
@@ -116,7 +116,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 pointsXYZ[i * 3 + 2] = (int)cp.Dim == 3 ? (double)cp.Coordinates[2] : 0.0;
             }
 
-            int result = NativeMethods.xbim_wire_build_polyline(
+            int result = XbimGeometryNativeApi.xbim_wire_build_polyline(
                 ContextHandle,
                 pointsXYZ, points.Count,
                 _modelService.Precision,
@@ -124,7 +124,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build wire from polyline #{ifcPolyline.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build wire from polyline #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeWire(wireHandle);
         }
@@ -170,7 +170,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (ifcIndexed.Segments == null || !ifcIndexed.Segments.Any())
             {
                 int numPoints = allPointsXYZ.Count / 3;
-                int result = NativeMethods.xbim_wire_build_polyline(
+                int result = XbimGeometryNativeApi.xbim_wire_build_polyline(
                     ContextHandle,
                     allPointsXYZ.ToArray(), numPoints,
                     _modelService.Precision,
@@ -178,7 +178,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                 if (result != 0)
                     throw new InvalidOperationException(
-                        $"Failed to build indexed poly curve #{ifcIndexed.EntityLabel}: {NativeMethods.GetLastError()}");
+                        $"Failed to build indexed poly curve #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new NativeWire(wireHandle);
             }
@@ -204,14 +204,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         int startIdx = (int)(indices[0] - 1);
                         int endIdx = (int)(indices[2] - 1);
 
-                        int r = NativeMethods.xbim_edge_build_line(
+                        int r = XbimGeometryNativeApi.xbim_edge_build_line(
                             ContextHandle,
                             allPointsXYZ[startIdx * 3], allPointsXYZ[startIdx * 3 + 1], allPointsXYZ[startIdx * 3 + 2],
                             allPointsXYZ[endIdx * 3], allPointsXYZ[endIdx * 3 + 1], allPointsXYZ[endIdx * 3 + 2],
                             out var edgeHandle);
                         if (r != 0)
                             throw new InvalidOperationException(
-                                $"Failed to build arc edge in indexed poly curve #{ifcIndexed.EntityLabel}: {NativeMethods.GetLastError()}");
+                                $"Failed to build arc edge in indexed poly curve #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
                         edgeHandles.Add(edgeHandle);
                     }
                     else
@@ -228,14 +228,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                         for (int i = 0; i < indices.Length - 1; i++)
                         {
-                            int r = NativeMethods.xbim_edge_build_line(
+                            int r = XbimGeometryNativeApi.xbim_edge_build_line(
                                 ContextHandle,
                                 segPointsXYZ[i * 3], segPointsXYZ[i * 3 + 1], segPointsXYZ[i * 3 + 2],
                                 segPointsXYZ[(i + 1) * 3], segPointsXYZ[(i + 1) * 3 + 1], segPointsXYZ[(i + 1) * 3 + 2],
                                 out var edgeHandle);
                             if (r != 0)
                                 throw new InvalidOperationException(
-                                    $"Failed to build line edge in indexed poly curve #{ifcIndexed.EntityLabel}: {NativeMethods.GetLastError()}");
+                                    $"Failed to build line edge in indexed poly curve #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
                             edgeHandles.Add(edgeHandle);
                         }
                     }
@@ -243,14 +243,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                 // Build wire from edges
                 var ptrs = edgeHandles.Select(h => h.DangerousGetHandle()).ToArray();
-                int buildResult = NativeMethods.xbim_wire_build_from_edges(
+                int buildResult = XbimGeometryNativeApi.xbim_wire_build_from_edges(
                     ContextHandle,
                     ptrs, ptrs.Length,
                     out var resultWireHandle);
 
                 if (buildResult != 0)
                     throw new InvalidOperationException(
-                        $"Failed to build wire from edges in indexed poly curve #{ifcIndexed.EntityLabel}: {NativeMethods.GetLastError()}");
+                        $"Failed to build wire from edges in indexed poly curve #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new NativeWire(resultWireHandle);
             }
@@ -317,14 +317,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var edge = (NativeEdge)((NativeEdgeFactory)_modelService.EdgeFactory).Build(ifcLine);
             var edgeHandles = new IntPtr[] { edge.Handle.DangerousGetHandle() };
 
-            int result = NativeMethods.xbim_wire_build_from_edges(
+            int result = XbimGeometryNativeApi.xbim_wire_build_from_edges(
                 ContextHandle,
                 edgeHandles, 1,
                 out var wireHandle);
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build wire from line #{ifcLine.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build wire from line #{ifcLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeWire(wireHandle);
         }
@@ -334,14 +334,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var edge = (NativeEdge)((NativeEdgeFactory)_modelService.EdgeFactory).Build(ifcCircle);
             var edgeHandles = new IntPtr[] { edge.Handle.DangerousGetHandle() };
 
-            int result = NativeMethods.xbim_wire_build_from_edges(
+            int result = XbimGeometryNativeApi.xbim_wire_build_from_edges(
                 ContextHandle,
                 edgeHandles, 1,
                 out var wireHandle);
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build wire from circle #{ifcCircle.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build wire from circle #{ifcCircle.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeWire(wireHandle);
         }
@@ -351,14 +351,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var edge = (NativeEdge)((NativeEdgeFactory)_modelService.EdgeFactory).Build(ifcEllipse);
             var edgeHandles = new IntPtr[] { edge.Handle.DangerousGetHandle() };
 
-            int result = NativeMethods.xbim_wire_build_from_edges(
+            int result = XbimGeometryNativeApi.xbim_wire_build_from_edges(
                 ContextHandle,
                 edgeHandles, 1,
                 out var wireHandle);
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build wire from ellipse #{ifcEllipse.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build wire from ellipse #{ifcEllipse.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeWire(wireHandle);
         }
@@ -369,14 +369,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var edge = (NativeEdge)_modelService.EdgeFactory.Build(ifcBSpline);
 
             var edgePtrs = new IntPtr[] { edge.Handle.DangerousGetHandle() };
-            int wireResult = NativeMethods.xbim_wire_build_from_edges(
+            int wireResult = XbimGeometryNativeApi.xbim_wire_build_from_edges(
                 ContextHandle,
                 edgePtrs, 1,
                 out var wireHandle);
 
             if (wireResult != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build wire from B-spline edge #{ifcBSpline.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build wire from B-spline edge #{ifcBSpline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeWire(wireHandle);
         }

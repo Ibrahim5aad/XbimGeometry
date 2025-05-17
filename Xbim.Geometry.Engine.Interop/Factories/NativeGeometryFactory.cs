@@ -188,12 +188,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out double zx, out double zy, out double zz,
                 out double xx, out double xy, out double xz);
 
-            int result = NativeMethods.xbim_location_create_from_axis2(
+            int result = XbimGeometryNativeApi.xbim_location_create_from_axis2(
                 ox, oy, oz, zx, zy, zz, xx, xy, xz, out var handle);
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to create location from axis2 placement: {NativeMethods.GetLastError()}");
+                    $"Failed to create location from axis2 placement: {XbimGeometryNativeApi.GetLastError()}");
 
             // Reconstruct the transform matrix from the axis2 placement.
             // The native side does: gp_Trsf.SetTransformation(gp_Ax3(origin, zDir, xDir), defaultAx3).Inverted()
@@ -250,12 +250,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
 
             // 2D placement maps to 3D: origin at (px, py, 0), Z = (0,0,1), X = (xDirX, xDirY, 0)
-            int result = NativeMethods.xbim_location_create_from_axis2(
+            int result = XbimGeometryNativeApi.xbim_location_create_from_axis2(
                 px, py, 0, 0, 0, 1, xDirX, xDirY, 0, out var handle);
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to create location from 2D axis placement: {NativeMethods.GetLastError()}");
+                    $"Failed to create location from 2D axis placement: {XbimGeometryNativeApi.GetLastError()}");
 
             // Y direction in 2D: perpendicular to X
             double yDirX = -xDirY;

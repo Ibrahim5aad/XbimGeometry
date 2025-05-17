@@ -20,7 +20,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             if (handle == null || handle.IsInvalid)
                 throw new ArgumentException("Cannot wrap an invalid shape handle.", nameof(handle));
 
-            int result = NativeMethods.xbim_shape_type(handle, out int typeVal);
+            int result = XbimGeometryNativeApi.xbim_shape_type(handle, out int typeVal);
             if (result != 0)
             {
                 // Can't determine type - wrap as generic shape
@@ -50,7 +50,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             if (handle == null || handle.IsInvalid)
                 throw new ArgumentException("Cannot wrap an invalid shape handle.", nameof(handle));
 
-            int result = NativeMethods.xbim_shape_type(handle, out int typeVal);
+            int result = XbimGeometryNativeApi.xbim_shape_type(handle, out int typeVal);
             if (result != 0 || (XShapeType)typeVal != XShapeType.Solid)
                 throw new InvalidOperationException(
                     $"Expected a Solid shape but got {(XShapeType)typeVal}.");
@@ -67,7 +67,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             if (handle == null || handle.IsInvalid)
                 throw new ArgumentException("Cannot wrap an invalid shape handle.", nameof(handle));
 
-            int result = NativeMethods.xbim_shape_type(handle, out int typeVal);
+            int result = XbimGeometryNativeApi.xbim_shape_type(handle, out int typeVal);
             if (result != 0 || (XShapeType)typeVal != XShapeType.Face)
                 throw new InvalidOperationException(
                     $"Expected a Face shape but got {(XShapeType)typeVal}.");

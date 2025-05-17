@@ -32,7 +32,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXEdge Build(IXPoint start, IXPoint end)
         {
-            int result = NativeMethods.xbim_edge_build_line(
+            int result = XbimGeometryNativeApi.xbim_edge_build_line(
                 ContextHandle,
                 start.X, start.Y, start.Z,
                 end.X, end.Y, end.Z,
@@ -40,7 +40,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build line edge: {NativeMethods.GetLastError()}");
+                    $"Failed to build line edge: {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeEdge(shapeHandle);
         }
@@ -89,7 +89,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             double endY = origin.Y + dirY * magnitude;
             double endZ = origin.Z + dirZ * magnitude;
 
-            int result = NativeMethods.xbim_edge_build_line(
+            int result = XbimGeometryNativeApi.xbim_edge_build_line(
                 ContextHandle,
                 origin.X, origin.Y, origin.Z,
                 endX, endY, endZ,
@@ -97,7 +97,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build line edge #{ifcLine.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build line edge #{ifcLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeEdge(shapeHandle);
         }
@@ -110,7 +110,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out double zx, out double zy, out double zz,
                 out _, out _, out _);
 
-            int result = NativeMethods.xbim_edge_build_circle_arc(
+            int result = XbimGeometryNativeApi.xbim_edge_build_circle_arc(
                 ContextHandle,
                 ox, oy, oz,
                 zx, zy, zz,
@@ -120,7 +120,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build circle edge #{ifcCircle.EntityLabel}: {NativeMethods.GetLastError()}");
+                    $"Failed to build circle edge #{ifcCircle.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeEdge(shapeHandle);
         }

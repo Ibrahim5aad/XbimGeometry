@@ -27,14 +27,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXVertex Build(double x, double y, double z = 0)
         {
-            int result = NativeMethods.xbim_vertex_build(
+            int result = XbimGeometryNativeApi.xbim_vertex_build(
                 ContextHandle, x, y, z,
                 _modelService.Precision,
                 out var shapeHandle);
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to build vertex at ({x}, {y}, {z}): {NativeMethods.GetLastError()}");
+                    $"Failed to build vertex at ({x}, {y}, {z}): {XbimGeometryNativeApi.GetLastError()}");
 
             return new NativeVertex(shapeHandle);
         }

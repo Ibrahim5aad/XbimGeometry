@@ -20,10 +20,10 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                int result = NativeMethods.xbim_shape_surface_area(Handle, out double area);
+                int result = XbimGeometryNativeApi.xbim_shape_surface_area(Handle, out double area);
                 if (result != 0)
                     throw new InvalidOperationException(
-                        $"Failed to compute surface area: {NativeMethods.GetLastError()}");
+                        $"Failed to compute surface area: {XbimGeometryNativeApi.GetLastError()}");
                 return area;
             }
         }
