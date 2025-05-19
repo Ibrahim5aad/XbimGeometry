@@ -1964,6 +1964,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_inner_wires(
  *   outBufferSize     – receives the buffer size in bytes
  *   outHasCurves      – receives 1 if the shape has curved edges, 0 otherwise
  *                        (may be NULL if not needed)
+ *   outMinX..outMaxZ  – receives the mesh bounding box in scaled coordinates
+ *                        (may be NULL if not needed)
  *
  * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if ctx or shape is NULL;
  * XBIM_NULL_SHAPE if the shape is null; XBIM_ERROR on meshing failure.
@@ -1978,7 +1980,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_mesh_create_wexbim(
     int                 checkEdges,
     unsigned char**     outBuffer,
     int*                outBufferSize,
-    int*                outHasCurves);
+    int*                outHasCurves,
+    double*             outMinX, double* outMinY, double* outMinZ,
+    double*             outMaxX, double* outMaxY, double* outMaxZ);
 
 /*
  * Compute the mesh bounding box of a shape after triangulation.

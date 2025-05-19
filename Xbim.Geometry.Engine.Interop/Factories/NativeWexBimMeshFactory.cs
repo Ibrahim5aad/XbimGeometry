@@ -70,7 +70,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 0, // checkEdges = false
                 out IntPtr bufferPtr,
                 out int bufferSize,
-                out int nativeHasCurves);
+                out int nativeHasCurves,
+                out double minX, out double minY, out double minZ,
+                out double maxX, out double maxY, out double maxZ);
 
             if (result != 0 || bufferPtr == IntPtr.Zero)
             {
@@ -87,21 +89,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 var meshBytes = new byte[bufferSize];
                 Marshal.Copy(bufferPtr, meshBytes, 0, bufferSize);
                 hasCurves = nativeHasCurves != 0;
-
-                // Get bounding box via dedicated API call
-                int bbResult = XbimGeometryNativeApi.xbim_mesh_get_bounding_box(
-                    _modelService.ContextHandle,
-                    nativeShape.Handle,
-                    tolerance,
-                    linearDeflection,
-                    angularDeflection,
-                    scale,
-                    out double minX, out double minY, out double minZ,
-                    out double maxX, out double maxY, out double maxZ);
-
-                bounds = bbResult == 0
-                    ? new XAxisAlignedBoundingBox(minX, minY, minZ, maxX, maxY, maxZ)
-                    : XAxisAlignedBoundingBox.Void;
+                bounds = new XAxisAlignedBoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
 
                 return meshBytes;
             }

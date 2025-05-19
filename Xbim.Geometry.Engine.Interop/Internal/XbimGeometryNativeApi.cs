@@ -825,7 +825,9 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             int checkEdges,
             out IntPtr outBuffer,
             out int outBufferSize,
-            out int outHasCurves);
+            out int outHasCurves,
+            out double outMinX, out double outMinY, out double outMinZ,
+            out double outMaxX, out double outMaxY, out double outMaxZ);
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_mesh_get_bounding_box(

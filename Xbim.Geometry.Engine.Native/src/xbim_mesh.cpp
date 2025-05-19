@@ -470,7 +470,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_mesh_create_wexbim(
     int                 checkEdges,
     unsigned char**     outBuffer,
     int*                outBufferSize,
-    int*                outHasCurves)
+    int*                outHasCurves,
+    double*             outMinX, double* outMinY, double* outMinZ,
+    double*             outMaxX, double* outMaxY, double* outMaxZ)
 {
     xbim_clear_error();
 
@@ -535,6 +537,26 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_mesh_create_wexbim(
 
         if (outHasCurves)
             *outHasCurves = mesh.HasCurves ? 1 : 0;
+
+        // Return bounding box computed during meshing (avoids re-triangulation)
+        if (mesh.BndBox.IsValid())
+        {
+            if (outMinX) *outMinX = mesh.BndBox.CornerMin().x();
+            if (outMinY) *outMinY = mesh.BndBox.CornerMin().y();
+            if (outMinZ) *outMinZ = mesh.BndBox.CornerMin().z();
+            if (outMaxX) *outMaxX = mesh.BndBox.CornerMax().x();
+            if (outMaxY) *outMaxY = mesh.BndBox.CornerMax().y();
+            if (outMaxZ) *outMaxZ = mesh.BndBox.CornerMax().z();
+        }
+        else
+        {
+            if (outMinX) *outMinX = 0.0;
+            if (outMinY) *outMinY = 0.0;
+            if (outMinZ) *outMinZ = 0.0;
+            if (outMaxX) *outMaxX = 0.0;
+            if (outMaxY) *outMaxY = 0.0;
+            if (outMaxZ) *outMaxZ = 0.0;
+        }
 
         return XBIM_OK;
     }
