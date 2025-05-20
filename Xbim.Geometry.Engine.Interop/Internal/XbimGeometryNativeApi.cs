@@ -811,6 +811,37 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeSurfaceHandle outHandle);
 
         #endregion
+
+        #region Mesh / WexBim
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_mesh_create_wexbim(
+            NativeContextHandle ctx,
+            NativeShapeHandle shapeHandle,
+            double tolerance,
+            double linearDeflection,
+            double angularDeflection,
+            double scale,
+            int checkEdges,
+            out IntPtr outBuffer,
+            out int outBufferSize,
+            out int outHasCurves);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_mesh_get_bounding_box(
+            NativeContextHandle ctx,
+            NativeShapeHandle shapeHandle,
+            double tolerance,
+            double linearDeflection,
+            double angularDeflection,
+            double scale,
+            out double outMinX, out double outMinY, out double outMinZ,
+            out double outMaxX, out double outMaxY, out double outMaxZ);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern void xbim_buffer_free(IntPtr buffer);
+
+        #endregion
     }
 
     /// <summary>

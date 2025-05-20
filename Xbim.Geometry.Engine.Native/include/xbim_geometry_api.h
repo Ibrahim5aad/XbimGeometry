@@ -1946,6 +1946,72 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_inner_wires(
     XbimShapeHandle*    outHandles,
     int*                count);
 
+/* ── WexBim mesh creation ──────────────────────────────────────────────── */
+
+/*
+ * Triangulate a shape and serialize the result to WexBim binary format.
+ * The mesh data is allocated by the native library and must be freed with
+ * xbim_buffer_free() when no longer needed.
+ *
+ *   ctx               – a valid context handle (for logging)
+ *   shapeHandle       – the shape to mesh
+ *   tolerance         – point coincidence tolerance for vertex deduplication
+ *   linearDeflection  – chord height tolerance in model units
+ *   angularDeflection – max angle between adjacent triangle normals (radians)
+ *   scale             – coordinate scale factor (typically 1/oneMeter)
+ *   checkEdges        – 1 to inspect face edges for curves, 0 to skip
+ *   outBuffer         – receives pointer to the WexBim byte buffer
+ *   outBufferSize     – receives the buffer size in bytes
+ *   outHasCurves      – receives 1 if the shape has curved edges, 0 otherwise
+ *                        (may be NULL if not needed)
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if ctx or shape is NULL;
+ * XBIM_NULL_SHAPE if the shape is null; XBIM_ERROR on meshing failure.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_mesh_create_wexbim(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     shapeHandle,
+    double              tolerance,
+    double              linearDeflection,
+    double              angularDeflection,
+    double              scale,
+    int                 checkEdges,
+    unsigned char**     outBuffer,
+    int*                outBufferSize,
+    int*                outHasCurves);
+
+/*
+ * Compute the mesh bounding box of a shape after triangulation.
+ * The bounding box is computed in scaled coordinates (same space as the
+ * WexBim mesh vertices).
+ *
+ *   ctx               – a valid context handle (for logging)
+ *   shapeHandle       – the shape to mesh
+ *   tolerance         – point coincidence tolerance
+ *   linearDeflection  – chord height tolerance
+ *   angularDeflection – max angle between normals (radians)
+ *   scale             – coordinate scale factor
+ *   outMinX..outMaxZ  – receives the bounding box corners
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE/XBIM_NULL_SHAPE on error.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_mesh_get_bounding_box(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     shapeHandle,
+    double              tolerance,
+    double              linearDeflection,
+    double              angularDeflection,
+    double              scale,
+    double*             outMinX, double* outMinY, double* outMinZ,
+    double*             outMaxX, double* outMaxY, double* outMaxZ);
+
+/*
+ * Free a byte buffer that was allocated by the native library.
+ * Passing NULL is a safe no-op.
+ * Use this to release the buffer returned by xbim_mesh_create_wexbim().
+ */
+XBIM_EXPORT void XBIM_CALL xbim_buffer_free(unsigned char* buffer);
+
 /* ── BRep serialization ────────────────────────────────────────────────── */
 
 /*
