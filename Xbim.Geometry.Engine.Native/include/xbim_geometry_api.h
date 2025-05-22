@@ -2029,6 +2029,42 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_write_brep(
     XbimShapeHandle handle,
     const char*     filePath);
 
+/*
+ * Serialize a shape to an OCCT BRep ASCII string.
+ *
+ *   handle     – a valid shape handle
+ *   outBrepStr – receives a malloc'd null-terminated UTF-8 string
+ *   outStrLen  – receives the string length in bytes (excluding null)
+ *
+ * The caller must free the returned string with xbim_string_free().
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if handle is NULL;
+ * XBIM_NULL_SHAPE if the shape is null; XBIM_ERROR on failure.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_to_brep_string(
+    XbimShapeHandle handle,
+    char**          outBrepStr,
+    int*            outStrLen);
+
+/*
+ * Deserialize a shape from an OCCT BRep ASCII string.
+ *
+ *   brepStr – null-terminated BRep ASCII data
+ *   strLen  – string length in bytes (or -1 to use strlen)
+ *
+ * Returns a valid shape handle on success, or NULL on failure.
+ * On failure, call xbim_get_last_error() for details.
+ */
+XBIM_EXPORT XbimShapeHandle XBIM_CALL xbim_shape_from_brep_string(
+    const char* brepStr,
+    int         strLen);
+
+/*
+ * Free a string allocated by native code (e.g. xbim_shape_to_brep_string).
+ * Passing NULL is a safe no-op.
+ */
+XBIM_EXPORT void XBIM_CALL xbim_string_free(char* str);
+
 #ifdef __cplusplus
 }
 #endif

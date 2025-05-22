@@ -842,6 +842,24 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         internal static extern void xbim_buffer_free(IntPtr buffer);
 
         #endregion
+
+        #region BRep Serialization
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_to_brep_string(
+            NativeShapeHandle handle,
+            out IntPtr outBrepStr,
+            out int outStrLen);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern NativeShapeHandle xbim_shape_from_brep_string(
+            [MarshalAs(UnmanagedType.LPStr)] string brepStr,
+            int strLen);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern void xbim_string_free(IntPtr str);
+
+        #endregion
     }
 
     /// <summary>

@@ -12,6 +12,9 @@
 #include "xbim_logging.h"
 
 #include <new>
+#include <sstream>
+#include <cstring>
+#include <cstdlib>
 
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
@@ -20,6 +23,7 @@
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
+#include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepGProp.hxx>
 #include <BRepBndLib.hxx>
@@ -546,4 +550,103 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_write_brep(
         xbim_set_error(msg ? msg : "xbim_shape_write_brep: OCCT exception");
         return XBIM_ERROR;
     }
+}
+
+/* ── BRep string serialization ──────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_to_brep_string(
+    XbimShapeHandle handle,
+    char**          outBrepStr,
+    int*            outStrLen)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_shape_to_brep_string: handle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!outBrepStr || !outStrLen)
+    {
+        xbim_set_error("xbim_shape_to_brep_string: output pointer is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    if (handle->shape.IsNull())
+    {
+        xbim_set_error("xbim_shape_to_brep_string: shape is null");
+        return XBIM_NULL_SHAPE;
+    }
+
+    try
+    {
+        std::ostringstream oss;
+        BRepTools::Write(handle->shape, oss);
+
+        std::string str = oss.str();
+        size_t len = str.size();
+
+        char* buf = static_cast<char*>(std::malloc(len + 1));
+        if (!buf)
+        {
+            xbim_set_error("xbim_shape_to_brep_string: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        std::memcpy(buf, str.c_str(), len + 1);
+        *outBrepStr = buf;
+        *outStrLen = static_cast<int>(len);
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_shape_to_brep_string: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimShapeHandle XBIM_CALL xbim_shape_from_brep_string(
+    const char* brepStr,
+    int         strLen)
+{
+    xbim_clear_error();
+
+    if (!brepStr)
+    {
+        xbim_set_error("xbim_shape_from_brep_string: brepStr is NULL");
+        return nullptr;
+    }
+
+    try
+    {
+        size_t len = (strLen >= 0)
+            ? static_cast<size_t>(strLen)
+            : std::strlen(brepStr);
+
+        std::string data(brepStr, len);
+        std::istringstream iss(data);
+
+        TopoDS_Shape shape;
+        BRep_Builder builder;
+        BRepTools::Read(shape, iss, builder);
+
+        if (shape.IsNull())
+        {
+            xbim_set_error("xbim_shape_from_brep_string: BRepTools::Read failed");
+            return nullptr;
+        }
+
+        return xbim_shape_create_from(shape);
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_shape_from_brep_string: OCCT exception");
+        return nullptr;
+    }
+}
+
+XBIM_EXPORT void XBIM_CALL xbim_string_free(char* str)
+{
+    std::free(str);
 }
