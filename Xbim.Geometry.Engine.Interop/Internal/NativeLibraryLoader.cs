@@ -42,7 +42,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
                 return handle;
 
             // Try the application base directory (flat publish / dev builds)
-            string basePath = Path.Combine(AppContext.BaseDirectory, GetPlatformLibraryName());
+            string basePath = Path.Combine(AppContext.BaseDirectory, PlatformInfo.NativeLibraryName);
             if (NativeLibrary.TryLoad(basePath, out handle))
                 return handle;
 
@@ -50,7 +50,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             string? assemblyDir = Path.GetDirectoryName(typeof(NativeLibraryLoader).Assembly.Location);
             if (!string.IsNullOrEmpty(assemblyDir))
             {
-                string asmPath = Path.Combine(assemblyDir, GetPlatformLibraryName());
+                string asmPath = Path.Combine(assemblyDir, PlatformInfo.NativeLibraryName);
                 if (NativeLibrary.TryLoad(asmPath, out handle))
                     return handle;
             }
@@ -62,8 +62,8 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             throw new DllNotFoundException(
                 $"Unable to load native library '{LibraryName}'. " +
                 $"Expected at: {ridPath ?? "(unknown RID path)"} or {basePath}. " +
-                $"Platform: {RuntimeInformation.RuntimeIdentifier}, " +
-                $"Architecture: {RuntimeInformation.ProcessArchitecture}");
+                $"Platform: {PlatformInfo.RuntimeIdentifier}, " +
+                $"Architecture: {PlatformInfo.ProcessArchitecture}");
         }
 
         /// <summary>
@@ -72,8 +72,8 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         /// </summary>
         private static string? GetRidNativePath()
         {
-            string rid = GetRuntimeIdentifier();
-            string libName = GetPlatformLibraryName();
+            string rid = PlatformInfo.RuntimeIdentifier;
+            string libName = PlatformInfo.NativeLibraryName;
 
             // Check relative to the application base directory
             // Layout: runtimes/{rid}/native/{libname}
@@ -91,46 +91,6 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             }
 
             return null;
-        }
-
-        /// <summary>
-        /// Returns the platform-specific library file name.
-        /// </summary>
-        internal static string GetPlatformLibraryName()
-        {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                return "xbim_geometry_native.dll";
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                return "libxbim_geometry_native.so";
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                return "libxbim_geometry_native.dylib";
-
-            return LibraryName;
-        }
-
-        /// <summary>
-        /// Returns the runtime identifier string for the current platform.
-        /// </summary>
-        internal static string GetRuntimeIdentifier()
-        {
-            string os;
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                os = "win";
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                os = "linux";
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                os = "osx";
-            else
-                os = "unknown";
-
-            string arch = RuntimeInformation.ProcessArchitecture switch
-            {
-                Architecture.X64 => "x64",
-                Architecture.Arm64 => "arm64",
-                _ => RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant()
-            };
-
-            return $"{os}-{arch}";
         }
     }
 }
