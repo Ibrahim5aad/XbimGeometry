@@ -2065,6 +2065,42 @@ XBIM_EXPORT XbimShapeHandle XBIM_CALL xbim_shape_from_brep_string(
  */
 XBIM_EXPORT void XBIM_CALL xbim_string_free(char* str);
 
+/* ── Binary shape serialization ──────────────────────────────────────── */
+
+/*
+ * Serialize a shape to OCCT BinTools binary format.
+ *
+ *   handle        – a valid shape handle
+ *   withTriangles – include mesh triangulation data (1 = yes, 0 = no)
+ *   withNormals   – include vertex normals (1 = yes, 0 = no)
+ *   outBuffer     – receives a malloc'd byte buffer
+ *   outSize       – receives the buffer size in bytes
+ *
+ * The caller must free the returned buffer with xbim_buffer_free().
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if handle is NULL;
+ * XBIM_NULL_SHAPE if the shape is null; XBIM_ERROR on failure.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_to_binary(
+    XbimShapeHandle     handle,
+    int                 withTriangles,
+    int                 withNormals,
+    unsigned char**     outBuffer,
+    int*                outSize);
+
+/*
+ * Deserialize a shape from OCCT BinTools binary format.
+ *
+ *   buffer – pointer to the binary data
+ *   size   – buffer size in bytes
+ *
+ * Returns a valid shape handle on success, or NULL on failure.
+ * On failure, call xbim_get_last_error() for details.
+ */
+XBIM_EXPORT XbimShapeHandle XBIM_CALL xbim_shape_from_binary(
+    const unsigned char*    buffer,
+    int                     size);
+
 #ifdef __cplusplus
 }
 #endif

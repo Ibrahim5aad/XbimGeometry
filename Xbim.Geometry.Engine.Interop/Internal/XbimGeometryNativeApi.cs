@@ -860,6 +860,23 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         internal static extern void xbim_string_free(IntPtr str);
 
         #endregion
+
+        #region Binary Shape Serialization
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_to_binary(
+            NativeShapeHandle handle,
+            int withTriangles,
+            int withNormals,
+            out IntPtr outBuffer,
+            out int outSize);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern NativeShapeHandle xbim_shape_from_binary(
+            IntPtr buffer,
+            int size);
+
+        #endregion
     }
 
     /// <summary>

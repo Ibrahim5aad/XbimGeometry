@@ -31,6 +31,7 @@
 #include <Bnd_Box.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepTools.hxx>
+#include <BinTools.hxx>
 #include <ShapeAnalysis.hxx>
 
 /* ── Internal helper ──────────────────────────────────────────────────────── */
@@ -649,4 +650,109 @@ XBIM_EXPORT XbimShapeHandle XBIM_CALL xbim_shape_from_brep_string(
 XBIM_EXPORT void XBIM_CALL xbim_string_free(char* str)
 {
     std::free(str);
+}
+
+/* ── Binary shape serialization ──────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_to_binary(
+    XbimShapeHandle     handle,
+    int                 withTriangles,
+    int                 withNormals,
+    unsigned char**     outBuffer,
+    int*                outSize)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_shape_to_binary: handle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!outBuffer || !outSize)
+    {
+        xbim_set_error("xbim_shape_to_binary: output pointer is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    if (handle->shape.IsNull())
+    {
+        xbim_set_error("xbim_shape_to_binary: shape is null");
+        return XBIM_NULL_SHAPE;
+    }
+
+    try
+    {
+        std::ostringstream oss;
+        BinTools::Write(handle->shape, oss,
+                        withTriangles != 0,
+                        withNormals != 0,
+                        BinTools_FormatVersion_VERSION_3);
+
+        std::string data = oss.str();
+        size_t len = data.size();
+
+        unsigned char* buf = static_cast<unsigned char*>(std::malloc(len));
+        if (!buf)
+        {
+            xbim_set_error("xbim_shape_to_binary: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        std::memcpy(buf, data.data(), len);
+        *outBuffer = buf;
+        *outSize = static_cast<int>(len);
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_shape_to_binary: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimShapeHandle XBIM_CALL xbim_shape_from_binary(
+    const unsigned char*    buffer,
+    int                     size)
+{
+    xbim_clear_error();
+
+    if (!buffer || size <= 0)
+    {
+        xbim_set_error("xbim_shape_from_binary: buffer is NULL or size <= 0");
+        return nullptr;
+    }
+
+    try
+    {
+        /* Create a stream from the raw buffer without copying */
+        class membuf : public std::basic_streambuf<char>
+        {
+        public:
+            membuf(const char* p, size_t n)
+            {
+                char* pp = const_cast<char*>(p);
+                setg(pp, pp, pp + n);
+            }
+        };
+
+        membuf sbuf(reinterpret_cast<const char*>(buffer), static_cast<size_t>(size));
+        std::istream iss(&sbuf);
+
+        TopoDS_Shape shape;
+        BinTools::Read(shape, iss);
+
+        if (shape.IsNull())
+        {
+            xbim_set_error("xbim_shape_from_binary: BinTools::Read produced a null shape");
+            return nullptr;
+        }
+
+        return xbim_shape_create_from(shape);
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_shape_from_binary: OCCT exception");
+        return nullptr;
+    }
 }
