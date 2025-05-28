@@ -8,6 +8,7 @@ using Xbim.Geometry.Abstractions.Extensions;
 using Xbim.Geometry.Engine.Interop.Factories;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Ifc4.Interfaces;
 
 namespace Xbim.Geometry.Engine.Interop.Services
@@ -40,8 +41,13 @@ namespace Xbim.Geometry.Engine.Interop.Services
         private NativeWireFactory? _wireFactory;
         private NativeFaceFactory? _faceFactory;
         private NativeShellFactory? _shellFactory;
+        private NativeCompoundFactory? _compoundFactory;
+        private NativeShapeFactory2? _shapeFactory;
+        private NativeMaterialFactory? _materialFactory;
+        private NativeProjectionFactory? _projectionFactory;
         private NativeWexBimMeshFactory? _wexBimMeshFactory;
         private NativeShapeBinarySerializer? _shapeBinarySerializer;
+        private NativeModelPlacementBuilder? _modelPlacementBuilder;
 
         public NativeModelGeometryService(IModel model, ILoggerFactory loggerFactory)
         {
@@ -118,15 +124,15 @@ namespace Xbim.Geometry.Engine.Interop.Services
         public IXFaceFactory FaceFactory => _faceFactory ??= new NativeFaceFactory(this, _logger);
         public IXShellFactory ShellFactory => _shellFactory ??= new NativeShellFactory(this, _logger);
         public IXSolidFactory SolidFactory => _solidFactory ??= new NativeSolidFactory(this, _logger);
-        public IXCompoundFactory CompoundFactory => throw new NotImplementedException("CompoundFactory not yet implemented in P/Invoke layer.");
+        public IXCompoundFactory CompoundFactory => _compoundFactory ??= new NativeCompoundFactory(this, _logger);
         public IXBooleanFactory BooleanFactory => _booleanFactory ??= new NativeBooleanFactory(this, _logger);
-        public IXShapeFactory ShapeFactory => throw new NotImplementedException("ShapeFactory not yet implemented in P/Invoke layer.");
+        public IXShapeFactory ShapeFactory => _shapeFactory ??= new NativeShapeFactory2(this, _logger);
         public IXProfileFactory ProfileFactory => _profileFactory ??= new NativeProfileFactory(this, _logger);
-        public IXMaterialFactory MaterialFactory => throw new NotImplementedException("MaterialFactory not yet implemented in P/Invoke layer.");
-        public IXProjectionFactory ProjectionFactory => throw new NotImplementedException("ProjectionFactory not yet implemented in P/Invoke layer.");
+        public IXMaterialFactory MaterialFactory => _materialFactory ??= new NativeMaterialFactory();
+        public IXProjectionFactory ProjectionFactory => _projectionFactory ??= new NativeProjectionFactory(this, _logger);
         public IXWexBimMeshFactory WexBimMeshFactory => _wexBimMeshFactory ??= new NativeWexBimMeshFactory(this, _logger);
         public IXShapeBinarySerializer ShapeBinarySerializer => _shapeBinarySerializer ??= new NativeShapeBinarySerializer(_logger);
-        public IXModelPlacementBuilder ModelPlacementBuilder => throw new NotImplementedException("ModelPlacementBuilder not yet implemented in P/Invoke layer.");
+        public IXModelPlacementBuilder ModelPlacementBuilder => _modelPlacementBuilder ??= new NativeModelPlacementBuilder(this, _logger);
 
         #endregion
 
@@ -226,12 +232,47 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXLocation Create(IIfcObjectPlacement objectPlacement)
         {
-            throw new NotImplementedException("Create(IIfcObjectPlacement) not yet implemented in P/Invoke layer.");
+            var geometryFactory = (NativeGeometryFactory)GeometryFactory;
+            return geometryFactory.ToLocation(objectPlacement);
         }
 
         public IXLocation CreateMappingTransform(IIfcMappedItem mappedItem)
         {
-            throw new NotImplementedException("CreateMappingTransform not yet implemented in P/Invoke layer.");
+            var geometryFactory = (NativeGeometryFactory)GeometryFactory;
+
+            // Build source transform from the mapping origin
+            var sourceLocation = geometryFactory.BuildLocation(mappedItem.MappingSource.MappingOrigin);
+
+            // Build target transform from the mapping target
+            var targetMatrix = geometryFactory.BuildTransform(mappedItem.MappingTarget);
+
+            // Compose: source * target
+            if (sourceLocation is XLocation srcLoc && targetMatrix.IsIdentity)
+                return srcLoc;
+
+            if (sourceLocation.IsIdentity && targetMatrix is XLocation tgtLoc)
+                return tgtLoc;
+
+            // For non-identity cases, multiply the matrices
+            var composed = sourceLocation.Multiply(targetMatrix);
+
+            // Create a location from the composed matrix
+            int result = XbimGeometryNativeApi.xbim_location_create_from_axis2(
+                composed.OffsetX, composed.OffsetY, composed.OffsetZ,
+                composed.M31, composed.M32, composed.M33, // Z direction
+                composed.M11, composed.M12, composed.M13, // X direction
+                out var handle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to create mapping transform: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new XLocation(handle,
+                composed.M11, composed.M12, composed.M13,
+                composed.M21, composed.M22, composed.M23,
+                composed.M31, composed.M32, composed.M33,
+                composed.OffsetX, composed.OffsetY, composed.OffsetZ,
+                composed.ScaleX);
         }
 
         #endregion
