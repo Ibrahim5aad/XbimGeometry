@@ -40,6 +40,8 @@ namespace Xbim.Geometry.Engine.Interop.Services
         private NativeWireFactory? _wireFactory;
         private NativeFaceFactory? _faceFactory;
         private NativeShellFactory? _shellFactory;
+        private NativeWexBimMeshFactory? _wexBimMeshFactory;
+        private NativeShapeBinarySerializer? _shapeBinarySerializer;
 
         public NativeModelGeometryService(IModel model, ILoggerFactory loggerFactory)
         {
@@ -122,8 +124,8 @@ namespace Xbim.Geometry.Engine.Interop.Services
         public IXProfileFactory ProfileFactory => _profileFactory ??= new NativeProfileFactory(this, _logger);
         public IXMaterialFactory MaterialFactory => throw new NotImplementedException("MaterialFactory not yet implemented in P/Invoke layer.");
         public IXProjectionFactory ProjectionFactory => throw new NotImplementedException("ProjectionFactory not yet implemented in P/Invoke layer.");
-        public IXWexBimMeshFactory WexBimMeshFactory => throw new NotImplementedException("WexBimMeshFactory not yet implemented in P/Invoke layer.");
-        public IXShapeBinarySerializer ShapeBinarySerializer => throw new NotImplementedException("ShapeBinarySerializer not yet implemented in P/Invoke layer.");
+        public IXWexBimMeshFactory WexBimMeshFactory => _wexBimMeshFactory ??= new NativeWexBimMeshFactory(this, _logger);
+        public IXShapeBinarySerializer ShapeBinarySerializer => _shapeBinarySerializer ??= new NativeShapeBinarySerializer(_logger);
         public IXModelPlacementBuilder ModelPlacementBuilder => throw new NotImplementedException("ModelPlacementBuilder not yet implemented in P/Invoke layer.");
 
         #endregion

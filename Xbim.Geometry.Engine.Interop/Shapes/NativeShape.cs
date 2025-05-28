@@ -4,6 +4,7 @@ using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
+using Xbim.Geometry.Engine.Interop.Services;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
@@ -70,9 +71,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         public string BrepString()
         {
-            // BRep string serialization not yet available in native API (MESH-002)
-            throw new NotImplementedException(
-                "BRep string serialization will be available after MESH-002.");
+            return NativeShapeBinarySerializer.ToBrep(this);
         }
 
         /// <summary>
