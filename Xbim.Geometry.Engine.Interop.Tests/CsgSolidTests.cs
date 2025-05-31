@@ -38,6 +38,10 @@ public class CsgSolidTests : IDisposable
 
     private void SaveBrep(IXShape shape, string name)
     {
+        #if !DEBUG
+          return;
+        #endif
+        
         if (shape is NativeShape ns)
         {
             var path = Path.Combine(_brepOutputDir, $"{name}.brep");

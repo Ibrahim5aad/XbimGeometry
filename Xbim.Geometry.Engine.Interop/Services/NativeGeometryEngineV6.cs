@@ -31,7 +31,78 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXShape Build(IIfcGeometricRepresentationItem geomRep)
         {
-            throw new NotImplementedException("Build(IIfcGeometricRepresentationItem) not yet implemented.");
+            if (geomRep == null)
+                throw new ArgumentNullException(nameof(geomRep));
+
+            // Solid models (extruded, revolved, CSG, swept disk, BRep, etc.)
+            if (geomRep is IIfcSolidModel solidModel)
+                return _service.SolidFactory.Build(solidModel);
+
+            // Boolean results (union, cut, intersect)
+            if (geomRep is IIfcBooleanResult boolResult)
+                return _service.BooleanFactory.Build(boolResult);
+
+            // Half-space solids (clipping planes)
+            if (geomRep is IIfcHalfSpaceSolid halfSpace)
+                return _service.SolidFactory.Build(halfSpace);
+
+            // CSG primitives (block, sphere, cylinder, cone, pyramid)
+            if (geomRep is IIfcCsgPrimitive3D csgPrimitive)
+                return _service.SolidFactory.Build(csgPrimitive);
+
+            // Surface models
+            if (geomRep is IIfcFaceBasedSurfaceModel faceBasedSurface)
+                return _service.SolidFactory.Build(faceBasedSurface);
+
+            if (geomRep is IIfcShellBasedSurfaceModel shellBasedSurface)
+                return _service.SolidFactory.Build(shellBasedSurface);
+
+            // Tessellated items
+            if (geomRep is IIfcTessellatedItem tessellated)
+                return _service.SolidFactory.Build(tessellated);
+
+            // Faceted BRep
+            if (geomRep is IIfcFacetedBrep facetedBrep)
+                return _service.SolidFactory.Build(facetedBrep);
+
+            // Sectioned spine
+            if (geomRep is IIfcSectionedSpine sectionedSpine)
+                return _service.SolidFactory.Build(sectionedSpine);
+
+            // Bounding box (build as a simple block)
+            if (geomRep is IIfcBoundingBox boundingBox)
+                return BuildBoundingBox(boundingBox);
+
+            throw new NotSupportedException(
+                $"Build: unsupported geometric representation type {geomRep.GetType().Name} (#{(geomRep as IPersistEntity)?.EntityLabel}).");
+        }
+
+        private IXShape BuildBoundingBox(IIfcBoundingBox bbox)
+        {
+            double xLen = bbox.XDim;
+            double yLen = bbox.YDim;
+            double zLen = bbox.ZDim;
+
+            if (xLen <= 0 || yLen <= 0 || zLen <= 0)
+                throw new InvalidOperationException(
+                    $"BoundingBox has zero or negative dimensions.");
+
+            var corner = bbox.Corner;
+            double ox = corner.X, oy = corner.Y, oz = corner.Z;
+
+            int result = Internal.XbimGeometryNativeApi.xbim_solid_build_block(
+                _service.ContextHandle,
+                ox, oy, oz,
+                0, 0, 1, // Z direction
+                1, 0, 0, // X direction
+                xLen, yLen, zLen,
+                out var shapeHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build BoundingBox solid: {Internal.XbimGeometryNativeApi.GetLastError()}");
+
+            return Shapes.NativeShapeFactory.WrapSolid(shapeHandle);
         }
 
         #endregion
