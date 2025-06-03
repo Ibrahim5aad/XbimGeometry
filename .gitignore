@@ -27,6 +27,9 @@ bld/
 vcpkg_installed/
 CMakeUserPresets.json
 
+# Staged native libraries (created by cmake --install for NuGet packaging)
+**/runtimes/*/native/
+
 # Roslyn cache directories
 *.ide/
 

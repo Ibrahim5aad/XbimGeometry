@@ -95,6 +95,32 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     )
 endif()
 
+# ── Install (stage native binaries for NuGet packaging) ─────────────────────
+# Usage: cmake --install build-vcpkg --config Release --prefix ../Xbim.Geometry.Engine.Interop
+# This stages native DLLs into runtimes/{rid}/native/ for NuGet package inclusion.
+if(WIN32)
+    set(XBIM_RID "win-x64")
+    set(XBIM_NATIVE_GLOB "*.dll")
+else()
+    set(XBIM_RID "linux-x64")
+    set(XBIM_NATIVE_GLOB "*.so*")
+endif()
+
+install(TARGETS xbim_geometry_native
+    RUNTIME DESTINATION "runtimes/${XBIM_RID}/native"
+    LIBRARY DESTINATION "runtimes/${XBIM_RID}/native"
+)
+
+# Also install OCCT runtime dependencies alongside our native library.
+# vcpkg copies dependent DLLs to the build output directory; we need them
+# in the runtimes/ layout too for NuGet packaging.
+install(CODE "
+    file(GLOB _build_dlls \"$<TARGET_FILE_DIR:xbim_geometry_native>/${XBIM_NATIVE_GLOB}\")
+    list(FILTER _build_dlls EXCLUDE REGEX \"test_[^/]*$\")
+    list(FILTER _build_dlls EXCLUDE REGEX \"xbim_geometry_native\")
+    file(INSTALL \${_build_dlls} DESTINATION \"\${CMAKE_INSTALL_PREFIX}/runtimes/${XBIM_RID}/native\")
+")
+
 # ── Tests ────────────────────────────────────────────────────────────────────
 option(XBIM_BUILD_TESTS "Build native API tests" ON)
 
