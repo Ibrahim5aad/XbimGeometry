@@ -40,12 +40,8 @@ Prior versions of Visual Studio are unlikely to work on this solution.
 
 The [free VS 2022 Community Edition](https://visualstudio.microsoft.com/downloads/) will be fine.
 
-In order to compile this solution which includes C++ projects you'll need the following additional
-components installed:
-
-- Visual C++ Core desktop features
-- VC++ 2022 v143 tools
-- Windows 10 SDK (10.0.17134.0)
+The managed solution (`.sln`) requires .NET 8.0 SDK. No C++ toolchain is needed to build the managed
+projects — they use P/Invoke to call the pre-built native library.
 
 The XBIM toolkit [uses the NuGet](https://www.nuget.org/packages/Xbim.Geometry/) for the management of our published packages.
 We have custom MyGet feeds for the *master* and *develop* branches of the solution which are automatically

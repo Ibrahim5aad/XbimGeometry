@@ -5,7 +5,6 @@
 		<SignAssembly>False</SignAssembly>
 		<AssemblyOriginatorKeyFile>..\XbimOpenSourceKeyFile.snk</AssemblyOriginatorKeyFile>
 		<LangVersion>8.0</LangVersion>
-		<GeometryInteropDirectory>../Xbim.Geometry.Engine.Interop.Legacy/bin/$(Configuration)/</GeometryInteropDirectory>
 		<Platforms>AnyCPU;x64;x86</Platforms>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -23,34 +22,10 @@
 		<PackageReference Include="NReco.Logging.File" Version="1.2.2" />	
 	</ItemGroup>
 	<ItemGroup>
-		<ProjectReference Include="..\Xbim.Geometry.Engine.Interop.Legacy\Xbim.Geometry.Engine.Interop.Legacy.csproj">
+		<ProjectReference Include="..\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj">
 		  <Private>True</Private>
 		</ProjectReference>
 		<ProjectReference Include="..\Xbim.ModelGeometry.Scene\Xbim.ModelGeometry.Scene.csproj" />
-	</ItemGroup>
-	<!--<Target Name="PostBuild" AfterTargets="PostBuildEvent">
-		<ItemGroup>
-			<Item Name="Occ86Dlls" Include="$(GeometryInteropDirectory)/win-x86/*.*" />
-			<Item Name="Occ64Dlls" Include="$(GeometryInteropDirectory)/win-x64/*.*" />
-		</ItemGroup>
-		<Copy SourceFiles="@(Occ86Dlls)" DestinationFiles="@(Occ86Dlls->'$(OutputPath)win-x86\%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
-		<Copy SourceFiles="@(Occ64Dlls)" DestinationFiles="@(Occ64Dlls->'$(OutputPath)win-x64\%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
-	</Target>-->
-
-	<ItemGroup Condition="'$(TargetFramework)'!=''">
-		<Content Include="$(GeometryInteropDirectory)$(TargetFramework)\win-x86\*.*">
-			<Link>win-x86\%(Filename)%(Extension)</Link>
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<Pack>false</Pack>
-			<Visible>true</Visible>
-		</Content>
-		<Content Include="$(GeometryInteropDirectory)$(TargetFramework)\win-x64\*.*">
-			<Link>win-x64\%(Filename)%(Extension)</Link>
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<Pack>false</Pack>
-			<Visible>true</Visible>
-		</Content>
-		<!-- TODO: ARM-->
 	</ItemGroup>
 
 </Project>

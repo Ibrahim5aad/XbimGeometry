@@ -6,7 +6,6 @@
     <Nullable>enable</Nullable>
 		<IsPackable>false</IsPackable>
 		<Platforms>AnyCPU;x64;x86</Platforms>
-		<GeometryInteropDirectory>../Xbim.Geometry.Engine.Interop.Legacy/bin/$(Configuration)/</GeometryInteropDirectory>
 	</PropertyGroup>
 
   <PropertyGroup Condition="'$(Platform)' == 'x64' Or '$(Platform)' == 'AnyCPU'">
@@ -618,27 +617,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj" />
 		<ProjectReference Include="..\Xbim.ModelGeometry.Scene\Xbim.ModelGeometry.Scene.csproj">
-			
 			<Private>True</Private>
 		</ProjectReference>
 		<ProjectReference Include="..\Xbim.Tessellator\Xbim.Tessellator.csproj" />
 	</ItemGroup>
 
-	
-	<ItemGroup Condition="'$(TargetFramework)'!=''">
-		<Content Include="$(GeometryInteropDirectory)$(TargetFramework)\win-x86\*.*">
-			<Link>win-x86\%(Filename)%(Extension)</Link>
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<Pack>false</Pack>
-			<Visible>true</Visible>
-		</Content>
-		<Content Include="$(GeometryInteropDirectory)$(TargetFramework)\win-x64\*.*">
-			<Link>win-x64\%(Filename)%(Extension)</Link>
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<Pack>false</Pack>
-			<Visible>true</Visible>
-		</Content>
-		<!-- TODO: ARM-->
-	</ItemGroup>
 </Project>

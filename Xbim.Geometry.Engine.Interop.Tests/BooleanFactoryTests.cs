@@ -34,15 +34,13 @@ public class BooleanFactoryTests : IDisposable
 
     private void SaveBrep(IXShape shape, string name)
     {
-        #if !DEBUG
-          return;
-        #endif
-        
+        #if DEBUG
         if (shape is NativeShape ns)
         {
             var path = Path.Combine(_brepOutputDir, $"{name}.brep");
             ns.WriteBrep(path);
         }
+        #endif
     }
 
     [Fact]
