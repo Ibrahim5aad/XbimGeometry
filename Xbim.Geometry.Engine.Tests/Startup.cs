@@ -31,7 +31,7 @@ namespace Xbim.Geometry.Engine.Tests
                     .AddConsole())
                 .AddXbimToolkit(configure => configure
                     .AddMemoryModel()
-                    .AddGeometryServices(builder => builder.Configure(c => c.GeometryEngineVersion = XGeometryEngineVersion.V5))
+                    .AddGeometryServices(builder => builder.Configure(c => c.GeometryEngineVersion = XGeometryEngineVersion.V6))
                     )
                 ;
 

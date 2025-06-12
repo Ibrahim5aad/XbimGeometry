@@ -1,11 +1,13 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Geometry.Engine.Interop.Configuration;
 using Xbim.Geometry.Engine.Interop.Factories;
+using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Ifc4.Interfaces;
 
 namespace Xbim.Common.Configuration
@@ -71,6 +73,13 @@ namespace Xbim.Common.Configuration
 
             // Register the native geometry converter factory directly — no reflection or assembly loading needed
             services.TryAddSingleton<IXGeometryConverterFactory, NativeGeometryConverterFactory>();
+
+            // Shape service for boolean operations, placement, serialization, and meshing
+            services.TryAddSingleton<IXShapeService>(sp =>
+                new NativeShapeService(sp.GetRequiredService<ILoggerFactory>()));
+
+            // Geometry primitives factory (points, directions, locations, matrices, bounding boxes)
+            services.TryAddSingleton<IXGeometryPrimitives, NativeGeometryPrimitives>();
 
             services.TryAddEnumerable(ServiceDescriptor.Singleton((IConfigureOptions<GeometryEngineOptions>)new DefaultGeometryEngineConfigurationOptions(XGeometryEngineVersion.V6)));
             configure(new GeometryEngineBuilder(services));

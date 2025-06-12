@@ -140,6 +140,53 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
         }
 
+        /// <summary>
+        /// Extracts origin, Z direction, and X direction from an IIfcAxis2Placement,
+        /// which may be either 2D or 3D. For 2D placements, Z defaults to (0,0,1)
+        /// and the X direction is taken from the 2D RefDirection.
+        /// </summary>
+        internal static void BuildAxis2PlacementAs3d(
+            IIfcAxis2Placement placement,
+            out double ox, out double oy, out double oz,
+            out double zx, out double zy, out double zz,
+            out double xx, out double xy, out double xz)
+        {
+            if (placement is IIfcAxis2Placement3D axis3D)
+            {
+                BuildAxis2Placement3d(axis3D, out ox, out oy, out oz,
+                    out zx, out zy, out zz, out xx, out xy, out xz);
+            }
+            else if (placement is IIfcAxis2Placement2D axis2D)
+            {
+                ox = axis2D.Location.Coordinates[0];
+                oy = axis2D.Location.Coordinates[1];
+                oz = 0;
+
+                zx = 0; zy = 0; zz = 1;
+
+                if (axis2D.RefDirection != null)
+                {
+                    xx = axis2D.RefDirection.DirectionRatios[0];
+                    xy = axis2D.RefDirection.DirectionRatios[1];
+                    xz = 0;
+                    double mag = Math.Sqrt(xx * xx + xy * xy);
+                    if (mag > 1e-15) { xx /= mag; xy /= mag; }
+                    else { xx = 1; xy = 0; }
+                }
+                else
+                {
+                    xx = 1; xy = 0; xz = 0;
+                }
+            }
+            else
+            {
+                // Fallback: identity placement
+                ox = 0; oy = 0; oz = 0;
+                zx = 0; zy = 0; zz = 1;
+                xx = 1; xy = 0; xz = 0;
+            }
+        }
+
         #endregion
 
         #region Location Building

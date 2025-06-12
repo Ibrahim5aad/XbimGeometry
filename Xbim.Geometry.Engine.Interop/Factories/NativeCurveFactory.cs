@@ -109,8 +109,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private NativeCurve BuildCircle(IIfcCircle ifcCircle)
         {
-            NativeGeometryFactory.BuildAxis2Placement3d(
-                (IIfcAxis2Placement3D)ifcCircle.Position,
+            NativeGeometryFactory.BuildAxis2PlacementAs3d(
+                ifcCircle.Position,
                 out double ox, out double oy, out double oz,
                 out double zx, out double zy, out double zz,
                 out _, out _, out _);
@@ -135,8 +135,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private NativeCurve BuildEllipse(IIfcEllipse ifcEllipse)
         {
-            NativeGeometryFactory.BuildAxis2Placement3d(
-                (IIfcAxis2Placement3D)ifcEllipse.Position,
+            NativeGeometryFactory.BuildAxis2PlacementAs3d(
+                ifcEllipse.Position,
                 out double ox, out double oy, out double oz,
                 out double zx, out double zy, out double zz,
                 out _, out _, out _);
