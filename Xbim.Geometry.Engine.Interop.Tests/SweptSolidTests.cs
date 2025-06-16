@@ -10,12 +10,12 @@ namespace Xbim.Geometry.Engine.Interop.Tests;
 
 /// <summary>
 /// Tests swept area solid operations via the full P/Invoke path:
-///   Mock IFC entity → NativeSolidFactory → P/Invoke → OCCT → NativeSolid
+///   Mock IFC entity → SolidFactory → P/Invoke → OCCT → Solid
 /// Covers extruded, extruded tapered, revolved, revolved tapered, and swept disk area solids.
 /// </summary>
 public class SweptSolidTests : IDisposable
 {
-    private readonly NativeModelGeometryService _service;
+    private readonly ModelGeometryService _service;
     private readonly IXSolidFactory _solidFactory;
     private readonly string _brepOutputDir;
 
@@ -23,7 +23,7 @@ public class SweptSolidTests : IDisposable
     {
         var loggerFactory = LoggerFactory.Create(b => b.AddConsole().SetMinimumLevel(LogLevel.Debug));
         var model = IfcMoq.ModelMock();
-        _service = new NativeModelGeometryService(model, loggerFactory);
+        _service = new ModelGeometryService(model, loggerFactory);
         _solidFactory = _service.SolidFactory;
 
         _brepOutputDir = Path.Combine(
@@ -37,7 +37,7 @@ public class SweptSolidTests : IDisposable
     private void SaveBrep(IXShape shape, string name)
     {
         #if DEBUG
-        if (shape is NativeShape ns)
+        if (shape is Shape ns)
         {
             var path = Path.Combine(_brepOutputDir, $"{name}.brep");
             ns.WriteBrep(path);

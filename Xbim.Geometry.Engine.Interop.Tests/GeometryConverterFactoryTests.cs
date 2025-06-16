@@ -9,19 +9,19 @@ using Xunit;
 namespace Xbim.Geometry.Engine.Interop.Tests;
 
 /// <summary>
-/// Tests for NativeGeometryConverterFactory: verifies factory creation methods,
+/// Tests for GeometryConverterFactory: verifies factory creation methods,
 /// version dispatch, and service extraction.
 /// </summary>
 public class GeometryConverterFactoryTests : IDisposable
 {
-    private readonly NativeGeometryConverterFactory _factory;
+    private readonly GeometryConverterFactory _factory;
     private readonly ILoggerFactory _loggerFactory;
     private readonly Common.IModel _model;
     private readonly List<IDisposable> _disposables = new();
 
     public GeometryConverterFactoryTests()
     {
-        _factory = new NativeGeometryConverterFactory();
+        _factory = new GeometryConverterFactory();
         _loggerFactory = LoggerFactory.Create(b => b.AddConsole().SetMinimumLevel(LogLevel.Debug));
         _model = IfcMoq.ModelMock();
     }
@@ -40,7 +40,7 @@ public class GeometryConverterFactoryTests : IDisposable
         _disposables.Add((IDisposable)service);
 
         service.Should().NotBeNull();
-        service.Should().BeOfType<NativeModelGeometryService>();
+        service.Should().BeOfType<ModelGeometryService>();
         service.Precision.Should().BeGreaterThan(0);
         service.OneMeter.Should().BeGreaterThan(0);
     }
@@ -52,9 +52,9 @@ public class GeometryConverterFactoryTests : IDisposable
         _disposables.Add((IDisposable)engine);
 
         engine.Should().NotBeNull();
-        engine.Should().BeOfType<NativeGeometryEngineV6>();
+        engine.Should().BeOfType<GeometryEngine>();
         engine.ModelGeometryService.Should().NotBeNull();
-        engine.ModelGeometryService.Should().BeOfType<NativeModelGeometryService>();
+        engine.ModelGeometryService.Should().BeOfType<ModelGeometryService>();
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public class GeometryConverterFactoryTests : IDisposable
         _disposables.Add((IDisposable)engine);
 
         engine.Should().NotBeNull();
-        engine.Should().BeOfType<NativeGeometryEngineV6>();
+        engine.Should().BeOfType<GeometryEngine>();
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public class GeometryConverterFactoryTests : IDisposable
         var service = _factory.GetUnderlyingModelGeometryService(engine);
 
         service.Should().NotBeNull();
-        service.Should().BeOfType<NativeModelGeometryService>();
+        service.Should().BeOfType<ModelGeometryService>();
         service.Should().BeSameAs(engine.ModelGeometryService);
     }
 

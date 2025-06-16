@@ -11,7 +11,7 @@ namespace Xbim.Geometry.Engine.Interop.Tests;
 
 public class BooleanFactoryTests : IDisposable
 {
-    private readonly NativeModelGeometryService _service;
+    private readonly ModelGeometryService _service;
     private readonly IXBooleanFactory _booleanFactory;
     private readonly IXSolidFactory _solidFactory;
     private readonly string _brepOutputDir;
@@ -20,7 +20,7 @@ public class BooleanFactoryTests : IDisposable
     {
         var loggerFactory = LoggerFactory.Create(b => b.AddConsole().SetMinimumLevel(LogLevel.Debug));
         var model = IfcMoq.ModelMock();
-        _service = new NativeModelGeometryService(model, loggerFactory);
+        _service = new ModelGeometryService(model, loggerFactory);
         _booleanFactory = _service.BooleanFactory;
         _solidFactory = _service.SolidFactory;
 
@@ -35,7 +35,7 @@ public class BooleanFactoryTests : IDisposable
     private void SaveBrep(IXShape shape, string name)
     {
         #if DEBUG
-        if (shape is NativeShape ns)
+        if (shape is Shape ns)
         {
             var path = Path.Combine(_brepOutputDir, $"{name}.brep");
             ns.WriteBrep(path);

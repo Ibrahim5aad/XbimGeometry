@@ -14,7 +14,7 @@ namespace Xbim.Geometry.Engine.Interop.Tests;
 /// </summary>
 public class MeshSerializationTests : IDisposable
 {
-    private readonly NativeModelGeometryService _service;
+    private readonly ModelGeometryService _service;
     private readonly IXSolidFactory _solidFactory;
     private readonly IXWexBimMeshFactory _meshFactory;
     private readonly IXShapeBinarySerializer _binarySerializer;
@@ -23,7 +23,7 @@ public class MeshSerializationTests : IDisposable
     {
         var loggerFactory = LoggerFactory.Create(b => b.AddConsole().SetMinimumLevel(LogLevel.Debug));
         var model = IfcMoq.ModelMock();
-        _service = new NativeModelGeometryService(model, loggerFactory);
+        _service = new ModelGeometryService(model, loggerFactory);
         _solidFactory = _service.SolidFactory;
         _meshFactory = _service.WexBimMeshFactory;
         _binarySerializer = _service.ShapeBinarySerializer;
@@ -141,11 +141,11 @@ public class MeshSerializationTests : IDisposable
         var solid = _solidFactory.Build(ifcBlock);
 
         // Serialize to BRep string
-        var brepStr = ((NativeShape)solid).BrepString();
+        var brepStr = ((Shape)solid).BrepString();
         brepStr.Should().NotBeNullOrEmpty("BRep string should be generated");
 
         // Deserialize from BRep string
-        var restored = NativeShapeBinarySerializer.FromBrep(brepStr);
+        var restored = ShapeBinarySerializer.FromBrep(brepStr);
         restored.Should().NotBeNull();
         restored.Should().BeAssignableTo<IXSolid>();
 
@@ -160,8 +160,8 @@ public class MeshSerializationTests : IDisposable
         var solid = _solidFactory.Build(ifcCylinder);
         double originalVolume = solid.Volume;
 
-        var brepStr = ((NativeShape)solid).BrepString();
-        var restored = NativeShapeBinarySerializer.FromBrep(brepStr);
+        var brepStr = ((Shape)solid).BrepString();
+        var restored = ShapeBinarySerializer.FromBrep(brepStr);
 
         ((IXSolid)restored).Volume.Should().BeApproximately(originalVolume, 0.1);
     }
@@ -172,8 +172,8 @@ public class MeshSerializationTests : IDisposable
         var ifcSphere = IfcMoq.Sphere(radius: 5);
         var solid = _solidFactory.Build(ifcSphere);
 
-        var brepStr = ((NativeShape)solid).BrepString();
-        var restored = NativeShapeBinarySerializer.FromBrep(brepStr) as NativeShape;
+        var brepStr = ((Shape)solid).BrepString();
+        var restored = ShapeBinarySerializer.FromBrep(brepStr) as Shape;
 
         restored.Should().NotBeNull();
         restored!.IsValidShape().Should().BeTrue("deserialized sphere should be a valid shape");
@@ -235,7 +235,7 @@ public class MeshSerializationTests : IDisposable
         var solid = _solidFactory.Build(ifcBlock);
 
         var binary = _binarySerializer.ToArray(solid);
-        var restored = _binarySerializer.FromArray(binary) as NativeShape;
+        var restored = _binarySerializer.FromArray(binary) as Shape;
 
         restored.Should().NotBeNull();
         restored!.IsValidShape().Should().BeTrue("deserialized shape should be valid");
@@ -251,8 +251,8 @@ public class MeshSerializationTests : IDisposable
         var solid = _solidFactory.Build(ifcBlock);
 
         // BRep round-trip
-        var brepStr = ((NativeShape)solid).BrepString();
-        var fromBrep = NativeShapeBinarySerializer.FromBrep(brepStr);
+        var brepStr = ((Shape)solid).BrepString();
+        var fromBrep = ShapeBinarySerializer.FromBrep(brepStr);
 
         // Binary round-trip
         var binary = _binarySerializer.ToArray(solid);

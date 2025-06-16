@@ -15,14 +15,14 @@ namespace Xbim.Geometry.Engine.Interop.Tests;
 /// </summary>
 public class GeometryEngineV6Tests : IDisposable
 {
-    private readonly NativeGeometryConverterFactory _converterFactory;
+    private readonly GeometryConverterFactory _converterFactory;
     private readonly ILoggerFactory _loggerFactory;
     private readonly IXGeometryEngineV6 _engine;
     private readonly string _brepOutputDir;
 
     public GeometryEngineV6Tests()
     {
-        _converterFactory = new NativeGeometryConverterFactory();
+        _converterFactory = new GeometryConverterFactory();
         _loggerFactory = LoggerFactory.Create(b => b.AddConsole().SetMinimumLevel(LogLevel.Debug));
         var model = IfcMoq.ModelMock();
         _engine = _converterFactory.CreateGeometryEngineV6(model, _loggerFactory);
@@ -42,7 +42,7 @@ public class GeometryEngineV6Tests : IDisposable
     private void SaveBrep(IXShape shape, string name)
     {
         #if DEBUG
-        if (shape is NativeShape ns)
+        if (shape is Shape ns)
         {
             var path = Path.Combine(_brepOutputDir, $"{name}.brep");
             ns.WriteBrep(path);

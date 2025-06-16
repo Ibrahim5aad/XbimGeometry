@@ -120,7 +120,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_shape_moved(
-            NativeShapeHandle shapeHandle,
+            NativeShapeHandle NativeShapeHandle,
             NativeLocationHandle locationHandle,
             out NativeShapeHandle outHandle);
 
@@ -817,7 +817,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_mesh_create_wexbim(
             NativeContextHandle ctx,
-            NativeShapeHandle shapeHandle,
+            NativeShapeHandle NativeShapeHandle,
             double tolerance,
             double linearDeflection,
             double angularDeflection,
@@ -832,7 +832,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_mesh_get_bounding_box(
             NativeContextHandle ctx,
-            NativeShapeHandle shapeHandle,
+            NativeShapeHandle NativeShapeHandle,
             double tolerance,
             double linearDeflection,
             double angularDeflection,

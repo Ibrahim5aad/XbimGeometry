@@ -14,14 +14,14 @@ namespace Xbim.Geometry.Engine.Interop.Tests;
 /// </summary>
 public class TopologyTests : IDisposable
 {
-    private readonly NativeModelGeometryService _service;
+    private readonly ModelGeometryService _service;
     private NativeContextHandle Ctx => _service.ContextHandle;
 
     public TopologyTests()
     {
         var loggerFactory = LoggerFactory.Create(b => b.AddConsole().SetMinimumLevel(LogLevel.Debug));
         var model = IfcMoq.ModelMock();
-        _service = new NativeModelGeometryService(model, loggerFactory);
+        _service = new ModelGeometryService(model, loggerFactory);
     }
 
     public void Dispose() => _service.Dispose();
