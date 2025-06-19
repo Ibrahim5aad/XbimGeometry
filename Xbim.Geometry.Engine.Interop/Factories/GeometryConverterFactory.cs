@@ -39,7 +39,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             return version switch
             {
-                XGeometryEngineVersion.V5 => CreateGeometryEngineV5(model, loggerFactory),
+                XGeometryEngineVersion.V5 => CreateGeometryEngineV6(model, loggerFactory), // default to V6 for V5 is not supported
                 XGeometryEngineVersion.V6 => CreateGeometryEngineV6(model, loggerFactory),
                 _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported geometry engine version.")
             };
