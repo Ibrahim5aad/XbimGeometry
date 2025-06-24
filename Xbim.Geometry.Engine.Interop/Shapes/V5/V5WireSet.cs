@@ -27,7 +27,17 @@ namespace Xbim.Geometry.Engine.Interop.Shapes.V5
         public bool IsValid => _wires.Length > 0;
         public bool IsSet => true;
 
-        public XbimRect3D BoundingBox => XbimRect3D.Empty;
+        public XbimRect3D BoundingBox
+        {
+            get
+            {
+                if (_wires.Length == 0) return XbimRect3D.Empty;
+                var result = _wires[0].BoundingBox;
+                for (int i = 1; i < _wires.Length; i++)
+                    result.Union(_wires[i].BoundingBox);
+                return result;
+            }
+        }
 
         public object Tag { get; set; }
 

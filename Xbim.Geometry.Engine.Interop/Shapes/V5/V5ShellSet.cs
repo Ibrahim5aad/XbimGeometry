@@ -30,7 +30,17 @@ namespace Xbim.Geometry.Engine.Interop.Shapes.V5
         public bool IsValid => _shells.Length > 0;
         public bool IsSet => true;
 
-        public XbimRect3D BoundingBox => XbimRect3D.Empty;
+        public XbimRect3D BoundingBox
+        {
+            get
+            {
+                if (_shells.Length == 0) return XbimRect3D.Empty;
+                var result = _shells[0].BoundingBox;
+                for (int i = 1; i < _shells.Length; i++)
+                    result.Union(_shells[i].BoundingBox);
+                return result;
+            }
+        }
 
         public object Tag { get; set; }
 

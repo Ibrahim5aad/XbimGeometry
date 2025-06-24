@@ -76,11 +76,13 @@ public class GeometryConverterFactoryTests : IDisposable
     }
 
     [Fact]
-    public void CreateGeometryEngine_V5_ThrowsPlatformNotSupported()
+    public void CreateGeometryEngine_V5_ReturnsV6Engine()
     {
-        var act = () => _factory.CreateGeometryEngine(XGeometryEngineVersion.V5, _model, _loggerFactory);
+        var engine = _factory.CreateGeometryEngine(XGeometryEngineVersion.V5, _model, _loggerFactory);
+        _disposables.Add((IDisposable)engine);
 
-        act.Should().Throw<PlatformNotSupportedException>();
+        engine.Should().NotBeNull();
+        engine.Should().BeOfType<GeometryEngine>();
     }
 
     [Fact]
