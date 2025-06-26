@@ -9,12 +9,21 @@ namespace Xbim.Geometry.Engine.Interop.Handles
     /// </summary>
     internal sealed class NativeContextHandle : SafeHandle
     {
+        /// <summary>
+        /// Sentinel handle representing "no context" (NULL).
+        /// Passed to native functions where the context is optional (used only for logging).
+        /// Uses <c>ownsHandle: false</c> so the GC never tries to release it.
+        /// </summary>
+        internal static readonly NativeContextHandle NullHandle = new NativeContextHandle(ownsHandle: false);
+
         static NativeContextHandle()
         {
             NativeLibraryLoader.EnsureLoaded();
         }
 
         public NativeContextHandle() : base(IntPtr.Zero, ownsHandle: true) { }
+
+        private NativeContextHandle(bool ownsHandle) : base(IntPtr.Zero, ownsHandle) { }
 
         public override bool IsInvalid => handle == IntPtr.Zero;
 

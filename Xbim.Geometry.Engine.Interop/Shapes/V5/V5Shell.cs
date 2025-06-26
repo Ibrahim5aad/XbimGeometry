@@ -3,6 +3,8 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
+using Xbim.Geometry.Engine.Interop.Handles;
+using Xbim.Geometry.Engine.Interop.Internal;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes.V5
 {
@@ -60,7 +62,16 @@ namespace Xbim.Geometry.Engine.Interop.Shapes.V5
 
         public IXbimSolid CreateSolid()
         {
-            throw new NotSupportedException("Shell-to-solid conversion not yet supported via V5 adapter.");
+            int result = XbimGeometryNativeApi.xbim_shell_make_solid(
+                NativeContextHandle.NullHandle,
+                _shell.Handle,
+                out var solidHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to create solid from shell: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new V5Solid(new Solid(solidHandle));
         }
 
         public IXbimGeometryObjectSet Cut(IXbimSolidSet toCut, double tolerance, ILogger logger = null)
