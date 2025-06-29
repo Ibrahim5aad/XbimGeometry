@@ -1,5 +1,8 @@
 using System;
+using System.Linq;
 using Xbim.Common.Geometry;
+using Xbim.Geometry.Abstractions;
+using Xbim.Geometry.Engine.Interop.Internal;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes.V5
 {
@@ -18,7 +21,10 @@ namespace Xbim.Geometry.Engine.Interop.Shapes.V5
         {
             get
             {
-                throw new NotSupportedException("Edge start vertex not yet supported.");
+                var vertexHandles = Inner.GetSubShapeHandles(XShapeType.Vertex);
+                if (vertexHandles.Length == 0)
+                    throw new InvalidOperationException("Edge has no vertices.");
+                return new V5Vertex(new Vertex(vertexHandles[0]));
             }
         }
 
@@ -26,7 +32,11 @@ namespace Xbim.Geometry.Engine.Interop.Shapes.V5
         {
             get
             {
-                throw new NotSupportedException("Edge end vertex not yet supported.");
+                var vertexHandles = Inner.GetSubShapeHandles(XShapeType.Vertex);
+                if (vertexHandles.Length == 0)
+                    throw new InvalidOperationException("Edge has no vertices.");
+                // For degenerate edges (single vertex), start == end
+                return new V5Vertex(new Vertex(vertexHandles[vertexHandles.Length > 1 ? 1 : 0]));
             }
         }
 
@@ -42,7 +52,11 @@ namespace Xbim.Geometry.Engine.Interop.Shapes.V5
         {
             get
             {
-                throw new NotSupportedException("Edge length not yet supported.");
+                int result = XbimGeometryNativeApi.xbim_edge_length(Inner.Handle, out double length);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to get edge length: {XbimGeometryNativeApi.GetLastError()}");
+                return length;
             }
         }
 
