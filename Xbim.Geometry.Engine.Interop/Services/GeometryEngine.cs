@@ -204,21 +204,47 @@ namespace Xbim.Geometry.Engine.Interop.Services
             return V5Shape.Wrap(shape);
         }
 
-        // --- CreateShapeGeometry (deferred to V5COMPAT-007) ---
+        // --- CreateShapeGeometry ---
 
         public XbimShapeGeometry CreateShapeGeometry(IXbimGeometryObject geometryObject, double precision, double deflection, double angle, XbimGeometryType storageType, ILogger logger)
         {
-            throw new NotImplementedException("CreateShapeGeometry not yet implemented.");
+            if (storageType != XbimGeometryType.PolyhedronBinary)
+                throw new NotSupportedException("Only PolyhedronBinary storage type is supported.");
+
+            var shapeGeom = new XbimShapeGeometry();
+
+            IXShape v6Shape = ExtractV6Shape(geometryObject);
+            if (v6Shape == null)
+            {
+                _logger.LogWarning("CreateShapeGeometry: unable to extract shape from geometry object.");
+                return shapeGeom;
+            }
+
+            var meshFactory = (WexBimMeshFactory)_service.WexBimMeshFactory;
+            byte[] meshData = meshFactory.CreateWexBimMesh(v6Shape, precision, deflection, angle, 1.0, out var bounds);
+
+            ((IXbimShapeGeometryData)shapeGeom).ShapeData = meshData;
+
+            if (meshData.Length > 0)
+            {
+                shapeGeom.BoundingBox = geometryObject.BoundingBox;
+                shapeGeom.LOD = XbimLOD.LOD_Unspecified;
+                shapeGeom.Format = storageType;
+            }
+
+            return shapeGeom;
         }
 
         public XbimShapeGeometry CreateShapeGeometry(IXbimGeometryObject geometryObject, double precision, double deflection, ILogger logger)
         {
-            throw new NotImplementedException("CreateShapeGeometry not yet implemented.");
+            return CreateShapeGeometry(geometryObject, precision, deflection, 0.5, XbimGeometryType.PolyhedronBinary, logger);
         }
 
         public XbimShapeGeometry CreateShapeGeometry(double oneMillimetre, IXbimGeometryObject geometryObject, double precision, ILogger logger)
         {
-            throw new NotImplementedException("CreateShapeGeometry not yet implemented.");
+            var mf = _service.MeshFactors;
+            double deflection = oneMillimetre * mf.LinearDefection / _service.OneMillimeter;
+            return CreateShapeGeometry(geometryObject, precision, deflection, mf.AngularDeflection, XbimGeometryType.PolyhedronBinary, logger);
         }
 
         // --- CreateSolid overloads ---
@@ -669,6 +695,54 @@ namespace Xbim.Geometry.Engine.Interop.Services
         #endregion
 
         #region V5 Helpers
+
+        /// <summary>
+        /// Extracts the underlying V6 shape from a V5 geometry object.
+        /// For sets, builds a compound shape from all constituent objects.
+        /// </summary>
+        private IXShape ExtractV6Shape(IXbimGeometryObject geometryObject)
+        {
+            if (geometryObject is V5Shape v5)
+                return v5.Inner;
+
+            // For sets, build a compound from all elements
+            if (geometryObject.IsSet && geometryObject is IEnumerable<IXbimGeometryObject> set)
+            {
+                var handles = new List<IntPtr>();
+                var shapeRefs = new List<Shape>(); // keep alive for GC
+                foreach (var item in set)
+                {
+                    if (item is V5Shape v5Item)
+                    {
+                        var shape = (Shape)v5Item.Inner;
+                        shapeRefs.Add(shape);
+                        handles.Add(shape.Handle.DangerousGetHandle());
+                    }
+                }
+
+                if (handles.Count == 0)
+                    return null;
+
+                int result = XbimGeometryNativeApi.xbim_compound_make(
+                    _service.ContextHandle,
+                    handles.ToArray(),
+                    handles.Count,
+                    out var compoundHandle);
+
+                GC.KeepAlive(shapeRefs);
+
+                if (result != 0)
+                {
+                    _logger.LogWarning("Failed to create compound from set: {Error}",
+                        XbimGeometryNativeApi.GetLastError());
+                    return null;
+                }
+
+                return Shapes.ShapeFactory.WrapShape(compoundHandle);
+            }
+
+            return null;
+        }
 
         /// <summary>
         /// Builds a solid model via V6 factory and wraps as V5 solid.
