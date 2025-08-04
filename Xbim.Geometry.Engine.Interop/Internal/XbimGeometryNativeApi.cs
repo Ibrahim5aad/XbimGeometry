@@ -497,19 +497,6 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double precision,
             out NativeShapeHandle outHandle);
 
-        [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_halfspace_build_boxed(
-            NativeContextHandle ctx,
-            int surfaceType,
-            double originX, double originY, double originZ,
-            double zDirX, double zDirY, double zDirZ,
-            double xDirX, double xDirY, double xDirZ,
-            double radius,
-            int agreementFlag,
-            double oneMeter,
-            double precision,
-            out NativeShapeHandle outHandle);
-
         #endregion
 
         #region Compound Operations

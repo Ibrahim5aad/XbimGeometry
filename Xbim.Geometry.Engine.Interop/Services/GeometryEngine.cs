@@ -681,13 +681,24 @@ namespace Xbim.Geometry.Engine.Interop.Services
             return FromBrep(brepStr);
         }
 
-        // --- Triangulation / Mesh (deferred) ---
+        // --- Triangulation / Mesh ---
 
         public void WriteTriangulation(TextWriter tw, IXbimGeometryObject shape, double tolerance, double deflection, double angle)
-            => throw new NotSupportedException("WriteTriangulation not yet supported.");
+            => throw new NotSupportedException("Text-based triangulation is not supported. Use binary format.");
 
         public void WriteTriangulation(BinaryWriter bw, IXbimGeometryObject shape, double tolerance, double deflection, double angle)
-            => throw new NotSupportedException("WriteTriangulation not yet supported.");
+        {
+            IXShape v6Shape = ExtractV6Shape(shape);
+            if (v6Shape == null)
+            {
+                _logger.LogWarning("WriteTriangulation: unable to extract shape from geometry object.");
+                return;
+            }
+
+            byte[] meshData = _service.WexBimMeshFactory.CreateWexBimMesh(v6Shape, tolerance, deflection, angle, 1.0, out _);
+            if (meshData != null && meshData.Length > 0)
+                bw.Write(meshData);
+        }
 
         public void Mesh(IXbimMeshReceiver receiver, IXbimGeometryObject geometryObject, double precision, double deflection, double angle)
             => throw new NotSupportedException("V5 Mesh not yet supported.");

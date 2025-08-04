@@ -658,24 +658,3 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_polygonal_bounded(
         return XBIM_ERROR;
     }
 }
-
-XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_boxed(
-    XbimContextHandle ctx,
-    XbimSurfaceType   surfaceType,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
-    double radius,
-    int    agreementFlag,
-    double oneMeter,
-    double precision,
-    XbimShapeHandle*  outHandle)
-{
-    // Per IFC spec and original C++/CLI engine: boxed half-space is treated
-    // identically to a normal half-space. The box is only a computational hint.
-    return xbim_halfspace_build(ctx, surfaceType,
-        originX, originY, originZ,
-        zDirX, zDirY, zDirZ,
-        xDirX, xDirY, xDirZ,
-        radius, agreementFlag, oneMeter, precision, outHandle);
-}

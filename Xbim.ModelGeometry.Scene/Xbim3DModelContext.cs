@@ -17,6 +17,7 @@ using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Engine.Interop.Shapes.V5;
 using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
 using Xbim.ModelGeometry.Scene.Clustering;
@@ -1019,37 +1020,47 @@ namespace Xbim.ModelGeometry.Scene
                     // make the finished shape
                     if (behaviour.HasFlag(MeshingBehaviourResult.PerformAdditions) && openingAndProjectionOp.ProjectGeometries.Any())
                     {
-                        var nextGeom = elementGeom.Union(openingAndProjectionOp.ProjectGeometries, _modelServices.MinimumGap, _logger);
-                        if (nextGeom.IsValid)
+                        var bodyShape = ExtractV6Shape(elementGeom);
+                        var additions = ExtractV6Shapes(openingAndProjectionOp.ProjectGeometries);
+                        if (bodyShape != null && additions.Any())
                         {
-                            if (nextGeom.First != null && nextGeom.First.IsValid)
-                                elementGeom = nextGeom;
+                            var result = _modelServices.ShapeFactory.Union(bodyShape, additions);
+                            if (result != null)
+                            {
+                                var nextGeom = WrapAsGeometryObjectSet(result);
+                                if (nextGeom.IsValid && nextGeom.First != null && nextGeom.First.IsValid)
+                                    elementGeom = nextGeom;
+                                else
+                                    LogWarning(_model.Instances[elementLabel], "Projections are an empty shape");
+                            }
                             else
-                                LogWarning(_model.Instances[elementLabel], "Projections are an empty shape");
+                                LogWarning(_model.Instances[elementLabel], "Joining of projections has failed. Projections have been ignored");
                         }
-                        else
-                            LogWarning(_model.Instances[elementLabel], "Joining of projections has failed. Projections have been ignored");
                     }
 
 
                     if (behaviour.HasFlag(MeshingBehaviourResult.PerformSubtractions) && openingAndProjectionOp.CutGeometries.Any())
                     {
-                        IXbimGeometryObjectSet nextGeom;
                         try
                         {
-
-                            nextGeom = elementGeom.Cut(openingAndProjectionOp.CutGeometries, _modelServices.MinimumGap, _logger);
-                            if (nextGeom.IsValid)
+                            var bodyShape = ExtractV6Shape(elementGeom);
+                            var subtractions = ExtractV6Shapes(openingAndProjectionOp.CutGeometries);
+                            if (bodyShape != null && subtractions.Any())
                             {
-                                if (nextGeom.First != null && nextGeom.First.IsValid)
-                                    elementGeom = nextGeom;
+                                var result = _modelServices.ShapeFactory.Cut(bodyShape, subtractions);
+                                if (result != null)
+                                {
+                                    var nextGeom = WrapAsGeometryObjectSet(result);
+                                    if (nextGeom.IsValid && nextGeom.First != null && nextGeom.First.IsValid)
+                                        elementGeom = nextGeom;
+                                    else
+                                        LogWarning(_model.Instances[elementLabel],
+                                            "Cutting openings has resulted in an empty shape");
+                                }
                                 else
                                     LogWarning(_model.Instances[elementLabel],
-                                        "Cutting openings has resulted in an empty shape");
+                                        "Cutting openings has failed. Openings have been ignored");
                             }
-                            else
-                                LogWarning(_model.Instances[elementLabel],
-                                    "Cutting openings has failed. Openings have been ignored");
                         }
                         catch (TimeoutException)
                         {
@@ -1061,7 +1072,6 @@ namespace Xbim.ModelGeometry.Scene
                     }
 
                     // now add to the DB     
-                    //
                     foreach (var geom in elementGeom)
                     {
                         XbimShapeGeometry shapeGeometry = new XbimShapeGeometry
@@ -1648,74 +1658,49 @@ namespace Xbim.ModelGeometry.Scene
             progDelegate?.Invoke(101, "WriteShapeGeometries, (" + localTally + " written)");
         }
 
+        /// <summary>
+        /// Extracts a single V6 shape from a V5 geometry object set.
+        /// If the set has multiple items, combines them into a compound.
+        /// </summary>
+        private IXShape ExtractV6Shape(IXbimGeometryObjectSet geomSet)
+        {
+            var shapes = new List<IXShape>();
+            foreach (var item in geomSet)
+            {
+                if (item is V5Shape v5)
+                    shapes.Add(v5.Inner);
+            }
+            if (shapes.Count == 0) return null;
+            if (shapes.Count == 1) return shapes[0];
+            // Multiple element parts — union them into one body
+            return _modelServices.ShapeFactory.Union(shapes[0], shapes.Skip(1));
+        }
+
+        /// <summary>
+        /// Extracts V6 shapes from a V5 solid set.
+        /// </summary>
+        private static IEnumerable<IXShape> ExtractV6Shapes(IXbimSolidSet solidSet)
+        {
+            foreach (var solid in solidSet)
+            {
+                if (solid is V5Shape v5)
+                    yield return v5.Inner;
+            }
+        }
+
+        /// <summary>
+        /// Wraps a V6 shape result back into a V5 geometry object set.
+        /// </summary>
+        private static IXbimGeometryObjectSet WrapAsGeometryObjectSet(IXShape shape)
+        {
+            var wrapped = V5Shape.Wrap(shape);
+            return new V5GeometryObjectSet(new[] { wrapped });
+        }
+
         private bool ShouldTesselateShapeDirectly(ShapeContext shapeMeta, XbimTessellator xbimTessellator)
         {
             return !shapeMeta.IsFeatureElementShape && !shapeMeta.IsVoidedProductShape && xbimTessellator.CanMesh(shapeMeta.Shape);
         }
-
-        //private IXbimGeometryObject CallWithTimeout(IIfcGeometricRepresentationItem shape, ILogger logger, int booleanTimeOutMilliSeconds)
-        //{
-        //    Thread threadToKill = null;
-        //    Func<IXbimGeometryObject> wrappedAction = () =>
-        //    {
-        //        threadToKill = Thread.CurrentThread;
-        //        try
-        //        {
-        //            return Engine.Create(shape, logger);
-        //        }
-        //        catch (ThreadAbortException)
-        //        {
-        //            _logger.LogWarning("Thread aborted due to timeout");
-        //            Thread.ResetAbort();// cancel hard aborting, lets to finish it nicely.
-        //            return null;
-        //        }
-
-        //    };
-
-        //    IAsyncResult result = wrappedAction.BeginInvoke(null, null);
-        //    if (result.AsyncWaitHandle.WaitOne(booleanTimeOutMilliSeconds))
-        //    {
-        //        var res = wrappedAction.EndInvoke(result);
-        //        result.AsyncWaitHandle.Close();
-        //        return res;
-        //    }
-        //    else
-        //    {
-        //        threadToKill?.Abort();
-        //        throw new TimeoutException();
-        //    }
-        //}
-        //private IXbimGeometryObjectSet CutWithTimeOut(IXbimGeometryObjectSet elementGeom, IXbimSolidSet cutGeometries, double precision, int booleanTimeOutMilliSeconds)
-        //{
-        //    Thread threadToKill = null;
-        //    Func<IXbimGeometryObjectSet> wrappedAction = () =>
-        //    {
-        //        try
-        //        {
-        //            threadToKill = Thread.CurrentThread;
-        //            return elementGeom.Cut(cutGeometries, precision);
-        //        }
-        //        catch (ThreadAbortException)
-        //        {
-        //            _logger.LogWarning("Thread aborted due to timeout");
-        //            Thread.ResetAbort();// cancel hard aborting, lets to finish it nicely.
-        //            return null;
-        //        }
-        //    };
-
-        //    IAsyncResult result = wrappedAction.BeginInvoke(null, null);
-        //    if (result.AsyncWaitHandle.WaitOne(booleanTimeOutMilliSeconds))
-        //    {
-        //        var res = wrappedAction.EndInvoke(result);
-        //        result.AsyncWaitHandle.Close();
-        //        return res;
-        //    }
-        //    else
-        //    {
-        //        threadToKill?.Abort();
-        //        throw new TimeoutException();
-        //    }
-        //}
 
         private int WriteRegionsToStore(IIfcRepresentationContext context, IEnumerable<XbimBBoxClusterElement> elementsToCluster, IGeometryStoreInitialiser txn, XbimMatrix3D WorldCoordinateSystem, int nextRegionNumber)
         {

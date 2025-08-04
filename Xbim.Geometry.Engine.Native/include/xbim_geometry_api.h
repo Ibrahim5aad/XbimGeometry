@@ -1231,26 +1231,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_polygonal_bounded(
     double precision,
     XbimShapeHandle*  outHandle);
 
-/*
- * Build a boxed half-space solid.
- * Per IFC specification, the boxed half-space is semantically identical
- * to a basic half-space — the bounding box is only for computational
- * efficiency hints. This function delegates directly to xbim_halfspace_build.
- *
- * Parameters are identical to xbim_halfspace_build.
- */
-XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_boxed(
-    XbimContextHandle ctx,
-    XbimSurfaceType   surfaceType,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
-    double radius,
-    int    agreementFlag,
-    double oneMeter,
-    double precision,
-    XbimShapeHandle*  outHandle);
-
 /* ── Compound operations ───────────────────────────────────────────────── */
 
 /*

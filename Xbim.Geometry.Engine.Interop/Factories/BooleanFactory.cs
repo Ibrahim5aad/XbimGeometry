@@ -188,26 +188,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     ox, oy, oz, zx, zy, zz, xx, xy, xz,
                     agreementFlag, oneMeter, precision);
 
-            // Basic or boxed half-space (boxed is treated identically per IFC spec)
-            int result;
-            NativeShapeHandle outHandle;
-
-            if (halfSpace is IIfcBoxedHalfSpace)
-            {
-                result = XbimGeometryNativeApi.xbim_halfspace_build_boxed(
+            // Basic or boxed half-space
+            int result = XbimGeometryNativeApi.xbim_halfspace_build(
                     ContextHandle, surfaceType,
                     ox, oy, oz, zx, zy, zz, xx, xy, xz,
                     radius, agreementFlag, oneMeter, precision,
-                    out outHandle);
-            }
-            else
-            {
-                result = XbimGeometryNativeApi.xbim_halfspace_build(
-                    ContextHandle, surfaceType,
-                    ox, oy, oz, zx, zy, zz, xx, xy, xz,
-                    radius, agreementFlag, oneMeter, precision,
-                    out outHandle);
-            }
+                    out NativeShapeHandle outHandle);
 
             if (result != 0)
                 throw new InvalidOperationException(

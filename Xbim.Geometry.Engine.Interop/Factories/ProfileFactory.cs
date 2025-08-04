@@ -714,7 +714,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             try
             {
-                foreach (var innerCurve in innerCurves)
+                foreach (var innerCurve in innerCurves.DistinctBy(c => c.EntityLabel))
                 {
                     NativeShapeHandle innerHandle = BuildClosedCurveAsShape(innerCurve);
                     if (innerHandle != null && !innerHandle.IsInvalid)
