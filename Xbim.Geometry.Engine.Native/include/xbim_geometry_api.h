@@ -1657,6 +1657,30 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_make_solid(
     XbimShapeHandle     shellHandle,
     XbimShapeHandle*    outHandle);
 
+/*
+ * Build a closed shell from individual faces using BRepOffsetAPI_Sewing,
+ * then convert to a solid via ShapeFix_Solid. This is the correct way to
+ * build a solid from faceted BRep faces that don't share edges.
+ *
+ * The sewing step merges coincident edges between adjacent faces,
+ * creating proper topological connectivity. The ShapeFix_Solid step
+ * fixes orientation and converts the shell to a valid solid.
+ *
+ *   ctx           – a valid context handle (used for logging; may be NULL)
+ *   faceHandles   – array of face shape handles
+ *   numFaces      – number of faces in the array (must be >= 4)
+ *   tolerance     – sewing tolerance for merging coincident edges
+ *   outHandle     – receives the resulting solid shape handle
+ *
+ * Returns XBIM_OK on success; XBIM_NULL_SHAPE if sewing or solid creation fails.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_closed_shell(
+    XbimContextHandle        ctx,
+    const XbimShapeHandle*   faceHandles,
+    int                      numFaces,
+    double                   tolerance,
+    XbimShapeHandle*         outHandle);
+
 /* ── Curve handle lifecycle ──────────────────────────────────────────── */
 
 /*

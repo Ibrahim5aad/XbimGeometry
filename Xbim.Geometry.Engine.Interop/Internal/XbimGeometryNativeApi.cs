@@ -695,6 +695,14 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeShapeHandle shellHandle,
             out NativeShapeHandle outHandle);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shell_build_closed_shell(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] faceHandles,
+            int numFaces,
+            double tolerance,
+            out NativeShapeHandle outHandle);
+
         #endregion
 
         #region Shape Traversal

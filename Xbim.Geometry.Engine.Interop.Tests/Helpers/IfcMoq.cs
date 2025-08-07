@@ -729,4 +729,136 @@ internal static class IfcMoq
             loc: CartesianPoint3d(0, 0, 5)));
         return moq.Object;
     }
+
+    // ── Faceted BRep mocks ────────────────────────────────────────
+
+    /// <summary>
+    /// Creates an IIfcPolyLoop from 3D points. Points should define a closed polygon.
+    /// </summary>
+    public static IIfcPolyLoop PolyLoop(params (double x, double y, double z)[] points)
+    {
+        var moq = MakeMoq<IIfcPolyLoop>();
+        var obj = moq.Object;
+        var polygon = new ItemListMoq<IIfcCartesianPoint>();
+        foreach (var (x, y, z) in points)
+            polygon.Add(CartesianPoint3d(x, y, z));
+        moq.SetupGet(p => p.Polygon).Returns(polygon);
+        return obj;
+    }
+
+    /// <summary>
+    /// Creates an IIfcFaceOuterBound with a PolyLoop bound.
+    /// </summary>
+    public static IIfcFaceOuterBound FaceOuterBound(IIfcPolyLoop polyLoop, bool orientation = true)
+    {
+        var moq = MakeMoq<IIfcFaceOuterBound>();
+        moq.SetupGet(b => b.Bound).Returns(polyLoop);
+        moq.SetupGet(b => b.Orientation).Returns(orientation);
+        return moq.Object;
+    }
+
+    /// <summary>
+    /// Creates an IIfcFaceBound (inner bound / void) with a PolyLoop.
+    /// </summary>
+    public static IIfcFaceBound FaceBound(IIfcPolyLoop polyLoop, bool orientation = true)
+    {
+        var moq = MakeMoq<IIfcFaceBound>();
+        moq.SetupGet(b => b.Bound).Returns(polyLoop);
+        moq.SetupGet(b => b.Orientation).Returns(orientation);
+        return moq.Object;
+    }
+
+    /// <summary>
+    /// Creates an IIfcFace with the given bounds (first should be FaceOuterBound).
+    /// </summary>
+    public static IIfcFace Face(params IIfcFaceBound[] bounds)
+    {
+        var moq = MakeMoq<IIfcFace>();
+        var boundSet = new ItemListMoq<IIfcFaceBound>();
+        foreach (var b in bounds)
+            boundSet.Add(b);
+        moq.SetupGet(f => f.Bounds).Returns(boundSet);
+        return moq.Object;
+    }
+
+    /// <summary>
+    /// Creates an IIfcClosedShell with the given faces.
+    /// </summary>
+    public static IIfcClosedShell ClosedShell(params IIfcFace[] faces)
+    {
+        var moq = MakeMoq<IIfcClosedShell>();
+        var faceSet = new ItemListMoq<IIfcFace>();
+        foreach (var f in faces)
+            faceSet.Add(f);
+        moq.SetupGet(s => s.CfsFaces).Returns(faceSet);
+        return moq.Object;
+    }
+
+    /// <summary>
+    /// Creates an IIfcFacetedBrep with a closed shell as its outer boundary.
+    /// </summary>
+    public static IIfcFacetedBrep FacetedBrep(IIfcClosedShell outer)
+    {
+        var moq = MakeMoq<IIfcFacetedBrep>();
+        moq.SetupGet(b => b.Outer).Returns(outer);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcFacetedBrep)));
+        return moq.Object;
+    }
+
+    /// <summary>
+    /// Creates an IIfcFacetedBrepWithVoids with an outer shell and void shells.
+    /// </summary>
+    public static IIfcFacetedBrepWithVoids FacetedBrepWithVoids(
+        IIfcClosedShell outer, params IIfcClosedShell[] voids)
+    {
+        var moq = MakeMoq<IIfcFacetedBrepWithVoids>();
+        moq.SetupGet(b => b.Outer).Returns(outer);
+        var voidSet = new ItemListMoq<IIfcClosedShell>();
+        foreach (var v in voids)
+            voidSet.Add(v);
+        moq.SetupGet(b => b.Voids).Returns(voidSet);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcFacetedBrepWithVoids)));
+        return moq.Object;
+    }
+
+    /// <summary>
+    /// Helper: builds a box closed shell from corner coordinates.
+    /// Creates 6 rectangular faces forming a closed box.
+    /// </summary>
+    public static IIfcClosedShell BoxShell(
+        double x0, double y0, double z0,
+        double x1, double y1, double z1)
+    {
+        // 8 vertices of the box
+        // Bottom: (x0,y0,z0), (x1,y0,z0), (x1,y1,z0), (x0,y1,z0)
+        // Top:    (x0,y0,z1), (x1,y0,z1), (x1,y1,z1), (x0,y1,z1)
+
+        // Bottom face (Z=z0) — CW when viewed from outside (facing -Z)
+        var bottom = Face(FaceOuterBound(PolyLoop(
+            (x0, y0, z0), (x0, y1, z0), (x1, y1, z0), (x1, y0, z0))));
+
+        // Top face (Z=z1) — CCW when viewed from outside (facing +Z)
+        var top = Face(FaceOuterBound(PolyLoop(
+            (x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1))));
+
+        // Front face (Y=y0)
+        var front = Face(FaceOuterBound(PolyLoop(
+            (x0, y0, z0), (x1, y0, z0), (x1, y0, z1), (x0, y0, z1))));
+
+        // Back face (Y=y1)
+        var back = Face(FaceOuterBound(PolyLoop(
+            (x0, y1, z0), (x0, y1, z1), (x1, y1, z1), (x1, y1, z0))));
+
+        // Left face (X=x0)
+        var left = Face(FaceOuterBound(PolyLoop(
+            (x0, y0, z0), (x0, y0, z1), (x0, y1, z1), (x0, y1, z0))));
+
+        // Right face (X=x1)
+        var right = Face(FaceOuterBound(PolyLoop(
+            (x1, y0, z0), (x1, y1, z0), (x1, y1, z1), (x1, y0, z1))));
+
+        return ClosedShell(bottom, top, front, back, left, right);
+    }
 }

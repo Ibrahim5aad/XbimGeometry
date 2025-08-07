@@ -23,7 +23,9 @@
 #include <BRep_Builder.hxx>
 #include <BRepBuilderAPI_MakeSolid.hxx>
 #include <BRepCheck_Shell.hxx>
+#include <BRepOffsetAPI_Sewing.hxx>
 #include <ShapeFix_Shell.hxx>
+#include <ShapeFix_Solid.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <Standard_Failure.hxx>
@@ -314,6 +316,145 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_make_solid(
     {
         xbim_log_occt_failure(ctx, e, "xbim_shell_make_solid");
         xbim_set_error("xbim_shell_make_solid: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── xbim_shell_build_closed_shell ─────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_closed_shell(
+    XbimContextHandle        ctx,
+    const XbimShapeHandle*   faceHandles,
+    int                      numFaces,
+    double                   tolerance,
+    XbimShapeHandle*         outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_shell_build_closed_shell: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!faceHandles)
+    {
+        xbim_set_error("xbim_shell_build_closed_shell: faceHandles is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    if (numFaces < 4)
+    {
+        xbim_set_error("xbim_shell_build_closed_shell: need >= 4 faces for a closed shell");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        /* Use BRepOffsetAPI_Sewing to merge coincident edges between faces */
+        BRepOffsetAPI_Sewing sewing(tolerance);
+
+        int addedCount = 0;
+        for (int i = 0; i < numFaces; i++)
+        {
+            if (!faceHandles[i])
+                continue;
+
+            const TopoDS_Shape& shape = faceHandles[i]->shape;
+            if (shape.IsNull())
+                continue;
+
+            if (shape.ShapeType() == TopAbs_FACE)
+            {
+                sewing.Add(shape);
+                addedCount++;
+            }
+            else
+            {
+                /* Extract faces from other shape types */
+                for (TopExp_Explorer exp(shape, TopAbs_FACE); exp.More(); exp.Next())
+                {
+                    sewing.Add(exp.Current());
+                    addedCount++;
+                }
+            }
+        }
+
+        if (addedCount < 4)
+        {
+            xbim_set_error("xbim_shell_build_closed_shell: fewer than 4 valid faces");
+            return XBIM_NULL_SHAPE;
+        }
+
+        sewing.Perform();
+
+        TopoDS_Shape sewedShape = sewing.SewedShape();
+        if (sewedShape.IsNull())
+        {
+            xbim_set_error("xbim_shell_build_closed_shell: sewing produced null shape");
+            return XBIM_NULL_SHAPE;
+        }
+
+        /* Extract a shell from the sewed result */
+        TopoDS_Shell shell;
+        if (sewedShape.ShapeType() == TopAbs_SHELL)
+        {
+            shell = TopoDS::Shell(sewedShape);
+        }
+        else
+        {
+            TopExp_Explorer exp(sewedShape, TopAbs_SHELL);
+            if (exp.More())
+                shell = TopoDS::Shell(exp.Current());
+        }
+
+        if (shell.IsNull())
+        {
+            xbim_set_error("xbim_shell_build_closed_shell: sewing did not produce a shell");
+            xbim_log_warning(ctx, "Sewing produced shape type %d instead of shell",
+                (int)sewedShape.ShapeType());
+            return XBIM_NULL_SHAPE;
+        }
+
+        /* Use ShapeFix_Solid to convert shell to solid with proper orientation */
+        ShapeFix_Solid solidFixer;
+        solidFixer.SetPrecision(tolerance);
+        solidFixer.SetMinTolerance(tolerance);
+        solidFixer.SetMaxTolerance(tolerance * 10);
+
+        TopoDS_Solid solid = solidFixer.SolidFromShell(shell);
+        if (solid.IsNull())
+        {
+            /* Fallback: try BRepBuilderAPI_MakeSolid */
+            xbim_log_warning(ctx, "ShapeFix_Solid failed, trying BRepBuilderAPI_MakeSolid");
+            BRepBuilderAPI_MakeSolid solidMaker(shell);
+            if (!solidMaker.IsDone())
+            {
+                xbim_set_error("xbim_shell_build_closed_shell: cannot create solid from shell");
+                return XBIM_NULL_SHAPE;
+            }
+            solid = solidMaker.Solid();
+        }
+
+        if (solid.IsNull())
+        {
+            xbim_set_error("xbim_shell_build_closed_shell: resulting solid is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        *outHandle = xbim_shape_create_from(solid);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_shell_build_closed_shell: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_shell_build_closed_shell");
+        xbim_set_error("xbim_shell_build_closed_shell: OCCT exception");
         return XBIM_ERROR;
     }
 }

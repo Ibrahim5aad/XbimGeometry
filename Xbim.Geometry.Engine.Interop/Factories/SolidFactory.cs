@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
@@ -190,6 +191,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 XSolidModelType.IfcSweptDiskSolidPolygonal => BuildSweptDiskSolid((IIfcSweptDiskSolid)ifcSolid),
                 XSolidModelType.IfcFixedReferenceSweptAreaSolid => BuildFixedReferenceSweptAreaSolid((IIfcFixedReferenceSweptAreaSolid)ifcSolid),
                 XSolidModelType.IfcSurfaceCurveSweptAreaSolid => BuildSurfaceCurveSweptAreaSolid((IIfcSurfaceCurveSweptAreaSolid)ifcSolid),
+                XSolidModelType.IfcFacetedBrep => Build((IIfcFacetedBrep)ifcSolid),
+                XSolidModelType.IfcFacetedBrepWithVoids => BuildFacetedBrepWithVoids((IIfcFacetedBrepWithVoids)ifcSolid),
                 _ => throw new NotSupportedException(
                     $"Solid model type {solidType} is not yet implemented in the P/Invoke layer.")
             };
@@ -415,13 +418,252 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         #endregion
 
-        #region Not Yet Implemented (future features)
+        #region Faceted BRep
 
         public IXShape Build(IIfcFacetedBrep ifcBrep)
         {
-            throw new NotImplementedException(
-                "Build(IIfcFacetedBrep) requires face/shell factory support (TOPO-001, TOPO-004).");
+            var solidHandle = BuildClosedShellAsSolid(ifcBrep.Outer);
+            return ShapeFactory.WrapShape(solidHandle);
         }
+
+        private IXShape BuildFacetedBrepWithVoids(IIfcFacetedBrepWithVoids ifcBrep)
+        {
+            // Build the outer solid
+            var outerHandle = BuildClosedShellAsSolid(ifcBrep.Outer);
+            double fuzzyTol = _modelService.Precision * 10;
+
+            // Cut each void shell from the outer solid
+            foreach (var voidShell in ifcBrep.Voids)
+            {
+                NativeShapeHandle voidSolidHandle;
+                try
+                {
+                    voidSolidHandle = BuildClosedShellAsSolid(voidShell);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("Skipping void shell: {Message}", ex.Message);
+                    continue;
+                }
+
+                int result = XbimGeometryNativeApi.xbim_boolean_cut(
+                    ContextHandle, outerHandle, voidSolidHandle,
+                    fuzzyTol, out _, out var cutHandle);
+
+                voidSolidHandle.Dispose();
+
+                if (result != 0)
+                {
+                    _logger.LogWarning("Boolean cut for void failed: {Error}",
+                        XbimGeometryNativeApi.GetLastError());
+                    continue;
+                }
+
+                outerHandle.Dispose();
+                outerHandle = cutHandle;
+            }
+
+            return ShapeFactory.WrapShape(outerHandle);
+        }
+
+        /// <summary>
+        /// Builds a closed shell from an IIfcConnectedFaceSet (typically IIfcClosedShell)
+        /// by constructing planar faces from polygon loops, sewing them together to merge
+        /// shared edges, and converting to a solid.
+        /// </summary>
+        private NativeShapeHandle BuildClosedShellAsSolid(IIfcConnectedFaceSet faceSet)
+        {
+            double tolerance = _modelService.Precision;
+            var faceHandles = new List<NativeShapeHandle>();
+
+            try
+            {
+                // Build each face from its polygon bounds
+                foreach (var ifcFace in faceSet.CfsFaces)
+                {
+                    var faceHandle = BuildPlanarFace(ifcFace, tolerance);
+                    if (faceHandle != null && !faceHandle.IsInvalid)
+                        faceHandles.Add(faceHandle);
+                }
+
+                if (faceHandles.Count < 4)
+                    throw new InvalidOperationException(
+                        $"Closed shell requires at least 4 faces but only {faceHandles.Count} were built.");
+
+                // Use the combined sew+solid API which merges shared edges
+                var facePtrs = new IntPtr[faceHandles.Count];
+                for (int i = 0; i < faceHandles.Count; i++)
+                    facePtrs[i] = faceHandles[i].DangerousGetHandle();
+
+                int result = XbimGeometryNativeApi.xbim_shell_build_closed_shell(
+                    ContextHandle, facePtrs, faceHandles.Count, tolerance, out var solidHandle);
+
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build closed shell solid: {XbimGeometryNativeApi.GetLastError()}");
+
+                return solidHandle;
+            }
+            finally
+            {
+                foreach (var h in faceHandles)
+                    h.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Builds a planar face from an IIfcFace by extracting polygon loops from its bounds.
+        /// The outer bound becomes the face wire; inner bounds become void wires.
+        /// </summary>
+        private NativeShapeHandle? BuildPlanarFace(IIfcFace ifcFace, double tolerance)
+        {
+            NativeShapeHandle? outerWireHandle = null;
+            var innerWireHandles = new List<NativeShapeHandle>();
+
+            try
+            {
+                foreach (var bound in ifcFace.Bounds)
+                {
+                    if (bound.Bound is not IIfcPolyLoop polyLoop)
+                    {
+                        _logger.LogWarning(
+                            "Face bound #{Label} is not an IIfcPolyLoop, skipping.",
+                            bound.EntityLabel);
+                        continue;
+                    }
+
+                    var wireHandle = BuildWireFromPolyLoop(polyLoop, bound.Orientation);
+                    if (wireHandle == null || wireHandle.IsInvalid)
+                        continue;
+
+                    if (bound is IIfcFaceOuterBound)
+                    {
+                        outerWireHandle?.Dispose();
+                        outerWireHandle = wireHandle;
+                    }
+                    else
+                    {
+                        innerWireHandles.Add(wireHandle);
+                    }
+                }
+
+                // If no explicit outer bound, use the first bound as outer
+                if (outerWireHandle == null && innerWireHandles.Count > 0)
+                {
+                    outerWireHandle = innerWireHandles[0];
+                    innerWireHandles.RemoveAt(0);
+                }
+
+                if (outerWireHandle == null)
+                    return null;
+
+                // Build face from outer wire (with inner wires if any)
+                NativeShapeHandle faceHandle;
+                if (innerWireHandles.Count == 0)
+                {
+                    int result = XbimGeometryNativeApi.xbim_face_build_from_wire(
+                        ContextHandle, outerWireHandle, out faceHandle);
+
+                    if (result != 0)
+                    {
+                        _logger.LogWarning("Failed to build face from wire: {Error}",
+                            XbimGeometryNativeApi.GetLastError());
+                        return null;
+                    }
+                }
+                else
+                {
+                    // Use advanced face build with inner wires (voids)
+                    var innerPtrs = new IntPtr[innerWireHandles.Count];
+                    for (int i = 0; i < innerWireHandles.Count; i++)
+                        innerPtrs[i] = innerWireHandles[i].DangerousGetHandle();
+
+                    // surfaceType 0 = PLANE, sameSense 1 = true
+                    // For planar faces inferred from wire, pass zero placement — the native
+                    // code will infer the plane from the outer wire
+                    int result = XbimGeometryNativeApi.xbim_face_build_advanced(
+                        ContextHandle,
+                        0, // PLANE
+                        0, 0, 0, // origin (ignored for inferred plane)
+                        0, 0, 1, // zDir
+                        1, 0, 0, // xDir
+                        0,       // radius (N/A for plane)
+                        outerWireHandle,
+                        innerPtrs,
+                        innerWireHandles.Count,
+                        tolerance,
+                        1, // sameSense
+                        out faceHandle);
+
+                    if (result != 0)
+                    {
+                        _logger.LogWarning("Failed to build advanced face with voids: {Error}",
+                            XbimGeometryNativeApi.GetLastError());
+                        return null;
+                    }
+                }
+
+                return faceHandle;
+            }
+            finally
+            {
+                outerWireHandle?.Dispose();
+                foreach (var h in innerWireHandles)
+                    h.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Builds a closed polygon wire from an IIfcPolyLoop's vertices.
+        /// </summary>
+        private NativeShapeHandle? BuildWireFromPolyLoop(IIfcPolyLoop polyLoop, bool orientation)
+        {
+            var polygon = polyLoop.Polygon;
+            if (polygon == null || polygon.Count < 3)
+                return null;
+
+            int count = polygon.Count;
+            var coords = new double[count * 3];
+
+            // Extract XYZ coordinates; if orientation is reversed, reverse the point order
+            if (orientation)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    var pt = polygon[i];
+                    coords[i * 3] = pt.X;
+                    coords[i * 3 + 1] = pt.Y;
+                    coords[i * 3 + 2] = pt.Z;
+                }
+            }
+            else
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    var pt = polygon[count - 1 - i];
+                    coords[i * 3] = pt.X;
+                    coords[i * 3 + 1] = pt.Y;
+                    coords[i * 3 + 2] = pt.Z;
+                }
+            }
+
+            int result = XbimGeometryNativeApi.xbim_wire_build_polygon(
+                ContextHandle, coords, count, 1, // closed = true
+                out var wireHandle);
+
+            if (result != 0)
+            {
+                _logger.LogWarning("Failed to build polygon wire: {Error}",
+                    XbimGeometryNativeApi.GetLastError());
+                return null;
+            }
+
+            return wireHandle;
+        }
+
+        #endregion
+
+        #region Not Yet Implemented (future features)
 
         public IXShape Build(IIfcFaceBasedSurfaceModel ifcSurfaceModel)
         {
