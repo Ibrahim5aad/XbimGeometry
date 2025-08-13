@@ -11,6 +11,7 @@
 
 #include "xbim_edge.h"
 #include "xbim_shape.h"
+#include "xbim_curve.h"
 #include "xbim_context.h"
 #include "xbim_error.h"
 #include "xbim_logging.h"
@@ -24,6 +25,7 @@
 #include <TopoDS_Edge.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
+#include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
 #include <Geom_Circle.hxx>
@@ -241,6 +243,95 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_circle_arc(
     {
         xbim_log_occt_failure(ctx, e, "xbim_edge_build_circle_arc");
         xbim_set_error("xbim_edge_build_circle_arc: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── xbim_edge_build_from_curve_handle ─────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve_handle(
+    XbimContextHandle ctx,
+    XbimCurveHandle   curveHandle,
+    double startX, double startY, double startZ,
+    double endX,   double endY,   double endZ,
+    int              sameSense,
+    double           tolerance,
+    XbimShapeHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_edge_build_from_curve_handle: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!curveHandle)
+    {
+        xbim_set_error("xbim_edge_build_from_curve_handle: curveHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        Handle(Geom_Curve) curve = curveHandle->curve;
+        if (curve.IsNull())
+        {
+            xbim_set_error("xbim_edge_build_from_curve_handle: curve is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        if (!sameSense)
+        {
+            curve = Handle(Geom_Curve)::DownCast(curve->Copy());
+            curve->Reverse();
+        }
+
+        gp_Pnt pStart(startX, startY, startZ);
+        gp_Pnt pEnd(endX, endY, endZ);
+
+        BRepBuilderAPI_MakeEdge edgeMaker;
+
+        /* If start and end are coincident, build a closed edge (seam) */
+        if (pStart.Distance(pEnd) < tolerance)
+        {
+            edgeMaker = BRepBuilderAPI_MakeEdge(curve);
+        }
+        else
+        {
+            BRepBuilderAPI_MakeVertex mv1(pStart);
+            BRepBuilderAPI_MakeVertex mv2(pEnd);
+            edgeMaker = BRepBuilderAPI_MakeEdge(curve, mv1.Vertex(), mv2.Vertex());
+        }
+
+        if (!edgeMaker.IsDone())
+        {
+            xbim_set_error("xbim_edge_build_from_curve_handle: edge construction failed");
+            xbim_log_warning(ctx, "BRepBuilderAPI_MakeEdge failed for curve-handle edge");
+            return XBIM_NULL_SHAPE;
+        }
+
+        TopoDS_Edge edge = edgeMaker.Edge();
+        if (edge.IsNull())
+        {
+            xbim_set_error("xbim_edge_build_from_curve_handle: resulting edge is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        *outHandle = xbim_shape_create_from(edge);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_edge_build_from_curve_handle: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_edge_build_from_curve_handle");
+        xbim_set_error("xbim_edge_build_from_curve_handle: OCCT exception");
         return XBIM_ERROR;
     }
 }

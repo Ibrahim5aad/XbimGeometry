@@ -22,6 +22,18 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         internal NativeCurveHandle Handle =>
             _handle ?? throw new ObjectDisposedException(nameof(Curve));
 
+        /// <summary>
+        /// Transfers ownership of the native handle to the caller.
+        /// After this call, Dispose() becomes a no-op.
+        /// </summary>
+        internal NativeCurveHandle DetachHandle()
+        {
+            var h = _handle ?? throw new ObjectDisposedException(nameof(Curve));
+            _handle = null!;
+            _disposed = true;
+            return h;
+        }
+
         public XCurveType CurveType => _curveType;
 
         public bool Is3d => true;

@@ -77,6 +77,11 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         internal static extern int xbim_shape_is_closed(NativeShapeHandle handle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_reversed(
+            NativeShapeHandle handle,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_shape_bounding_box(
             NativeShapeHandle handle,
             out double minX, out double minY, out double minZ,
@@ -571,6 +576,16 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeShapeHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_edge_build_from_curve_handle(
+            NativeContextHandle ctx,
+            NativeCurveHandle curveHandle,
+            double startX, double startY, double startZ,
+            double endX, double endY, double endZ,
+            int sameSense,
+            double tolerance,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_edge_length(
             NativeShapeHandle edgeHandle,
             out double outLength);
@@ -637,6 +652,17 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double zDirX, double zDirY, double zDirZ,
             double xDirX, double xDirY, double xDirZ,
             double radius,
+            NativeShapeHandle outerWireHandle,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] innerWireHandles,
+            int numInnerWires,
+            double tolerance,
+            int sameSense,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_build_advanced_with_surface(
+            NativeContextHandle ctx,
+            NativeSurfaceHandle surfaceHandle,
             NativeShapeHandle outerWireHandle,
             [MarshalAs(UnmanagedType.LPArray)] IntPtr[] innerWireHandles,
             int numInnerWires,

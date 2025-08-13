@@ -22,6 +22,18 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         internal NativeSurfaceHandle Handle =>
             _handle ?? throw new ObjectDisposedException(nameof(Surface));
 
+        /// <summary>
+        /// Transfers ownership of the native handle to the caller.
+        /// After this call, Dispose() becomes a no-op.
+        /// </summary>
+        internal NativeSurfaceHandle DetachHandle()
+        {
+            var h = _handle ?? throw new ObjectDisposedException(nameof(Surface));
+            _handle = null!;
+            _disposed = true;
+            return h;
+        }
+
         public XSurfaceType SurfaceType => _surfaceType;
 
         public bool IsUPeriodic => false; // TODO: query from native when available

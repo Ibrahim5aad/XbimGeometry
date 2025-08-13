@@ -8,6 +8,7 @@
 *.orig
 .vs/
 .idea/
+.vscode/
 global.json
 
 # Build results

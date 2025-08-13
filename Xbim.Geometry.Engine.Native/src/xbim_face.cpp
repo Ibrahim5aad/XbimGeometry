@@ -12,6 +12,7 @@
 
 #include "xbim_face.h"
 #include "xbim_shape.h"
+#include "xbim_surface.h"
 #include "xbim_context.h"
 #include "xbim_error.h"
 #include "xbim_logging.h"
@@ -374,6 +375,144 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced(
     {
         xbim_log_occt_failure(ctx, e, "xbim_face_build_advanced");
         xbim_set_error("xbim_face_build_advanced: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── xbim_face_build_advanced_with_surface ─────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced_with_surface(
+    XbimContextHandle        ctx,
+    XbimSurfaceHandle        surfaceHandle,
+    XbimShapeHandle          outerWireHandle,
+    const XbimShapeHandle*   innerWireHandles,
+    int                      numInnerWires,
+    double                   tolerance,
+    int                      sameSense,
+    XbimShapeHandle*         outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_face_build_advanced_with_surface: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!surfaceHandle)
+    {
+        xbim_set_error("xbim_face_build_advanced_with_surface: surfaceHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    if (!outerWireHandle)
+    {
+        xbim_set_error("xbim_face_build_advanced_with_surface: outerWireHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        Handle(Geom_Surface) surface = surfaceHandle->surface;
+        if (surface.IsNull())
+        {
+            xbim_set_error("xbim_face_build_advanced_with_surface: surface is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        const TopoDS_Shape& outerShape = outerWireHandle->shape;
+        if (outerShape.IsNull())
+        {
+            xbim_set_error("xbim_face_build_advanced_with_surface: outer wire shape is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        TopoDS_Wire outerWire;
+        if (outerShape.ShapeType() == TopAbs_WIRE)
+            outerWire = TopoDS::Wire(outerShape);
+        else if (outerShape.ShapeType() == TopAbs_FACE)
+        {
+            TopExp_Explorer ex(outerShape, TopAbs_WIRE);
+            if (ex.More())
+                outerWire = TopoDS::Wire(ex.Current());
+        }
+
+        if (outerWire.IsNull())
+        {
+            xbim_set_error("xbim_face_build_advanced_with_surface: could not extract outer wire");
+            return XBIM_INVALID_ARG;
+        }
+
+        bool outerLoopIsCCW = add_parametric_curves(surface, outerWire, tolerance);
+
+        BRepBuilderAPI_MakeFace faceMaker(
+            surface,
+            outerLoopIsCCW ? outerWire : TopoDS::Wire(outerWire.Reversed()),
+            false);
+
+        if (numInnerWires > 0 && innerWireHandles)
+        {
+            for (int i = 0; i < numInnerWires; ++i)
+            {
+                if (!innerWireHandles[i])
+                    continue;
+
+                const TopoDS_Shape& innerShape = innerWireHandles[i]->shape;
+                if (innerShape.IsNull())
+                    continue;
+
+                TopoDS_Wire innerWire;
+                if (innerShape.ShapeType() == TopAbs_WIRE)
+                    innerWire = TopoDS::Wire(innerShape);
+                else if (innerShape.ShapeType() == TopAbs_FACE)
+                {
+                    TopExp_Explorer ex(innerShape, TopAbs_WIRE);
+                    if (ex.More())
+                        innerWire = TopoDS::Wire(ex.Current());
+                }
+
+                if (innerWire.IsNull())
+                    continue;
+
+                bool innerLoopIsCCW = add_parametric_curves(surface, innerWire, tolerance);
+                if (innerLoopIsCCW)
+                    innerWire.Reverse();
+
+                faceMaker.Add(innerWire);
+            }
+        }
+
+        if (!faceMaker.IsDone())
+        {
+            xbim_set_error("xbim_face_build_advanced_with_surface: could not apply bounds to face");
+            xbim_log_error(ctx, "Face specification error: could not apply bounds");
+            return XBIM_NULL_SHAPE;
+        }
+
+        TopoDS_Face result = faceMaker.Face();
+        if (!sameSense)
+            result = TopoDS::Face(result.Reversed());
+
+        if (result.IsNull())
+        {
+            xbim_set_error("xbim_face_build_advanced_with_surface: resulting face is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        *outHandle = xbim_shape_create_from(result);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_face_build_advanced_with_surface: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_face_build_advanced_with_surface");
+        xbim_set_error("xbim_face_build_advanced_with_surface: OCCT exception");
         return XBIM_ERROR;
     }
 }

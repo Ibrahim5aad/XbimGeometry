@@ -24,6 +24,7 @@
 #include <BRepBuilderAPI_MakeSolid.hxx>
 #include <BRepCheck_Shell.hxx>
 #include <BRepOffsetAPI_Sewing.hxx>
+#include <ShapeFix_Shape.hxx>
 #include <ShapeFix_Shell.hxx>
 #include <ShapeFix_Solid.hxx>
 #include <TopExp_Explorer.hxx>
@@ -441,6 +442,16 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_closed_shell(
             xbim_set_error("xbim_shell_build_closed_shell: resulting solid is null");
             return XBIM_NULL_SHAPE;
         }
+
+        /* Run ShapeFix_Shape to fix topology issues from sewing */
+        Handle(ShapeFix_Shape) shapeFixer = new ShapeFix_Shape(solid);
+        shapeFixer->SetPrecision(tolerance);
+        shapeFixer->SetMinTolerance(tolerance);
+        shapeFixer->SetMaxTolerance(tolerance * 10);
+        shapeFixer->Perform();
+        TopoDS_Shape fixedShape = shapeFixer->Shape();
+        if (!fixedShape.IsNull() && fixedShape.ShapeType() == TopAbs_SOLID)
+            solid = TopoDS::Solid(fixedShape);
 
         *outHandle = xbim_shape_create_from(solid);
         if (!*outHandle)

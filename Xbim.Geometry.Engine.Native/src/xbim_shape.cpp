@@ -134,6 +134,41 @@ XBIM_EXPORT int XBIM_CALL xbim_shape_is_closed(XbimShapeHandle handle)
     return BRep_Tool::IsClosed(handle->shape) ? 1 : 0;
 }
 
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_reversed(
+    XbimShapeHandle handle,
+    XbimShapeHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_shape_reversed: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_shape_reversed: handle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    if (handle->shape.IsNull())
+    {
+        xbim_set_error("xbim_shape_reversed: shape is null");
+        return XBIM_NULL_SHAPE;
+    }
+
+    *outHandle = xbim_shape_create_from(handle->shape.Reversed());
+    if (!*outHandle)
+    {
+        xbim_set_error("xbim_shape_reversed: memory allocation failed");
+        return XBIM_ERROR;
+    }
+
+    return XBIM_OK;
+}
+
 XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_bounding_box(
     XbimShapeHandle handle,
     double* minX, double* minY, double* minZ,

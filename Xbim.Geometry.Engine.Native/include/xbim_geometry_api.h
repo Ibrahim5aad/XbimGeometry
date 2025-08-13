@@ -190,6 +190,19 @@ XBIM_EXPORT int XBIM_CALL xbim_shape_is_valid(XbimShapeHandle handle);
 XBIM_EXPORT int XBIM_CALL xbim_shape_is_closed(XbimShapeHandle handle);
 
 /*
+ * Create a new shape handle with reversed orientation.
+ * The underlying geometry is shared; only the orientation flag is flipped.
+ *
+ *   handle    – the source shape handle
+ *   outHandle – receives a new handle wrapping the reversed shape
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_reversed(
+    XbimShapeHandle  handle,
+    XbimShapeHandle* outHandle);
+
+/*
  * Compute the axis-aligned bounding box of a shape.
  *
  *   handle       – a valid shape handle
@@ -1411,6 +1424,32 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced(
     XbimShapeHandle*         outHandle);
 
 /*
+ * Build an advanced face from a pre-built surface handle.
+ * Unlike xbim_face_build_advanced which constructs the surface from type codes,
+ * this variant accepts any XbimSurfaceHandle (including B-spline surfaces).
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   surfaceHandle    – pre-built surface handle (plane, cylinder, BSpline, etc.)
+ *   outerWireHandle  – the outer boundary wire
+ *   innerWireHandles – optional array of inner boundary wires (holes)
+ *   numInnerWires    – number of inner wires (0 if none)
+ *   tolerance        – precision tolerance for pcurve fitting
+ *   sameSense        – 1 if face normal matches surface normal, 0 to reverse
+ *   outHandle        – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced_with_surface(
+    XbimContextHandle        ctx,
+    XbimSurfaceHandle        surfaceHandle,
+    XbimShapeHandle          outerWireHandle,
+    const XbimShapeHandle*   innerWireHandles,
+    int                      numInnerWires,
+    double                   tolerance,
+    int                      sameSense,
+    XbimShapeHandle*         outHandle);
+
+/*
  * Compute the surface area of a face shape.
  * Uses BRepGProp::SurfaceProperties to calculate the area.
  *
@@ -1583,6 +1622,30 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_circle_arc(
     double radius,
     double startAngle,
     double endAngle,
+    XbimShapeHandle* outHandle);
+
+/*
+ * Build an edge from a pre-built curve handle with start/end vertex positions.
+ * Used for IFC edge curves in advanced BRep faces. If start and end positions
+ * are coincident (within tolerance), builds a closed edge (seam).
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   curveHandle      – a pre-built curve handle (line, circle, BSpline, etc.)
+ *   startX/Y/Z       – coordinates of the start vertex
+ *   endX/Y/Z         – coordinates of the end vertex
+ *   sameSense        – 1 if edge direction matches curve parametric direction
+ *   tolerance        – vertex proximity tolerance
+ *   outHandle        – receives the new edge shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve_handle(
+    XbimContextHandle ctx,
+    XbimCurveHandle   curveHandle,
+    double startX, double startY, double startZ,
+    double endX,   double endY,   double endZ,
+    int              sameSense,
+    double           tolerance,
     XbimShapeHandle* outHandle);
 
 /*

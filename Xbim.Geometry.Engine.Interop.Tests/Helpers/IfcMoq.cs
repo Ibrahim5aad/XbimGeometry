@@ -823,6 +823,217 @@ internal static class IfcMoq
         return moq.Object;
     }
 
+    // ── Advanced BRep mocks ────────────────────────────────────────
+
+    private static int _advancedBrepEntityLabelCounter = 5000;
+
+    public static IIfcVertexPoint VertexPoint(double x, double y, double z)
+    {
+        var label = Interlocked.Increment(ref _advancedBrepEntityLabelCounter);
+        var moq = MakeMoq<IIfcVertexPoint>();
+        moq.SetupGet(v => v.EntityLabel).Returns(label);
+        moq.SetupGet(v => v.VertexGeometry).Returns(CartesianPoint3d(x, y, z));
+        return moq.Object;
+    }
+
+    public static IIfcEdgeCurve EdgeCurve(
+        IIfcVertexPoint start, IIfcVertexPoint end,
+        IIfcCurve edgeGeometry, bool sameSense = true)
+    {
+        var label = Interlocked.Increment(ref _advancedBrepEntityLabelCounter);
+        var moq = MakeMoq<IIfcEdgeCurve>();
+        moq.SetupGet(e => e.EntityLabel).Returns(label);
+        moq.SetupGet(e => e.EdgeStart).Returns(start);
+        moq.SetupGet(e => e.EdgeEnd).Returns(end);
+        moq.SetupGet(e => e.EdgeGeometry).Returns(edgeGeometry);
+        moq.SetupGet(e => e.SameSense).Returns(sameSense);
+        return moq.Object;
+    }
+
+    public static IIfcOrientedEdge OrientedEdge(IIfcEdgeCurve edgeElement, bool orientation = true)
+    {
+        var label = Interlocked.Increment(ref _advancedBrepEntityLabelCounter);
+        var moq = MakeMoq<IIfcOrientedEdge>();
+        moq.SetupGet(e => e.EntityLabel).Returns(label);
+        moq.SetupGet(e => e.EdgeElement).Returns(edgeElement);
+        moq.SetupGet(e => e.Orientation).Returns(orientation);
+        return moq.Object;
+    }
+
+    public static IIfcEdgeLoop EdgeLoop(params IIfcOrientedEdge[] edges)
+    {
+        var label = Interlocked.Increment(ref _advancedBrepEntityLabelCounter);
+        var moq = MakeMoq<IIfcEdgeLoop>();
+        moq.SetupGet(l => l.EntityLabel).Returns(label);
+        var edgeList = new ItemListMoq<IIfcOrientedEdge>();
+        foreach (var e in edges)
+            edgeList.Add(e);
+        moq.SetupGet(l => l.EdgeList).Returns(edgeList);
+        return moq.Object;
+    }
+
+    public static IIfcFaceOuterBound AdvancedFaceOuterBound(IIfcEdgeLoop edgeLoop, bool orientation = true)
+    {
+        var moq = MakeMoq<IIfcFaceOuterBound>();
+        moq.SetupGet(b => b.Bound).Returns(edgeLoop);
+        moq.SetupGet(b => b.Orientation).Returns(orientation);
+        return moq.Object;
+    }
+
+    public static IIfcAdvancedFace AdvancedFace(
+        IIfcSurface faceSurface, bool sameSense, params IIfcFaceBound[] bounds)
+    {
+        var label = Interlocked.Increment(ref _advancedBrepEntityLabelCounter);
+        var moq = MakeMoq<IIfcAdvancedFace>();
+        moq.SetupGet(f => f.EntityLabel).Returns(label);
+        moq.SetupGet(f => f.FaceSurface).Returns(faceSurface);
+        moq.SetupGet(f => f.SameSense).Returns(sameSense);
+        var boundSet = new ItemListMoq<IIfcFaceBound>();
+        foreach (var b in bounds)
+            boundSet.Add(b);
+        moq.SetupGet(f => f.Bounds).Returns(boundSet);
+        return moq.Object;
+    }
+
+    public static IIfcPlane IfcPlane(
+        double ox, double oy, double oz,
+        double nx, double ny, double nz,
+        double rx = 1, double ry = 0, double rz = 0)
+    {
+        var label = Interlocked.Increment(ref _advancedBrepEntityLabelCounter);
+        var moq = MakeMoq<IIfcPlane>();
+        moq.SetupGet(p => p.EntityLabel).Returns(label);
+        moq.SetupGet(p => p.ExpressType).Returns(MetaData.ExpressType(typeof(IfcPlane)));
+        moq.SetupGet(p => p.Position).Returns(Axis2Placement3d(
+            axis: Direction3d(nx, ny, nz),
+            refDir: Direction3d(rx, ry, rz),
+            loc: CartesianPoint3d(ox, oy, oz)));
+        return moq.Object;
+    }
+
+    public static IIfcLine IfcLine(
+        double ox, double oy, double oz,
+        double dx, double dy, double dz,
+        double magnitude = 1.0)
+    {
+        var label = Interlocked.Increment(ref _advancedBrepEntityLabelCounter);
+        var moq = MakeMoq<IIfcLine>();
+        moq.SetupGet(l => l.EntityLabel).Returns(label);
+        moq.SetupGet(l => l.Pnt).Returns(CartesianPoint3d(ox, oy, oz));
+        var dirMoq = MakeMoq<IIfcVector>();
+        dirMoq.SetupGet(v => v.Orientation).Returns(Direction3d(dx, dy, dz));
+        dirMoq.SetupGet(v => v.Magnitude).Returns(magnitude);
+        moq.SetupGet(l => l.Dir).Returns(dirMoq.Object);
+        return moq.Object;
+    }
+
+    public static IIfcAdvancedBrep AdvancedBrep(IIfcClosedShell outer)
+    {
+        var moq = MakeMoq<IIfcAdvancedBrep>();
+        moq.SetupGet(b => b.Outer).Returns(outer);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcAdvancedBrep)));
+        return moq.Object;
+    }
+
+    public static IIfcAdvancedBrepWithVoids AdvancedBrepWithVoids(
+        IIfcClosedShell outer, params IIfcClosedShell[] voids)
+    {
+        var moq = MakeMoq<IIfcAdvancedBrepWithVoids>();
+        moq.SetupGet(b => b.Outer).Returns(outer);
+        var voidSet = new ItemListMoq<IIfcClosedShell>();
+        foreach (var v in voids)
+            voidSet.Add(v);
+        moq.SetupGet(b => b.Voids).Returns(voidSet);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcAdvancedBrepWithVoids)));
+        return moq.Object;
+    }
+
+    /// <summary>
+    /// Builds a box as an Advanced BRep with planar faces and line edge curves.
+    /// Each face is an IIfcAdvancedFace with an IIfcPlane surface and an IIfcEdgeLoop.
+    /// </summary>
+    public static IIfcClosedShell AdvancedBoxShell(
+        double x0, double y0, double z0,
+        double x1, double y1, double z1)
+    {
+        // 8 corner vertices
+        var v000 = VertexPoint(x0, y0, z0);
+        var v100 = VertexPoint(x1, y0, z0);
+        var v110 = VertexPoint(x1, y1, z0);
+        var v010 = VertexPoint(x0, y1, z0);
+        var v001 = VertexPoint(x0, y0, z1);
+        var v101 = VertexPoint(x1, y0, z1);
+        var v111 = VertexPoint(x1, y1, z1);
+        var v011 = VertexPoint(x0, y1, z1);
+
+        // Helper: create a line edge curve between two vertices
+        IIfcEdgeCurve MakeEdge(IIfcVertexPoint start, IIfcVertexPoint end)
+        {
+            var sp = (IIfcCartesianPoint)start.VertexGeometry;
+            var ep = (IIfcCartesianPoint)end.VertexGeometry;
+            double dx = ep.X - sp.X, dy = ep.Y - sp.Y, dz = ep.Z - sp.Z;
+            double len = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+            var line = IfcLine(sp.X, sp.Y, sp.Z, dx / len, dy / len, dz / len, len);
+            return EdgeCurve(start, end, line);
+        }
+
+        // 12 edges of the box
+        var e_000_100 = MakeEdge(v000, v100);
+        var e_100_110 = MakeEdge(v100, v110);
+        var e_110_010 = MakeEdge(v110, v010);
+        var e_010_000 = MakeEdge(v010, v000);
+        var e_001_101 = MakeEdge(v001, v101);
+        var e_101_111 = MakeEdge(v101, v111);
+        var e_111_011 = MakeEdge(v111, v011);
+        var e_011_001 = MakeEdge(v011, v001);
+        var e_000_001 = MakeEdge(v000, v001);
+        var e_100_101 = MakeEdge(v100, v101);
+        var e_110_111 = MakeEdge(v110, v111);
+        var e_010_011 = MakeEdge(v010, v011);
+
+        // Helper: build a planar advanced face
+        IIfcAdvancedFace MakeFace(
+            double nx, double ny, double nz,
+            double px, double py, double pz,
+            params (IIfcEdgeCurve edge, bool forward)[] edges)
+        {
+            var plane = IfcPlane(px, py, pz, nx, ny, nz);
+            var orientedEdges = edges.Select(e => OrientedEdge(e.edge, e.forward)).ToArray();
+            var loop = EdgeLoop(orientedEdges);
+            var outerBound = AdvancedFaceOuterBound(loop);
+            return AdvancedFace(plane, true, outerBound);
+        }
+
+        // 6 faces with correct edge orientation (outward normals)
+        // Bottom (z=z0, normal -Z)
+        var bottom = MakeFace(0, 0, -1, x0, y0, z0,
+            (e_000_100, true), (e_100_110, true), (e_110_010, true), (e_010_000, true));
+
+        // Top (z=z1, normal +Z)
+        var top = MakeFace(0, 0, 1, x0, y0, z1,
+            (e_001_101, true), (e_101_111, true), (e_111_011, true), (e_011_001, true));
+
+        // Front (y=y0, normal -Y)
+        var front = MakeFace(0, -1, 0, x0, y0, z0,
+            (e_000_100, true), (e_100_101, true), (e_001_101, false), (e_000_001, false));
+
+        // Back (y=y1, normal +Y)
+        var back = MakeFace(0, 1, 0, x0, y1, z0,
+            (e_110_010, true), (e_010_011, true), (e_111_011, false), (e_110_111, false));
+
+        // Left (x=x0, normal -X)
+        var left = MakeFace(-1, 0, 0, x0, y0, z0,
+            (e_010_000, true), (e_000_001, true), (e_011_001, false), (e_010_011, false));
+
+        // Right (x=x1, normal +X)
+        var right = MakeFace(1, 0, 0, x1, y0, z0,
+            (e_100_110, true), (e_110_111, true), (e_101_111, false), (e_100_101, false));
+
+        return ClosedShell(bottom, top, front, back, left, right);
+    }
+
     /// <summary>
     /// Helper: builds a box closed shell from corner coordinates.
     /// Creates 6 rectangular faces forming a closed box.
