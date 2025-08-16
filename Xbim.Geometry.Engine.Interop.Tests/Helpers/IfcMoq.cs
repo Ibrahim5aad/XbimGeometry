@@ -730,6 +730,49 @@ internal static class IfcMoq
         return moq.Object;
     }
 
+    public static IIfcPolygonalBoundedHalfSpace PolygonalBoundedHalfSpace(
+        IIfcPlane? baseSurface = null,
+        bool agreementFlag = false,
+        IIfcAxis2Placement3D? position = null,
+        (double x, double y)[]? boundaryPoints = null,
+        int entityLabel = 310)
+    {
+        var moq = MakeMoq<IIfcPolygonalBoundedHalfSpace>();
+
+        var surface = baseSurface ?? Plane();
+        moq.SetupGet(x => x.BaseSurface).Returns(surface);
+        moq.SetupGet(x => x.AgreementFlag).Returns(agreementFlag);
+        moq.SetupGet(x => x.EntityLabel).Returns(entityLabel);
+
+        // Position (coordinate system of the boundary polygon)
+        moq.SetupGet(x => x.Position).Returns(position ?? Axis2Placement3d(
+            axis: Direction3d(0, 0, 1),
+            refDir: Direction3d(1, 0, 0),
+            loc: CartesianPoint3d(0, 0, 0)));
+
+        // Build polyline boundary (2D points)
+        var pts = boundaryPoints ?? new[] { (-5.0, -5.0), (5.0, -5.0), (5.0, 5.0), (-5.0, 5.0) };
+        var polyMoq = MakeMoq<IIfcPolyline>();
+        var poly = polyMoq.Object;
+        foreach (var (x, y) in pts)
+            poly.Points.Add(CartesianPoint2d(x, y));
+        moq.SetupGet(x => x.PolygonalBoundary).Returns(poly);
+
+        return moq.Object;
+    }
+
+    public static IIfcBoxedHalfSpace BoxedHalfSpace(
+        IIfcSurface? baseSurface = null,
+        bool agreementFlag = false,
+        int entityLabel = 320)
+    {
+        var moq = MakeMoq<IIfcBoxedHalfSpace>();
+        moq.SetupGet(x => x.BaseSurface).Returns(baseSurface ?? Plane());
+        moq.SetupGet(x => x.AgreementFlag).Returns(agreementFlag);
+        moq.SetupGet(x => x.EntityLabel).Returns(entityLabel);
+        return moq.Object;
+    }
+
     // ── Faceted BRep mocks ────────────────────────────────────────
 
     /// <summary>

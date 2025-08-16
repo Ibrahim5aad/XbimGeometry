@@ -1064,8 +1064,121 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXSolid Build(IIfcHalfSpaceSolid ifcHalfSpaceSolid)
         {
-            throw new NotImplementedException(
-                "Build(IIfcHalfSpaceSolid) requires boolean half-space support (BOOL-002).");
+            return BuildHalfSpace(ifcHalfSpaceSolid);
+        }
+
+        private IXSolid BuildHalfSpace(IIfcHalfSpaceSolid halfSpace)
+        {
+            var elementarySurface = halfSpace.BaseSurface as IIfcElementarySurface;
+            if (elementarySurface == null)
+                throw new InvalidOperationException(
+                    $"Half-space #{halfSpace.EntityLabel}: only elementary surfaces are supported.");
+
+            int surfaceType;
+            double radius = 0;
+
+            if (elementarySurface is IIfcPlane)
+            {
+                surfaceType = 0; // XBIM_SURFACE_PLANE
+            }
+            else if (elementarySurface is IIfcCylindricalSurface cylSurf)
+            {
+                surfaceType = 1; // XBIM_SURFACE_CYLINDRICAL
+                radius = cylSurf.Radius;
+            }
+            else if (elementarySurface is IIfcSphericalSurface sphSurf)
+            {
+                surfaceType = 2; // XBIM_SURFACE_SPHERICAL
+                radius = sphSurf.Radius;
+            }
+            else
+            {
+                throw new NotSupportedException(
+                    $"Half-space #{halfSpace.EntityLabel}: surface type {elementarySurface.GetType().Name} is not supported.");
+            }
+
+            GeometryFactory.BuildAxis2Placement3d(elementarySurface.Position,
+                out double ox, out double oy, out double oz,
+                out double zx, out double zy, out double zz,
+                out double xx, out double xy, out double xz);
+
+            int agreementFlag = halfSpace.AgreementFlag ? 1 : 0;
+            double oneMeter = _modelService.OneMeter;
+            double precision = _modelService.Precision;
+
+            if (halfSpace is IIfcPolygonalBoundedHalfSpace polyBounded)
+                return BuildPolygonalBoundedHalfSpace(polyBounded,
+                    ox, oy, oz, zx, zy, zz, xx, xy, xz,
+                    agreementFlag, oneMeter, precision);
+
+            // Basic half-space or IfcBoxedHalfSpace (treated identically per IFC spec)
+            int result = XbimGeometryNativeApi.xbim_halfspace_build(
+                ContextHandle, surfaceType,
+                ox, oy, oz, zx, zy, zz, xx, xy, xz,
+                radius, agreementFlag, oneMeter, precision,
+                out NativeShapeHandle outHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build half-space #{halfSpace.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return ShapeFactory.WrapSolid(outHandle);
+        }
+
+        private IXSolid BuildPolygonalBoundedHalfSpace(
+            IIfcPolygonalBoundedHalfSpace polyBounded,
+            double surfOx, double surfOy, double surfOz,
+            double surfZx, double surfZy, double surfZz,
+            double surfXx, double surfXy, double surfXz,
+            int agreementFlag, double oneMeter, double precision)
+        {
+            if (!(polyBounded.BaseSurface is IIfcPlane))
+                throw new InvalidOperationException(
+                    $"Polygonal bounded half-space #{polyBounded.EntityLabel}: base surface must be planar.");
+
+            var polyline = polyBounded.PolygonalBoundary as IIfcPolyline;
+            if (polyline == null)
+                throw new NotSupportedException(
+                    $"Polygonal bounded half-space #{polyBounded.EntityLabel}: only polyline boundaries are supported.");
+
+            int pointCount = polyline.Points.Count;
+            if (pointCount < 3)
+                throw new InvalidOperationException(
+                    $"Polygonal bounded half-space #{polyBounded.EntityLabel}: boundary needs at least 3 points.");
+
+            var xCoords = new double[pointCount];
+            var yCoords = new double[pointCount];
+            for (int i = 0; i < pointCount; i++)
+            {
+                xCoords[i] = polyline.Points[i].Coordinates[0];
+                yCoords[i] = polyline.Points[i].Coordinates[1];
+            }
+
+            double bOx = 0, bOy = 0, bOz = 0;
+            double bZx = 0, bZy = 0, bZz = 1;
+            double bXx = 1, bXy = 0, bXz = 0;
+            if (polyBounded.Position != null)
+            {
+                GeometryFactory.BuildAxis2Placement3d(polyBounded.Position,
+                    out bOx, out bOy, out bOz,
+                    out bZx, out bZy, out bZz,
+                    out bXx, out bXy, out bXz);
+            }
+
+            int result = XbimGeometryNativeApi.xbim_halfspace_build_polygonal_bounded(
+                ContextHandle,
+                surfOx, surfOy, surfOz, surfZx, surfZy, surfZz, surfXx, surfXy, surfXz,
+                agreementFlag,
+                xCoords, yCoords, pointCount,
+                bOx, bOy, bOz, bZx, bZy, bZz, bXx, bXy, bXz,
+                oneMeter, precision,
+                out var outHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build polygonal bounded half-space #{polyBounded.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return ShapeFactory.WrapSolid(outHandle);
         }
 
         public IXShape Build(IIfcShellBasedSurfaceModel ifcSurfaceModel)
