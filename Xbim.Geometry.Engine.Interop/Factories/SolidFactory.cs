@@ -1054,13 +1054,124 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         #endregion
 
-        #region Not Yet Implemented (future features)
+        #region Face-Based Surface Model
 
+        /// <summary>
+        /// Builds a compound of shells from a face-based surface model by constructing
+        /// each connected face set as a sewn shell and combining them.
+        /// </summary>
         public IXShape Build(IIfcFaceBasedSurfaceModel ifcSurfaceModel)
         {
-            throw new NotImplementedException(
-                "Build(IIfcFaceBasedSurfaceModel) requires face factory support (TOPO-001).");
+            double tolerance = _modelService.Precision;
+            var shellHandles = new List<NativeShapeHandle>();
+
+            try
+            {
+                foreach (var faceSet in ifcSurfaceModel.FbsmFaces)
+                {
+                    var shellHandle = BuildShellFromConnectedFaceSet(faceSet, tolerance);
+                    if (shellHandle != null && !shellHandle.IsInvalid)
+                        shellHandles.Add(shellHandle);
+                }
+
+                if (shellHandles.Count == 0)
+                    throw new InvalidOperationException(
+                        $"FaceBasedSurfaceModel #{ifcSurfaceModel.EntityLabel}: no valid shells were built.");
+
+                if (shellHandles.Count == 1)
+                {
+                    // WrapShape takes ownership — remove from list so finally won't dispose it
+                    var handle = shellHandles[0];
+                    shellHandles.Clear();
+                    return ShapeFactory.WrapShape(handle);
+                }
+
+                // Assemble multiple shells into a compound
+                var ptrs = new IntPtr[shellHandles.Count];
+                for (int i = 0; i < shellHandles.Count; i++)
+                    ptrs[i] = shellHandles[i].DangerousGetHandle();
+
+                int result = XbimGeometryNativeApi.xbim_compound_make(
+                    ContextHandle, ptrs, shellHandles.Count, out var compoundHandle);
+
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"FaceBasedSurfaceModel #{ifcSurfaceModel.EntityLabel}: failed to create compound: " +
+                        XbimGeometryNativeApi.GetLastError());
+
+                return ShapeFactory.WrapShape(compoundHandle);
+            }
+            finally
+            {
+                foreach (var h in shellHandles)
+                    h.Dispose();
+            }
         }
+
+        /// <summary>
+        /// Builds a sewn shell from a connected face set by constructing planar faces
+        /// from polygon loops and sewing them together.
+        /// </summary>
+        private NativeShapeHandle? BuildShellFromConnectedFaceSet(
+            IIfcConnectedFaceSet faceSet, double tolerance)
+        {
+            var faceHandles = new List<NativeShapeHandle>();
+
+            try
+            {
+                foreach (var ifcFace in faceSet.CfsFaces)
+                {
+                    var faceHandle = BuildPlanarFace(ifcFace, tolerance);
+                    if (faceHandle != null && !faceHandle.IsInvalid)
+                        faceHandles.Add(faceHandle);
+                }
+
+                if (faceHandles.Count == 0)
+                {
+                    _logger.LogWarning("Connected face set produced no valid faces.");
+                    return null;
+                }
+
+                var facePtrs = new IntPtr[faceHandles.Count];
+                for (int i = 0; i < faceHandles.Count; i++)
+                    facePtrs[i] = faceHandles[i].DangerousGetHandle();
+
+                // Build raw shell from faces
+                int result = XbimGeometryNativeApi.xbim_shell_build_from_faces(
+                    ContextHandle, facePtrs, faceHandles.Count, tolerance, out var rawShellHandle);
+
+                if (result != 0)
+                {
+                    _logger.LogWarning("Failed to build shell from connected face set: {Error}",
+                        XbimGeometryNativeApi.GetLastError());
+                    return null;
+                }
+
+                // Sew the shell to merge shared edges and fix orientation
+                result = XbimGeometryNativeApi.xbim_shell_sew(
+                    ContextHandle, rawShellHandle, tolerance, out _, out var sewedHandle);
+
+                rawShellHandle.Dispose();
+
+                if (result != 0)
+                {
+                    _logger.LogWarning("Failed to sew shell: {Error}",
+                        XbimGeometryNativeApi.GetLastError());
+                    return null;
+                }
+
+                return sewedHandle;
+            }
+            finally
+            {
+                foreach (var h in faceHandles)
+                    h.Dispose();
+            }
+        }
+
+        #endregion
+
+        #region Not Yet Implemented (future features)
 
         public IXSolid Build(IIfcHalfSpaceSolid ifcHalfSpaceSolid)
         {

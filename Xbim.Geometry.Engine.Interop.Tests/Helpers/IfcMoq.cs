@@ -1081,6 +1081,35 @@ internal static class IfcMoq
     /// Helper: builds a box closed shell from corner coordinates.
     /// Creates 6 rectangular faces forming a closed box.
     /// </summary>
+    /// <summary>
+    /// Creates an IIfcConnectedFaceSet (open shell) with the given faces.
+    /// </summary>
+    public static IIfcConnectedFaceSet ConnectedFaceSet(params IIfcFace[] faces)
+    {
+        var moq = MakeMoq<IIfcConnectedFaceSet>();
+        var faceSet = new ItemListMoq<IIfcFace>();
+        foreach (var f in faces)
+            faceSet.Add(f);
+        moq.SetupGet(s => s.CfsFaces).Returns(faceSet);
+        return moq.Object;
+    }
+
+    /// <summary>
+    /// Creates an IIfcFaceBasedSurfaceModel from connected face sets.
+    /// </summary>
+    public static IIfcFaceBasedSurfaceModel FaceBasedSurfaceModel(
+        params IIfcConnectedFaceSet[] faceSets)
+    {
+        var moq = MakeMoq<IIfcFaceBasedSurfaceModel>();
+        var faceSetCollection = new ItemListMoq<IIfcConnectedFaceSet>();
+        foreach (var fs in faceSets)
+            faceSetCollection.Add(fs);
+        moq.SetupGet(m => m.FbsmFaces).Returns(faceSetCollection);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcFaceBasedSurfaceModel)));
+        return moq.Object;
+    }
+
     public static IIfcClosedShell BoxShell(
         double x0, double y0, double z0,
         double x1, double y1, double z1)
