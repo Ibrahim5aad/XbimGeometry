@@ -178,6 +178,12 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_type(
     XbimShapeType*  outType);
 
 /*
+ * Check whether a shape is null (empty). A null handle or a handle wrapping
+ * a default-constructed TopoDS_Shape returns 1. Returns 0 for non-null shapes.
+ */
+XBIM_EXPORT int XBIM_CALL xbim_shape_is_null(XbimShapeHandle handle);
+
+/*
  * Check whether a shape is valid (non-null and passes BRepCheck).
  * Returns 1 if valid, 0 otherwise. NULL handles return 0.
  */
@@ -294,6 +300,30 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_location_compose(
  * Passing NULL is a safe no-op.
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_location_destroy(XbimLocationHandle handle);
+
+/*
+ * Extract the location (transform) from a shape.
+ * Returns the location handle and the 3x3 rotation matrix, translation
+ * vector, and scale factor. Matrix components follow gp_Trsf::Value(row, col)
+ * convention (1-based): M11=Value(1,1), M12=Value(1,2), etc.
+ *
+ *   shapeHandle    – a valid shape handle
+ *   outHandle      – receives the location handle
+ *   outM11..outM33 – rotation matrix components (may be NULL)
+ *   outOffsetX/Y/Z – translation components (may be NULL)
+ *   outScale       – scale factor (may be NULL)
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if shapeHandle is NULL;
+ * XBIM_NULL_SHAPE if the shape is null.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_get_location(
+    XbimShapeHandle     shapeHandle,
+    XbimLocationHandle* outHandle,
+    double* outM11, double* outM12, double* outM13,
+    double* outM21, double* outM22, double* outM23,
+    double* outM31, double* outM32, double* outM33,
+    double* outOffsetX, double* outOffsetY, double* outOffsetZ,
+    double* outScale);
 
 /*
  * Apply a location transform to a shape, producing a new shape at the
@@ -1307,6 +1337,53 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_cut(
     int*                outHasWarnings,
     XbimShapeHandle*    outHandle);
 
+/*
+ * Add a child shape to an existing compound.
+ * Mutates the compound in-place using BRep_Builder::Add.
+ *
+ *   compoundHandle – a valid compound shape handle
+ *   childHandle    – the shape to add (must not be NULL)
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if the handle is not a compound.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_add(
+    XbimShapeHandle compoundHandle,
+    XbimShapeHandle childHandle);
+
+/*
+ * Count the direct children of a compound shape.
+ * Uses TopoDS_Iterator (not TopExp_Explorer) so only immediate children
+ * are counted, not shapes nested inside sub-compounds or sub-solids.
+ *
+ *   handle    – a valid shape handle (should be a compound)
+ *   outCount  – receives the number of direct children
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_child_count(
+    XbimShapeHandle handle,
+    int*            outCount);
+
+/*
+ * Extract the direct children of a compound shape.
+ * The caller must first call xbim_compound_child_count to determine
+ * the required array size.
+ *
+ * Each returned handle is a new heap-allocated XbimShape_ that the
+ * caller owns and must eventually destroy with xbim_shape_destroy.
+ *
+ *   handle      – a valid shape handle (should be a compound)
+ *   outHandles  – caller-allocated array of at least *count entries
+ *   count       – on input: capacity of outHandles array
+ *                 on output: actual number of children written
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_get_children(
+    XbimShapeHandle     handle,
+    XbimShapeHandle*    outHandles,
+    int*                count);
+
 /* ── Vertex construction and query ────────────────────────────────────── */
 
 /*
@@ -1340,6 +1417,31 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_build(
 XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_point(
     XbimShapeHandle vertexHandle,
     double* outX, double* outY, double* outZ);
+
+/*
+ * Get the tolerance of a vertex. Uses BRep_Tool::Tolerance.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_tolerance(
+    XbimShapeHandle vertexHandle,
+    double*         outTolerance);
+
+/* ── Wire queries ──────────────────────────────────────────────────────── */
+
+/*
+ * Compute the total arc length of a wire.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_length(
+    XbimShapeHandle wireHandle,
+    double*         outLength);
+
+/*
+ * Compute the contour area enclosed by a wire.
+ * Uses a shoelace-based projection. Not the surface area — the flat
+ * polygon area of the wire outline.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_contour_area(
+    XbimShapeHandle wireHandle,
+    double*         outArea);
 
 /* ── Face construction and queries ────────────────────────────────────── */
 
@@ -1480,6 +1582,63 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_normal(
     double*         outNormalX,
     double*         outNormalY,
     double*         outNormalZ);
+
+/*
+ * Get the geometric tolerance of a face.
+ * Uses BRep_Tool::Tolerance.
+ *
+ *   faceHandle    – a valid shape handle containing a TopoDS_Face
+ *   outTolerance  – receives the tolerance value
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if not a face.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_tolerance(
+    XbimShapeHandle faceHandle,
+    double*         outTolerance);
+
+/*
+ * Extract the underlying Geom_Surface from a face.
+ * Returns both a surface handle and an integer surface type code
+ * matching the Xbim.Geometry.Abstractions.XSurfaceType enum.
+ *
+ *   faceHandle     – a valid shape handle containing a TopoDS_Face
+ *   outSurface     – receives the new surface handle (caller owns)
+ *   outSurfaceType – receives the surface type code
+ *
+ * Returns XBIM_OK on success; XBIM_NULL_SHAPE if the face has no surface.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_get_surface(
+    XbimShapeHandle    faceHandle,
+    XbimSurfaceHandle* outSurface,
+    int*               outSurfaceType);
+
+/*
+ * Add inner wires (holes) to a face. Returns a new face with the wires added.
+ *
+ *   faceHandle   – a valid face shape handle
+ *   wireHandles  – array of wire shape handles to add
+ *   wireCount    – number of wires
+ *   outHandle    – receives the new face with inner wires
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_add_wires(
+    XbimShapeHandle     faceHandle,
+    XbimShapeHandle*    wireHandles,
+    int                 wireCount,
+    XbimShapeHandle*    outHandle);
+
+/*
+ * Repair a face using ShapeFix_Face.
+ *
+ *   faceHandle – a valid face shape handle
+ *   tolerance  – geometric tolerance for the fix
+ *   outFaces   – receives the fixed face handle(s) (may be NULL for count query)
+ *   outCount   – receives the number of result faces
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_fix(
+    XbimShapeHandle     faceHandle,
+    double              tolerance,
+    XbimShapeHandle*    outFaces,
+    int*                outCount);
 
 /* ── Wire construction and query ────────────────────────────────────────── */
 
@@ -1661,6 +1820,35 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_length(
     XbimShapeHandle edgeHandle,
     double*         outLength);
 
+/*
+ * Get the geometric tolerance of an edge.
+ * Uses BRep_Tool::Tolerance.
+ *
+ *   edgeHandle    – a valid shape handle containing a TopoDS_Edge
+ *   outTolerance  – receives the tolerance value
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if not an edge.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_tolerance(
+    XbimShapeHandle edgeHandle,
+    double*         outTolerance);
+
+/*
+ * Extract the start and end vertices of an edge.
+ * Uses TopExp::Vertices. Either output handle may be NULL if the
+ * edge has no corresponding vertex (e.g. periodic/closed edges).
+ *
+ *   edgeHandle – a valid shape handle containing a TopoDS_Edge
+ *   outStart   – receives the first vertex handle (caller owns)
+ *   outEnd     – receives the last vertex handle (caller owns)
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if not an edge.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_vertices(
+    XbimShapeHandle  edgeHandle,
+    XbimShapeHandle* outStart,
+    XbimShapeHandle* outEnd);
+
 /* ── Shell construction and repair ──────────────────────────────────────── */
 
 /*
@@ -1833,6 +2021,56 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_bspline(
  * Passing NULL is a safe no-op.
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_destroy(XbimCurveHandle handle);
+
+/* ── Curve queries ─────────────────────────────────────────────────────── */
+
+/*
+ * Get the parametric range of a curve.
+ *   outFirst/outLast – receive the first and last parameter values
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_parameters(
+    XbimCurveHandle handle,
+    double*         outFirst,
+    double*         outLast);
+
+/*
+ * Compute the arc length of a curve over its full parameter range.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_length(
+    XbimCurveHandle handle,
+    double*         outLength);
+
+/*
+ * Evaluate a point on the curve at parameter u.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_value(
+    XbimCurveHandle handle,
+    double          u,
+    double*         outX, double* outY, double* outZ);
+
+/*
+ * Evaluate point and first derivative at parameter u.
+ *   outPx..outPz – point coordinates
+ *   outDx..outDz – first derivative vector
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_d1(
+    XbimCurveHandle handle,
+    double          u,
+    double*         outPx, double* outPy, double* outPz,
+    double*         outDx, double* outDy, double* outDz);
+
+/*
+ * Evaluate point, first derivative, and second derivative at parameter u.
+ *   outPx..outPz   – point coordinates
+ *   outD1x..outD1z – first derivative vector
+ *   outD2x..outD2z – second derivative vector
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_d2(
+    XbimCurveHandle handle,
+    double          u,
+    double*         outPx,  double* outPy,  double* outPz,
+    double*         outD1x, double* outD1y, double* outD1z,
+    double*         outD2x, double* outD2y, double* outD2z);
 
 /* ── Surface handle lifecycle ───────────────────────────────────────── */
 
@@ -2013,6 +2251,27 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_inner_wires(
     XbimShapeHandle*    outHandles,
     int*                count);
 
+/* ── Shape triangulation ─────────────────────────────────────────────── */
+
+/*
+ * Triangulate a shape using BRepMesh_IncrementalMesh.
+ * The resulting triangulation is stored on the shape's faces and can be
+ * queried with BRep_Tool::Triangulation().
+ *
+ *   shapeHandle       – the shape to triangulate
+ *   linearDeflection  – chord height tolerance in model units
+ *   angularDeflection – max angle between adjacent triangle normals (radians)
+ *   relative          – 1 to use relative deflection, 0 for absolute
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if shape is NULL;
+ * XBIM_NULL_SHAPE if the shape is null; XBIM_ERROR on meshing failure.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_triangulate(
+    XbimShapeHandle     shapeHandle,
+    double              linearDeflection,
+    double              angularDeflection,
+    int                 relative);
+
 /* ── WexBim mesh creation ──────────────────────────────────────────────── */
 
 /*
@@ -2171,6 +2430,16 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_to_binary(
 XBIM_EXPORT XbimShapeHandle XBIM_CALL xbim_shape_from_binary(
     const unsigned char*    buffer,
     int                     size);
+
+/* ── Domain unification ────────────────────────────────────────────────── */
+
+/*
+ * Merge co-planar faces and co-linear edges using ShapeUpgrade_UnifySameDomain.
+ * Returns a new shape with merged geometry.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_unify_domain(
+    XbimShapeHandle     shapeHandle,
+    XbimShapeHandle*    outHandle);
 
 #ifdef __cplusplus
 }

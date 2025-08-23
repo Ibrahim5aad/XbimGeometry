@@ -30,6 +30,8 @@
 #include <GCPnts_AbscissaPoint.hxx>
 #include <Geom_Circle.hxx>
 #include <Geom_TrimmedCurve.hxx>
+#include <TopExp.hxx>
+#include <TopoDS_Vertex.hxx>
 #include <Standard_Failure.hxx>
 
 /* ── xbim_edge_build_line ──────────────────────────────────────────────── */
@@ -375,6 +377,79 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_length(
     catch (const Standard_Failure&)
     {
         xbim_set_error("xbim_edge_length: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── xbim_edge_tolerance ─────────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_tolerance(
+    XbimShapeHandle edgeHandle,
+    double*         outTolerance)
+{
+    xbim_clear_error();
+    if (!outTolerance) { xbim_set_error("xbim_edge_tolerance: outTolerance is NULL"); return XBIM_INVALID_ARG; }
+    *outTolerance = 0.0;
+    if (!edgeHandle) { xbim_set_error("xbim_edge_tolerance: edgeHandle is NULL"); return XBIM_INVALID_HANDLE; }
+
+    try
+    {
+        const TopoDS_Shape& shape = edgeHandle->shape;
+        if (shape.IsNull() || shape.ShapeType() != TopAbs_EDGE)
+        {
+            xbim_set_error("xbim_edge_tolerance: handle is not an edge");
+            return XBIM_INVALID_ARG;
+        }
+
+        *outTolerance = BRep_Tool::Tolerance(TopoDS::Edge(shape));
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_edge_tolerance: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── xbim_edge_vertices ──────────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_vertices(
+    XbimShapeHandle edgeHandle,
+    XbimShapeHandle* outStart,
+    XbimShapeHandle* outEnd)
+{
+    xbim_clear_error();
+    if (!outStart || !outEnd)
+    {
+        xbim_set_error("xbim_edge_vertices: outStart or outEnd is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outStart = nullptr;
+    *outEnd = nullptr;
+    if (!edgeHandle) { xbim_set_error("xbim_edge_vertices: edgeHandle is NULL"); return XBIM_INVALID_HANDLE; }
+
+    try
+    {
+        const TopoDS_Shape& shape = edgeHandle->shape;
+        if (shape.IsNull() || shape.ShapeType() != TopAbs_EDGE)
+        {
+            xbim_set_error("xbim_edge_vertices: handle is not an edge");
+            return XBIM_INVALID_ARG;
+        }
+
+        TopoDS_Vertex vFirst, vLast;
+        TopExp::Vertices(TopoDS::Edge(shape), vFirst, vLast);
+
+        if (!vFirst.IsNull())
+            *outStart = xbim_shape_create_from(vFirst);
+        if (!vLast.IsNull())
+            *outEnd = xbim_shape_create_from(vLast);
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_edge_vertices: OCCT exception");
         return XBIM_ERROR;
     }
 }

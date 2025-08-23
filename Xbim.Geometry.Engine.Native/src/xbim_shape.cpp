@@ -33,6 +33,7 @@
 #include <BRepTools.hxx>
 #include <BinTools.hxx>
 #include <ShapeAnalysis.hxx>
+#include <ShapeUpgrade_UnifySameDomain.hxx>
 
 /* ── Internal helper ──────────────────────────────────────────────────────── */
 
@@ -100,6 +101,13 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_type(
     }
 
     return XBIM_OK;
+}
+
+XBIM_EXPORT int XBIM_CALL xbim_shape_is_null(XbimShapeHandle handle)
+{
+    if (!handle)
+        return 1;
+    return handle->shape.IsNull() ? 1 : 0;
 }
 
 XBIM_EXPORT int XBIM_CALL xbim_shape_is_valid(XbimShapeHandle handle)
@@ -789,5 +797,60 @@ XBIM_EXPORT XbimShapeHandle XBIM_CALL xbim_shape_from_binary(
         const char* msg = e.GetMessageString();
         xbim_set_error(msg ? msg : "xbim_shape_from_binary: OCCT exception");
         return nullptr;
+    }
+}
+
+/* ── xbim_shape_unify_domain ──────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_unify_domain(
+    XbimShapeHandle     shapeHandle,
+    XbimShapeHandle*    outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_shape_unify_domain: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!shapeHandle)
+    {
+        xbim_set_error("xbim_shape_unify_domain: shapeHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (shapeHandle->shape.IsNull())
+    {
+        xbim_set_error("xbim_shape_unify_domain: shape is null");
+        return XBIM_NULL_SHAPE;
+    }
+
+    try
+    {
+        ShapeUpgrade_UnifySameDomain unifier(shapeHandle->shape);
+        unifier.Build();
+
+        const TopoDS_Shape& result = unifier.Shape();
+        if (result.IsNull())
+        {
+            xbim_set_error("xbim_shape_unify_domain: result is null");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_shape_create_from(result);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_shape_unify_domain: allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_shape_unify_domain: OCCT exception");
+        return XBIM_ERROR;
     }
 }

@@ -30,6 +30,8 @@
 #include <TColgp_Array1OfPnt.hxx>
 #include <TColStd_Array1OfReal.hxx>
 #include <TColStd_Array1OfInteger.hxx>
+#include <GeomAdaptor_Curve.hxx>
+#include <GCPnts_AbscissaPoint.hxx>
 #include <Standard_Failure.hxx>
 
 /* ── Internal helpers ──────────────────────────────────────────────────── */
@@ -290,6 +292,210 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_bspline(
     {
         xbim_log_occt_failure(ctx, e, "xbim_curve_build_bspline");
         xbim_set_error("xbim_curve_build_bspline: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── xbim_curve_parameters ─────────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_parameters(
+    XbimCurveHandle handle,
+    double*         outFirst,
+    double*         outLast)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_curve_parameters: null handle");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!outFirst || !outLast)
+    {
+        xbim_set_error("xbim_curve_parameters: null output parameter");
+        return XBIM_INVALID_ARG;
+    }
+
+    const Handle(Geom_Curve)& c = handle->curve;
+    if (c.IsNull())
+    {
+        xbim_set_error("xbim_curve_parameters: curve is null");
+        return XBIM_ERROR;
+    }
+
+    *outFirst = c->FirstParameter();
+    *outLast  = c->LastParameter();
+    return XBIM_OK;
+}
+
+/* ── xbim_curve_length ─────────────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_length(
+    XbimCurveHandle handle,
+    double*         outLength)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_curve_length: null handle");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!outLength)
+    {
+        xbim_set_error("xbim_curve_length: null output parameter");
+        return XBIM_INVALID_ARG;
+    }
+
+    const Handle(Geom_Curve)& c = handle->curve;
+    if (c.IsNull())
+    {
+        xbim_set_error("xbim_curve_length: curve is null");
+        return XBIM_ERROR;
+    }
+
+    try
+    {
+        GeomAdaptor_Curve adaptor(c);
+        *outLength = GCPnts_AbscissaPoint::Length(adaptor);
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_curve_length: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── xbim_curve_value ──────────────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_value(
+    XbimCurveHandle handle,
+    double          u,
+    double*         outX, double* outY, double* outZ)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_curve_value: null handle");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    const Handle(Geom_Curve)& c = handle->curve;
+    if (c.IsNull())
+    {
+        xbim_set_error("xbim_curve_value: curve is null");
+        return XBIM_ERROR;
+    }
+
+    try
+    {
+        gp_Pnt pt = c->Value(u);
+        if (outX) *outX = pt.X();
+        if (outY) *outY = pt.Y();
+        if (outZ) *outZ = pt.Z();
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_curve_value: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── xbim_curve_d1 ─────────────────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_d1(
+    XbimCurveHandle handle,
+    double          u,
+    double*         outPx, double* outPy, double* outPz,
+    double*         outDx, double* outDy, double* outDz)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_curve_d1: null handle");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    const Handle(Geom_Curve)& c = handle->curve;
+    if (c.IsNull())
+    {
+        xbim_set_error("xbim_curve_d1: curve is null");
+        return XBIM_ERROR;
+    }
+
+    try
+    {
+        gp_Pnt pt;
+        gp_Vec v1;
+        c->D1(u, pt, v1);
+
+        if (outPx) *outPx = pt.X();
+        if (outPy) *outPy = pt.Y();
+        if (outPz) *outPz = pt.Z();
+        if (outDx) *outDx = v1.X();
+        if (outDy) *outDy = v1.Y();
+        if (outDz) *outDz = v1.Z();
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_curve_d1: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── xbim_curve_d2 ─────────────────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_d2(
+    XbimCurveHandle handle,
+    double          u,
+    double*         outPx,  double* outPy,  double* outPz,
+    double*         outD1x, double* outD1y, double* outD1z,
+    double*         outD2x, double* outD2y, double* outD2z)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_curve_d2: null handle");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    const Handle(Geom_Curve)& c = handle->curve;
+    if (c.IsNull())
+    {
+        xbim_set_error("xbim_curve_d2: curve is null");
+        return XBIM_ERROR;
+    }
+
+    try
+    {
+        gp_Pnt pt;
+        gp_Vec v1, v2;
+        c->D2(u, pt, v1, v2);
+
+        if (outPx)  *outPx  = pt.X();
+        if (outPy)  *outPy  = pt.Y();
+        if (outPz)  *outPz  = pt.Z();
+        if (outD1x) *outD1x = v1.X();
+        if (outD1y) *outD1y = v1.Y();
+        if (outD1z) *outD1z = v1.Z();
+        if (outD2x) *outD2x = v2.X();
+        if (outD2y) *outD2y = v2.Y();
+        if (outD2z) *outD2z = v2.Z();
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_curve_d2: OCCT exception");
         return XBIM_ERROR;
     }
 }

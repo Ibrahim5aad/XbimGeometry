@@ -662,6 +662,58 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_mesh_get_bounding_box(
     }
 }
 
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_triangulate(
+    XbimShapeHandle     shapeHandle,
+    double              linearDeflection,
+    double              angularDeflection,
+    int                 relative)
+{
+    xbim_clear_error();
+
+    if (!shapeHandle)
+    {
+        xbim_set_error("xbim_shape_triangulate: null shape handle");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    const TopoDS_Shape& shape = shapeHandle->shape;
+    if (shape.IsNull())
+    {
+        xbim_set_error("xbim_shape_triangulate: shape is null");
+        return XBIM_NULL_SHAPE;
+    }
+
+    try
+    {
+        BRepMesh_IncrementalMesh mesh(
+            shape, linearDeflection,
+            relative != 0 ? Standard_True : Standard_False,
+            angularDeflection);
+
+        if (!mesh.IsDone())
+        {
+            xbim_set_error("xbim_shape_triangulate: meshing failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        std::string msg = "xbim_shape_triangulate: OCCT error - ";
+        msg += e.GetMessageString() ? e.GetMessageString() : "unknown";
+        xbim_set_error(msg.c_str());
+        return XBIM_ERROR;
+    }
+    catch (const std::exception& e)
+    {
+        std::string msg = "xbim_shape_triangulate: C++ exception - ";
+        msg += e.what();
+        xbim_set_error(msg.c_str());
+        return XBIM_ERROR;
+    }
+}
+
 XBIM_EXPORT void XBIM_CALL xbim_buffer_free(unsigned char* buffer)
 {
     std::free(buffer);

@@ -28,6 +28,9 @@
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepAdaptor_CompCurve.hxx>
+#include <GCPnts_AbscissaPoint.hxx>
+#include <GProp_GProps.hxx>
+#include <BRepGProp.hxx>
 #include <TopTools_SequenceOfShape.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <Standard_Failure.hxx>
@@ -344,6 +347,114 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_is_closed(
     catch (const Standard_Failure&)
     {
         xbim_set_error("xbim_wire_is_closed: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── xbim_wire_length ──────────────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_length(
+    XbimShapeHandle wireHandle,
+    double*         outLength)
+{
+    xbim_clear_error();
+
+    if (!outLength)
+    {
+        xbim_set_error("xbim_wire_length: outLength is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outLength = 0.0;
+
+    if (!wireHandle)
+    {
+        xbim_set_error("xbim_wire_length: wireHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        const TopoDS_Shape& shape = wireHandle->shape;
+        if (shape.IsNull() || shape.ShapeType() != TopAbs_WIRE)
+        {
+            xbim_set_error("xbim_wire_length: handle is not a wire");
+            return XBIM_INVALID_ARG;
+        }
+
+        GProp_GProps props;
+        BRepGProp::LinearProperties(shape, props);
+        *outLength = props.Mass();
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_wire_length: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── xbim_wire_contour_area ────────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_contour_area(
+    XbimShapeHandle wireHandle,
+    double*         outArea)
+{
+    xbim_clear_error();
+
+    if (!outArea)
+    {
+        xbim_set_error("xbim_wire_contour_area: outArea is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outArea = 0.0;
+
+    if (!wireHandle)
+    {
+        xbim_set_error("xbim_wire_contour_area: wireHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        const TopoDS_Shape& shape = wireHandle->shape;
+        if (shape.IsNull() || shape.ShapeType() != TopAbs_WIRE)
+        {
+            xbim_set_error("xbim_wire_contour_area: handle is not a wire");
+            return XBIM_INVALID_ARG;
+        }
+
+        /* Use the shoelace formula on projected edge vertices.
+         * This computes the signed area of the polygon formed by
+         * sampling edge start points along the wire. */
+        const TopoDS_Wire& wire = TopoDS::Wire(shape);
+        BRepAdaptor_CompCurve cc(wire, Standard_True);
+
+        /* Sample enough points along the composite curve to get
+         * an accurate area. For a polygon wire, each segment
+         * contributes exactly one linear piece. */
+        double first = cc.FirstParameter();
+        double last  = cc.LastParameter();
+        int numSamples = 200;
+        double step = (last - first) / numSamples;
+
+        double area = 0.0;
+        gp_Pnt prev = cc.Value(first);
+        for (int i = 1; i <= numSamples; i++)
+        {
+            double u = first + i * step;
+            gp_Pnt curr = cc.Value(u);
+            /* Shoelace in 3D projected onto dominant plane.
+             * We accumulate the cross product; the magnitude gives 2*area. */
+            area += prev.X() * curr.Y() - curr.X() * prev.Y();
+            prev = curr;
+        }
+
+        *outArea = std::abs(area) * 0.5;
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_wire_contour_area: OCCT exception");
         return XBIM_ERROR;
     }
 }

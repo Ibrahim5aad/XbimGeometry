@@ -26,13 +26,20 @@
 #include <Geom_Plane.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_SphericalSurface.hxx>
+#include <Geom_ToroidalSurface.hxx>
+#include <Geom_BSplineSurface.hxx>
+#include <Geom_RectangularTrimmedSurface.hxx>
+#include <Geom_SurfaceOfLinearExtrusion.hxx>
+#include <Geom_SurfaceOfRevolution.hxx>
 #include <Geom_Surface.hxx>
+#include <BRep_Tool.hxx>
 #include <BRep_Builder.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepGProp_Face.hxx>
 #include <BRepGProp.hxx>
 #include <GProp_GProps.hxx>
 #include <ShapeFix_Wire.hxx>
+#include <ShapeFix_Face.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Wire.hxx>
@@ -621,6 +628,214 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_normal(
     catch (const Standard_Failure&)
     {
         xbim_set_error("xbim_face_normal: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── xbim_face_tolerance ─────────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_tolerance(
+    XbimShapeHandle faceHandle,
+    double*         outTolerance)
+{
+    xbim_clear_error();
+    if (!outTolerance) { xbim_set_error("xbim_face_tolerance: outTolerance is NULL"); return XBIM_INVALID_ARG; }
+    *outTolerance = 0.0;
+    if (!faceHandle) { xbim_set_error("xbim_face_tolerance: faceHandle is NULL"); return XBIM_INVALID_HANDLE; }
+
+    try
+    {
+        const TopoDS_Shape& shape = faceHandle->shape;
+        if (shape.IsNull() || shape.ShapeType() != TopAbs_FACE)
+        {
+            xbim_set_error("xbim_face_tolerance: handle is not a face");
+            return XBIM_INVALID_ARG;
+        }
+
+        *outTolerance = BRep_Tool::Tolerance(TopoDS::Face(shape));
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_face_tolerance: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── xbim_face_get_surface ───────────────────────────────────────────── */
+
+/*
+ * Map OCCT Geom_Surface dynamic type to XbimSurfaceType int.
+ * Values match Xbim.Geometry.Abstractions.XSurfaceType enum.
+ */
+static int classify_surface(const Handle(Geom_Surface)& surf)
+{
+    if (surf->IsKind(STANDARD_TYPE(Geom_Plane)))                   return 8;  // IfcPlane
+    if (surf->IsKind(STANDARD_TYPE(Geom_CylindricalSurface)))     return 7;  // IfcCylindricalSurface
+    if (surf->IsKind(STANDARD_TYPE(Geom_SphericalSurface)))       return 9;  // IfcSphericalSurface
+    if (surf->IsKind(STANDARD_TYPE(Geom_ToroidalSurface)))        return 10; // IfcToroidalSurface
+    if (surf->IsKind(STANDARD_TYPE(Geom_SurfaceOfLinearExtrusion))) return 5; // IfcSurfaceOfLinearExtrusion
+    if (surf->IsKind(STANDARD_TYPE(Geom_SurfaceOfRevolution)))    return 6;  // IfcSurfaceOfRevolution
+    if (surf->IsKind(STANDARD_TYPE(Geom_RectangularTrimmedSurface))) return 4; // IfcRectangularTrimmedSurface
+    if (surf->IsKind(STANDARD_TYPE(Geom_BSplineSurface)))         return 0;  // IfcBSplineSurfaceWithKnots
+    return 0; // default to BSpline
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_get_surface(
+    XbimShapeHandle    faceHandle,
+    XbimSurfaceHandle* outSurface,
+    int*               outSurfaceType)
+{
+    xbim_clear_error();
+    if (!outSurface || !outSurfaceType)
+    {
+        xbim_set_error("xbim_face_get_surface: outSurface or outSurfaceType is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outSurface = nullptr;
+    *outSurfaceType = 0;
+    if (!faceHandle) { xbim_set_error("xbim_face_get_surface: faceHandle is NULL"); return XBIM_INVALID_HANDLE; }
+
+    try
+    {
+        const TopoDS_Shape& shape = faceHandle->shape;
+        if (shape.IsNull() || shape.ShapeType() != TopAbs_FACE)
+        {
+            xbim_set_error("xbim_face_get_surface: handle is not a face");
+            return XBIM_INVALID_ARG;
+        }
+
+        Handle(Geom_Surface) surf = BRep_Tool::Surface(TopoDS::Face(shape));
+        if (surf.IsNull())
+        {
+            xbim_set_error("xbim_face_get_surface: face has no surface");
+            return XBIM_NULL_SHAPE;
+        }
+
+        *outSurfaceType = classify_surface(surf);
+        *outSurface = xbim_surface_create_from(surf);
+        return *outSurface ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_face_get_surface: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── xbim_face_add_wires ──────────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_add_wires(
+    XbimShapeHandle     faceHandle,
+    XbimShapeHandle*    wireHandles,
+    int                 wireCount,
+    XbimShapeHandle*    outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_face_add_wires: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!faceHandle || faceHandle->shape.IsNull())
+    {
+        xbim_set_error("xbim_face_add_wires: invalid face handle");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!wireHandles || wireCount <= 0)
+    {
+        xbim_set_error("xbim_face_add_wires: no wires provided");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        // Make a copy so we don't mutate the original
+        TopoDS_Face face = TopoDS::Face(faceHandle->shape);
+        BRep_Builder builder;
+
+        for (int i = 0; i < wireCount; i++)
+        {
+            if (!wireHandles[i] || wireHandles[i]->shape.IsNull())
+                continue;
+            if (wireHandles[i]->shape.ShapeType() != TopAbs_WIRE)
+                continue;
+
+            const TopoDS_Wire& wire = TopoDS::Wire(wireHandles[i]->shape);
+            builder.Add(face, wire);
+        }
+
+        *outHandle = xbim_shape_create_from(face);
+        return *outHandle ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_face_add_wires: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── xbim_face_fix ─────────────────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_fix(
+    XbimShapeHandle     faceHandle,
+    double              tolerance,
+    XbimShapeHandle*    outFaces,
+    int*                outCount)
+{
+    xbim_clear_error();
+
+    if (!outCount)
+    {
+        xbim_set_error("xbim_face_fix: outCount is NULL");
+        return XBIM_INVALID_ARG;
+    }
+
+    if (!faceHandle || faceHandle->shape.IsNull())
+    {
+        xbim_set_error("xbim_face_fix: invalid face handle");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (faceHandle->shape.ShapeType() != TopAbs_FACE)
+    {
+        xbim_set_error("xbim_face_fix: handle is not a face");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        TopoDS_Face face = TopoDS::Face(faceHandle->shape);
+        ShapeFix_Face fixer(face);
+        fixer.SetPrecision(tolerance);
+        fixer.Perform();
+
+        TopoDS_Face result = fixer.Face();
+        if (result.IsNull())
+        {
+            // Fix produced nothing — return original
+            if (outFaces)
+            {
+                outFaces[0] = xbim_shape_create_from(face);
+            }
+            *outCount = 1;
+            return XBIM_OK;
+        }
+
+        if (outFaces)
+        {
+            outFaces[0] = xbim_shape_create_from(result);
+        }
+        *outCount = 1;
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_face_fix: OCCT exception");
         return XBIM_ERROR;
     }
 }

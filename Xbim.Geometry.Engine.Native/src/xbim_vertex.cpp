@@ -122,3 +122,44 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_point(
         return XBIM_ERROR;
     }
 }
+
+/* ── xbim_vertex_tolerance ────────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_tolerance(
+    XbimShapeHandle vertexHandle,
+    double*         outTolerance)
+{
+    xbim_clear_error();
+
+    if (!outTolerance)
+    {
+        xbim_set_error("xbim_vertex_tolerance: outTolerance is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outTolerance = 0.0;
+
+    if (!vertexHandle)
+    {
+        xbim_set_error("xbim_vertex_tolerance: vertexHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        const TopoDS_Shape& shape = vertexHandle->shape;
+        if (shape.IsNull() || shape.ShapeType() != TopAbs_VERTEX)
+        {
+            xbim_set_error("xbim_vertex_tolerance: handle is not a vertex");
+            return XBIM_INVALID_ARG;
+        }
+
+        const TopoDS_Vertex& vertex = TopoDS::Vertex(shape);
+        *outTolerance = BRep_Tool::Tolerance(vertex);
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_vertex_tolerance: OCCT exception");
+        return XBIM_ERROR;
+    }
+}

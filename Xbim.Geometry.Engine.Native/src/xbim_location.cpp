@@ -167,6 +167,77 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_location_destroy(XbimLocationHandle handle
     return XBIM_OK;
 }
 
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_get_location(
+    XbimShapeHandle     shapeHandle,
+    XbimLocationHandle* outHandle,
+    double* outM11, double* outM12, double* outM13,
+    double* outM21, double* outM22, double* outM23,
+    double* outM31, double* outM32, double* outM33,
+    double* outOffsetX, double* outOffsetY, double* outOffsetZ,
+    double* outScale)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_shape_get_location: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+
+    *outHandle = nullptr;
+
+    if (!shapeHandle)
+    {
+        xbim_set_error("xbim_shape_get_location: shapeHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (shapeHandle->shape.IsNull())
+    {
+        xbim_set_error("xbim_shape_get_location: shape is null");
+        return XBIM_NULL_SHAPE;
+    }
+
+    try
+    {
+        const TopLoc_Location& loc = shapeHandle->shape.Location();
+        *outHandle = xbim_location_create_internal(loc);
+
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_shape_get_location: allocation failed");
+            return XBIM_ERROR;
+        }
+
+        if (loc.IsIdentity())
+        {
+            if (outM11) *outM11 = 1; if (outM12) *outM12 = 0; if (outM13) *outM13 = 0;
+            if (outM21) *outM21 = 0; if (outM22) *outM22 = 1; if (outM23) *outM23 = 0;
+            if (outM31) *outM31 = 0; if (outM32) *outM32 = 0; if (outM33) *outM33 = 1;
+            if (outOffsetX) *outOffsetX = 0; if (outOffsetY) *outOffsetY = 0; if (outOffsetZ) *outOffsetZ = 0;
+            if (outScale) *outScale = 1.0;
+        }
+        else
+        {
+            const gp_Trsf& trsf = loc.Transformation();
+            if (outM11) *outM11 = trsf.Value(1,1); if (outM12) *outM12 = trsf.Value(1,2); if (outM13) *outM13 = trsf.Value(1,3);
+            if (outM21) *outM21 = trsf.Value(2,1); if (outM22) *outM22 = trsf.Value(2,2); if (outM23) *outM23 = trsf.Value(2,3);
+            if (outM31) *outM31 = trsf.Value(3,1); if (outM32) *outM32 = trsf.Value(3,2); if (outM33) *outM33 = trsf.Value(3,3);
+            if (outOffsetX) *outOffsetX = trsf.Value(1,4);
+            if (outOffsetY) *outOffsetY = trsf.Value(2,4);
+            if (outOffsetZ) *outOffsetZ = trsf.Value(3,4);
+            if (outScale) *outScale = trsf.ScaleFactor();
+        }
+
+        return XBIM_OK;
+    }
+    catch (Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_shape_get_location: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
 XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_moved(
     XbimShapeHandle     shapeHandle,
     XbimLocationHandle  locationHandle,

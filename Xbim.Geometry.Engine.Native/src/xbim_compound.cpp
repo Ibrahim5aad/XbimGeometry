@@ -168,3 +168,102 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_cut(
     *outHandle = xbim_shape_create_from(result);
     return *outHandle ? XBIM_OK : XBIM_ERROR;
 }
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_add(
+    XbimShapeHandle compoundHandle,
+    XbimShapeHandle childHandle)
+{
+    xbim_clear_error();
+    if (!compoundHandle) { xbim_set_error("xbim_compound_add: compoundHandle is NULL"); return XBIM_INVALID_HANDLE; }
+    if (!childHandle)    { xbim_set_error("xbim_compound_add: childHandle is NULL"); return XBIM_INVALID_HANDLE; }
+    if (compoundHandle->shape.IsNull()) { xbim_set_error("xbim_compound_add: compound is null"); return XBIM_NULL_SHAPE; }
+    if (compoundHandle->shape.ShapeType() != TopAbs_COMPOUND)
+    {
+        xbim_set_error("xbim_compound_add: shape is not a compound");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        BRep_Builder builder;
+        builder.Add(compoundHandle->shape, childHandle->shape);
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_compound_add: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_child_count(
+    XbimShapeHandle handle,
+    int*            outCount)
+{
+    xbim_clear_error();
+    if (!handle)  { xbim_set_error("xbim_compound_child_count: handle is NULL"); return XBIM_INVALID_HANDLE; }
+    if (!outCount){ xbim_set_error("xbim_compound_child_count: outCount is NULL"); return XBIM_INVALID_ARG; }
+    if (handle->shape.IsNull()) { xbim_set_error("xbim_compound_child_count: shape is null"); return XBIM_NULL_SHAPE; }
+
+    try
+    {
+        int count = 0;
+        for (TopoDS_Iterator it(handle->shape, Standard_False, Standard_False); it.More(); it.Next())
+            ++count;
+        *outCount = count;
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_compound_child_count: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_get_children(
+    XbimShapeHandle     handle,
+    XbimShapeHandle*    outHandles,
+    int*                count)
+{
+    xbim_clear_error();
+    if (!handle)    { xbim_set_error("xbim_compound_get_children: handle is NULL"); return XBIM_INVALID_HANDLE; }
+    if (!outHandles || !count) { xbim_set_error("xbim_compound_get_children: outHandles or count is NULL"); return XBIM_INVALID_ARG; }
+    if (handle->shape.IsNull()) { xbim_set_error("xbim_compound_get_children: shape is null"); return XBIM_NULL_SHAPE; }
+
+    try
+    {
+        int capacity = *count;
+        int idx = 0;
+
+        for (TopoDS_Iterator it(handle->shape, Standard_False, Standard_False); it.More(); it.Next())
+        {
+            if (idx >= capacity)
+            {
+                xbim_set_error("xbim_compound_get_children: array capacity too small");
+                for (int j = 0; j < idx; ++j) { delete outHandles[j]; outHandles[j] = nullptr; }
+                *count = 0;
+                return XBIM_INVALID_ARG;
+            }
+            XbimShapeHandle sub = xbim_shape_create_from(it.Value());
+            if (!sub)
+            {
+                xbim_set_error("xbim_compound_get_children: allocation failed");
+                for (int j = 0; j < idx; ++j) { delete outHandles[j]; outHandles[j] = nullptr; }
+                *count = 0;
+                return XBIM_ERROR;
+            }
+            outHandles[idx++] = sub;
+        }
+
+        *count = idx;
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_compound_get_children: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
