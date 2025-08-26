@@ -1,6 +1,7 @@
 using System;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
+using Xbim.Geometry.Engine.Interop.Internal;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
@@ -18,9 +19,11 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                // Edge length not yet available in native API (TOPO-003)
-                throw new NotImplementedException(
-                    "Edge length will be available after TOPO-003.");
+                int result = XbimGeometryNativeApi.xbim_edge_length(Handle, out double length);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to get edge length: {XbimGeometryNativeApi.GetLastError()}");
+                return length;
             }
         }
 
@@ -28,9 +31,11 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                // Edge tolerance not yet available in native API (TOPO-003)
-                throw new NotImplementedException(
-                    "Edge tolerance will be available after TOPO-003.");
+                int result = XbimGeometryNativeApi.xbim_edge_tolerance(Handle, out double tol);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to get edge tolerance: {XbimGeometryNativeApi.GetLastError()}");
+                return tol;
             }
         }
 
@@ -38,9 +43,8 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                // Edge geometry not yet available in native API (TOPO-006)
                 throw new NotImplementedException(
-                    "Edge geometry will be available after TOPO-006.");
+                    "Edge geometry extraction requires curve query infrastructure (CURVE phase).");
             }
         }
 
@@ -48,9 +52,14 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                // Edge vertex extraction not yet available in native API (TOPO-003)
-                throw new NotImplementedException(
-                    "Edge vertices will be available after TOPO-003.");
+                int result = XbimGeometryNativeApi.xbim_edge_vertices(Handle, out var start, out var end);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to get edge vertices: {XbimGeometryNativeApi.GetLastError()}");
+                end?.Dispose();
+                if (start == null || start.IsInvalid)
+                    return null!;
+                return new Vertex(start);
             }
         }
 
@@ -58,9 +67,14 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                // Edge vertex extraction not yet available in native API (TOPO-003)
-                throw new NotImplementedException(
-                    "Edge vertices will be available after TOPO-003.");
+                int result = XbimGeometryNativeApi.xbim_edge_vertices(Handle, out var start, out var end);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to get edge vertices: {XbimGeometryNativeApi.GetLastError()}");
+                start?.Dispose();
+                if (end == null || end.IsInvalid)
+                    return null!;
+                return new Vertex(end);
             }
         }
     }

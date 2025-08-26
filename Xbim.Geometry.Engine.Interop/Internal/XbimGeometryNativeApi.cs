@@ -71,6 +71,9 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out int outType);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_is_null(NativeShapeHandle handle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_shape_is_valid(NativeShapeHandle handle);
 
         [DllImport(Lib, CallingConvention = CC)]
@@ -122,6 +125,16 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeLocationHandle loc1,
             NativeLocationHandle loc2,
             out NativeLocationHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_get_location(
+            NativeShapeHandle shapeHandle,
+            out NativeLocationHandle outHandle,
+            out double outM11, out double outM12, out double outM13,
+            out double outM21, out double outM22, out double outM23,
+            out double outM31, out double outM32, out double outM33,
+            out double outOffsetX, out double outOffsetY, out double outOffsetZ,
+            out double outScale);
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_shape_moved(
@@ -530,6 +543,22 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out int outHasWarnings,
             out NativeShapeHandle outHandle);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_compound_add(
+            NativeShapeHandle compoundHandle,
+            NativeShapeHandle childHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_compound_child_count(
+            NativeShapeHandle handle,
+            out int outCount);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_compound_get_children(
+            NativeShapeHandle handle,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] outHandles,
+            ref int count);
+
         #endregion
 
         #region Vertex
@@ -545,6 +574,11 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         internal static extern int xbim_vertex_point(
             NativeShapeHandle vertexHandle,
             out double outX, out double outY, out double outZ);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_vertex_tolerance(
+            NativeShapeHandle vertexHandle,
+            out double outTolerance);
 
         #endregion
 
@@ -590,6 +624,17 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeShapeHandle edgeHandle,
             out double outLength);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_edge_tolerance(
+            NativeShapeHandle edgeHandle,
+            out double outTolerance);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_edge_vertices(
+            NativeShapeHandle edgeHandle,
+            out NativeShapeHandle outStart,
+            out NativeShapeHandle outEnd);
+
         #endregion
 
         #region Wire
@@ -622,6 +667,16 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeShapeHandle wireHandle,
             double tolerance,
             out int outClosed);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_length(
+            NativeShapeHandle wireHandle,
+            out double outLength);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_contour_area(
+            NativeShapeHandle wireHandle,
+            out double outArea);
 
         #endregion
 
@@ -683,6 +738,17 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out double outNormalX,
             out double outNormalY,
             out double outNormalZ);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_tolerance(
+            NativeShapeHandle faceHandle,
+            out double outTolerance);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_get_surface(
+            NativeShapeHandle faceHandle,
+            out NativeSurfaceHandle outSurface,
+            out int outSurfaceType);
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_face_outer_wire(
@@ -785,6 +851,38 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             [MarshalAs(UnmanagedType.LPArray)] double[]? weights,
             out NativeCurveHandle outHandle);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_parameters(
+            NativeCurveHandle handle,
+            out double outFirst,
+            out double outLast);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_length(
+            NativeCurveHandle handle,
+            out double outLength);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_value(
+            NativeCurveHandle handle,
+            double u,
+            out double outX, out double outY, out double outZ);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_d1(
+            NativeCurveHandle handle,
+            double u,
+            out double outPx, out double outPy, out double outPz,
+            out double outDx, out double outDy, out double outDz);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_d2(
+            NativeCurveHandle handle,
+            double u,
+            out double outPx, out double outPy, out double outPz,
+            out double outD1x, out double outD1y, out double outD1z,
+            out double outD2x, out double outD2y, out double outD2z);
+
         #endregion
 
         #region Surface Construction
@@ -834,6 +932,13 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         #endregion
 
         #region Mesh / WexBim
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_triangulate(
+            NativeShapeHandle shapeHandle,
+            double linearDeflection,
+            double angularDeflection,
+            int relative);
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_mesh_create_wexbim(
@@ -898,6 +1003,29 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         internal static extern NativeShapeHandle xbim_shape_from_binary(
             IntPtr buffer,
             int size);
+
+        #endregion
+
+        #region Shape Repair / Domain
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_unify_domain(
+            NativeShapeHandle shapeHandle,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_add_wires(
+            NativeShapeHandle faceHandle,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] wireHandles,
+            int wireCount,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_fix(
+            NativeShapeHandle faceHandle,
+            double tolerance,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] outFaces,
+            ref int outCount);
 
         #endregion
     }

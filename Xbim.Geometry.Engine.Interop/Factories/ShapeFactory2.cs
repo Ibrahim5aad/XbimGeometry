@@ -100,25 +100,78 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXShape UnifyDomain(IXShape toFix)
         {
-            // Domain unification requires native OCCT ShapeUpgrade_UnifySameDomain.
-            // Not yet available as a native export. Return the shape unchanged.
-            _logger.LogDebug("UnifyDomain not yet available, returning shape unchanged.");
-            return toFix;
+            if (toFix is not Shape ns)
+                throw new ArgumentException("Shape must be a Shape instance.", nameof(toFix));
+
+            int result = XbimGeometryNativeApi.xbim_shape_unify_domain(ns.Handle, out var outHandle);
+            if (result != 0)
+            {
+                _logger.LogWarning("UnifyDomain failed: {Error}, returning shape unchanged.",
+                    XbimGeometryNativeApi.GetLastError());
+                return toFix;
+            }
+
+            return ShapeFactory.WrapShape(outHandle);
         }
 
         public IEnumerable<IXFace> FixFace(IXFace face)
         {
-            // Face repair requires native OCCT ShapeFix_Face.
-            // Not yet available as a native export. Return the face unchanged.
-            _logger.LogDebug("FixFace not yet available, returning face unchanged.");
-            return new[] { face };
+            if (face is not Face nsFace)
+                throw new ArgumentException("Face must be a Face instance.", nameof(face));
+
+            // First query to get count
+            int count = 1;
+            int result = XbimGeometryNativeApi.xbim_face_fix(
+                nsFace.Handle, _modelService.Model.ModelFactors.Precision,
+                null!, ref count);
+
+            if (result != 0 || count == 0)
+            {
+                _logger.LogWarning("FixFace failed: {Error}, returning face unchanged.",
+                    XbimGeometryNativeApi.GetLastError());
+                return new[] { face };
+            }
+
+            // Now get the actual faces
+            var ptrs = new IntPtr[count];
+            result = XbimGeometryNativeApi.xbim_face_fix(
+                nsFace.Handle, _modelService.Model.ModelFactors.Precision,
+                ptrs, ref count);
+
+            if (result != 0)
+                return new[] { face };
+
+            var faces = new IXFace[count];
+            for (int i = 0; i < count; i++)
+                faces[i] = new Face(NativeShapeHandle.FromIntPtr(ptrs[i]));
+            return faces;
         }
 
         public IXFace Add(IXFace toFace, IXWire[] wires)
         {
-            // Adding wires to a face requires native BRep_Builder::Add.
-            // Not yet available as a native export.
-            throw new NotImplementedException("Adding wires to a face requires native BRep_Builder support.");
+            if (toFace is not Face nsFace)
+                throw new ArgumentException("Face must be a Face instance.", nameof(toFace));
+
+            var wireShapes = new Shape[wires.Length];
+            var wirePtrs = new IntPtr[wires.Length];
+            for (int i = 0; i < wires.Length; i++)
+            {
+                if (wires[i] is not Shape ws)
+                    throw new ArgumentException($"Wire at index {i} must be a Shape instance.");
+                wireShapes[i] = ws;
+                wirePtrs[i] = ws.Handle.DangerousGetHandle();
+            }
+
+            int result = XbimGeometryNativeApi.xbim_face_add_wires(
+                nsFace.Handle, wirePtrs, wires.Length, out var outHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to add wires to face: {XbimGeometryNativeApi.GetLastError()}");
+
+            // Keep wireShapes alive until after the call
+            GC.KeepAlive(wireShapes);
+            return new Face(outHandle);
         }
 
         #endregion
@@ -246,10 +299,17 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             IXShape current = body;
             foreach (var subShape in substraction)
             {
-                var result = Cut(current, subShape);
-                if (!ReferenceEquals(current, body))
-                    current.Dispose();
-                current = result;
+                try
+                {
+                    var result = Cut(current, subShape);
+                    if (!ReferenceEquals(current, body))
+                        current.Dispose();
+                    current = result;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Boolean cut failed for a sub-shape, skipping it.");
+                }
             }
             return current;
         }
@@ -265,7 +325,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (tool is not Shape nsTool)
                 throw new ArgumentException("Tool must be a Shape instance.", nameof(tool));
 
-            double fuzzyTolerance = _modelService.Model.ModelFactors.PrecisionBoolean;
+            double fuzzyTolerance = _modelService.Model.ModelFactors.Precision;
 
             int result = operation(
                 ContextHandle, nsBody.Handle, nsTool.Handle,

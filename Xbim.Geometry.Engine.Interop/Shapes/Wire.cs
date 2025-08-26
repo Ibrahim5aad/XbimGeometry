@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
+using Xbim.Geometry.Engine.Interop.Internal;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
@@ -19,9 +20,11 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                // Wire length not yet available in native API (TOPO-002)
-                throw new NotImplementedException(
-                    "Wire length will be available after TOPO-002.");
+                int result = XbimGeometryNativeApi.xbim_wire_length(Handle, out double length);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to get wire length: {XbimGeometryNativeApi.GetLastError()}");
+                return length;
             }
         }
 
@@ -29,9 +32,11 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                // Contour area not yet available in native API (TOPO-002)
-                throw new NotImplementedException(
-                    "ContourArea will be available after TOPO-002.");
+                int result = XbimGeometryNativeApi.xbim_wire_contour_area(Handle, out double area);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to get wire contour area: {XbimGeometryNativeApi.GetLastError()}");
+                return area;
             }
         }
 

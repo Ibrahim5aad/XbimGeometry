@@ -105,24 +105,38 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         public bool IsEmptyShape()
         {
-            return Handle.IsInvalid;
+            if (Handle.IsInvalid)
+                return true;
+            return XbimGeometryNativeApi.xbim_shape_is_null(Handle) == 1;
         }
 
         public bool Triangulate(IXMeshFactors meshFactors)
         {
-            // Triangulation not yet available in native API (MESH-001)
-            throw new NotImplementedException(
-                "Triangulation will be available after MESH-001.");
+            int result = XbimGeometryNativeApi.xbim_shape_triangulate(
+                Handle,
+                meshFactors.LinearDefection,
+                meshFactors.AngularDeflection,
+                meshFactors.Relative ? 1 : 0);
+            return result == 0;
         }
 
         public IXLocation Location
         {
             get
             {
-                // Shape location extraction not yet available in native API.
-                // Return identity for now - the actual location is typically
-                // managed at a higher level via IIfcObjectPlacement.
-                return new XLocation();
+                int result = XbimGeometryNativeApi.xbim_shape_get_location(
+                    Handle, out var locHandle,
+                    out double m11, out double m12, out double m13,
+                    out double m21, out double m22, out double m23,
+                    out double m31, out double m32, out double m33,
+                    out double ox, out double oy, out double oz,
+                    out double scale);
+                if (result != 0)
+                    return new XLocation(); // fallback to identity
+
+                return new XLocation(locHandle,
+                    m11, m12, m13, m21, m22, m23, m31, m32, m33,
+                    ox, oy, oz, scale);
             }
         }
 

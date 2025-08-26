@@ -2,6 +2,7 @@ using System;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Engine.Interop.Primitives;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
@@ -31,9 +32,11 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                // Face tolerance extraction not yet available in native API (TOPO-001)
-                throw new NotImplementedException(
-                    "Face tolerance will be available after TOPO-001.");
+                int result = XbimGeometryNativeApi.xbim_face_tolerance(Handle, out double tol);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to get face tolerance: {XbimGeometryNativeApi.GetLastError()}");
+                return tol;
             }
         }
 
@@ -77,9 +80,11 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                // Surface extraction not yet available in native API (TOPO-006)
-                throw new NotImplementedException(
-                    "Surface will be available after TOPO-006.");
+                int result = XbimGeometryNativeApi.xbim_face_get_surface(Handle, out var surfHandle, out int surfType);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to get face surface: {XbimGeometryNativeApi.GetLastError()}");
+                return new Surface(surfHandle, (XSurfaceType)surfType);
             }
         }
     }

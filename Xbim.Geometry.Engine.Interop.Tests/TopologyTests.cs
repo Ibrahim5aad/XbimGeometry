@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Services;
@@ -26,7 +27,7 @@ public class TopologyTests : IDisposable
 
     public void Dispose() => _service.Dispose();
 
-    // ── Vertex ──────────────────────────────────────────────────────────────
+    #region Vertex
 
     [Fact]
     public void Vertex_BuildAndQuery_RoundTrips()
@@ -49,7 +50,34 @@ public class TopologyTests : IDisposable
         vtx.Dispose();
     }
 
-    // ── Edge ────────────────────────────────────────────────────────────────
+    [Fact]
+    public void Vertex_Managed_Tolerance_IsPositive()
+    {
+        XbimGeometryNativeApi.xbim_vertex_build(Ctx, 5, 10, 15, 1e-3, out var vtxHandle);
+        var vtx = (IXVertex)Shapes.ShapeFactory.WrapShape(vtxHandle);
+        using ((IDisposable)vtx)
+        {
+            vtx.Tolerance.Should().BeApproximately(1e-3, 1e-9);
+        }
+    }
+
+    [Fact]
+    public void Vertex_Managed_Geometry_ReturnsPoint()
+    {
+        XbimGeometryNativeApi.xbim_vertex_build(Ctx, 7, 14, 21, 1e-6, out var vtxHandle);
+        var vtx = (IXVertex)Shapes.ShapeFactory.WrapShape(vtxHandle);
+        using ((IDisposable)vtx)
+        {
+            var pt = vtx.VertexGeometry;
+            pt.X.Should().BeApproximately(7, 1e-10);
+            pt.Y.Should().BeApproximately(14, 1e-10);
+            pt.Z.Should().BeApproximately(21, 1e-10);
+        }
+    }
+
+    #endregion
+
+    #region Edge
 
     [Fact]
     public void Edge_BuildLine_ReturnsValidEdge()
@@ -115,7 +143,100 @@ public class TopologyTests : IDisposable
         }
     }
 
-    // ── Wire ────────────────────────────────────────────────────────────────
+    [Fact]
+    public void Edge_Tolerance_IsPositive()
+    {
+        XbimGeometryNativeApi.xbim_edge_build_line(Ctx, 0, 0, 0, 10, 0, 0, out var edge).Should().Be(0);
+        using (edge)
+        {
+            XbimGeometryNativeApi.xbim_edge_tolerance(edge, out var tol).Should().Be(0);
+            tol.Should().BeGreaterThan(0);
+        }
+    }
+
+    [Fact]
+    public void Edge_Vertices_ReturnsStartAndEnd()
+    {
+        XbimGeometryNativeApi.xbim_edge_build_line(Ctx, 1, 2, 3, 4, 5, 6, out var edge).Should().Be(0);
+        using (edge)
+        {
+            XbimGeometryNativeApi.xbim_edge_vertices(edge, out var start, out var end).Should().Be(0);
+            using (start)
+            using (end)
+            {
+                start.IsInvalid.Should().BeFalse();
+                end.IsInvalid.Should().BeFalse();
+
+                XbimGeometryNativeApi.xbim_vertex_point(start, out var sx, out var sy, out var sz).Should().Be(0);
+                sx.Should().BeApproximately(1, 1e-10);
+                sy.Should().BeApproximately(2, 1e-10);
+                sz.Should().BeApproximately(3, 1e-10);
+
+                XbimGeometryNativeApi.xbim_vertex_point(end, out var ex, out var ey, out var ez).Should().Be(0);
+                ex.Should().BeApproximately(4, 1e-10);
+                ey.Should().BeApproximately(5, 1e-10);
+                ez.Should().BeApproximately(6, 1e-10);
+            }
+        }
+    }
+
+    [Fact]
+    public void Edge_Managed_Length_MatchesNative()
+    {
+        XbimGeometryNativeApi.xbim_edge_build_line(Ctx, 0, 0, 0, 3, 4, 0, out var edgeHandle).Should().Be(0);
+        var edge = (IXEdge)Shapes.ShapeFactory.WrapShape(edgeHandle);
+        using ((IDisposable)edge)
+        {
+            edge.Length.Should().BeApproximately(5.0, 1e-6);
+        }
+    }
+
+    [Fact]
+    public void Edge_Managed_Tolerance_IsPositive()
+    {
+        XbimGeometryNativeApi.xbim_edge_build_line(Ctx, 0, 0, 0, 10, 0, 0, out var edgeHandle).Should().Be(0);
+        var edge = (IXEdge)Shapes.ShapeFactory.WrapShape(edgeHandle);
+        using ((IDisposable)edge)
+        {
+            edge.Tolerance.Should().BeGreaterThan(0);
+        }
+    }
+
+    [Fact]
+    public void Edge_Managed_StartEnd_Coordinates()
+    {
+        XbimGeometryNativeApi.xbim_edge_build_line(Ctx, 10, 20, 30, 40, 50, 60, out var edgeHandle).Should().Be(0);
+        var edge = (IXEdge)Shapes.ShapeFactory.WrapShape(edgeHandle);
+        using ((IDisposable)edge)
+        {
+            var start = edge.EdgeStart;
+            start.Should().NotBeNull();
+            // Vertex point query via native handle
+            using (start as IDisposable)
+            {
+                var startShape = (Shapes.Shape)start;
+                XbimGeometryNativeApi.xbim_vertex_point(startShape.Handle, out var x, out var y, out var z).Should().Be(0);
+                x.Should().BeApproximately(10, 1e-10);
+                y.Should().BeApproximately(20, 1e-10);
+                z.Should().BeApproximately(30, 1e-10);
+            }
+
+            var end = edge.EdgeEnd;
+            end.Should().NotBeNull();
+            using (end as IDisposable)
+            {
+                var endShape = (Shapes.Shape)end;
+                XbimGeometryNativeApi.xbim_vertex_point(endShape.Handle, out var x, out var y, out var z).Should().Be(0);
+                x.Should().BeApproximately(40, 1e-10);
+                y.Should().BeApproximately(50, 1e-10);
+                z.Should().BeApproximately(60, 1e-10);
+            }
+        }
+    }
+
+    #endregion
+
+    #region Wire
 
     [Fact]
     public void Wire_BuildPolyline_Triangle()
@@ -194,7 +315,42 @@ public class TopologyTests : IDisposable
         }
     }
 
-    // ── Face ────────────────────────────────────────────────────────────────
+    [Fact]
+    public void Wire_Managed_Length_SquarePerimeter()
+    {
+        using var wireHandle = BuildSquareWire(10);
+        var wire = (IXWire)Shapes.ShapeFactory.WrapShape(wireHandle);
+        using ((IDisposable)wire)
+        {
+            wire.Length.Should().BeApproximately(40, 0.1); // 4 * 10
+        }
+    }
+
+    [Fact]
+    public void Wire_Managed_ContourArea_Square()
+    {
+        using var wireHandle = BuildSquareWire(10);
+        var wire = (IXWire)Shapes.ShapeFactory.WrapShape(wireHandle);
+        using ((IDisposable)wire)
+        {
+            wire.ContourArea.Should().BeApproximately(100, 1.0); // 10 * 10
+        }
+    }
+
+    [Fact]
+    public void Wire_Managed_EdgeLoop_ReturnsEdges()
+    {
+        using var wireHandle = BuildSquareWire(5);
+        var wire = (IXWire)Shapes.ShapeFactory.WrapShape(wireHandle);
+        using ((IDisposable)wire)
+        {
+            wire.EdgeLoop.Length.Should().BeGreaterThanOrEqualTo(4);
+        }
+    }
+
+    #endregion
+
+    #region Face
 
     [Fact]
     public void Face_BuildFromWire_Square_HasCorrectArea()
@@ -287,7 +443,64 @@ public class TopologyTests : IDisposable
         }
     }
 
-    // ── Shell ───────────────────────────────────────────────────────────────
+    [Fact]
+    public void Face_Tolerance_IsPositive()
+    {
+        using var wire = BuildSquareWire(10);
+        XbimGeometryNativeApi.xbim_face_build_from_wire(Ctx, wire, out var face).Should().Be(0);
+        using (face)
+        {
+            XbimGeometryNativeApi.xbim_face_tolerance(face, out var tol).Should().Be(0);
+            tol.Should().BeGreaterThan(0);
+        }
+    }
+
+    [Fact]
+    public void Face_GetSurface_PlanarFace_ReturnsPlane()
+    {
+        using var wire = BuildSquareWire(10);
+        XbimGeometryNativeApi.xbim_face_build_from_wire(Ctx, wire, out var face).Should().Be(0);
+        using (face)
+        {
+            XbimGeometryNativeApi.xbim_face_get_surface(face, out var surfHandle, out var surfType).Should().Be(0);
+            using (surfHandle)
+            {
+                surfType.Should().Be(8); // IfcPlane
+                surfHandle.IsInvalid.Should().BeFalse();
+            }
+        }
+    }
+
+    [Fact]
+    public void Face_Managed_Tolerance_IsPositive()
+    {
+        using var wire = BuildSquareWire(10);
+        XbimGeometryNativeApi.xbim_face_build_from_wire(Ctx, wire, out var faceHandle).Should().Be(0);
+        var face = (IXFace)Shapes.ShapeFactory.WrapShape(faceHandle);
+        using ((IDisposable)face)
+        {
+            face.Tolerance.Should().BeGreaterThan(0);
+        }
+    }
+
+    [Fact]
+    public void Face_Managed_Surface_ReturnsPlaneSurface()
+    {
+        using var wire = BuildSquareWire(10);
+        XbimGeometryNativeApi.xbim_face_build_from_wire(Ctx, wire, out var faceHandle).Should().Be(0);
+        var face = (IXFace)Shapes.ShapeFactory.WrapShape(faceHandle);
+        using ((IDisposable)face)
+        {
+            var surface = face.Surface;
+            surface.Should().NotBeNull();
+            surface.SurfaceType.Should().Be(XSurfaceType.IfcPlane);
+            ((IDisposable)surface).Dispose();
+        }
+    }
+
+    #endregion
+
+    #region Shell
 
     [Fact]
     public void Shell_BuildFromFaces_SixFaces_ReturnsShell()
@@ -331,7 +544,292 @@ public class TopologyTests : IDisposable
         }
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────
+    #endregion
+
+    #region Compound
+
+    [Fact]
+    public void Compound_Make_TwoSolids_ReturnsCompound()
+    {
+        using var s1 = BuildBoxSolid(10, 10, 10);
+        using var s2 = BuildBoxSolid(5, 5, 5);
+        var ptrs = new IntPtr[] { s1.DangerousGetHandle(), s2.DangerousGetHandle() };
+        XbimGeometryNativeApi.xbim_compound_make(Ctx, ptrs, 2, out var compound).Should().Be(0);
+        using (compound)
+        {
+            XbimGeometryNativeApi.xbim_shape_type(compound, out var t).Should().Be(0);
+            t.Should().Be(6); // XBIM_SHAPE_COMPOUND
+        }
+    }
+
+    [Fact]
+    public void Compound_ChildCount_MatchesInputCount()
+    {
+        using var s1 = BuildBoxSolid(10, 10, 10);
+        using var s2 = BuildBoxSolid(5, 5, 5);
+        using var s3 = BuildBoxSolid(3, 3, 3);
+        var ptrs = new IntPtr[] { s1.DangerousGetHandle(), s2.DangerousGetHandle(), s3.DangerousGetHandle() };
+        XbimGeometryNativeApi.xbim_compound_make(Ctx, ptrs, 3, out var compound).Should().Be(0);
+        using (compound)
+        {
+            XbimGeometryNativeApi.xbim_compound_child_count(compound, out var count).Should().Be(0);
+            count.Should().Be(3);
+        }
+    }
+
+    [Fact]
+    public void Compound_GetChildren_ReturnsSolids()
+    {
+        using var s1 = BuildBoxSolid(10, 10, 10);
+        using var s2 = BuildBoxSolid(5, 5, 5);
+        var ptrs = new IntPtr[] { s1.DangerousGetHandle(), s2.DangerousGetHandle() };
+        XbimGeometryNativeApi.xbim_compound_make(Ctx, ptrs, 2, out var compound).Should().Be(0);
+        using (compound)
+        {
+            XbimGeometryNativeApi.xbim_compound_child_count(compound, out var count).Should().Be(0);
+            count.Should().Be(2);
+
+            var childPtrs = new IntPtr[count];
+            int capacity = count;
+            XbimGeometryNativeApi.xbim_compound_get_children(compound, childPtrs, ref capacity).Should().Be(0);
+            capacity.Should().Be(2);
+
+            for (int i = 0; i < capacity; i++)
+            {
+                using var child = NativeShapeHandle.FromIntPtr(childPtrs[i]);
+                XbimGeometryNativeApi.xbim_shape_type(child, out var childType).Should().Be(0);
+                childType.Should().Be(5); // XBIM_SHAPE_SOLID
+            }
+        }
+    }
+
+    [Fact]
+    public void Compound_Add_IncreasesChildCount()
+    {
+        // Start with 1 solid
+        using var s1 = BuildBoxSolid(10, 10, 10);
+        var ptrs = new IntPtr[] { s1.DangerousGetHandle() };
+        XbimGeometryNativeApi.xbim_compound_make(Ctx, ptrs, 1, out var compound).Should().Be(0);
+        using (compound)
+        {
+            XbimGeometryNativeApi.xbim_compound_child_count(compound, out var count1).Should().Be(0);
+            count1.Should().Be(1);
+
+            // Add a second solid
+            using var s2 = BuildBoxSolid(5, 5, 5);
+            XbimGeometryNativeApi.xbim_compound_add(compound, s2).Should().Be(0);
+
+            XbimGeometryNativeApi.xbim_compound_child_count(compound, out var count2).Should().Be(0);
+            count2.Should().Be(2);
+        }
+    }
+
+    [Fact]
+    public void Compound_MixedChildren_HasCorrectTypes()
+    {
+        // Build a solid and a face, combine into compound
+        using var solid = BuildBoxSolid(10, 10, 10);
+        using var wire = BuildSquareWire(5);
+        XbimGeometryNativeApi.xbim_face_build_from_wire(Ctx, wire, out var face).Should().Be(0);
+        using (face)
+        {
+            var ptrs = new IntPtr[] { solid.DangerousGetHandle(), face.DangerousGetHandle() };
+            XbimGeometryNativeApi.xbim_compound_make(Ctx, ptrs, 2, out var compound).Should().Be(0);
+            using (compound)
+            {
+                XbimGeometryNativeApi.xbim_compound_child_count(compound, out var count).Should().Be(0);
+                count.Should().Be(2);
+
+                var childPtrs = new IntPtr[count];
+                int capacity = count;
+                XbimGeometryNativeApi.xbim_compound_get_children(compound, childPtrs, ref capacity).Should().Be(0);
+
+                var types = new int[capacity];
+                for (int i = 0; i < capacity; i++)
+                {
+                    using var child = NativeShapeHandle.FromIntPtr(childPtrs[i]);
+                    XbimGeometryNativeApi.xbim_shape_type(child, out types[i]).Should().Be(0);
+                }
+
+                types.Should().Contain(5); // XBIM_SHAPE_SOLID
+                types.Should().Contain(3); // XBIM_SHAPE_FACE
+            }
+        }
+    }
+
+    [Fact]
+    public void Compound_Managed_IsSolidsOnly_True()
+    {
+        using var s1 = BuildBoxSolid(10, 10, 10);
+        using var s2 = BuildBoxSolid(5, 5, 5);
+        var ptrs = new IntPtr[] { s1.DangerousGetHandle(), s2.DangerousGetHandle() };
+        XbimGeometryNativeApi.xbim_compound_make(Ctx, ptrs, 2, out var compoundHandle).Should().Be(0);
+
+        var compound = (IXCompound)Shapes.ShapeFactory.WrapShape(compoundHandle);
+        using ((IDisposable)compound)
+        {
+            compound.IsSolidsOnly.Should().BeTrue();
+            compound.HasSolids.Should().BeTrue();
+            compound.HasFaces.Should().BeFalse();
+            compound.Solids.Should().HaveCount(2);
+            compound.Faces.Should().BeEmpty();
+        }
+    }
+
+    [Fact]
+    public void Compound_Managed_Add_WorksAndInvalidatesCache()
+    {
+        using var s1 = BuildBoxSolid(10, 10, 10);
+        var ptrs = new IntPtr[] { s1.DangerousGetHandle() };
+        XbimGeometryNativeApi.xbim_compound_make(Ctx, ptrs, 1, out var compoundHandle).Should().Be(0);
+
+        var compound = (IXCompound)Shapes.ShapeFactory.WrapShape(compoundHandle);
+        using ((IDisposable)compound)
+        {
+            compound.Solids.Should().HaveCount(1);
+
+            // Add another solid via managed Add
+            using var s2 = BuildBoxSolid(5, 5, 5);
+            var wrappedS2 = Shapes.ShapeFactory.WrapShape(s2);
+            compound.Add(wrappedS2);
+
+            compound.Solids.Should().HaveCount(2);
+        }
+    }
+
+    #endregion
+
+    #region Curve
+
+    [Fact]
+    public void Curve_Line_Parameters_AreFinite()
+    {
+        XbimGeometryNativeApi.xbim_curve_build_line_3d(
+            Ctx, 0, 0, 0, 1, 0, 0, out var curveHandle).Should().Be(0);
+        using (curveHandle)
+        {
+            XbimGeometryNativeApi.xbim_curve_parameters(curveHandle, out double first, out double last).Should().Be(0);
+            // Lines in OCCT have infinite parameter range
+            first.Should().BeLessThan(0);
+            last.Should().BeGreaterThan(0);
+        }
+    }
+
+    [Fact]
+    public void Curve_Circle_Length_IsCircumference()
+    {
+        double radius = 10;
+        XbimGeometryNativeApi.xbim_curve_build_circle_3d(
+            Ctx, 0, 0, 0, 0, 0, 1, radius, out var curveHandle).Should().Be(0);
+        var curve = new Primitives.Curve(curveHandle, XCurveType.IfcCircle);
+        using (curve)
+        {
+            curve.Length.Should().BeApproximately(2 * Math.PI * radius, 1e-3);
+        }
+    }
+
+    [Fact]
+    public void Curve_Circle_GetPoint_AtStart()
+    {
+        double radius = 5;
+        XbimGeometryNativeApi.xbim_curve_build_circle_3d(
+            Ctx, 0, 0, 0, 0, 0, 1, radius, out var curveHandle).Should().Be(0);
+        var curve = new Primitives.Curve(curveHandle, XCurveType.IfcCircle);
+        using (curve)
+        {
+            var pt = curve.GetPoint(curve.FirstParameter);
+            // Circle starts at (radius, 0, 0) by default
+            pt.X.Should().BeApproximately(radius, 1e-6);
+            pt.Y.Should().BeApproximately(0, 1e-6);
+        }
+    }
+
+    [Fact]
+    public void Curve_Circle_FirstDerivative_IsTangent()
+    {
+        double radius = 5;
+        XbimGeometryNativeApi.xbim_curve_build_circle_3d(
+            Ctx, 0, 0, 0, 0, 0, 1, radius, out var curveHandle).Should().Be(0);
+        var curve = new Primitives.Curve(curveHandle, XCurveType.IfcCircle);
+        using (curve)
+        {
+            var pt = curve.GetFirstDerivative(curve.FirstParameter, out var dir);
+            // At u=0, tangent of circle in XY plane is (0, 1, 0)
+            dir.Y.Should().BeApproximately(1, 1e-6);
+        }
+    }
+
+    [Fact]
+    public void Curve_Circle_SecondDerivative_PointsToCenter()
+    {
+        double radius = 5;
+        XbimGeometryNativeApi.xbim_curve_build_circle_3d(
+            Ctx, 0, 0, 0, 0, 0, 1, radius, out var curveHandle).Should().Be(0);
+        var curve = new Primitives.Curve(curveHandle, XCurveType.IfcCircle);
+        using (curve)
+        {
+            curve.GetSecondDerivative(curve.FirstParameter, out _, out var normal);
+            // At u=0, second derivative points toward center: (-1, 0, 0)
+            normal.X.Should().BeApproximately(-1, 1e-6);
+        }
+    }
+
+    #endregion
+
+    #region Shape (Triangulate, Location)
+
+    [Fact]
+    public void Shape_Triangulate_BoxSolid_ReturnsTrue()
+    {
+        using var solid = BuildBoxSolid(10, 10, 10);
+        var shape = Shapes.ShapeFactory.WrapShape(solid);
+        using ((IDisposable)shape)
+        {
+            var meshFactors = new Services.MeshFactors(1000, 1e-3);
+            bool ok = shape.Triangulate(meshFactors);
+            ok.Should().BeTrue();
+        }
+    }
+
+    [Fact]
+    public void Shape_Location_Identity_ByDefault()
+    {
+        using var solid = BuildBoxSolid(5, 5, 5);
+        var shape = Shapes.ShapeFactory.WrapShape(solid);
+        using ((IDisposable)shape)
+        {
+            var loc = shape.Location;
+            loc.IsIdentity.Should().BeTrue();
+        }
+    }
+
+    [Fact]
+    public void Shape_Location_AfterMove_HasTranslation()
+    {
+        using var solid = BuildBoxSolid(5, 5, 5);
+
+        // Move the shape to (10, 20, 30)
+        int locResult = XbimGeometryNativeApi.xbim_location_create_from_axis2(
+            10, 20, 30, 0, 0, 1, 1, 0, 0, out var locHandle);
+        locResult.Should().Be(0);
+
+        XbimGeometryNativeApi.xbim_shape_moved(solid, locHandle, out var movedHandle);
+        locHandle.Dispose();
+
+        var moved = Shapes.ShapeFactory.WrapShape(movedHandle);
+        using ((IDisposable)moved)
+        {
+            var loc = moved.Location;
+            loc.IsIdentity.Should().BeFalse();
+            loc.OffsetX.Should().BeApproximately(10, 1e-6);
+            loc.OffsetY.Should().BeApproximately(20, 1e-6);
+            loc.OffsetZ.Should().BeApproximately(30, 1e-6);
+        }
+    }
+
+    #endregion
+
+    #region Helpers
 
     private NativeShapeHandle BuildSquareWire(double size, double offsetX = 0, double offsetY = 0)
     {
@@ -340,6 +838,13 @@ public class TopologyTests : IDisposable
         double[] pts = { x0, y0, 0, x1, y0, 0, x1, y1, 0, x0, y1, 0 };
         XbimGeometryNativeApi.xbim_wire_build_polygon(Ctx, pts, 4, 1, out var wire);
         return wire;
+    }
+
+    private NativeShapeHandle BuildBoxSolid(double dx, double dy, double dz)
+    {
+        using var shell = BuildBoxShell(dx, dy, dz);
+        XbimGeometryNativeApi.xbim_shell_make_solid(Ctx, shell, out var solid);
+        return solid;
     }
 
     private NativeShapeHandle BuildBoxShell(double dx, double dy, double dz)
@@ -376,4 +881,6 @@ public class TopologyTests : IDisposable
                 f?.Dispose();
         }
     }
+
+    #endregion
 }

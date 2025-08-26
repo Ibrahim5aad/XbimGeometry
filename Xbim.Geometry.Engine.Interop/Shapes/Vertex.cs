@@ -1,6 +1,8 @@
 using System;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
+using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Engine.Interop.Primitives;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
@@ -18,9 +20,11 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                // Vertex tolerance not yet available in native API (TOPO-005)
-                throw new NotImplementedException(
-                    "Vertex tolerance will be available after TOPO-005.");
+                int result = XbimGeometryNativeApi.xbim_vertex_tolerance(Handle, out double tol);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to get vertex tolerance: {XbimGeometryNativeApi.GetLastError()}");
+                return tol;
             }
         }
 
@@ -28,9 +32,12 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                // Vertex point extraction not yet available in native API (TOPO-005)
-                throw new NotImplementedException(
-                    "Vertex point will be available after TOPO-005.");
+                int result = XbimGeometryNativeApi.xbim_vertex_point(
+                    Handle, out double x, out double y, out double z);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to get vertex point: {XbimGeometryNativeApi.GetLastError()}");
+                return new XPoint(x, y, z);
             }
         }
     }
