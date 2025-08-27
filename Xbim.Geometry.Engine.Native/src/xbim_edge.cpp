@@ -34,7 +34,7 @@
 #include <TopoDS_Vertex.hxx>
 #include <Standard_Failure.hxx>
 
-/* ── xbim_edge_build_line ──────────────────────────────────────────────── */
+#pragma region Edge Construction
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_line(
     XbimContextHandle ctx,
@@ -95,7 +95,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_line(
     }
 }
 
-/* ── xbim_edge_build_from_curve ────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve(
     XbimContextHandle ctx,
@@ -183,7 +182,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve(
     }
 }
 
-/* ── xbim_edge_build_circle_arc ────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_circle_arc(
     XbimContextHandle ctx,
@@ -249,7 +247,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_circle_arc(
     }
 }
 
-/* ── xbim_edge_build_from_curve_handle ─────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve_handle(
     XbimContextHandle ctx,
@@ -338,7 +335,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve_handle(
     }
 }
 
-/* ── xbim_edge_length ──────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Edge Queries
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_length(
     XbimShapeHandle edgeHandle,
@@ -381,7 +380,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_length(
     }
 }
 
-/* ── xbim_edge_tolerance ─────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_tolerance(
     XbimShapeHandle edgeHandle,
@@ -411,7 +409,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_tolerance(
     }
 }
 
-/* ── xbim_edge_vertices ──────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_vertices(
     XbimShapeHandle edgeHandle,
@@ -453,3 +450,5 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_vertices(
         return XBIM_ERROR;
     }
 }
+
+#pragma endregion

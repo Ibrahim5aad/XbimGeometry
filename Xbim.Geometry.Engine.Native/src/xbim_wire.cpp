@@ -35,7 +35,7 @@
 #include <TopAbs_ShapeEnum.hxx>
 #include <Standard_Failure.hxx>
 
-/* ── xbim_wire_build_from_edges ────────────────────────────────────────── */
+#pragma region Wire Construction
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_edges(
     XbimContextHandle        ctx,
@@ -106,7 +106,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_edges(
     }
 }
 
-/* ── xbim_wire_build_polyline ──────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polyline(
     XbimContextHandle ctx,
@@ -212,7 +211,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polyline(
     }
 }
 
-/* ── xbim_wire_build_polygon ───────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polygon(
     XbimContextHandle ctx,
@@ -304,7 +302,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polygon(
     }
 }
 
-/* ── xbim_wire_is_closed ───────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Wire Queries
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_is_closed(
     XbimShapeHandle wireHandle,
@@ -351,7 +351,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_is_closed(
     }
 }
 
-/* ── xbim_wire_length ──────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_length(
     XbimShapeHandle wireHandle,
@@ -393,7 +392,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_length(
     }
 }
 
-/* ── xbim_wire_contour_area ────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_contour_area(
     XbimShapeHandle wireHandle,
@@ -458,3 +456,5 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_contour_area(
         return XBIM_ERROR;
     }
 }
+
+#pragma endregion

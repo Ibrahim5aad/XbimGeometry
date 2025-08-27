@@ -23,7 +23,7 @@
 #include <TopTools_ListOfShape.hxx>
 #include <Standard_Failure.hxx>
 
-/* ── Exported C API ───────────────────────────────────────────────────────── */
+#pragma region Compound Operations
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_make(
     XbimContextHandle         ctx,
@@ -267,3 +267,5 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_get_children(
         return XBIM_ERROR;
     }
 }
+
+#pragma endregion

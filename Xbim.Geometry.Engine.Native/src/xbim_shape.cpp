@@ -35,7 +35,7 @@
 #include <ShapeAnalysis.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
 
-/* ── Internal helper ──────────────────────────────────────────────────────── */
+#pragma region Shape Helpers
 
 XbimShapeHandle xbim_shape_create_from(const TopoDS_Shape& shape)
 {
@@ -45,7 +45,9 @@ XbimShapeHandle xbim_shape_create_from(const TopoDS_Shape& shape)
     return s;
 }
 
-/* ── Public API ───────────────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Shape Lifecycle
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_destroy(XbimShapeHandle handle)
 {
@@ -296,7 +298,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_surface_area(
     }
 }
 
-/* ── Topology traversal helpers ────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Topology Traversal
 
 static TopAbs_ShapeEnum xbim_to_topabs(XbimShapeType st)
 {
@@ -596,7 +600,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_write_brep(
     }
 }
 
-/* ── BRep string serialization ──────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region BRep Serialization
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_to_brep_string(
     XbimShapeHandle handle,
@@ -695,7 +701,9 @@ XBIM_EXPORT void XBIM_CALL xbim_string_free(char* str)
     std::free(str);
 }
 
-/* ── Binary shape serialization ──────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Binary Serialization
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_to_binary(
     XbimShapeHandle     handle,
@@ -800,7 +808,9 @@ XBIM_EXPORT XbimShapeHandle XBIM_CALL xbim_shape_from_binary(
     }
 }
 
-/* ── xbim_shape_unify_domain ──────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Shape Utilities
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_unify_domain(
     XbimShapeHandle     shapeHandle,
@@ -854,3 +864,5 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_unify_domain(
         return XBIM_ERROR;
     }
 }
+
+#pragma endregion

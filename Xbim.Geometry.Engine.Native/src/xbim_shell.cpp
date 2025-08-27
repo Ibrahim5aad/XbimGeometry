@@ -31,7 +31,7 @@
 #include <TopAbs_ShapeEnum.hxx>
 #include <Standard_Failure.hxx>
 
-/* ── xbim_shell_build_from_faces ───────────────────────────────────────── */
+#pragma region Shell Construction
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_from_faces(
     XbimContextHandle        ctx,
@@ -121,7 +121,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_from_faces(
     }
 }
 
-/* ── xbim_shell_sew ────────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_sew(
     XbimContextHandle   ctx,
@@ -239,7 +238,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_sew(
     }
 }
 
-/* ── xbim_shell_make_solid ─────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Shell Conversion
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_make_solid(
     XbimContextHandle   ctx,
@@ -321,7 +322,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_make_solid(
     }
 }
 
-/* ── xbim_shell_build_closed_shell ─────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_closed_shell(
     XbimContextHandle        ctx,
@@ -469,3 +469,5 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_closed_shell(
         return XBIM_ERROR;
     }
 }
+
+#pragma endregion

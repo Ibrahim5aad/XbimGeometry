@@ -15,7 +15,7 @@
 extern "C" {
 #endif
 
-/* ── Export / calling-convention macros ─────────────────────────────────────── */
+#pragma region Export And Calling Convention Macros
 
 #if defined(_WIN32) || defined(_WIN64)
     #ifdef XBIM_BUILD_DLL
@@ -29,7 +29,9 @@ extern "C" {
     #define XBIM_CALL
 #endif
 
-/* ── Opaque handle types ───────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Opaque Handle Types
 
 typedef struct XbimContext_*        XbimContextHandle;
 typedef struct XbimShape_*          XbimShapeHandle;
@@ -37,7 +39,9 @@ typedef struct XbimLocation_*       XbimLocationHandle;
 typedef struct XbimCurve_*          XbimCurveHandle;
 typedef struct XbimSurface_*        XbimSurfaceHandle;
 
-/* ── Result / error codes ──────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Result And Error Codes
 
 typedef int XbimResult;
 
@@ -55,7 +59,9 @@ typedef int XbimResult;
  */
 XBIM_EXPORT const char* XBIM_CALL xbim_get_last_error(void);
 
-/* ── Logging callback ──────────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Logging Callback
 
 /*
  * Log levels (matching Xbim.Geometry.Engine NLoggingService convention).
@@ -75,7 +81,9 @@ XBIM_EXPORT const char* XBIM_CALL xbim_get_last_error(void);
  */
 typedef void (XBIM_CALL *XbimLogCallback)(int level, const char* msg);
 
-/* ── Context lifecycle ─────────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Context Lifecycle
 
 /*
  * Create a geometry context wrapping model-level parameters.
@@ -110,7 +118,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_context_create(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_context_destroy(XbimContextHandle handle);
 
-/* ── Context logging ──────────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Context Logging
 
 /*
  * Replace the logging callback on an existing context.
@@ -139,7 +149,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_context_log(
     int                level,
     const char*        message);
 
-/* ── Shape type enumeration ────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Shape Type Enumeration
 
 /*
  * Matches Xbim.Geometry.Abstractions.XShapeType (C# enum).
@@ -156,7 +168,9 @@ typedef enum XbimShapeType
     XBIM_SHAPE_COMPOUND = 6
 } XbimShapeType;
 
-/* ── Shape handle lifecycle ───────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Shape Handle Lifecycle
 
 /*
  * Destroy a shape handle and free its resources.
@@ -248,7 +262,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_surface_area(
     XbimShapeHandle handle,
     double*         outArea);
 
-/* ── Location handle lifecycle ────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Location Handle Lifecycle
 
 /*
  * Create a location (transform) from an axis-2 placement.
@@ -341,7 +357,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_moved(
     XbimLocationHandle  locationHandle,
     XbimShapeHandle*    outHandle);
 
-/* ── CSG solid primitives ────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region CSG Solid Primitives
 
 /*
  * Build a rectangular block (box) solid.
@@ -448,7 +466,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_rectangular_pyramid(
     double xLen,    double yLen,    double height,
     XbimShapeHandle* outHandle);
 
-/* ── Sweep operations (extruded area solids) ─────────────────────────────── */
+#pragma endregion
+
+#pragma region Extruded Area Solids
 
 /*
  * Build an extruded area solid (linear sweep / prism).
@@ -499,7 +519,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_extruded_tapered(
     XbimLocationHandle  locationHandle,
     XbimShapeHandle*    outHandle);
 
-/* ── Sweep operations (revolved area solids) ──────────────────────────────── */
+#pragma endregion
+
+#pragma region Revolved Area Solids
 
 /*
  * Build a revolved area solid.
@@ -607,7 +629,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_fixed_reference_swept(
     XbimLocationHandle  locationHandle,
     XbimShapeHandle*    outHandle);
 
-/* ── Parametric profile primitives ────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Parametric Profiles
 
 /*
  * Build a rectangular profile face.
@@ -697,7 +721,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rounded_rectangle(
     double xDim,    double yDim,    double roundingRadius,
     XbimShapeHandle* outHandle);
 
-/* ── Structural profile primitives ───────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Structural Profiles
 
 /*
  * Build a symmetric I-shape (wide-flange) profile face.
@@ -934,7 +960,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_asymmetric_ishape(
     double bottomFlangeSlope, double topFlangeSlope,
     XbimShapeHandle* outHandle);
 
-/* ── Hollow profile primitives ────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Hollow Profiles
 
 /*
  * Build a rectangle hollow profile face (rectangle with a rectangular hole).
@@ -987,7 +1015,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_circle_hollow(
     double radius,  double wallThickness,
     XbimShapeHandle* outHandle);
 
-/* ── Arbitrary / composite / derived profile primitives ────────────────── */
+#pragma endregion
+
+#pragma region Arbitrary And Derived Profiles
 
 /*
  * Build a closed face from an arbitrary 2D polyline.
@@ -1110,7 +1140,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_mirrored(
     XbimShapeHandle   parentHandle,
     XbimShapeHandle*  outHandle);
 
-/* ── Boolean operations ────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Boolean Operations
 
 /*
  * Perform a boolean union (fuse) of two shapes.
@@ -1181,7 +1213,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_intersect(
     int*                outHasWarnings,
     XbimShapeHandle*    outHandle);
 
-/* ── Half-space operations ─────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Half-Space Operations
 
 /*
  * Surface type for half-space construction.
@@ -1274,7 +1308,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_polygonal_bounded(
     double precision,
     XbimShapeHandle*  outHandle);
 
-/* ── Compound operations ───────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Compound Operations
 
 /*
  * Create a compound shape from an array of child shapes.
@@ -1384,7 +1420,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_get_children(
     XbimShapeHandle*    outHandles,
     int*                count);
 
-/* ── Vertex construction and query ────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Vertex Operations
 
 /*
  * Build a vertex at the given 3D point with the specified tolerance.
@@ -1425,7 +1463,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_tolerance(
     XbimShapeHandle vertexHandle,
     double*         outTolerance);
 
-/* ── Wire queries ──────────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Wire Queries
 
 /*
  * Compute the total arc length of a wire.
@@ -1443,7 +1483,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_contour_area(
     XbimShapeHandle wireHandle,
     double*         outArea);
 
-/* ── Face construction and queries ────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Face Operations
 
 /*
  * Build a face from an elementary surface with no boundary wires.
@@ -1640,7 +1682,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_fix(
     XbimShapeHandle*    outFaces,
     int*                outCount);
 
-/* ── Wire construction and query ────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Wire Construction
 
 /*
  * Build a wire from a sequence of edge shape handles.
@@ -1719,7 +1763,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_is_closed(
     double          tolerance,
     int*            outClosed);
 
-/* ── Edge construction and query ────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Edge Operations
 
 /*
  * Build a straight edge (line segment) between two 3D points.
@@ -1849,7 +1895,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_vertices(
     XbimShapeHandle* outStart,
     XbimShapeHandle* outEnd);
 
-/* ── Shell construction and repair ──────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Shell Operations
 
 /*
  * Build a shell from an array of face shape handles.
@@ -1932,7 +1980,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_closed_shell(
     double                   tolerance,
     XbimShapeHandle*         outHandle);
 
-/* ── Curve handle lifecycle ──────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Curve Lifecycle
 
 /*
  * Build an infinite 3D line curve from an origin point and direction.
@@ -2022,7 +2072,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_bspline(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_destroy(XbimCurveHandle handle);
 
-/* ── Curve queries ─────────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Curve Queries
 
 /*
  * Get the parametric range of a curve.
@@ -2072,7 +2124,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_d2(
     double*         outD1x, double* outD1y, double* outD1z,
     double*         outD2x, double* outD2y, double* outD2z);
 
-/* ── Surface handle lifecycle ───────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Surface Operations
 
 /*
  * Build an infinite plane surface from an origin point and normal direction.
@@ -2177,7 +2231,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_bspline(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_destroy(XbimSurfaceHandle handle);
 
-/* ── Shape traversal (topology navigation) ─────────────────────────────── */
+#pragma endregion
+
+#pragma region Topology Traversal
 
 /*
  * Count the number of sub-shapes of the given type contained in a shape.
@@ -2251,7 +2307,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_inner_wires(
     XbimShapeHandle*    outHandles,
     int*                count);
 
-/* ── Shape triangulation ─────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Shape Triangulation
 
 /*
  * Triangulate a shape using BRepMesh_IncrementalMesh.
@@ -2272,7 +2330,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_triangulate(
     double              angularDeflection,
     int                 relative);
 
-/* ── WexBim mesh creation ──────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region WexBim Mesh Creation
 
 /*
  * Triangulate a shape and serialize the result to WexBim binary format.
@@ -2342,7 +2402,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_mesh_get_bounding_box(
  */
 XBIM_EXPORT void XBIM_CALL xbim_buffer_free(unsigned char* buffer);
 
-/* ── BRep serialization ────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region BRep Serialization
 
 /*
  * Write a shape to a file in OCCT BRep ASCII format.
@@ -2395,7 +2457,9 @@ XBIM_EXPORT XbimShapeHandle XBIM_CALL xbim_shape_from_brep_string(
  */
 XBIM_EXPORT void XBIM_CALL xbim_string_free(char* str);
 
-/* ── Binary shape serialization ──────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Binary Shape Serialization
 
 /*
  * Serialize a shape to OCCT BinTools binary format.
@@ -2431,7 +2495,9 @@ XBIM_EXPORT XbimShapeHandle XBIM_CALL xbim_shape_from_binary(
     const unsigned char*    buffer,
     int                     size);
 
-/* ── Domain unification ────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Shape Utilities
 
 /*
  * Merge co-planar faces and co-linear edges using ShapeUpgrade_UnifySameDomain.
@@ -2444,5 +2510,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_unify_domain(
 #ifdef __cplusplus
 }
 #endif
+
+#pragma endregion
 
 #endif /* XBIM_GEOMETRY_API_H */

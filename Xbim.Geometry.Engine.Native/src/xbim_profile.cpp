@@ -73,7 +73,7 @@
 #include <GProp_GProps.hxx>
 #include <BRepGProp.hxx>
 
-/* ── Helper: build placement transform from 9 doubles ────────────────────── */
+#pragma region Profile Helpers
 
 static TopLoc_Location make_placement(
     double originX, double originY, double originZ,
@@ -91,7 +91,6 @@ static TopLoc_Location make_placement(
     return TopLoc_Location(trsf);
 }
 
-/* ── Helper: apply fillets to selected vertices of a wire ────────────────── */
 
 /*
  * Given a wire, a list of vertex indices (1-based) and their radii,
@@ -133,7 +132,6 @@ static TopoDS_Wire apply_fillets(const TopoDS_Wire& wire, const FilletSpec* spec
     return wire;
 }
 
-/* ── Helper: build a face from a wire, apply placement, wrap as shape ───── */
 
 static XbimResult make_profile_face(
     XbimContextHandle ctx,
@@ -171,7 +169,9 @@ static XbimResult make_profile_face(
     return XBIM_OK;
 }
 
-/* ── Rectangle profile ───────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Parametric Profiles
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rectangle(
     XbimContextHandle ctx,
@@ -255,7 +255,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rectangle(
     }
 }
 
-/* ── Circle profile ──────────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_circle(
     XbimContextHandle ctx,
@@ -326,7 +325,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_circle(
     }
 }
 
-/* ── Ellipse profile ─────────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ellipse(
     XbimContextHandle ctx,
@@ -410,7 +408,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ellipse(
     }
 }
 
-/* ── Rounded rectangle profile ───────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rounded_rectangle(
     XbimContextHandle ctx,
@@ -529,7 +526,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rounded_rectangle(
     }
 }
 
-/* ── I-shape profile ─────────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Structural Profiles
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ishape(
     XbimContextHandle ctx,
@@ -635,7 +634,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ishape(
     }
 }
 
-/* ── L-shape profile ─────────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_lshape(
     XbimContextHandle ctx,
@@ -719,7 +717,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_lshape(
     }
 }
 
-/* ── T-shape profile ─────────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_tshape(
     XbimContextHandle ctx,
@@ -844,7 +841,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_tshape(
     }
 }
 
-/* ── U-shape profile ─────────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ushape(
     XbimContextHandle ctx,
@@ -935,7 +931,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ushape(
     }
 }
 
-/* ── Z-shape profile ─────────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_zshape(
     XbimContextHandle ctx,
@@ -1017,7 +1012,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_zshape(
     }
 }
 
-/* ── C-shape profile ─────────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_cshape(
     XbimContextHandle ctx,
@@ -1197,7 +1191,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_cshape(
     }
 }
 
-/* ── Trapezium profile ────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_trapezium(
     XbimContextHandle ctx,
@@ -1268,7 +1261,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_trapezium(
     }
 }
 
-/* ── Asymmetric I-shape profile ──────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_asymmetric_ishape(
     XbimContextHandle ctx,
@@ -1407,7 +1399,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_asymmetric_ishape(
     }
 }
 
-/* ── Rectangle hollow profile ────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Hollow Profiles
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rectangle_hollow(
     XbimContextHandle ctx,
@@ -1571,7 +1565,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rectangle_hollow(
     }
 }
 
-/* ── Circle hollow profile ───────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_circle_hollow(
     XbimContextHandle ctx,
@@ -1660,7 +1653,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_circle_hollow(
     }
 }
 
-/* ── Arbitrary closed profile ──────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Arbitrary And Derived Profiles
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_arbitrary_closed(
     XbimContextHandle ctx,
@@ -1753,7 +1748,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_arbitrary_closed(
     }
 }
 
-/* ── Arbitrary open profile (wire, not face) ─────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_arbitrary_open(
     XbimContextHandle ctx,
@@ -1825,7 +1819,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_arbitrary_open(
     }
 }
 
-/* ── Profile with voids (outer face + inner wire holes) ──────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_with_voids(
     XbimContextHandle ctx,
@@ -1956,7 +1949,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_with_voids(
     }
 }
 
-/* ── Composite profile (multiple profiles merged into a compound) ── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_composite(
     XbimContextHandle ctx,
@@ -2029,7 +2021,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_composite(
     }
 }
 
-/* ── Derived profile (apply 2D transform to parent face) ─────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_derived(
     XbimContextHandle ctx,
@@ -2135,7 +2126,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_derived(
     }
 }
 
-/* ── Mirrored profile (mirror parent face about Y axis) ──────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_mirrored(
     XbimContextHandle ctx,
@@ -2201,3 +2191,5 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_mirrored(
         return XBIM_ERROR;
     }
 }
+
+#pragma endregion

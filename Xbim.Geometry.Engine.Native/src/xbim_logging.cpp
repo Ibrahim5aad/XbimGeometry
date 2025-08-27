@@ -17,7 +17,7 @@
 /* Maximum length for a single formatted log message */
 static const int LOG_BUFFER_SIZE = 2048;
 
-/* ── Internal formatting helper ────────────────────────────────────────────── */
+#pragma region Logging Internals
 
 static void log_formatted_va(const XbimContext_* ctx, int level,
                              const char* fmt, va_list args)
@@ -37,7 +37,6 @@ static void log_formatted_va(const XbimContext_* ctx, int level,
     ctx->logCallback(level, buffer);
 }
 
-/* ── Public internal helpers ───────────────────────────────────────────────── */
 
 void xbim_log_message(const XbimContext_* ctx, int level,
                       const char* fmt, ...)
@@ -88,7 +87,6 @@ void xbim_log_critical(const XbimContext_* ctx, const char* fmt, ...)
     va_end(args);
 }
 
-/* ── OCCT failure logging ──────────────────────────────────────────────────── */
 
 void xbim_log_occt_failure(const XbimContext_* ctx, const Standard_Failure& e,
                            const char* context_msg)
@@ -104,7 +102,9 @@ void xbim_log_occt_failure(const XbimContext_* ctx, const Standard_Failure& e,
     ctx->logCallback(XBIM_LOG_WARNING, strm.str().c_str());
 }
 
-/* ── Exported C API ────────────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Logging Exports
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_context_set_logger(
     XbimContextHandle handle,
@@ -130,3 +130,5 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_context_log(
 
     return XBIM_OK;
 }
+
+#pragma endregion

@@ -47,7 +47,7 @@
 #include <TopAbs_ShapeEnum.hxx>
 #include <Standard_Failure.hxx>
 
-/* ── Helper: add parametric curves to a wire on a non-planar surface ──── */
+#pragma region Face Helpers
 
 /*
  * For non-planar surfaces, we need to add 2D parametric curves (pcurves) to
@@ -78,7 +78,6 @@ static bool add_parametric_curves(Handle(Geom_Surface)& surface,
     return gProps.Mass() > 0;
 }
 
-/* ── Helper: build a Geom_Surface from surface type and placement ──────── */
 
 static Handle(Geom_Surface) make_surface(
     int surfaceType,
@@ -105,7 +104,9 @@ static Handle(Geom_Surface) make_surface(
     }
 }
 
-/* ── xbim_face_build_from_surface ──────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Face Construction
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_surface(
     XbimContextHandle ctx,
@@ -173,7 +174,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_surface(
     }
 }
 
-/* ── xbim_face_build_from_wire ─────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_wire(
     XbimContextHandle ctx,
@@ -238,7 +238,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_wire(
     }
 }
 
-/* ── xbim_face_build_advanced ──────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced(
     XbimContextHandle        ctx,
@@ -386,7 +385,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced(
     }
 }
 
-/* ── xbim_face_build_advanced_with_surface ─────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced_with_surface(
     XbimContextHandle        ctx,
@@ -524,7 +522,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced_with_surface(
     }
 }
 
-/* ── xbim_face_area ────────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Face Queries
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_face_area(
     XbimShapeHandle faceHandle,
@@ -566,7 +566,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_area(
     }
 }
 
-/* ── xbim_face_normal ──────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_face_normal(
     XbimShapeHandle faceHandle,
@@ -632,7 +631,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_normal(
     }
 }
 
-/* ── xbim_face_tolerance ─────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_face_tolerance(
     XbimShapeHandle faceHandle,
@@ -662,7 +660,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_tolerance(
     }
 }
 
-/* ── xbim_face_get_surface ───────────────────────────────────────────── */
 
 /*
  * Map OCCT Geom_Surface dynamic type to XbimSurfaceType int.
@@ -723,7 +720,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_get_surface(
     }
 }
 
-/* ── xbim_face_add_wires ──────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Face Modification
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_face_add_wires(
     XbimShapeHandle     faceHandle,
@@ -779,7 +778,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_add_wires(
     }
 }
 
-/* ── xbim_face_fix ─────────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_face_fix(
     XbimShapeHandle     faceHandle,
@@ -839,3 +837,5 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_fix(
         return XBIM_ERROR;
     }
 }
+
+#pragma endregion

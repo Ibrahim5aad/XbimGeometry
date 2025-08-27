@@ -34,7 +34,7 @@
 #include <Graphic3d_BndBox3d.hxx>
 #include <BVH_Types.hxx>
 
-/* ── PackedNormal ───────────────────────────────────────────────────────── */
+#pragma region PackedNormal
 
 struct PackedNormal
 {
@@ -49,7 +49,9 @@ struct PackedNormal
     static PackedNormal FromDirection(const gp_Dir& vec);
 };
 
-/* ── PointInspector (vertex deduplication via spatial hashing) ──────────── */
+#pragma endregion
+
+#pragma region PointInspector
 
 struct CellFilter_InspectorXYZ
 {
@@ -98,7 +100,9 @@ private:
     gp_XYZ current_;
 };
 
-/* ── FaceMeshIterator ──────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region FaceMeshIterator
 
 class FaceMeshIterator
 {
@@ -167,7 +171,9 @@ private:
     NCollection_Vector<gp_Dir> normals_;
 };
 
-/* ── WexBimMesh ────────────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region WexBimMesh
 
 typedef NCollection_Vec3<int> Vec3Int;
 
@@ -210,5 +216,7 @@ private:
 
     static const unsigned char VERSION = 1;
 };
+
+#pragma endregion
 
 #endif /* XBIM_MESH_H */

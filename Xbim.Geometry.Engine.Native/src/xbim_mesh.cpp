@@ -313,7 +313,7 @@ void WexBimMesh::SaveIndicesAndNormals(FaceMeshIterator& faceIter)
     normalsPerFace_.push_back(std::move(normals));
 }
 
-/* ── Serialization helpers ─────────────────────────────────────────────── */
+#pragma region WexBim Serialization
 
 template<typename T>
 static void writeValue(std::vector<unsigned char>& buf, const T& val)
@@ -718,3 +718,5 @@ XBIM_EXPORT void XBIM_CALL xbim_buffer_free(unsigned char* buffer)
 {
     std::free(buffer);
 }
+
+#pragma endregion

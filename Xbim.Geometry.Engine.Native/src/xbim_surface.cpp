@@ -30,7 +30,7 @@
 #include <TColStd_Array2OfReal.hxx>
 #include <Standard_Failure.hxx>
 
-/* ── Internal helpers ──────────────────────────────────────────────────── */
+#pragma region Surface Helpers
 
 XbimSurfaceHandle xbim_surface_create_from(const Handle(Geom_Surface)& surface)
 {
@@ -45,7 +45,9 @@ XbimSurfaceHandle xbim_surface_create_from(const Handle(Geom_Surface)& surface)
     return wrapper;
 }
 
-/* ── xbim_surface_destroy ──────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Surface Construction
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_destroy(XbimSurfaceHandle handle)
 {
@@ -56,7 +58,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_destroy(XbimSurfaceHandle handle)
     return XBIM_OK;
 }
 
-/* ── xbim_surface_build_plane ──────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_plane(
     XbimContextHandle ctx,
@@ -97,7 +98,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_plane(
     }
 }
 
-/* ── xbim_surface_build_cylindrical ────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_cylindrical(
     XbimContextHandle ctx,
@@ -148,7 +148,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_cylindrical(
     }
 }
 
-/* ── xbim_surface_build_spherical ──────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_spherical(
     XbimContextHandle ctx,
@@ -199,7 +198,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_spherical(
     }
 }
 
-/* ── xbim_surface_build_bspline ────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_bspline(
     XbimContextHandle ctx,
@@ -310,3 +308,5 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_bspline(
         return XBIM_ERROR;
     }
 }
+
+#pragma endregion

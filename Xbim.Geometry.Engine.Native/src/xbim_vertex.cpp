@@ -20,7 +20,7 @@
 #include <BRep_Tool.hxx>
 #include <Standard_Failure.hxx>
 
-/* ── xbim_vertex_build ─────────────────────────────────────────────────── */
+#pragma region Vertex Operations
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_build(
     XbimContextHandle ctx,
@@ -75,7 +75,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_build(
     }
 }
 
-/* ── xbim_vertex_point ─────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_point(
     XbimShapeHandle vertexHandle,
@@ -123,7 +122,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_point(
     }
 }
 
-/* ── xbim_vertex_tolerance ────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_tolerance(
     XbimShapeHandle vertexHandle,
@@ -163,3 +161,5 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_tolerance(
         return XBIM_ERROR;
     }
 }
+
+#pragma endregion

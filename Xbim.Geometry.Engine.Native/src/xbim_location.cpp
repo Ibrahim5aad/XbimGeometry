@@ -20,7 +20,7 @@
 #include <TopLoc_Location.hxx>
 #include <Standard_Failure.hxx>
 
-/* ── Internal helper ──────────────────────────────────────────────────────── */
+#pragma region Location Helpers
 
 XbimLocationHandle xbim_location_create_internal(const TopLoc_Location& loc)
 {
@@ -30,7 +30,9 @@ XbimLocationHandle xbim_location_create_internal(const TopLoc_Location& loc)
     return l;
 }
 
-/* ── Public API ───────────────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Location Operations
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_location_create_from_axis2(
     double originX, double originY, double originZ,
@@ -290,3 +292,5 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_moved(
         return XBIM_ERROR;
     }
 }
+
+#pragma endregion

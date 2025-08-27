@@ -12,7 +12,7 @@
 #include <cstring>
 #include <new>
 
-/* ── Public API ────────────────────────────────────────────────────────────── */
+#pragma region Context Lifecycle
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_context_create(
     double precision,
@@ -84,3 +84,5 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_context_destroy(XbimContextHandle handle)
 }
 
 /* Logging helpers are now in xbim_logging.h / xbim_logging.cpp */
+
+#pragma endregion

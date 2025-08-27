@@ -83,7 +83,7 @@
 #include <Geom_Surface.hxx>
 #include <GeomLProp_SLProps.hxx>
 
-/* ── Helper: build gp_Ax2 from 9 doubles ────────────────────────────────── */
+#pragma region Solid Helpers
 
 static gp_Ax2 make_ax2(
     double originX, double originY, double originZ,
@@ -96,7 +96,9 @@ static gp_Ax2 make_ax2(
         gp_Dir(xDirX, xDirY, xDirZ));
 }
 
-/* ── Block (box) ─────────────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region CSG Primitives
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_block(
     XbimContextHandle ctx,
@@ -154,7 +156,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_block(
     }
 }
 
-/* ── Sphere ──────────────────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_sphere(
     XbimContextHandle ctx,
@@ -212,7 +213,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_sphere(
     }
 }
 
-/* ── Right circular cylinder ─────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_right_circular_cylinder(
     XbimContextHandle ctx,
@@ -270,7 +270,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_right_circular_cylinder(
     }
 }
 
-/* ── Right circular cone ─────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_right_circular_cone(
     XbimContextHandle ctx,
@@ -329,7 +328,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_right_circular_cone(
     }
 }
 
-/* ── Rectangular pyramid ─────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_rectangular_pyramid(
     XbimContextHandle ctx,
@@ -497,7 +495,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_rectangular_pyramid(
     }
 }
 
-/* ── Extruded area solid (linear sweep / prism) ──────────────────────── */
+#pragma endregion
+
+#pragma region Sweep Operations
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_extruded(
     XbimContextHandle   ctx,
@@ -578,7 +578,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_extruded(
     }
 }
 
-/* ── Extruded area solid tapered (ThruSections loft) ─────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_extruded_tapered(
     XbimContextHandle   ctx,
@@ -719,7 +718,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_extruded_tapered(
     }
 }
 
-/* ── Revolved area solid (BRepPrimAPI_MakeRevol) ─────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_revolved(
     XbimContextHandle   ctx,
@@ -807,7 +805,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_revolved(
     }
 }
 
-/* ── Revolved area solid tapered (MakePipeShell along arc) ───────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_revolved_tapered(
     XbimContextHandle   ctx,
@@ -1025,7 +1022,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_revolved_tapered(
     }
 }
 
-/* ── Helper: unwrap trimmed curves to get the basis curve ────────────── */
+#pragma endregion
+
+#pragma region Pipe Operations
 
 static Handle(Geom_Curve) get_basis_curve(const Handle(Geom_Curve)& curve)
 {
@@ -1406,3 +1405,5 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_fixed_reference_swept(
         return XBIM_ERROR;
     }
 }
+
+#pragma endregion

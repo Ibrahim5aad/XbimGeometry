@@ -34,7 +34,7 @@
 #include <GCPnts_AbscissaPoint.hxx>
 #include <Standard_Failure.hxx>
 
-/* ── Internal helpers ──────────────────────────────────────────────────── */
+#pragma region Curve Helpers
 
 XbimCurveHandle xbim_curve_create_from(const Handle(Geom_Curve)& curve)
 {
@@ -49,7 +49,9 @@ XbimCurveHandle xbim_curve_create_from(const Handle(Geom_Curve)& curve)
     return wrapper;
 }
 
-/* ── xbim_curve_destroy ────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Curve Construction
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_destroy(XbimCurveHandle handle)
 {
@@ -60,7 +62,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_destroy(XbimCurveHandle handle)
     return XBIM_OK;
 }
 
-/* ── xbim_curve_build_line_3d ──────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_line_3d(
     XbimContextHandle ctx,
@@ -101,7 +102,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_line_3d(
     }
 }
 
-/* ── xbim_curve_build_circle_3d ────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_circle_3d(
     XbimContextHandle ctx,
@@ -150,7 +150,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_circle_3d(
     }
 }
 
-/* ── xbim_curve_build_ellipse_3d ───────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_ellipse_3d(
     XbimContextHandle ctx,
@@ -206,7 +205,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_ellipse_3d(
     }
 }
 
-/* ── xbim_curve_build_bspline ──────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_bspline(
     XbimContextHandle ctx,
@@ -296,7 +294,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_bspline(
     }
 }
 
-/* ── xbim_curve_parameters ─────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Curve Queries
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_parameters(
     XbimCurveHandle handle,
@@ -328,7 +328,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_parameters(
     return XBIM_OK;
 }
 
-/* ── xbim_curve_length ─────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_length(
     XbimCurveHandle handle,
@@ -368,7 +367,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_length(
     }
 }
 
-/* ── xbim_curve_value ──────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_value(
     XbimCurveHandle handle,
@@ -406,7 +404,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_value(
     }
 }
 
-/* ── xbim_curve_d1 ─────────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_d1(
     XbimCurveHandle handle,
@@ -451,7 +448,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_d1(
     }
 }
 
-/* ── xbim_curve_d2 ─────────────────────────────────────────────────────── */
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_d2(
     XbimCurveHandle handle,
@@ -499,3 +495,5 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_d2(
         return XBIM_ERROR;
     }
 }
+
+#pragma endregion

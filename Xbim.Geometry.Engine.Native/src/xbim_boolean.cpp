@@ -54,7 +54,7 @@
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <TopExp_Explorer.hxx>
 
-/* ── Internal helpers ─────────────────────────────────────────────────────── */
+#pragma region Boolean Helpers
 
 bool is_empty(const TopoDS_Shape& shape)
 {
@@ -173,7 +173,9 @@ TopoDS_Shape perform_boolean(
     return TopoDS_Shape(); // empty shape signals failure
 }
 
-/* ── Exported C API ───────────────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Boolean Operations
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_union(
     XbimContextHandle   ctx,
@@ -343,7 +345,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_intersect(
     return *outHandle ? XBIM_OK : XBIM_ERROR;
 }
 
-/* ── Half-space operations ──────────────────────────────────────────────── */
+#pragma endregion
+
+#pragma region Half-Space Operations
 
 /*
  * Helper: build a face and point-in-material from surface parameters.
@@ -658,3 +662,5 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_polygonal_bounded(
         return XBIM_ERROR;
     }
 }
+
+#pragma endregion
