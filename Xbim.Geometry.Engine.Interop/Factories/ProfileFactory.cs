@@ -120,7 +120,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build RectangleProfileDef #{rectangleProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
         }
 
         private IXFace BuildRoundedRectangleFace(IIfcRoundedRectangleProfileDef roundedRectProfile)
@@ -148,7 +148,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build RoundedRectangleProfileDef #{roundedRectProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
         }
 
         private IXFace BuildCircleFace(IIfcCircleProfileDef circleProfile)
@@ -172,7 +172,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build CircleProfileDef #{circleProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
         }
 
         private IXFace BuildEllipseFace(IIfcEllipseProfileDef ellipseProfile)
@@ -196,7 +196,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build EllipseProfileDef #{ellipseProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
         }
 
         #endregion
@@ -234,7 +234,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build RectangleHollowProfileDef #{hollowProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
         }
 
         private IXFace BuildCircleHollowFace(IIfcCircleHollowProfileDef hollowProfile)
@@ -262,7 +262,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build CircleHollowProfileDef #{hollowProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
         }
 
         #endregion
@@ -296,7 +296,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build IShapeProfileDef #{iProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
         }
 
         private IXFace BuildAsymmetricIShapeFace(IIfcAsymmetricIShapeProfileDef asymProfile)
@@ -342,7 +342,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build AsymmetricIShapeProfileDef #{asymProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
         }
 
         private IXFace BuildLShapeFace(IIfcLShapeProfileDef lProfile)
@@ -375,7 +375,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build LShapeProfileDef #{lProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
         }
 
         private IXFace BuildTShapeFace(IIfcTShapeProfileDef tProfile)
@@ -414,7 +414,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build TShapeProfileDef #{tProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
         }
 
         private IXFace BuildUShapeFace(IIfcUShapeProfileDef uProfile)
@@ -448,7 +448,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build UShapeProfileDef #{uProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
         }
 
         private IXFace BuildZShapeFace(IIfcZShapeProfileDef zProfile)
@@ -480,7 +480,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build ZShapeProfileDef #{zProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
         }
 
         private IXFace BuildCShapeFace(IIfcCShapeProfileDef cProfile)
@@ -509,7 +509,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build CShapeProfileDef #{cProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
         }
 
         private IXFace BuildTrapeziumFace(IIfcTrapeziumProfileDef trapProfile)
@@ -534,7 +534,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build TrapeziumProfileDef #{trapProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
         }
 
         #endregion
@@ -575,7 +575,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build ArbitraryClosedProfileDef #{arbitraryProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return ShapeFactory.WrapFace(NativeShapeHandle);
+                return NativeShapeWrapper.WrapFace(NativeShapeHandle);
             }
 
             if (outerCurve is IIfcIndexedPolyCurve indexedPolyCurve)
@@ -604,7 +604,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build ArbitraryClosedProfileDef #{arbitraryProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return ShapeFactory.WrapFace(NativeShapeHandle);
+                return NativeShapeWrapper.WrapFace(NativeShapeHandle);
             }
 
             throw new NotSupportedException(
@@ -696,7 +696,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build IndexedPolyCurve profile #{entityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
         }
 
         private IXFace BuildArbitraryWithVoidsFace(IIfcArbitraryProfileDefWithVoids arbitraryWithVoids)
@@ -742,7 +742,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         $"Failed to build ArbitraryProfileDefWithVoids #{arbitraryWithVoids.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 outerFace.Dispose();
-                return ShapeFactory.WrapFace(resultHandle);
+                return NativeShapeWrapper.WrapFace(resultHandle);
             }
             finally
             {
@@ -863,7 +863,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build DerivedProfileDef #{derivedProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return ShapeFactory.WrapFace(NativeShapeHandle);
+                return NativeShapeWrapper.WrapFace(NativeShapeHandle);
             }
             finally
             {
@@ -891,7 +891,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build MirroredProfileDef #{mirroredProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return ShapeFactory.WrapFace(NativeShapeHandle);
+                return NativeShapeWrapper.WrapFace(NativeShapeHandle);
             }
             finally
             {

@@ -4,6 +4,7 @@ using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Services;
+using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Geometry.Engine.Interop.Tests.Helpers;
 using Xunit;
 
@@ -54,8 +55,8 @@ public class TopologyTests : IDisposable
     public void Vertex_Managed_Tolerance_IsPositive()
     {
         XbimGeometryNativeApi.xbim_vertex_build(Ctx, 5, 10, 15, 1e-3, out var vtxHandle);
-        var vtx = (IXVertex)Shapes.ShapeFactory.WrapShape(vtxHandle);
-        using ((IDisposable)vtx)
+        var vtx = NativeShapeWrapper.WrapShape<IXVertex>(vtxHandle);
+        using (vtx)
         {
             vtx.Tolerance.Should().BeApproximately(1e-3, 1e-9);
         }
@@ -65,8 +66,8 @@ public class TopologyTests : IDisposable
     public void Vertex_Managed_Geometry_ReturnsPoint()
     {
         XbimGeometryNativeApi.xbim_vertex_build(Ctx, 7, 14, 21, 1e-6, out var vtxHandle);
-        var vtx = (IXVertex)Shapes.ShapeFactory.WrapShape(vtxHandle);
-        using ((IDisposable)vtx)
+        var vtx = NativeShapeWrapper.WrapShape<IXVertex>(vtxHandle);
+        using (vtx)
         {
             var pt = vtx.VertexGeometry;
             pt.X.Should().BeApproximately(7, 1e-10);
@@ -184,8 +185,8 @@ public class TopologyTests : IDisposable
     public void Edge_Managed_Length_MatchesNative()
     {
         XbimGeometryNativeApi.xbim_edge_build_line(Ctx, 0, 0, 0, 3, 4, 0, out var edgeHandle).Should().Be(0);
-        var edge = (IXEdge)Shapes.ShapeFactory.WrapShape(edgeHandle);
-        using ((IDisposable)edge)
+        var edge = NativeShapeWrapper.WrapShape<IXEdge>(edgeHandle);
+        using (edge)
         {
             edge.Length.Should().BeApproximately(5.0, 1e-6);
         }
@@ -195,8 +196,8 @@ public class TopologyTests : IDisposable
     public void Edge_Managed_Tolerance_IsPositive()
     {
         XbimGeometryNativeApi.xbim_edge_build_line(Ctx, 0, 0, 0, 10, 0, 0, out var edgeHandle).Should().Be(0);
-        var edge = (IXEdge)Shapes.ShapeFactory.WrapShape(edgeHandle);
-        using ((IDisposable)edge)
+        var edge = NativeShapeWrapper.WrapShape<IXEdge>(edgeHandle);
+        using (edge)
         {
             edge.Tolerance.Should().BeGreaterThan(0);
         }
@@ -206,15 +207,15 @@ public class TopologyTests : IDisposable
     public void Edge_Managed_StartEnd_Coordinates()
     {
         XbimGeometryNativeApi.xbim_edge_build_line(Ctx, 10, 20, 30, 40, 50, 60, out var edgeHandle).Should().Be(0);
-        var edge = (IXEdge)Shapes.ShapeFactory.WrapShape(edgeHandle);
-        using ((IDisposable)edge)
+        var edge = NativeShapeWrapper.WrapShape<IXEdge>(edgeHandle);
+        using (edge)
         {
             var start = edge.EdgeStart;
             start.Should().NotBeNull();
             // Vertex point query via native handle
-            using (start as IDisposable)
+            using (start)
             {
-                var startShape = (Shapes.Shape)start;
+                var startShape = (Shape)start;
                 XbimGeometryNativeApi.xbim_vertex_point(startShape.Handle, out var x, out var y, out var z).Should().Be(0);
                 x.Should().BeApproximately(10, 1e-10);
                 y.Should().BeApproximately(20, 1e-10);
@@ -223,9 +224,9 @@ public class TopologyTests : IDisposable
 
             var end = edge.EdgeEnd;
             end.Should().NotBeNull();
-            using (end as IDisposable)
+            using (end)
             {
-                var endShape = (Shapes.Shape)end;
+                var endShape = (Shape)end;
                 XbimGeometryNativeApi.xbim_vertex_point(endShape.Handle, out var x, out var y, out var z).Should().Be(0);
                 x.Should().BeApproximately(40, 1e-10);
                 y.Should().BeApproximately(50, 1e-10);
@@ -319,8 +320,8 @@ public class TopologyTests : IDisposable
     public void Wire_Managed_Length_SquarePerimeter()
     {
         using var wireHandle = BuildSquareWire(10);
-        var wire = (IXWire)Shapes.ShapeFactory.WrapShape(wireHandle);
-        using ((IDisposable)wire)
+        var wire = NativeShapeWrapper.WrapShape<IXWire>(wireHandle);
+        using (wire)
         {
             wire.Length.Should().BeApproximately(40, 0.1); // 4 * 10
         }
@@ -330,8 +331,8 @@ public class TopologyTests : IDisposable
     public void Wire_Managed_ContourArea_Square()
     {
         using var wireHandle = BuildSquareWire(10);
-        var wire = (IXWire)Shapes.ShapeFactory.WrapShape(wireHandle);
-        using ((IDisposable)wire)
+        var wire = NativeShapeWrapper.WrapShape<IXWire>(wireHandle);
+        using (wire)
         {
             wire.ContourArea.Should().BeApproximately(100, 1.0); // 10 * 10
         }
@@ -341,8 +342,8 @@ public class TopologyTests : IDisposable
     public void Wire_Managed_EdgeLoop_ReturnsEdges()
     {
         using var wireHandle = BuildSquareWire(5);
-        var wire = (IXWire)Shapes.ShapeFactory.WrapShape(wireHandle);
-        using ((IDisposable)wire)
+        var wire = NativeShapeWrapper.WrapShape<IXWire>(wireHandle);
+        using (wire)
         {
             wire.EdgeLoop.Length.Should().BeGreaterThanOrEqualTo(4);
         }
@@ -476,8 +477,8 @@ public class TopologyTests : IDisposable
     {
         using var wire = BuildSquareWire(10);
         XbimGeometryNativeApi.xbim_face_build_from_wire(Ctx, wire, out var faceHandle).Should().Be(0);
-        var face = (IXFace)Shapes.ShapeFactory.WrapShape(faceHandle);
-        using ((IDisposable)face)
+        var face = NativeShapeWrapper.WrapShape<IXFace>(faceHandle);
+        using (face)
         {
             face.Tolerance.Should().BeGreaterThan(0);
         }
@@ -488,8 +489,8 @@ public class TopologyTests : IDisposable
     {
         using var wire = BuildSquareWire(10);
         XbimGeometryNativeApi.xbim_face_build_from_wire(Ctx, wire, out var faceHandle).Should().Be(0);
-        var face = (IXFace)Shapes.ShapeFactory.WrapShape(faceHandle);
-        using ((IDisposable)face)
+        var face = NativeShapeWrapper.WrapShape<IXFace>(faceHandle);
+        using (face)
         {
             var surface = face.Surface;
             surface.Should().NotBeNull();
@@ -665,8 +666,8 @@ public class TopologyTests : IDisposable
         var ptrs = new IntPtr[] { s1.DangerousGetHandle(), s2.DangerousGetHandle() };
         XbimGeometryNativeApi.xbim_compound_make(Ctx, ptrs, 2, out var compoundHandle).Should().Be(0);
 
-        var compound = (IXCompound)Shapes.ShapeFactory.WrapShape(compoundHandle);
-        using ((IDisposable)compound)
+        var compound = NativeShapeWrapper.WrapShape<IXCompound>(compoundHandle);
+        using (compound)
         {
             compound.IsSolidsOnly.Should().BeTrue();
             compound.HasSolids.Should().BeTrue();
@@ -683,14 +684,14 @@ public class TopologyTests : IDisposable
         var ptrs = new IntPtr[] { s1.DangerousGetHandle() };
         XbimGeometryNativeApi.xbim_compound_make(Ctx, ptrs, 1, out var compoundHandle).Should().Be(0);
 
-        var compound = (IXCompound)Shapes.ShapeFactory.WrapShape(compoundHandle);
-        using ((IDisposable)compound)
+        var compound = NativeShapeWrapper.WrapShape<IXCompound>(compoundHandle);
+        using (compound)
         {
             compound.Solids.Should().HaveCount(1);
 
             // Add another solid via managed Add
             using var s2 = BuildBoxSolid(5, 5, 5);
-            var wrappedS2 = Shapes.ShapeFactory.WrapShape(s2);
+            var wrappedS2 = NativeShapeWrapper.WrapShape(s2);
             compound.Add(wrappedS2);
 
             compound.Solids.Should().HaveCount(2);
@@ -782,8 +783,8 @@ public class TopologyTests : IDisposable
     public void Shape_Triangulate_BoxSolid_ReturnsTrue()
     {
         using var solid = BuildBoxSolid(10, 10, 10);
-        var shape = Shapes.ShapeFactory.WrapShape(solid);
-        using ((IDisposable)shape)
+        var shape = NativeShapeWrapper.WrapShape(solid);
+        using (shape)
         {
             var meshFactors = new Services.MeshFactors(1000, 1e-3);
             bool ok = shape.Triangulate(meshFactors);
@@ -795,8 +796,8 @@ public class TopologyTests : IDisposable
     public void Shape_Location_Identity_ByDefault()
     {
         using var solid = BuildBoxSolid(5, 5, 5);
-        var shape = Shapes.ShapeFactory.WrapShape(solid);
-        using ((IDisposable)shape)
+        var shape = NativeShapeWrapper.WrapShape(solid);
+        using (shape)
         {
             var loc = shape.Location;
             loc.IsIdentity.Should().BeTrue();
@@ -816,8 +817,8 @@ public class TopologyTests : IDisposable
         XbimGeometryNativeApi.xbim_shape_moved(solid, locHandle, out var movedHandle);
         locHandle.Dispose();
 
-        var moved = Shapes.ShapeFactory.WrapShape(movedHandle);
-        using ((IDisposable)moved)
+        var moved = NativeShapeWrapper.WrapShape(movedHandle);
+        using (moved)
         {
             var loc = moved.Location;
             loc.IsIdentity.Should().BeFalse();

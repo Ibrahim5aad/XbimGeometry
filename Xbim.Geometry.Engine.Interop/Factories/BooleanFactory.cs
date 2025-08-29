@@ -34,7 +34,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     $"Boolean result #{boolResult.EntityLabel} produced an empty shape.");
 
             // WrapShape takes ownership of the handle
-            return ShapeFactory.WrapShape(resultHandle);
+            return NativeShapeWrapper.WrapShape(resultHandle);
         }
 
         private NativeShapeHandle BuildBooleanResult(IIfcBooleanResult boolResult)

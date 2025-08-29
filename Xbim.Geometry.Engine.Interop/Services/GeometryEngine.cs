@@ -107,7 +107,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 throw new InvalidOperationException(
                     $"Failed to build BoundingBox solid: {Internal.XbimGeometryNativeApi.GetLastError()}");
 
-            return Shapes.ShapeFactory.WrapSolid(NativeShapeHandle);
+            return Shapes.NativeShapeWrapper.WrapSolid(NativeShapeHandle);
         }
 
         #endregion
@@ -198,7 +198,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                     if (moveResult != 0)
                         throw new InvalidOperationException(
                             $"Failed to apply placement: {XbimGeometryNativeApi.GetLastError()}");
-                    shape = Shapes.ShapeFactory.WrapShape(movedHandle);
+                    shape = Shapes.NativeShapeWrapper.WrapShape(movedHandle);
                 }
             }
             return V5Shape.Wrap(shape);
@@ -448,7 +448,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                     if (result != 0)
                         throw new InvalidOperationException(
                             $"Failed to build face from wire: {XbimGeometryNativeApi.GetLastError()}");
-                    return V5Shape.WrapFace(Shapes.ShapeFactory.WrapFace(faceHandle));
+                    return V5Shape.WrapFace(Shapes.NativeShapeWrapper.WrapFace(faceHandle));
                 }
             }
             throw new InvalidOperationException("Wire must be a V5Wire from this geometry engine.");
@@ -749,7 +749,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                     return null;
                 }
 
-                return Shapes.ShapeFactory.WrapShape(compoundHandle);
+                return Shapes.NativeShapeWrapper.WrapShape(compoundHandle);
             }
 
             return null;
@@ -820,7 +820,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 throw new InvalidOperationException(
                     $"Failed to build face from wire: {XbimGeometryNativeApi.GetLastError()}");
 
-            return V5Shape.WrapFace(Shapes.ShapeFactory.WrapFace(faceHandle));
+            return V5Shape.WrapFace(Shapes.NativeShapeWrapper.WrapFace(faceHandle));
         }
 
         /// <summary>
@@ -835,7 +835,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 if (moveResult != 0)
                     throw new InvalidOperationException(
                         $"Failed to move shape: {XbimGeometryNativeApi.GetLastError()}");
-                return V5Shape.Wrap(Shapes.ShapeFactory.WrapShape(movedHandle));
+                return V5Shape.Wrap(Shapes.NativeShapeWrapper.WrapShape(movedHandle));
             }
         }
 

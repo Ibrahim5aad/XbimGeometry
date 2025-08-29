@@ -42,7 +42,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         private FaceFactory? _faceFactory;
         private ShellFactory? _shellFactory;
         private CompoundFactory? _compoundFactory;
-        private ShapeFactory2? _shapeFactory;
+        private ShapeFactory? _shapeFactory;
         private MaterialFactory? _materialFactory;
         private ProjectionFactory? _projectionFactory;
         private WexBimMeshFactory? _wexBimMeshFactory;
@@ -126,7 +126,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         public IXSolidFactory SolidFactory => _solidFactory ??= new SolidFactory(this, _logger);
         public IXCompoundFactory CompoundFactory => _compoundFactory ??= new CompoundFactory(this, _logger);
         public IXBooleanFactory BooleanFactory => _booleanFactory ??= new BooleanFactory(this, _logger);
-        public IXShapeFactory ShapeFactory => _shapeFactory ??= new ShapeFactory2(this, _logger);
+        public IXShapeFactory ShapeFactory => _shapeFactory ??= new ShapeFactory(this, _logger);
         public IXProfileFactory ProfileFactory => _profileFactory ??= new ProfileFactory(this, _logger);
         public IXMaterialFactory MaterialFactory => _materialFactory ??= new MaterialFactory();
         public IXProjectionFactory ProjectionFactory => _projectionFactory ??= new ProjectionFactory(this, _logger);

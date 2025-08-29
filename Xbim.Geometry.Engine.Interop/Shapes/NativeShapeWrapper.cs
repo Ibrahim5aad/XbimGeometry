@@ -9,7 +9,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
     /// Factory for wrapping a <see cref="NativeShapeHandle"/> into the correct
     /// <see cref="IXShape"/> subtype based on the native shape's actual type.
     /// </summary>
-    internal static class ShapeFactory
+    internal static class NativeShapeWrapper
     {
         /// <summary>
         /// Wraps a native shape handle into the most specific managed IXShape subtype.
@@ -40,6 +40,12 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 _ => new Shape(handle),
             };
         }
+
+        /// <summary>
+        /// Wraps a native shape handle and casts to the requested IXShape subtype.
+        /// </summary>
+        internal static T WrapShape<T>(NativeShapeHandle handle) where T : IXShape
+            => (T)WrapShape(handle);
 
         /// <summary>
         /// Wraps a native shape handle as an <see cref="IXSolid"/>.

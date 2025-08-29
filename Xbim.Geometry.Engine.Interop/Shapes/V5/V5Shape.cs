@@ -154,7 +154,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes.V5
                     throw new InvalidOperationException(
                         $"Failed to move shape: {XbimGeometryNativeApi.GetLastError()}");
 
-                return (Shape)ShapeFactory.WrapShape(movedHandle);
+                return (Shape)NativeShapeWrapper.WrapShape(movedHandle);
             }
         }
 

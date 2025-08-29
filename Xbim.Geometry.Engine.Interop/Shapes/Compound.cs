@@ -41,7 +41,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
             var children = new IXShape[capacity];
             for (int i = 0; i < capacity; i++)
-                children[i] = ShapeFactory.WrapShape(NativeShapeHandle.FromIntPtr(ptrs[i]));
+                children[i] = NativeShapeWrapper.WrapShape(NativeShapeHandle.FromIntPtr(ptrs[i]));
 
             _children = children;
             return _children;

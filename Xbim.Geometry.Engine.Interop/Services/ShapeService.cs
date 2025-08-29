@@ -64,7 +64,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 throw new InvalidOperationException(
                     $"Failed to parse BRep string: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapShape(handle);
+            return NativeShapeWrapper.WrapShape(handle);
         }
 
         public IXbimGeometryObject ConvertToV5(string brepString)
@@ -123,7 +123,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                     throw new InvalidOperationException(
                         $"Failed to transform shape: {XbimGeometryNativeApi.GetLastError()}");
 
-                return ShapeFactory.WrapShape(movedHandle);
+                return NativeShapeWrapper.WrapShape(movedHandle);
             }
         }
 
@@ -222,7 +222,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 throw new InvalidOperationException(
                     $"Failed to move shape: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapShape(movedHandle);
+            return NativeShapeWrapper.WrapShape(movedHandle);
         }
 
         public IXShape Scaled(IXShape shape, double scale)
@@ -255,7 +255,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                     throw new InvalidOperationException(
                         $"Failed to scale shape: {XbimGeometryNativeApi.GetLastError()}");
 
-                return ShapeFactory.WrapShape(movedHandle);
+                return NativeShapeWrapper.WrapShape(movedHandle);
             }
         }
 
@@ -304,7 +304,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 throw new InvalidOperationException(
                     $"Failed to combine shapes: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapShape(compoundHandle);
+            return NativeShapeWrapper.WrapShape(compoundHandle);
         }
 
         public bool IsOverlapping(IXShape shape1, IXShape shape2, IXMeshFactors meshFactors)
@@ -372,7 +372,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 throw new InvalidOperationException(
                     $"Boolean operation failed: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapShape(resultHandle);
+            return NativeShapeWrapper.WrapShape(resultHandle);
         }
 
         /// <summary>

@@ -69,7 +69,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                     throw new InvalidOperationException($"Failed to deserialize shape from binary: {error}");
                 }
 
-                return ShapeFactory.WrapShape(handle);
+                return NativeShapeWrapper.WrapShape(handle);
             }
             finally
             {
@@ -119,7 +119,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 throw new InvalidOperationException($"Failed to deserialize shape from BRep: {error}");
             }
 
-            return ShapeFactory.WrapShape(handle);
+            return NativeShapeWrapper.WrapShape(handle);
         }
     }
 }

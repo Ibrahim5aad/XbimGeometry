@@ -72,7 +72,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build CSG Block #{ifcBlock.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapSolid(NativeShapeHandle);
+            return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
         }
 
         private IXSolid BuildSphere(IIfcSphere ifcSphere)
@@ -96,7 +96,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build CSG Sphere #{ifcSphere.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapSolid(NativeShapeHandle);
+            return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
         }
 
         private IXSolid BuildRightCircularCylinder(IIfcRightCircularCylinder ifcCylinder)
@@ -120,7 +120,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build CSG RightCircularCylinder #{ifcCylinder.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapSolid(NativeShapeHandle);
+            return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
         }
 
         private IXSolid BuildRightCircularCone(IIfcRightCircularCone ifcCone)
@@ -144,7 +144,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build CSG RightCircularCone #{ifcCone.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapSolid(NativeShapeHandle);
+            return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
         }
 
         private IXSolid BuildRectangularPyramid(IIfcRectangularPyramid ifcPyramid)
@@ -168,7 +168,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build CSG RectangularPyramid #{ifcPyramid.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapSolid(NativeShapeHandle);
+            return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
         }
 
         #endregion
@@ -235,7 +235,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build extruded area solid #{extrudedSolid.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapSolid(NativeShapeHandle);
+            return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
         }
 
         private IXShape BuildExtrudedAreaSolidTapered(IIfcExtrudedAreaSolidTapered extrudedTapered)
@@ -275,7 +275,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build extruded area solid tapered #{extrudedTapered.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapSolid(NativeShapeHandle);
+            return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
         }
 
         private IXShape BuildRevolvedAreaSolid(IIfcRevolvedAreaSolid revolvedSolid)
@@ -320,7 +320,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build revolved area solid #{revolvedSolid.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapSolid(NativeShapeHandle);
+            return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
         }
 
         private IXShape BuildRevolvedAreaSolidTapered(IIfcRevolvedAreaSolidTapered revolvedTapered)
@@ -367,7 +367,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build revolved area solid tapered #{revolvedTapered.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapSolid(NativeShapeHandle);
+            return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
         }
 
         private IXShape BuildSweptDiskSolid(IIfcSweptDiskSolid sweptDisk)
@@ -426,7 +426,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         public IXShape Build(IIfcFacetedBrep ifcBrep)
         {
             var solidHandle = BuildClosedShellAsSolid(ifcBrep.Outer);
-            return ShapeFactory.WrapShape(solidHandle);
+            return NativeShapeWrapper.WrapShape(solidHandle);
         }
 
         private IXShape BuildFacetedBrepWithVoids(IIfcFacetedBrepWithVoids ifcBrep)
@@ -466,7 +466,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 outerHandle = cutHandle;
             }
 
-            return ShapeFactory.WrapShape(outerHandle);
+            return NativeShapeWrapper.WrapShape(outerHandle);
         }
 
         /// <summary>
@@ -671,7 +671,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXShape BuildAdvancedBrep(IIfcAdvancedBrep ifcBrep)
         {
             var solidHandle = BuildAdvancedShellAsSolid(ifcBrep.Outer);
-            return ShapeFactory.WrapShape(solidHandle);
+            return NativeShapeWrapper.WrapShape(solidHandle);
         }
 
         private IXShape BuildAdvancedBrepWithVoids(IIfcAdvancedBrepWithVoids ifcBrep)
@@ -709,7 +709,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 outerHandle = cutHandle;
             }
 
-            return ShapeFactory.WrapShape(outerHandle);
+            return NativeShapeWrapper.WrapShape(outerHandle);
         }
 
         /// <summary>
@@ -1083,7 +1083,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     // WrapShape takes ownership — remove from list so finally won't dispose it
                     var handle = shellHandles[0];
                     shellHandles.Clear();
-                    return ShapeFactory.WrapShape(handle);
+                    return NativeShapeWrapper.WrapShape(handle);
                 }
 
                 // Assemble multiple shells into a compound
@@ -1099,7 +1099,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         $"FaceBasedSurfaceModel #{ifcSurfaceModel.EntityLabel}: failed to create compound: " +
                         XbimGeometryNativeApi.GetLastError());
 
-                return ShapeFactory.WrapShape(compoundHandle);
+                return NativeShapeWrapper.WrapShape(compoundHandle);
             }
             finally
             {
@@ -1233,7 +1233,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build half-space #{halfSpace.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapSolid(outHandle);
+            return NativeShapeWrapper.WrapSolid(outHandle);
         }
 
         private IXSolid BuildPolygonalBoundedHalfSpace(
@@ -1289,7 +1289,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build polygonal bounded half-space #{polyBounded.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapSolid(outHandle);
+            return NativeShapeWrapper.WrapSolid(outHandle);
         }
 
         public IXShape Build(IIfcShellBasedSurfaceModel ifcSurfaceModel)

@@ -19,12 +19,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
     /// <see cref="ShapeBinarySerializer"/> and boolean operations to
     /// <see cref="BooleanFactory"/>.
     /// </summary>
-    internal class ShapeFactory2 : IXShapeFactory
+    internal class ShapeFactory : IXShapeFactory
     {
         private readonly ModelGeometryService _modelService;
         private readonly ILogger _logger;
 
-        public ShapeFactory2(ModelGeometryService modelService, ILogger logger)
+        public ShapeFactory(ModelGeometryService modelService, ILogger logger)
         {
             _modelService = modelService ?? throw new ArgumentNullException(nameof(modelService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -111,7 +111,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 return toFix;
             }
 
-            return ShapeFactory.WrapShape(outHandle);
+            return NativeShapeWrapper.WrapShape(outHandle);
         }
 
         public IEnumerable<IXFace> FixFace(IXFace face)
@@ -205,7 +205,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to move shape: {XbimGeometryNativeApi.GetLastError()}");
 
-                return ShapeFactory.WrapShape(movedHandle);
+                return NativeShapeWrapper.WrapShape(movedHandle);
             }
             finally
             {
@@ -225,7 +225,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to move shape: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapShape(movedHandle);
+            return NativeShapeWrapper.WrapShape(movedHandle);
         }
 
         public IXShape Moved(IXShape shape, IIfcObjectPlacement placement, bool invertPlacement)
@@ -335,7 +335,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Boolean operation failed: {XbimGeometryNativeApi.GetLastError()}");
 
-            return ShapeFactory.WrapShape(outHandle);
+            return NativeShapeWrapper.WrapShape(outHandle);
         }
 
         #endregion
