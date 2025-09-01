@@ -30,6 +30,7 @@
 #include <GCPnts_AbscissaPoint.hxx>
 #include <Geom_Circle.hxx>
 #include <Geom_TrimmedCurve.hxx>
+#include <GC_MakeArcOfCircle.hxx>
 #include <TopExp.hxx>
 #include <TopoDS_Vertex.hxx>
 #include <Standard_Failure.hxx>
@@ -331,6 +332,93 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve_handle(
     {
         xbim_log_occt_failure(ctx, e, "xbim_edge_build_from_curve_handle");
         xbim_set_error("xbim_edge_build_from_curve_handle: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_circle_arc_3pt(
+    XbimContextHandle ctx,
+    double p1X, double p1Y, double p1Z,
+    double p2X, double p2Y, double p2Z,
+    double p3X, double p3Y, double p3Z,
+    XbimShapeHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_edge_build_circle_arc_3pt: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    try
+    {
+        gp_Pnt start(p1X, p1Y, p1Z);
+        gp_Pnt mid(p2X, p2Y, p2Z);
+        gp_Pnt end(p3X, p3Y, p3Z);
+
+        if (start.Distance(mid) < Precision::Confusion() ||
+            mid.Distance(end) < Precision::Confusion() ||
+            start.Distance(end) < Precision::Confusion())
+        {
+            xbim_set_error("xbim_edge_build_circle_arc_3pt: two or more points are coincident");
+            return XBIM_INVALID_ARG;
+        }
+
+        /* Check collinearity: if the three points are collinear, build a line edge instead */
+        gp_Vec v1(start, mid);
+        gp_Vec v2(start, end);
+        if (v1.CrossMagnitude(v2) < Precision::Confusion() * v1.Magnitude())
+        {
+            /* Collinear points - fall back to a straight line edge */
+            BRepBuilderAPI_MakeEdge edgeMaker(start, end);
+            if (!edgeMaker.IsDone())
+            {
+                xbim_set_error("xbim_edge_build_circle_arc_3pt: line edge fallback failed");
+                return XBIM_NULL_SHAPE;
+            }
+            *outHandle = xbim_shape_create_from(edgeMaker.Edge());
+            return *outHandle ? XBIM_OK : XBIM_ERROR;
+        }
+
+        GC_MakeArcOfCircle arcMaker(start, mid, end);
+        if (!arcMaker.IsDone())
+        {
+            xbim_set_error("xbim_edge_build_circle_arc_3pt: GC_MakeArcOfCircle failed");
+            xbim_log_warning(ctx, "Cannot build circular arc through 3 points");
+            return XBIM_NULL_SHAPE;
+        }
+
+        Handle(Geom_TrimmedCurve) arc = arcMaker.Value();
+        BRepBuilderAPI_MakeEdge edgeMaker(arc);
+        if (!edgeMaker.IsDone())
+        {
+            xbim_set_error("xbim_edge_build_circle_arc_3pt: edge construction failed");
+            return XBIM_NULL_SHAPE;
+        }
+
+        TopoDS_Edge edge = edgeMaker.Edge();
+        if (edge.IsNull())
+        {
+            xbim_set_error("xbim_edge_build_circle_arc_3pt: resulting edge is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        *outHandle = xbim_shape_create_from(edge);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_edge_build_circle_arc_3pt: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_edge_build_circle_arc_3pt");
+        xbim_set_error("xbim_edge_build_circle_arc_3pt: OCCT exception");
         return XBIM_ERROR;
     }
 }

@@ -13,6 +13,7 @@
 #include "xbim_shape.h"
 #include "xbim_context.h"
 #include "xbim_error.h"
+#include "xbim_curve2d.h"
 #include "xbim_logging.h"
 
 #include <gp_Pnt.hxx>
@@ -33,7 +34,11 @@
 #include <BRepGProp.hxx>
 #include <TopTools_SequenceOfShape.hxx>
 #include <TopAbs_ShapeEnum.hxx>
+#include <BRepBuilderAPI_MakeEdge2d.hxx>
+#include <BRepLib.hxx>
+#include <ShapeFix_Edge.hxx>
 #include <Standard_Failure.hxx>
+
 
 #pragma region Wire Construction
 
@@ -60,15 +65,12 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_edges(
 
     try
     {
-        BRep_Builder builder;
-        TopoDS_Wire wire;
-        builder.MakeWire(wire);
+        BRepBuilderAPI_MakeWire wireMaker;
 
         for (int i = 0; i < numEdges; ++i)
         {
             if (!edgeHandles[i])
             {
-                xbim_set_error("xbim_wire_build_from_edges: edge handle at index is NULL");
                 xbim_log_warning(ctx, "Wire edge handle at index %d is NULL, skipping", i);
                 continue;
             }
@@ -80,9 +82,17 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_edges(
                 continue;
             }
 
-            builder.Add(wire, TopoDS::Edge(shape));
+            wireMaker.Add(TopoDS::Edge(shape));
         }
 
+        if (!wireMaker.IsDone())
+        {
+            xbim_set_error("xbim_wire_build_from_edges: could not build wire from edges");
+            xbim_log_warning(ctx, "BRepBuilderAPI_MakeWire failed");
+            return XBIM_NULL_SHAPE;
+        }
+
+        TopoDS_Wire wire = wireMaker.Wire();
         if (wire.IsNull())
         {
             xbim_set_error("xbim_wire_build_from_edges: resulting wire is null");
@@ -298,6 +308,179 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polygon(
     {
         xbim_log_occt_failure(ctx, e, "xbim_wire_build_polygon");
         xbim_set_error("xbim_wire_build_polygon: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_2d_curves(
+    XbimContextHandle   ctx,
+    XbimCurve2dHandle*  curves,
+    int                 numCurves,
+    double              tolerance,
+    double              gapSize,
+    XbimShapeHandle*    outWire)
+{
+    xbim_clear_error();
+
+    if (!outWire)
+    {
+        xbim_set_error("xbim_wire_build_from_2d_curves: outWire is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outWire = nullptr;
+
+    if (!curves || numCurves <= 0)
+    {
+        xbim_set_error("xbim_wire_build_from_2d_curves: curves is NULL or numCurves <= 0");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        ShapeFix_Edge toleranceFixer;
+        TopTools_SequenceOfShape edges;
+        BRep_Builder builder;
+
+        TopoDS_Edge theFirstEdge;
+        TopoDS_Vertex theFirstVertex;
+        gp_Pnt theFirstPoint;
+        bool isClosed = false;
+
+        for (int i = 0; i < numCurves; ++i)
+        {
+            if (!curves[i] || curves[i]->curve.IsNull())
+            {
+                xbim_log_warning(ctx, "xbim_wire_build_from_2d_curves: curve at index %d is NULL, skipping", i);
+                continue;
+            }
+
+            const Handle(Geom2d_Curve)& segment = curves[i]->curve;
+            bool tolerancesAdjusted = false;
+            TopoDS_Edge anEdge;
+
+            if (edges.Length() == 0) /* first edge */
+            {
+                BRepBuilderAPI_MakeEdge2d edgeMaker(segment);
+                if (!edgeMaker.IsDone())
+                {
+                    xbim_log_warning(ctx, "xbim_wire_build_from_2d_curves: MakeEdge2d failed for first segment");
+                    continue;
+                }
+                anEdge = edgeMaker.Edge();
+                theFirstEdge = anEdge;
+                theFirstVertex = TopExp::FirstVertex(anEdge);
+                theFirstPoint = BRep_Tool::Pnt(theFirstVertex);
+            }
+            else /* subsequent edges — share vertices */
+            {
+                const TopoDS_Edge& lastEdge = TopoDS::Edge(edges.Last());
+                gp_Pnt lastEdgeEndPoint = BRep_Tool::Pnt(TopExp::LastVertex(lastEdge));
+
+                gp_Pnt2d segStart2d = segment->Value(segment->FirstParameter());
+                gp_Pnt2d segEnd2d   = segment->Value(segment->LastParameter());
+                gp_Pnt segStartPoint(segStart2d.X(), segStart2d.Y(), 0);
+                gp_Pnt segEndPoint(segEnd2d.X(), segEnd2d.Y(), 0);
+
+                double gap = segStartPoint.Distance(lastEdgeEndPoint);
+                if (gap > gapSize)
+                {
+                    xbim_log_warning(ctx,
+                        "xbim_wire_build_from_2d_curves: segment %d gap %.6f exceeds gapSize %.6f",
+                        i, gap, gapSize);
+                }
+
+                /* Adjust vertex tolerance to bridge the gap */
+                if (gap > Precision::Confusion())
+                {
+                    TopoDS_Vertex lastV = TopExp::LastVertex(lastEdge);
+                    double newTol = std::max(BRep_Tool::Tolerance(lastV), gap / 2.0 + Precision::Confusion());
+                    builder.UpdateVertex(lastV, newTol);
+                    tolerancesAdjusted = true;
+                }
+
+                /* Check if this is the last segment and closes the wire */
+                TopoDS_Vertex segEndVertex;
+                if (i == numCurves - 1 && theFirstPoint.Distance(segEndPoint) < gapSize)
+                {
+                    isClosed = true;
+                    double closingGap = segEndPoint.Distance(theFirstPoint);
+                    if (closingGap > Precision::Confusion())
+                    {
+                        double newTol = std::max(BRep_Tool::Tolerance(theFirstVertex),
+                                                 closingGap / 2.0 + Precision::Confusion());
+                        builder.UpdateVertex(theFirstVertex, newTol);
+                        tolerancesAdjusted = true;
+                    }
+                }
+                else
+                {
+                    builder.MakeVertex(segEndVertex, segEndPoint, tolerance);
+                }
+
+                BRepBuilderAPI_MakeEdge2d edgeMaker(
+                    segment,
+                    TopExp::LastVertex(lastEdge),
+                    isClosed ? theFirstVertex : segEndVertex);
+
+                if (!edgeMaker.IsDone())
+                {
+                    xbim_log_warning(ctx,
+                        "xbim_wire_build_from_2d_curves: MakeEdge2d failed for segment %d (error %d)",
+                        i, (int)edgeMaker.Error());
+                    continue;
+                }
+
+                anEdge = edgeMaker.Edge();
+
+                if (tolerancesAdjusted)
+                {
+                    if (isClosed)
+                        toleranceFixer.FixVertexTolerance(theFirstEdge);
+                    else
+                        toleranceFixer.FixVertexTolerance(lastEdge);
+                    toleranceFixer.FixVertexTolerance(anEdge);
+                }
+            }
+
+            /* Generate 3D curve from the 2D edge */
+            bool ok = BRepLib::BuildCurve3d(anEdge, tolerance);
+            if (ok)
+                edges.Append(anEdge);
+            else
+                xbim_log_warning(ctx,
+                    "xbim_wire_build_from_2d_curves: BuildCurve3d failed for segment %d", i);
+        }
+
+        if (edges.Length() == 0)
+        {
+            xbim_set_error("xbim_wire_build_from_2d_curves: no valid edges built");
+            return XBIM_NULL_SHAPE;
+        }
+
+        /* Assemble wire */
+        TopoDS_Wire wire;
+        builder.MakeWire(wire);
+        for (auto it = edges.cbegin(); it != edges.cend(); ++it)
+        {
+            builder.Add(wire, *it);
+        }
+        if (isClosed)
+            wire.Closed(true);
+
+        *outWire = xbim_shape_create_from(wire);
+        if (!*outWire)
+        {
+            xbim_set_error("xbim_wire_build_from_2d_curves: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_wire_build_from_2d_curves");
+        xbim_set_error("xbim_wire_build_from_2d_curves: OCCT exception");
         return XBIM_ERROR;
     }
 }

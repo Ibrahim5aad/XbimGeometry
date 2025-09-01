@@ -583,28 +583,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 return BuildArbitraryFromIndexedPolyCurve(indexedPolyCurve, arbitraryProfile.EntityLabel);
             }
 
-            // For compound curves and other complex types, fall back to extracting
-            // polyline points from the curve if possible
             if (outerCurve is IIfcCompositeCurve compositeCurve)
             {
-                var points = ExtractPointsFromCompositeCurve(compositeCurve);
-                if (points.Count < 3)
-                    throw new InvalidOperationException(
-                        $"ArbitraryClosedProfileDef #{arbitraryProfile.EntityLabel} composite curve has less than 3 unique points.");
-
-                double[] pointsX = points.Select(p => p.Item1).ToArray();
-                double[] pointsY = points.Select(p => p.Item2).ToArray();
-
-                int result = XbimGeometryNativeApi.xbim_profile_build_arbitrary_closed(
-                    ContextHandle,
-                    pointsX, pointsY, points.Count,
-                    out var NativeShapeHandle);
-
-                if (result != 0)
-                    throw new InvalidOperationException(
-                        $"Failed to build ArbitraryClosedProfileDef #{arbitraryProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
-
-                return NativeShapeWrapper.WrapFace(NativeShapeHandle);
+                return BuildFaceFromCompositeCurve(compositeCurve, arbitraryProfile.EntityLabel);
             }
 
             throw new NotSupportedException(
@@ -620,63 +601,53 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"IndexedPolyCurve #{entityLabel} has no Points coordinate list.");
 
-            // Extract coordinates from the point list
-            List<(double, double)> points;
-
-            if (pointList is IIfcCartesianPointList2D pointList2D)
-            {
-                points = new List<(double, double)>();
-                foreach (var coordList in pointList2D.CoordList)
-                {
-                    var coords = coordList.ToList();
-                    points.Add((coords[0], coords[1]));
-                }
-            }
-            else
-            {
+            if (!(pointList is IIfcCartesianPointList2D pointList2D))
                 throw new NotSupportedException(
                     $"IndexedPolyCurve #{entityLabel} points type {pointList.ExpressType.ExpressName} is not supported for 2D profiles.");
+
+            var coords = new List<(double x, double y)>();
+            foreach (var coordList in pointList2D.CoordList)
+            {
+                var c = coordList.ToList();
+                coords.Add((c[0], c[1]));
             }
 
-            if (points.Count < 3)
+            if (coords.Count < 3)
                 throw new InvalidOperationException(
                     $"IndexedPolyCurve #{entityLabel} has less than 3 points.");
 
-            // If there are segments, use them to order points; otherwise use points in order
-            List<(double, double)> orderedPoints;
+            // If segments exist, build 2D curves respecting line/arc types
             if (indexedPolyCurve.Segments != null && indexedPolyCurve.Segments.Any())
             {
-                orderedPoints = new List<(double, double)>();
-                foreach (var segment in indexedPolyCurve.Segments)
+                var curves = new List<NativeCurve2dHandle>();
+                try
                 {
-                    if (segment is IfcLineIndex lineIndex)
-                    {
-                        var indices = (System.Collections.IList)lineIndex.Value;
-                        // Add all points except the last (it's the first of the next segment)
-                        for (int i = 0; i < indices.Count - 1; i++)
-                        {
-                            int idx = (int)(long)indices[i]! - 1; // 1-based to 0-based
-                            if (idx >= 0 && idx < points.Count)
-                                orderedPoints.Add(points[idx]);
-                        }
-                    }
-                    // Arc segments would need curve support - skip for now, treat as line
+                    BuildCurves2dFromIndexedPolyCurve(indexedPolyCurve, curves);
+
+                    if (curves.Count == 0)
+                        throw new InvalidOperationException(
+                            $"IndexedPolyCurve #{entityLabel} produced no valid 2D curves.");
+
+                    return BuildFaceFrom2dCurves(curves, entityLabel);
                 }
-                // Don't close - the native function will close automatically
-            }
-            else
-            {
-                // Use points directly, skip last point if it duplicates the first
-                orderedPoints = new List<(double, double)>(points);
-                if (orderedPoints.Count > 1)
+                finally
                 {
-                    var first = orderedPoints[0];
-                    var last = orderedPoints[orderedPoints.Count - 1];
-                    if (Math.Abs(first.Item1 - last.Item1) < 1e-10 &&
-                        Math.Abs(first.Item2 - last.Item2) < 1e-10)
-                    {
-                        orderedPoints.RemoveAt(orderedPoints.Count - 1);
-                    }
+                    foreach (var curve in curves)
+                        curve.Dispose();
+                }
+            }
+
+            // No segments: use points in order as a polygon
+            // Skip last point if it duplicates the first (closing point)
+            var orderedPoints = new List<(double x, double y)>(coords);
+            if (orderedPoints.Count > 1)
+            {
+                var first = orderedPoints[0];
+                var last = orderedPoints[orderedPoints.Count - 1];
+                if (Math.Abs(first.x - last.x) < 1e-10 &&
+                    Math.Abs(first.y - last.y) < 1e-10)
+                {
+                    orderedPoints.RemoveAt(orderedPoints.Count - 1);
                 }
             }
 
@@ -684,19 +655,19 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"IndexedPolyCurve #{entityLabel} resolved to less than 3 unique points.");
 
-            double[] pointsX = orderedPoints.Select(p => p.Item1).ToArray();
-            double[] pointsY = orderedPoints.Select(p => p.Item2).ToArray();
+            double[] pointsX = orderedPoints.Select(p => p.x).ToArray();
+            double[] pointsY = orderedPoints.Select(p => p.y).ToArray();
 
             int result = XbimGeometryNativeApi.xbim_profile_build_arbitrary_closed(
                 ContextHandle,
                 pointsX, pointsY, orderedPoints.Count,
-                out var NativeShapeHandle);
+                out var profileHandle);
 
             if (result != 0)
                 throw new InvalidOperationException(
                     $"Failed to build IndexedPolyCurve profile #{entityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(profileHandle);
         }
 
         private IXFace BuildArbitraryWithVoidsFace(IIfcArbitraryProfileDefWithVoids arbitraryWithVoids)
@@ -771,9 +742,37 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 int result = XbimGeometryNativeApi.xbim_profile_build_arbitrary_closed(
                     ContextHandle,
                     pointsX, pointsY, points.Count,
-                    out var NativeShapeHandle);
+                    out var profileHandle);
 
-                return result == 0 ? NativeShapeHandle : null;
+                return result == 0 ? profileHandle : null;
+            }
+
+            if (curve is IIfcCompositeCurve compositeCurve)
+            {
+                try
+                {
+                    var face = BuildFaceFromCompositeCurve(compositeCurve, 0);
+                    return ((Face)face).Handle;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("Failed to build inner composite curve: {Message}", ex.Message);
+                    return null;
+                }
+            }
+
+            if (curve is IIfcIndexedPolyCurve indexedPolyCurve)
+            {
+                try
+                {
+                    var face = BuildArbitraryFromIndexedPolyCurve(indexedPolyCurve, 0);
+                    return ((Face)face).Handle;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("Failed to build inner indexed poly curve: {Message}", ex.Message);
+                    return null;
+                }
             }
 
             _logger.LogWarning("Inner curve type {CurveType} is not yet supported for void extraction, skipping",
@@ -1049,52 +1048,509 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         #endregion
 
-        #region Curve Extraction Helpers
+        #region Composite Curve Helpers
 
-        private List<(double, double)> ExtractPointsFromCompositeCurve(IIfcCompositeCurve compositeCurve)
+        /// <summary>
+        /// Builds a planar face from a composite curve by constructing 2D curves
+        /// for each segment, assembling them into a wire with shared vertices.
+        /// </summary>
+        private IXFace BuildFaceFromCompositeCurve(IIfcCompositeCurve compositeCurve, int entityLabel)
         {
-            var points = new List<(double, double)>();
-
-            foreach (var segment in compositeCurve.Segments)
+            var curves = new List<NativeCurve2dHandle>();
+            try
             {
-                if (segment.ParentCurve is IIfcPolyline polyline)
+                int lastLabel = -1;
+                foreach (var segment in compositeCurve.Segments)
                 {
-                    foreach (var pt in polyline.Points)
+                    // Skip duplicate segments (archicad bug workaround)
+                    if (segment.EntityLabel == lastLabel)
+                        continue;
+                    lastLabel = segment.EntityLabel;
+
+                    var parentCurve = segment.ParentCurve;
+                    if (parentCurve == null) continue;
+
+                    var segmentCurves = new List<NativeCurve2dHandle>();
+                    BuildCurves2dFromCurve(parentCurve, segmentCurves);
+
+                    if (!segment.SameSense)
                     {
-                        var coords = pt.Coordinates;
-                        var point = (coords[0], coords[1]);
-                        if (points.Count == 0 || PointDistance(points[points.Count - 1], point) > 1e-10)
-                            points.Add(point);
+                        // Reverse each curve and reverse the order (matching legacy curve->Reverse())
+                        segmentCurves.Reverse();
+                        foreach (var c in segmentCurves)
+                            XbimGeometryNativeApi.xbim_curve2d_reverse(c);
                     }
+
+                    curves.AddRange(segmentCurves);
                 }
-                else if (segment.ParentCurve is IIfcTrimmedCurve trimmedCurve)
+
+                if (curves.Count == 0)
+                    throw new InvalidOperationException(
+                        $"CompositeCurve for profile #{entityLabel} produced no valid 2D curves.");
+
+                return BuildFaceFrom2dCurves(curves, entityLabel);
+            }
+            finally
+            {
+                foreach (var curve in curves)
+                    curve.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Builds a wire from 2D curves and creates a planar face from the wire.
+        /// </summary>
+        private IXFace BuildFaceFrom2dCurves(List<NativeCurve2dHandle> curves, int entityLabel)
+        {
+            IntPtr[] curvePtrs = curves.Select(c => c.DangerousGetHandle()).ToArray();
+            int wireResult = XbimGeometryNativeApi.xbim_wire_build_from_2d_curves(
+                ContextHandle, curvePtrs, curvePtrs.Length,
+                _modelService.Precision, _modelService.MinimumGap,
+                out var wireHandle);
+
+            try
+            {
+                if (wireResult != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build wire from 2D curves for profile #{entityLabel}: " +
+                        XbimGeometryNativeApi.GetLastError());
+
+                int faceResult = XbimGeometryNativeApi.xbim_face_build_from_wire(
+                    ContextHandle, wireHandle, out var faceHandle);
+
+                if (faceResult != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build face from 2D curve wire for profile #{entityLabel}: " +
+                        XbimGeometryNativeApi.GetLastError());
+
+                return NativeShapeWrapper.WrapFace(faceHandle);
+            }
+            finally
+            {
+                wireHandle?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Dispatches curve types to the appropriate 2D curve builder.
+        /// </summary>
+        private void BuildCurves2dFromCurve(IIfcCurve curve, List<NativeCurve2dHandle> curves)
+        {
+            if (curve is IIfcPolyline polyline)
+            {
+                BuildCurves2dFromPolyline(polyline, curves);
+            }
+            else if (curve is IIfcTrimmedCurve trimmedCurve)
+            {
+                BuildCurve2dFromTrimmedCurve(trimmedCurve, curves);
+            }
+            else if (curve is IIfcCircle circle)
+            {
+                BuildCurve2dFromFullCircle(circle, curves);
+            }
+            else if (curve is IIfcIndexedPolyCurve indexedPolyCurve)
+            {
+                BuildCurves2dFromIndexedPolyCurve(indexedPolyCurve, curves);
+            }
+            else
+            {
+                _logger.LogWarning("Unsupported composite curve segment type: {CurveType}, skipping",
+                    curve.ExpressType.ExpressName);
+            }
+        }
+
+        private void BuildCurves2dFromPolyline(IIfcPolyline polyline, List<NativeCurve2dHandle> curves)
+        {
+            var points = polyline.Points.ToList();
+            for (int i = 0; i < points.Count - 1; i++)
+            {
+                var c1 = points[i].Coordinates;
+                var c2 = points[i + 1].Coordinates;
+                double x1 = c1[0], y1 = c1[1];
+                double x2 = c2[0], y2 = c2[1];
+
+                double dx = x2 - x1, dy = y2 - y1;
+                if (Math.Sqrt(dx * dx + dy * dy) < 1e-10)
+                    continue;
+
+                int result = XbimGeometryNativeApi.xbim_curve2d_build_line(
+                    ContextHandle, x1, y1, x2, y2,
+                    out var curveHandle);
+
+                if (result == 0 && curveHandle != null && !curveHandle.IsInvalid)
+                    curves.Add(curveHandle);
+            }
+        }
+
+        private void BuildCurve2dFromTrimmedCurve(IIfcTrimmedCurve trimmedCurve, List<NativeCurve2dHandle> curves)
+        {
+            var basisCurve = trimmedCurve.BasisCurve;
+
+            if (basisCurve is IIfcCircle ifcCircle)
+            {
+                BuildCurve2dFromTrimmedCircle(trimmedCurve, ifcCircle, curves);
+            }
+            else if (basisCurve is IIfcEllipse ifcEllipse)
+            {
+                BuildCurve2dFromTrimmedEllipse(trimmedCurve, ifcEllipse, curves);
+            }
+            else if (basisCurve is IIfcLine)
+            {
+                BuildCurve2dFromTrimmedLine(trimmedCurve, curves);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Unsupported trimmed curve basis type: {BasisType}, skipping",
+                    basisCurve.ExpressType.ExpressName);
+            }
+        }
+
+        private void BuildCurve2dFromTrimmedCircle(
+            IIfcTrimmedCurve trimmedCurve, IIfcCircle ifcCircle, List<NativeCurve2dHandle> curves)
+        {
+            double radius = ifcCircle.Radius;
+            ExtractPlacementCenter2D(ifcCircle.Position, out double cx, out double cy,
+                out double refDirX, out double refDirY);
+
+            int circleResult = XbimGeometryNativeApi.xbim_curve2d_build_circle(
+                ContextHandle, cx, cy, radius, refDirX, refDirY,
+                out var circleHandle);
+
+            if (circleResult != 0)
+            {
+                _logger.LogWarning("Failed to build 2D circle curve: {Error}",
+                    XbimGeometryNativeApi.GetLastError());
+                return;
+            }
+
+            try
+            {
+                // Extract trim parameters — prefer CARTESIAN (project onto 2D circle)
+                double u1, u2;
+                double tolerance = _modelService.Precision;
+
+                var startPt = GetCartesianTrimPoint(trimmedCurve.Trim1);
+                if (startPt != null)
                 {
-                    // Extract trimming points for line segments
-                    foreach (var trim in trimmedCurve.Trim1)
+                    int r1 = XbimGeometryNativeApi.xbim_curve2d_project_point(
+                        ContextHandle, circleHandle,
+                        startPt.Value.x, startPt.Value.y, tolerance, out u1);
+                    if (r1 != 0) { _logger.LogWarning("Failed to project start point onto 2D circle"); return; }
+                }
+                else
+                {
+                    double? param1 = GetParameterTrimValue(trimmedCurve.Trim1);
+                    if (!param1.HasValue) { _logger.LogWarning("Cannot extract start trim for circle"); return; }
+                    u1 = param1.Value * _modelService.RadianFactor;
+                }
+
+                var endPt = GetCartesianTrimPoint(trimmedCurve.Trim2);
+                if (endPt != null)
+                {
+                    int r2 = XbimGeometryNativeApi.xbim_curve2d_project_point(
+                        ContextHandle, circleHandle,
+                        endPt.Value.x, endPt.Value.y, tolerance, out u2);
+                    if (r2 != 0) { _logger.LogWarning("Failed to project end point onto 2D circle"); return; }
+                }
+                else
+                {
+                    double? param2 = GetParameterTrimValue(trimmedCurve.Trim2);
+                    if (!param2.HasValue) { _logger.LogWarning("Cannot extract end trim for circle"); return; }
+                    u2 = param2.Value * _modelService.RadianFactor;
+                }
+
+                int sense = trimmedCurve.SenseAgreement ? 1 : 0;
+                int arcResult = XbimGeometryNativeApi.xbim_curve2d_build_arc_of_circle(
+                    ContextHandle, circleHandle, u1, u2, sense,
+                    out var arcHandle);
+
+                if (arcResult == 0 && arcHandle != null && !arcHandle.IsInvalid)
+                    curves.Add(arcHandle);
+                else
+                    _logger.LogWarning("Failed to build 2D circle arc: {Error}",
+                        XbimGeometryNativeApi.GetLastError());
+            }
+            finally
+            {
+                circleHandle.Dispose();
+            }
+        }
+
+        private void BuildCurve2dFromTrimmedEllipse(
+            IIfcTrimmedCurve trimmedCurve, IIfcEllipse ifcEllipse, List<NativeCurve2dHandle> curves)
+        {
+            ExtractPlacementCenter2D(ifcEllipse.Position, out double cx, out double cy,
+                out double refDirX, out double refDirY);
+
+            int ellipseResult = XbimGeometryNativeApi.xbim_curve2d_build_ellipse(
+                ContextHandle, cx, cy,
+                ifcEllipse.SemiAxis1, ifcEllipse.SemiAxis2,
+                refDirX, refDirY,
+                out var ellipseHandle);
+
+            if (ellipseResult != 0)
+            {
+                _logger.LogWarning("Failed to build 2D ellipse curve: {Error}",
+                    XbimGeometryNativeApi.GetLastError());
+                return;
+            }
+
+            try
+            {
+                double u1, u2;
+                double tolerance = _modelService.Precision;
+
+                var startPt = GetCartesianTrimPoint(trimmedCurve.Trim1);
+                if (startPt != null)
+                {
+                    int r1 = XbimGeometryNativeApi.xbim_curve2d_project_point(
+                        ContextHandle, ellipseHandle,
+                        startPt.Value.x, startPt.Value.y, tolerance, out u1);
+                    if (r1 != 0) { _logger.LogWarning("Failed to project start point onto 2D ellipse"); return; }
+                }
+                else
+                {
+                    double? param1 = GetParameterTrimValue(trimmedCurve.Trim1);
+                    if (!param1.HasValue) { _logger.LogWarning("Cannot extract start trim for ellipse"); return; }
+                    u1 = param1.Value * _modelService.RadianFactor;
+                }
+
+                var endPt = GetCartesianTrimPoint(trimmedCurve.Trim2);
+                if (endPt != null)
+                {
+                    int r2 = XbimGeometryNativeApi.xbim_curve2d_project_point(
+                        ContextHandle, ellipseHandle,
+                        endPt.Value.x, endPt.Value.y, tolerance, out u2);
+                    if (r2 != 0) { _logger.LogWarning("Failed to project end point onto 2D ellipse"); return; }
+                }
+                else
+                {
+                    double? param2 = GetParameterTrimValue(trimmedCurve.Trim2);
+                    if (!param2.HasValue) { _logger.LogWarning("Cannot extract end trim for ellipse"); return; }
+                    u2 = param2.Value * _modelService.RadianFactor;
+                }
+
+                int sense = trimmedCurve.SenseAgreement ? 1 : 0;
+                int arcResult = XbimGeometryNativeApi.xbim_curve2d_build_arc_of_ellipse(
+                    ContextHandle, ellipseHandle, u1, u2, sense,
+                    out var arcHandle);
+
+                if (arcResult == 0 && arcHandle != null && !arcHandle.IsInvalid)
+                    curves.Add(arcHandle);
+                else
+                    _logger.LogWarning("Failed to build 2D ellipse arc: {Error}",
+                        XbimGeometryNativeApi.GetLastError());
+            }
+            finally
+            {
+                ellipseHandle.Dispose();
+            }
+        }
+
+        private void BuildCurve2dFromTrimmedLine(IIfcTrimmedCurve trimmedCurve, List<NativeCurve2dHandle> curves)
+        {
+            var startPt = GetCartesianTrimPoint(trimmedCurve.Trim1);
+            var endPt = GetCartesianTrimPoint(trimmedCurve.Trim2);
+
+            if (startPt == null || endPt == null)
+            {
+                _logger.LogWarning("Trimmed line requires CARTESIAN trim points, skipping");
+                return;
+            }
+
+            double x1 = startPt.Value.x, y1 = startPt.Value.y;
+            double x2 = endPt.Value.x, y2 = endPt.Value.y;
+
+            if (!trimmedCurve.SenseAgreement)
+                (x1, y1, x2, y2) = (x2, y2, x1, y1);
+
+            double dx = x2 - x1, dy = y2 - y1;
+            if (Math.Sqrt(dx * dx + dy * dy) < 1e-10)
+                return;
+
+            int result = XbimGeometryNativeApi.xbim_curve2d_build_line(
+                ContextHandle, x1, y1, x2, y2,
+                out var curveHandle);
+
+            if (result == 0 && curveHandle != null && !curveHandle.IsInvalid)
+                curves.Add(curveHandle);
+        }
+
+        private void BuildCurve2dFromFullCircle(IIfcCircle ifcCircle, List<NativeCurve2dHandle> curves)
+        {
+            ExtractPlacementCenter2D(ifcCircle.Position, out double cx, out double cy,
+                out double refDirX, out double refDirY);
+
+            int circResult = XbimGeometryNativeApi.xbim_curve2d_build_circle(
+                ContextHandle, cx, cy, ifcCircle.Radius, refDirX, refDirY,
+                out var circleHandle);
+
+            if (circResult != 0) return;
+
+            try
+            {
+                int trimResult = XbimGeometryNativeApi.xbim_curve2d_build_trimmed(
+                    ContextHandle, circleHandle, 0, 2 * Math.PI, 1,
+                    out var trimmedHandle);
+
+                if (trimResult == 0 && trimmedHandle != null && !trimmedHandle.IsInvalid)
+                    curves.Add(trimmedHandle);
+            }
+            finally
+            {
+                circleHandle.Dispose();
+            }
+        }
+
+        private void BuildCurves2dFromIndexedPolyCurve(
+            IIfcIndexedPolyCurve indexedPolyCurve, List<NativeCurve2dHandle> curves)
+        {
+            if (!(indexedPolyCurve.Points is IIfcCartesianPointList2D pointList2D))
+            {
+                _logger.LogWarning("IndexedPolyCurve points must be 2D for profiles, skipping");
+                return;
+            }
+
+            var coords = new List<(double x, double y)>();
+            foreach (var coordList in pointList2D.CoordList)
+            {
+                var c = coordList.ToList();
+                coords.Add((c[0], c[1]));
+            }
+
+            if (indexedPolyCurve.Segments != null && indexedPolyCurve.Segments.Any())
+            {
+                foreach (var segment in indexedPolyCurve.Segments)
+                {
+                    if (segment is IfcLineIndex lineIndex)
                     {
-                        if (trim is IIfcCartesianPoint cp)
+                        var indices = (System.Collections.IList)lineIndex.Value;
+                        for (int i = 0; i < indices.Count - 1; i++)
                         {
-                            var coords = cp.Coordinates;
-                            var point = (coords[0], coords[1]);
-                            if (points.Count == 0 || PointDistance(points[points.Count - 1], point) > 1e-10)
-                                points.Add(point);
+                            int idx1 = (int)(long)indices[i]! - 1;
+                            int idx2 = (int)(long)indices[i + 1]! - 1;
+                            if (idx1 < 0 || idx1 >= coords.Count || idx2 < 0 || idx2 >= coords.Count)
+                                continue;
+
+                            var p1 = coords[idx1];
+                            var p2 = coords[idx2];
+                            double dx = p2.x - p1.x, dy = p2.y - p1.y;
+                            if (Math.Sqrt(dx * dx + dy * dy) < 1e-10) continue;
+
+                            int result = XbimGeometryNativeApi.xbim_curve2d_build_line(
+                                ContextHandle, p1.x, p1.y, p2.x, p2.y,
+                                out var curveHandle);
+                            if (result == 0 && curveHandle != null && !curveHandle.IsInvalid)
+                                curves.Add(curveHandle);
                         }
+                    }
+                    else if (segment is IfcArcIndex arcIndex)
+                    {
+                        var indices = (System.Collections.IList)arcIndex.Value;
+                        if (indices.Count != 3) continue;
+
+                        int idx1 = (int)(long)indices[0]! - 1;
+                        int idx2 = (int)(long)indices[1]! - 1;
+                        int idx3 = (int)(long)indices[2]! - 1;
+                        if (idx1 < 0 || idx1 >= coords.Count ||
+                            idx2 < 0 || idx2 >= coords.Count ||
+                            idx3 < 0 || idx3 >= coords.Count)
+                            continue;
+
+                        var p1 = coords[idx1];
+                        var p2 = coords[idx2];
+                        var p3 = coords[idx3];
+
+                        int result = XbimGeometryNativeApi.xbim_curve2d_build_arc_3pt(
+                            ContextHandle,
+                            p1.x, p1.y, p2.x, p2.y, p3.x, p3.y,
+                            out var curveHandle);
+                        if (result == 0 && curveHandle != null && !curveHandle.IsInvalid)
+                            curves.Add(curveHandle);
                     }
                 }
             }
+            else
+            {
+                for (int i = 0; i < coords.Count - 1; i++)
+                {
+                    var p1 = coords[i];
+                    var p2 = coords[i + 1];
+                    double dx = p2.x - p1.x, dy = p2.y - p1.y;
+                    if (Math.Sqrt(dx * dx + dy * dy) < 1e-10) continue;
 
-            // Remove duplicated closing point
-            if (points.Count > 1 && PointDistance(points[0], points[points.Count - 1]) < 1e-10)
-                points.RemoveAt(points.Count - 1);
-
-            return points;
+                    int result = XbimGeometryNativeApi.xbim_curve2d_build_line(
+                        ContextHandle, p1.x, p1.y, p2.x, p2.y,
+                        out var curveHandle);
+                    if (result == 0 && curveHandle != null && !curveHandle.IsInvalid)
+                        curves.Add(curveHandle);
+                }
+            }
         }
 
-        private static double PointDistance((double, double) a, (double, double) b)
+        /// <summary>
+        /// Extracts the center coordinates and reference direction from an IFC placement.
+        /// Defaults to origin (0,0) and X-direction (1,0) when not specified.
+        /// </summary>
+        private static void ExtractPlacementCenter2D(
+            IIfcAxis2Placement placement,
+            out double cx, out double cy,
+            out double refDirX, out double refDirY)
         {
-            double dx = a.Item1 - b.Item1;
-            double dy = a.Item2 - b.Item2;
-            return Math.Sqrt(dx * dx + dy * dy);
+            cx = 0; cy = 0;
+            refDirX = 1; refDirY = 0;
+
+            if (placement is IIfcAxis2Placement2D pos2D)
+            {
+                if (pos2D.Location != null)
+                {
+                    var coords = pos2D.Location.Coordinates;
+                    cx = coords[0];
+                    cy = coords[1];
+                }
+                if (pos2D.RefDirection != null)
+                {
+                    double dx = pos2D.RefDirection.DirectionRatios[0];
+                    double dy = pos2D.RefDirection.DirectionRatios[1];
+                    double mag = Math.Sqrt(dx * dx + dy * dy);
+                    if (mag > 1e-15) { refDirX = dx / mag; refDirY = dy / mag; }
+                }
+            }
+            else if (placement is IIfcAxis2Placement3D pos3D)
+            {
+                if (pos3D.Location != null)
+                {
+                    var coords = pos3D.Location.Coordinates;
+                    cx = coords[0];
+                    cy = coords[1];
+                }
+            }
+        }
+
+        private static (double x, double y)? GetCartesianTrimPoint(
+            IEnumerable<IIfcTrimmingSelect> trims)
+        {
+            foreach (var trim in trims)
+            {
+                if (trim is IIfcCartesianPoint cp)
+                {
+                    var coords = cp.Coordinates;
+                    return (coords[0], coords[1]);
+                }
+            }
+            return null;
+        }
+
+        private static double? GetParameterTrimValue(
+            IEnumerable<IIfcTrimmingSelect> trims)
+        {
+            foreach (var trim in trims)
+            {
+                if (trim is Xbim.Ifc4.MeasureResource.IfcParameterValue pv)
+                    return (double)pv;
+            }
+            return null;
         }
 
         #endregion

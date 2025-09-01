@@ -37,6 +37,7 @@ typedef struct XbimContext_*        XbimContextHandle;
 typedef struct XbimShape_*          XbimShapeHandle;
 typedef struct XbimLocation_*       XbimLocationHandle;
 typedef struct XbimCurve_*          XbimCurveHandle;
+typedef struct XbimCurve2d_*        XbimCurve2dHandle;
 typedef struct XbimSurface_*        XbimSurfaceHandle;
 
 #pragma endregion
@@ -1830,6 +1831,27 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_circle_arc(
     XbimShapeHandle* outHandle);
 
 /*
+ * Build a circular arc edge passing through three points.
+ * Uses OCCT GC_MakeArcOfCircle to find the unique circle through the three
+ * points and construct a trimmed arc from p1 through p2 to p3.
+ * If the points are collinear, falls back to a straight line from p1 to p3.
+ *
+ *   ctx        – a valid context handle (used for logging; may be NULL)
+ *   p1X/Y/Z    – first point (arc start)
+ *   p2X/Y/Z    – second point (arc passes through)
+ *   p3X/Y/Z    – third point (arc end)
+ *   outHandle  – receives the new edge shape handle (caller owns)
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if points are coincident.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_circle_arc_3pt(
+    XbimContextHandle ctx,
+    double p1X, double p1Y, double p1Z,
+    double p2X, double p2Y, double p2Z,
+    double p3X, double p3Y, double p3Z,
+    XbimShapeHandle* outHandle);
+
+/*
  * Build an edge from a pre-built curve handle with start/end vertex positions.
  * Used for IFC edge curves in advanced BRep faces. If start and end positions
  * are coincident (within tolerance), builds a closed edge (seam).
@@ -2507,10 +2529,144 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_unify_domain(
     XbimShapeHandle     shapeHandle,
     XbimShapeHandle*    outHandle);
 
+#pragma endregion
+
+#pragma region Curve2d Lifecycle
+
+/*
+ * Destroy a 2D curve handle and free its resources.
+ * Passing NULL is a safe no-op.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_destroy(XbimCurve2dHandle handle);
+
+#pragma endregion
+
+#pragma region Curve2d Construction
+
+/*
+ * Build a 2D line segment (Geom2d_TrimmedCurve) between two points.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_line(
+    XbimContextHandle   ctx,
+    double x1, double y1,
+    double x2, double y2,
+    XbimCurve2dHandle*  outHandle);
+
+/*
+ * Build a 2D circle (Geom2d_Circle) from center, radius, and reference direction.
+ * The reference direction defines the X axis of the circle's local coordinate system.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_circle(
+    XbimContextHandle   ctx,
+    double cx, double cy,
+    double radius,
+    double refDirX, double refDirY,
+    XbimCurve2dHandle*  outHandle);
+
+/*
+ * Build a 2D ellipse (Geom2d_Ellipse) from center, semi-axes, and reference direction.
+ * If minorRadius > majorRadius, they are automatically swapped.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_ellipse(
+    XbimContextHandle   ctx,
+    double cx, double cy,
+    double majorRadius, double minorRadius,
+    double refDirX, double refDirY,
+    XbimCurve2dHandle*  outHandle);
+
+/*
+ * Build a generic trimmed 2D curve from a basis curve and parameter range.
+ *   sense – nonzero for same-sense, zero for reversed
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_trimmed(
+    XbimContextHandle   ctx,
+    XbimCurve2dHandle   basisHandle,
+    double u1, double u2,
+    int sense,
+    XbimCurve2dHandle*  outHandle);
+
+/*
+ * Build a circular arc (Geom2d_TrimmedCurve) from a circle and parameter range.
+ * Uses GCE2d_MakeArcOfCircle. If !sense, parameters are swapped (legacy behavior).
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_arc_of_circle(
+    XbimContextHandle   ctx,
+    XbimCurve2dHandle   circleHandle,
+    double u1, double u2,
+    int sense,
+    XbimCurve2dHandle*  outHandle);
+
+/*
+ * Build an elliptical arc (Geom2d_TrimmedCurve) from an ellipse and parameter range.
+ * Uses GCE2d_MakeArcOfEllipse. If !sense, result is reversed (legacy behavior).
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_arc_of_ellipse(
+    XbimContextHandle   ctx,
+    XbimCurve2dHandle   ellipseHandle,
+    double u1, double u2,
+    int sense,
+    XbimCurve2dHandle*  outHandle);
+
+/*
+ * Build a 2D circular arc through three points.
+ * Falls back to a line segment if the points are collinear.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_arc_3pt(
+    XbimContextHandle   ctx,
+    double x1, double y1,
+    double x2, double y2,
+    double x3, double y3,
+    XbimCurve2dHandle*  outHandle);
+
+#pragma endregion
+
+#pragma region Curve2d Queries
+
+/*
+ * Project a 2D point onto a curve and return the parameter.
+ * Uses Geom2dLib_Tool::Parameter.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_project_point(
+    XbimContextHandle   ctx,
+    XbimCurve2dHandle   curveHandle,
+    double px, double py,
+    double tolerance,
+    double* outParam);
+
+#pragma endregion
+
+#pragma region Curve2d Mutation
+
+/*
+ * Reverse the direction of a 2D curve in-place.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_reverse(XbimCurve2dHandle handle);
+
+#pragma endregion
+
+#pragma region Wire from 2D Curves
+
+/*
+ * Build a wire from an array of 2D bounded curves.
+ * Edges are created via BRepBuilderAPI_MakeEdge2d, vertices are shared between
+ * consecutive edges, 3D curves are generated via BRepLib::BuildCurve3d,
+ * and the wire is closed if the first and last points are within gapSize.
+ *
+ * This matches the legacy NWireFactory::BuildWire(TColGeom2d_SequenceOfBoundedCurve)
+ * approach for building profile wires from 2D curve segments.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_2d_curves(
+    XbimContextHandle   ctx,
+    XbimCurve2dHandle*  curves,
+    int                 numCurves,
+    double              tolerance,
+    double              gapSize,
+    XbimShapeHandle*    outWire);
+
+#pragma endregion
+
 #ifdef __cplusplus
 }
 #endif
-
-#pragma endregion
 
 #endif /* XBIM_GEOMETRY_API_H */

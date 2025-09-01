@@ -610,6 +610,14 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeShapeHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_edge_build_circle_arc_3pt(
+            NativeContextHandle ctx,
+            double p1X, double p1Y, double p1Z,
+            double p2X, double p2Y, double p2Z,
+            double p3X, double p3Y, double p3Z,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_edge_build_from_curve_handle(
             NativeContextHandle ctx,
             NativeCurveHandle curveHandle,
@@ -1026,6 +1034,89 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double tolerance,
             [MarshalAs(UnmanagedType.LPArray)] IntPtr[] outFaces,
             ref int outCount);
+
+        #endregion
+
+        #region Curve2d Construction
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_line(
+            NativeContextHandle ctx,
+            double x1, double y1,
+            double x2, double y2,
+            out NativeCurve2dHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_circle(
+            NativeContextHandle ctx,
+            double cx, double cy,
+            double radius,
+            double refDirX, double refDirY,
+            out NativeCurve2dHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_ellipse(
+            NativeContextHandle ctx,
+            double cx, double cy,
+            double majorRadius, double minorRadius,
+            double refDirX, double refDirY,
+            out NativeCurve2dHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_trimmed(
+            NativeContextHandle ctx,
+            NativeCurve2dHandle basisHandle,
+            double u1, double u2,
+            int sense,
+            out NativeCurve2dHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_arc_of_circle(
+            NativeContextHandle ctx,
+            NativeCurve2dHandle circleHandle,
+            double u1, double u2,
+            int sense,
+            out NativeCurve2dHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_arc_of_ellipse(
+            NativeContextHandle ctx,
+            NativeCurve2dHandle ellipseHandle,
+            double u1, double u2,
+            int sense,
+            out NativeCurve2dHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_arc_3pt(
+            NativeContextHandle ctx,
+            double x1, double y1,
+            double x2, double y2,
+            double x3, double y3,
+            out NativeCurve2dHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_project_point(
+            NativeContextHandle ctx,
+            NativeCurve2dHandle curveHandle,
+            double px, double py,
+            double tolerance,
+            out double outParam);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_reverse(NativeCurve2dHandle handle);
+
+        #endregion
+
+        #region Wire from 2D Curves
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_build_from_2d_curves(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] curves,
+            int numCurves,
+            double tolerance,
+            double gapSize,
+            out NativeShapeHandle outWire);
 
         #endregion
     }
