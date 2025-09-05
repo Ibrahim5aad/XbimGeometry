@@ -113,7 +113,7 @@ public class SweptSolidTests : IDisposable
 
         var shape = _solidFactory.Build(ifcSolid);
 
-        ((IXShape)shape).IsValidShape().Should().BeTrue();
+        shape.IsValidShape().Should().BeTrue();
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public class SweptSolidTests : IDisposable
 
         var shape = _solidFactory.Build(ifcSolid);
 
-        ((IXShape)shape).IsClosed.Should().BeTrue();
+        shape.IsClosed.Should().BeTrue();
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public class SweptSolidTests : IDisposable
             depth: 100);
 
         var shape = _solidFactory.Build(ifcSolid);
-        var bounds = ((IXShape)shape).Bounds();
+        var bounds = shape.Bounds();
 
         bounds.LenX.Should().BeApproximately(40, 0.1);
         bounds.LenY.Should().BeApproximately(60, 0.1);
@@ -180,8 +180,8 @@ public class SweptSolidTests : IDisposable
 
         var shape = _solidFactory.Build(ifcSolid);
 
-        ((IXShape)shape).IsValidShape().Should().BeTrue();
-        ((IXShape)shape).IsClosed.Should().BeTrue();
+        shape.IsValidShape().Should().BeTrue();
+        shape.IsClosed.Should().BeTrue();
     }
 
     [Fact]
@@ -305,8 +305,8 @@ public class SweptSolidTests : IDisposable
 
         var shape = _solidFactory.Build(ifcSolid);
 
-        ((IXShape)shape).IsValidShape().Should().BeTrue();
-        ((IXShape)shape).IsClosed.Should().BeTrue();
+        shape.IsValidShape().Should().BeTrue();
+        shape.IsClosed.Should().BeTrue();
     }
 
     [Fact]
@@ -381,8 +381,8 @@ public class SweptSolidTests : IDisposable
         var revolved = _solidFactory.Build(IfcMoq.RevolvedAreaSolid());
 
         extruded.Should().BeAssignableTo<IDisposable>();
-        ((IDisposable)extruded).Dispose();
-        ((IDisposable)extrudedTapered).Dispose();
-        ((IDisposable)revolved).Dispose();
+        extruded.Dispose();
+        extrudedTapered.Dispose();
+        revolved.Dispose();
     }
 }

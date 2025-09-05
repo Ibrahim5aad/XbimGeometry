@@ -38,6 +38,7 @@
 #include <BRepLib.hxx>
 #include <ShapeFix_Edge.hxx>
 #include <Standard_Failure.hxx>
+#include <ShapeAnalysis.hxx>
 
 
 #pragma region Wire Construction
@@ -97,6 +98,17 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_edges(
         {
             xbim_set_error("xbim_wire_build_from_edges: resulting wire is null");
             return XBIM_NULL_SHAPE;
+        }
+
+        /* Detect closure: check if first and last vertices coincide */
+        TopoDS_Vertex vFirst, vLast;
+        TopExp::Vertices(wire, vFirst, vLast);
+        if (!vFirst.IsNull() && !vLast.IsNull())
+        {
+            gp_Pnt p1 = BRep_Tool::Pnt(vFirst);
+            gp_Pnt p2 = BRep_Tool::Pnt(vLast);
+            if (p1.IsEqual(p2, Precision::Confusion()))
+                wire.Closed(true);
         }
 
         *outHandle = xbim_shape_create_from(wire);
@@ -184,10 +196,16 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polyline(
         /* Check if the polyline is closed (first/last points within tolerance) */
         gp_Pnt firstPt = BRep_Tool::Pnt(TopoDS::Vertex(vertices.First()));
         gp_Pnt lastPt = BRep_Tool::Pnt(TopoDS::Vertex(vertices.Last()));
-        bool closed = firstPt.Distance(lastPt) <= tolerance;
+        bool closed = (vertices.Length() > 2) && (firstPt.Distance(lastPt) <= tolerance);
+
+        /* If closed, drop the duplicate last vertex — the closing edge
+         * will reuse the first vertex to produce proper shared topology. */
+        if (closed)
+            vertices.Remove(vertices.Length());
 
         /* Build edges between consecutive vertices */
-        for (int i = 2; i <= vertices.Length(); ++i)
+        int nv = vertices.Length();
+        for (int i = 2; i <= nv; ++i)
         {
             const TopoDS_Vertex& startV = TopoDS::Vertex(vertices.Value(i - 1));
             const TopoDS_Vertex& endV = TopoDS::Vertex(vertices.Value(i));
@@ -195,8 +213,15 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polyline(
             builder.Add(wire, edgeMaker.Edge());
         }
 
+        /* Add closing edge sharing the first vertex */
         if (closed)
+        {
+            BRepBuilderAPI_MakeEdge closingEdge(
+                TopoDS::Vertex(vertices.Value(nv)),
+                TopoDS::Vertex(vertices.First()));
+            builder.Add(wire, closingEdge.Edge());
             wire.Closed(true);
+        }
 
         if (wire.IsNull())
         {
@@ -523,7 +548,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_is_closed(
         BRepAdaptor_CompCurve cc(wire, Standard_True);
         gp_Pnt p1 = cc.Value(cc.FirstParameter());
         gp_Pnt p2 = cc.Value(cc.LastParameter());
-        *outClosed = p1.IsEqual(p2, tolerance) ? 1 : 0;
+        *outClosed = p1.IsEqual(p2, tolerance) ? XBIM_TRUE : XBIM_FALSE;
 
         return XBIM_OK;
     }
@@ -603,34 +628,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_contour_area(
             xbim_set_error("xbim_wire_contour_area: handle is not a wire");
             return XBIM_INVALID_ARG;
         }
-
-        /* Use the shoelace formula on projected edge vertices.
-         * This computes the signed area of the polygon formed by
-         * sampling edge start points along the wire. */
         const TopoDS_Wire& wire = TopoDS::Wire(shape);
-        BRepAdaptor_CompCurve cc(wire, Standard_True);
-
-        /* Sample enough points along the composite curve to get
-         * an accurate area. For a polygon wire, each segment
-         * contributes exactly one linear piece. */
-        double first = cc.FirstParameter();
-        double last  = cc.LastParameter();
-        int numSamples = 200;
-        double step = (last - first) / numSamples;
-
-        double area = 0.0;
-        gp_Pnt prev = cc.Value(first);
-        for (int i = 1; i <= numSamples; i++)
-        {
-            double u = first + i * step;
-            gp_Pnt curr = cc.Value(u);
-            /* Shoelace in 3D projected onto dominant plane.
-             * We accumulate the cross product; the magnitude gives 2*area. */
-            area += prev.X() * curr.Y() - curr.X() * prev.Y();
-            prev = curr;
-        }
-
-        *outArea = std::abs(area) * 0.5;
+        *outArea = ShapeAnalysis::ContourArea(wire);
         return XBIM_OK;
     }
     catch (const Standard_Failure&)

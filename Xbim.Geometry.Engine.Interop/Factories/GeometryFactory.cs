@@ -4,6 +4,7 @@ using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
+using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4x3.GeometryResource;
 
@@ -558,12 +559,16 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public bool IsFacingAwayFrom(IXFace face, IXDirection direction)
         {
-            throw new NotImplementedException("IsFacingAwayFrom requires face normal evaluation.");
+            if (direction.IsNull) return false;
+            var nativeFace = (Face)face;
+            return XbimGeometryNativeApi.xbim_face_is_facing_away(
+                nativeFace.Handle,
+                direction.X, direction.Y, direction.Z) != 0;
         }
 
         public IXPlane BuildPlane(IIfcPlane plane)
         {
-            throw new NotImplementedException("BuildPlane requires surface factory support.");
+            return (IXPlane)_modelService.SurfaceFactory.Build(plane);
         }
 
         public double Distance(IXPoint a, IXPoint b)
@@ -581,7 +586,19 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXDirection NormalAt(IXFace face, IXPoint position, double tolerance)
         {
-            throw new NotImplementedException("NormalAt requires face surface evaluation.");
+            var nativeFace = (Shapes.Face)face;
+            int result = XbimGeometryNativeApi.xbim_face_normal_at_point(
+                nativeFace.Handle,
+                position.X, position.Y, position.Z,
+                _modelService.Precision,
+                tolerance,
+                out double nx, out double ny, out double nz);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to compute normal at point: {XbimGeometryNativeApi.GetLastError()}");
+
+            return BuildDirection3d(nx, ny, nz);
         }
 
         #endregion

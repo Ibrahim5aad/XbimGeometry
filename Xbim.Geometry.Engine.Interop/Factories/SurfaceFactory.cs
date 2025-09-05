@@ -54,14 +54,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 ContextHandle,
                 origin.X, origin.Y, origin.Z,
                 normal.X, normal.Y, normal.Z,
-                out var NativeSurfaceHandle);
+                out var NativeSurfaceHandle,
+                out double refX, out double refY, out double refZ);
 
             if (result != 0)
                 throw new InvalidOperationException(
                     $"Failed to build plane: {XbimGeometryNativeApi.GetLastError()}");
 
-            // Default reference direction: perpendicular to normal
-            var refDir = ComputeRefDirection(normal);
+            var refDir = new XDirection(refX, refY, refZ);
             return new Plane(NativeSurfaceHandle, origin, normal, refDir);
         }
 
@@ -78,7 +78,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 ContextHandle,
                 ox, oy, oz,
                 zx, zy, zz,
-                out var NativeSurfaceHandle);
+                out var NativeSurfaceHandle,
+                out _, out _, out _);
 
             if (result != 0)
                 throw new InvalidOperationException(
@@ -227,34 +228,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 : XSurfaceType.IfcBSplineSurfaceWithKnots;
 
             return new Surface(NativeSurfaceHandle, surfaceType);
-        }
-
-        #endregion
-
-        #region Helpers
-
-        private static XDirection ComputeRefDirection(IXDirection normal)
-        {
-            // Find a direction perpendicular to the normal
-            double nx = normal.X, ny = normal.Y, nz = normal.Z;
-            double ax, ay, az;
-
-            if (Math.Abs(nz) < 0.9)
-            {
-                // Cross product with (0, 0, 1)
-                ax = ny;
-                ay = -nx;
-                az = 0;
-            }
-            else
-            {
-                // Cross product with (1, 0, 0)
-                ax = 0;
-                ay = nz;
-                az = -ny;
-            }
-
-            return new XDirection(ax, ay, az);
         }
 
         #endregion

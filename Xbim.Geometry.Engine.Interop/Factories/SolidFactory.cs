@@ -214,7 +214,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             // Build the swept profile face
             var profileFace = (Face)_modelService.ProfileFactory.BuildFace(extrudedSolid.SweptArea);
-
+            
             // Build optional position location (NullHandle = identity)
             var locationHandle = NativeLocationHandle.NullHandle;
             if (extrudedSolid.Position != null)

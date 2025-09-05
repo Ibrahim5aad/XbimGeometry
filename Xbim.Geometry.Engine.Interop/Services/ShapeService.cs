@@ -261,19 +261,14 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public bool IsFacingAwayFrom(IXFace face, IXDirection direction)
         {
-            if (face == null || direction == null) return false;
+            if (face == null || direction == null || direction.IsNull) return false;
 
             var native = face as Shape;
             if (native == null) return false;
 
-            int result = XbimGeometryNativeApi.xbim_face_normal(
-                native.Handle, 0.5, 0.5,
-                out double nx, out double ny, out double nz);
-
-            if (result != 0) return false;
-
-            double dot = nx * direction.X + ny * direction.Y + nz * direction.Z;
-            return dot < 0;
+            return XbimGeometryNativeApi.xbim_face_is_facing_away(
+                native.Handle,
+                direction.X, direction.Y, direction.Z) != 0;
         }
 
         public IXShape Combine(IEnumerable<IXShape> shapes)

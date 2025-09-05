@@ -40,7 +40,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private NativeShapeHandle BuildBooleanResult(IIfcBooleanResult boolResult)
         {
             var firstHandle = BuildOperand(boolResult.FirstOperand);
-            NativeShapeHandle? secondHandle = null;
+            NativeShapeHandle secondHandle;
 
             try
             {
@@ -63,7 +63,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
 
             double fuzzyTolerance = _modelService.Model.ModelFactors.PrecisionBoolean;
-
             NativeShapeHandle outHandle;
             int hasWarnings;
             int result;
@@ -123,7 +122,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 return ExtractHandle(shape, operand);
             }
 
-            // 3. Half-space solid (clipping plane)
+            // 3. Half-space solid
             if (operand is IIfcHalfSpaceSolid halfSpace)
             {
                 var shape = _modelService.SolidFactory.Build(halfSpace);

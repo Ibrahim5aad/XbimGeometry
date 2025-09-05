@@ -46,11 +46,14 @@ typedef struct XbimSurface_*        XbimSurfaceHandle;
 
 typedef int XbimResult;
 
-#define XBIM_OK              0  /* Success                                   */
-#define XBIM_ERROR           1  /* General / unspecified error                */
-#define XBIM_INVALID_HANDLE  2  /* A NULL or otherwise invalid handle was passed */
-#define XBIM_NULL_SHAPE      3  /* The resulting shape is null / empty        */
-#define XBIM_INVALID_ARG     4  /* An argument value is out of range          */
+#define XBIM_OK                0  /* Success                                        */
+#define XBIM_ERROR             1  /* General / unspecified error                    */
+#define XBIM_INVALID_HANDLE    2  /* A NULL or otherwise invalid handle was passed  */
+#define XBIM_NULL_SHAPE        3  /* The resulting shape is null / empty            */
+#define XBIM_INVALID_ARG       4  /* An argument value is out of range              */
+
+#define XBIM_TRUE              1  /* Boolean true                                   */
+#define XBIM_FALSE             0  /* Boolean false                                  */
 
 /*
  * Retrieve a human-readable description of the last error that occurred
@@ -1627,6 +1630,41 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_normal(
     double*         outNormalZ);
 
 /*
+ * Compute the surface normal at a 3D point projected onto the face.
+ * Projects the point onto the face surface using ShapeAnalysis_Surface::ValueOfUV,
+ * then evaluates the normal at that UV via GeomLProp_SLProps.
+ *
+ *   faceHandle         – a valid shape handle containing a TopoDS_Face
+ *   pointX/Y/Z         – the 3D point to project
+ *   precision           – tolerance for the UV projection
+ *   tolerance           – tolerance for the surface property evaluation
+ *   outNormalX/Y/Z     – receives the normal vector components
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if not a face.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_normal_at_point(
+    XbimShapeHandle faceHandle,
+    double          pointX,
+    double          pointY,
+    double          pointZ,
+    double          precision,
+    double          tolerance,
+    double*         outNormalX,
+    double*         outNormalY,
+    double*         outNormalZ);
+
+/*
+ * Check whether a face is facing away from a given direction.
+ * Computes the face normal at the parametric centre and compares the angle
+ * with the given direction vector. Returns XBIM_TRUE if facing away.
+ */
+XBIM_EXPORT int XBIM_CALL xbim_face_is_facing_away(
+    XbimShapeHandle faceHandle,
+    double          dirX,
+    double          dirY,
+    double          dirZ);
+
+/*
  * Get the geometric tolerance of a face.
  * Uses BRep_Tool::Tolerance.
  *
@@ -1670,18 +1708,19 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_add_wires(
     XbimShapeHandle*    outHandle);
 
 /*
- * Repair a face using ShapeFix_Face.
+ * Repair a face using ShapeFix_Shape.
+ * Returns the fixed shape — a single face, or a shell/compound containing
+ * multiple faces when the fixer splits the input (e.g. multiple outer bounds).
+ * Use xbim_shape_sub_shapes with TopAbs_FACE to extract individual faces.
  *
  *   faceHandle – a valid face shape handle
  *   tolerance  – geometric tolerance for the fix
- *   outFaces   – receives the fixed face handle(s) (may be NULL for count query)
- *   outCount   – receives the number of result faces
+ *   outHandle  – receives the fixed shape handle
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_face_fix(
     XbimShapeHandle     faceHandle,
     double              tolerance,
-    XbimShapeHandle*    outFaces,
-    int*                outCount);
+    XbimShapeHandle*    outHandle);
 
 #pragma endregion
 
@@ -2157,6 +2196,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_d2(
  *   originX/Y/Z    – a point on the plane
  *   normalX/Y/Z    – plane normal direction (must be non-zero)
  *   outHandle      – receives the new surface handle
+ *   outRefDirX/Y/Z – receives the OCCT-computed reference direction (X-axis)
  *
  * Returns XBIM_OK on success.
  */
@@ -2164,7 +2204,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_plane(
     XbimContextHandle ctx,
     double originX, double originY, double originZ,
     double normalX, double normalY, double normalZ,
-    XbimSurfaceHandle* outHandle);
+    XbimSurfaceHandle* outHandle,
+    double* outRefDirX, double* outRefDirY, double* outRefDirZ);
 
 /*
  * Build a cylindrical surface from an axis-2 placement and radius.

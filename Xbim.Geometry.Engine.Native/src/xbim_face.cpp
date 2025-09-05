@@ -39,7 +39,9 @@
 #include <BRepGProp.hxx>
 #include <GProp_GProps.hxx>
 #include <ShapeFix_Wire.hxx>
-#include <ShapeFix_Face.hxx>
+#include <ShapeFix_Shape.hxx>
+#include <ShapeAnalysis_Surface.hxx>
+#include <GeomLProp_SLProps.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Wire.hxx>
@@ -221,6 +223,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_wire(
             return XBIM_NULL_SHAPE;
         }
 
+        face.Closed(true);
         *outHandle = xbim_shape_create_from(face);
         if (!*outHandle)
         {
@@ -368,6 +371,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced(
             return XBIM_NULL_SHAPE;
         }
 
+        result.Closed(true);
         *outHandle = xbim_shape_create_from(result);
         if (!*outHandle)
         {
@@ -505,6 +509,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced_with_surface(
             return XBIM_NULL_SHAPE;
         }
 
+        result.Closed(true);
         *outHandle = xbim_shape_create_from(result);
         if (!*outHandle)
         {
@@ -782,16 +787,16 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_add_wires(
 XBIM_EXPORT XbimResult XBIM_CALL xbim_face_fix(
     XbimShapeHandle     faceHandle,
     double              tolerance,
-    XbimShapeHandle*    outFaces,
-    int*                outCount)
+    XbimShapeHandle*    outHandle)
 {
     xbim_clear_error();
 
-    if (!outCount)
+    if (!outHandle)
     {
-        xbim_set_error("xbim_face_fix: outCount is NULL");
+        xbim_set_error("xbim_face_fix: outHandle is NULL");
         return XBIM_INVALID_ARG;
     }
+    *outHandle = nullptr;
 
     if (!faceHandle || faceHandle->shape.IsNull())
     {
@@ -807,27 +812,24 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_fix(
     try
     {
         TopoDS_Face face = TopoDS::Face(faceHandle->shape);
-        ShapeFix_Face fixer(face);
+        ShapeFix_Shape fixer(face);
         fixer.SetPrecision(tolerance);
-        fixer.Perform();
+        bool ok = fixer.Perform();
 
-        TopoDS_Face result = fixer.Face();
-        if (result.IsNull())
+        if (ok)
         {
-            // Fix produced nothing — return original
-            if (outFaces)
+            *outHandle = xbim_shape_create_from(fixer.Shape());
+            if (!*outHandle)
             {
-                outFaces[0] = xbim_shape_create_from(face);
+                xbim_set_error("xbim_face_fix: memory allocation failed");
+                return XBIM_ERROR;
             }
-            *outCount = 1;
             return XBIM_OK;
         }
 
-        if (outFaces)
-        {
-            outFaces[0] = xbim_shape_create_from(result);
-        }
-        *outCount = 1;
+        /* Fix failed — return original face */
+        xbim_log_warning(nullptr, "xbim_face_fix: ShapeFix_Shape::Perform failed");
+        *outHandle = xbim_shape_create_from(face);
         return XBIM_OK;
     }
     catch (const Standard_Failure& e)

@@ -63,11 +63,13 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void Can_cut_two_coincidental_blocks()
         {
-
             var booleanResult = IfcMoq.IfcBooleanResultMoq(boolOp: Ifc4.Interfaces.IfcBooleanOperator.DIFFERENCE);
             var booleanFactory = _modelSvc.BooleanFactory;
-            Assert.ThrowsAny<Exception>(() => booleanFactory.Build(booleanResult));
+            var shape = booleanFactory.Build(booleanResult);
+            shape.IsEmptyShape().Should().BeTrue();
         }
+
+        
         /// <summary>
         /// These tests create two blocks and vary their distance apart to either union to one block  if they
         /// are <=1mm apart, otherwise 2, this shows fuzz tolerance is working correctly, which is default 1mm
@@ -179,18 +181,14 @@ namespace Xbim.Geometry.Engine.Tests
             var booleanFactory = _modelSvc.BooleanFactory;
             if (!intersects) //will always return an empty shape
             {
-
-                Assert.ThrowsAny<Exception>(() => booleanFactory.Build(booleanResult));
+                var shape = booleanFactory.Build(booleanResult);
+                shape.IsEmptyShape().Should().BeTrue();
             }
             else
             {
                 var shape = booleanFactory.Build(booleanResult);
                 Assert.True(shape.ShapeType == XShapeType.Solid);
                 var solid = shape as IXSolid;
-#if DEBUG
-                var def = solid.BrepString();
-#endif
-
                 var box = solid.Bounds();
                 box.LenX.Should().BeApproximately(lenX - Math.Abs(dispX), Precision);
             }

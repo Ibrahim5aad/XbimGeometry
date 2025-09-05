@@ -88,18 +88,14 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         public bool IsValidShape()
         {
-            // xbim_shape_is_valid returns 1 for valid, 0 for invalid, negative for error
-            int result = XbimGeometryNativeApi.xbim_shape_is_valid(Handle);
-            return result == 1;
+            return XbimGeometryNativeApi.xbim_shape_is_valid(Handle) != 0;
         }
 
         public bool IsClosed
         {
             get
             {
-                // xbim_shape_is_closed returns 1 for closed, 0 for not closed, negative for error
-                int result = XbimGeometryNativeApi.xbim_shape_is_closed(Handle);
-                return result == 1;
+                return XbimGeometryNativeApi.xbim_shape_is_closed(Handle) != 0;
             }
         }
 
@@ -107,7 +103,8 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             if (Handle.IsInvalid)
                 return true;
-            return XbimGeometryNativeApi.xbim_shape_is_null(Handle) == 1;
+
+            return XbimGeometryNativeApi.xbim_shape_is_null(Handle) != 0;
         }
 
         public bool Triangulate(IXMeshFactors meshFactors)

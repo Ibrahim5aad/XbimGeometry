@@ -130,7 +130,7 @@ public class CsgSolidTests : IDisposable
         var ifcBlock = IfcMoq.Block();
         var solid = _solidFactory.Build(ifcBlock);
 
-        ((IXShape)solid).IsValidShape().Should().BeTrue();
+        solid.IsValidShape().Should().BeTrue();
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public class CsgSolidTests : IDisposable
         var ifcBlock = IfcMoq.Block();
         var solid = _solidFactory.Build(ifcBlock);
 
-        ((IXShape)solid).IsClosed.Should().BeTrue();
+        solid.IsClosed.Should().BeTrue();
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public class CsgSolidTests : IDisposable
         var ifcBlock = IfcMoq.Block(xLen: 10, yLen: 20, zLen: 30);
 
         var solid = _solidFactory.Build(ifcBlock);
-        var bounds = ((IXShape)solid).Bounds();
+        var bounds = solid.Bounds();
 
         bounds.LenX.Should().BeApproximately(10, 0.01);
         bounds.LenY.Should().BeApproximately(20, 0.01);
@@ -161,7 +161,7 @@ public class CsgSolidTests : IDisposable
     public void Sphere_IsValid()
     {
         var solid = _solidFactory.Build(IfcMoq.Sphere());
-        ((IXShape)solid).IsValidShape().Should().BeTrue();
+        solid.IsValidShape().Should().BeTrue();
 
         SaveBrep(solid, "sphere_default");
     }
@@ -170,7 +170,7 @@ public class CsgSolidTests : IDisposable
     public void Cylinder_IsValid()
     {
         var solid = _solidFactory.Build(IfcMoq.Cylinder());
-        ((IXShape)solid).IsValidShape().Should().BeTrue();
+        solid.IsValidShape().Should().BeTrue();
     }
 
     [Fact]
@@ -184,11 +184,11 @@ public class CsgSolidTests : IDisposable
         var pyramid = _solidFactory.Build(IfcMoq.Pyramid());
 
         block.Should().BeAssignableTo<IDisposable>();
-        ((IDisposable)block).Dispose();
-        ((IDisposable)sphere).Dispose();
-        ((IDisposable)cylinder).Dispose();
-        ((IDisposable)cone).Dispose();
-        ((IDisposable)pyramid).Dispose();
+        block.Dispose();
+        sphere.Dispose();
+        cylinder.Dispose();
+        cone.Dispose();
+        pyramid.Dispose();
     }
 
     // ── Profile tests ─────────────────────────────────────────────────
@@ -598,9 +598,9 @@ public class CsgSolidTests : IDisposable
             new[] { (0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0) }));
 
         ishape.Should().BeAssignableTo<IDisposable>();
-        ((IDisposable)ishape).Dispose();
-        ((IDisposable)lshape).Dispose();
-        ((IDisposable)trapezium).Dispose();
-        ((IDisposable)arbitrary).Dispose();
+        ishape.Dispose();
+        lshape.Dispose();
+        trapezium.Dispose();
+        arbitrary.Dispose();
     }
 }

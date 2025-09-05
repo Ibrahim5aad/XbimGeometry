@@ -63,7 +63,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_plane(
     XbimContextHandle ctx,
     double originX, double originY, double originZ,
     double normalX, double normalY, double normalZ,
-    XbimSurfaceHandle* outHandle)
+    XbimSurfaceHandle* outHandle,
+    double* outRefDirX, double* outRefDirY, double* outRefDirZ)
 {
     xbim_clear_error();
 
@@ -80,6 +81,15 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_plane(
         gp_Dir normal(normalX, normalY, normalZ);
 
         Handle(Geom_Plane) plane = new Geom_Plane(origin, normal);
+
+        /* Output the reference direction (X-axis) that OCCT computed */
+        if (outRefDirX && outRefDirY && outRefDirZ)
+        {
+            const gp_Dir& xDir = plane->Position().XDirection();
+            *outRefDirX = xDir.X();
+            *outRefDirY = xDir.Y();
+            *outRefDirZ = xDir.Z();
+        }
 
         *outHandle = xbim_surface_create_from(plane);
         if (!*outHandle)

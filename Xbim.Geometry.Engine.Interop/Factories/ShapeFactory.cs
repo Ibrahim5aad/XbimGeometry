@@ -119,32 +119,23 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (face is not Face nsFace)
                 throw new ArgumentException("Face must be a Face instance.", nameof(face));
 
-            // First query to get count
-            int count = 1;
             int result = XbimGeometryNativeApi.xbim_face_fix(
                 nsFace.Handle, _modelService.Model.ModelFactors.Precision,
-                null!, ref count);
+                out var fixedHandle);
 
-            if (result != 0 || count == 0)
+            if (result != 0)
             {
                 _logger.LogWarning("FixFace failed: {Error}, returning face unchanged.",
                     XbimGeometryNativeApi.GetLastError());
                 return new[] { face };
             }
 
-            // Now get the actual faces
-            var ptrs = new IntPtr[count];
-            result = XbimGeometryNativeApi.xbim_face_fix(
-                nsFace.Handle, _modelService.Model.ModelFactors.Precision,
-                ptrs, ref count);
-
-            if (result != 0)
+            var fixedShape = new Shape(fixedHandle);
+            var faceHandles = fixedShape.GetSubShapeHandles(Abstractions.XShapeType.Face);
+            if (faceHandles.Length == 0)
                 return new[] { face };
 
-            var faces = new IXFace[count];
-            for (int i = 0; i < count; i++)
-                faces[i] = new Face(NativeShapeHandle.FromIntPtr(ptrs[i]));
-            return faces;
+            return faceHandles.Select(h => new Face(h)).ToArray();
         }
 
         public IXFace Add(IXFace toFace, IXWire[] wires)

@@ -108,28 +108,28 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_type(
 XBIM_EXPORT int XBIM_CALL xbim_shape_is_null(XbimShapeHandle handle)
 {
     if (!handle)
-        return 1;
-    return handle->shape.IsNull() ? 1 : 0;
+        return XBIM_TRUE;
+    return handle->shape.IsNull() ? XBIM_TRUE : XBIM_FALSE;
 }
 
 XBIM_EXPORT int XBIM_CALL xbim_shape_is_valid(XbimShapeHandle handle)
 {
     if (!handle)
-        return 0;
+        return XBIM_FALSE;
     if (handle->shape.IsNull())
-        return 0;
+        return XBIM_FALSE;
 
     /* Quick topology check using BRepCheck_Analyzer */
     BRepCheck_Analyzer analyzer(handle->shape, Standard_False);
-    return analyzer.IsValid() ? 1 : 0;
+    return analyzer.IsValid() ? XBIM_TRUE : XBIM_FALSE;
 }
 
 XBIM_EXPORT int XBIM_CALL xbim_shape_is_closed(XbimShapeHandle handle)
 {
     if (!handle)
-        return 0;
+        return XBIM_FALSE;
     if (handle->shape.IsNull())
-        return 0;
+        return XBIM_FALSE;
 
     /* For solids and compsolids, they are closed by definition if valid.
      * BRep_Tool::IsClosed checks edges shared by 2 faces, which doesn't
@@ -138,10 +138,10 @@ XBIM_EXPORT int XBIM_CALL xbim_shape_is_closed(XbimShapeHandle handle)
     if (stype == TopAbs_SOLID || stype == TopAbs_COMPSOLID)
     {
         BRepCheck_Analyzer analyzer(handle->shape, Standard_False);
-        return analyzer.IsValid() ? 1 : 0;
+        return analyzer.IsValid() ? XBIM_TRUE : XBIM_FALSE;
     }
 
-    return BRep_Tool::IsClosed(handle->shape) ? 1 : 0;
+    return BRep_Tool::IsClosed(handle->shape) ? XBIM_TRUE : XBIM_FALSE;
 }
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_reversed(

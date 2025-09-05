@@ -254,7 +254,7 @@ public class BooleanFactoryTests : IDisposable
         var csgSolid = IfcMoq.CsgSolid(boolResult);
 
         // Act
-        var shape = _solidFactory.Build((IIfcSolidModel)csgSolid);
+        var shape = _solidFactory.Build(csgSolid);
 
         // Assert
         shape.Should().NotBeNull();
@@ -269,7 +269,7 @@ public class BooleanFactoryTests : IDisposable
         var csgSolid = IfcMoq.CsgSolid(block);
 
         // Act
-        var shape = _solidFactory.Build((IIfcSolidModel)csgSolid);
+        var shape = _solidFactory.Build(csgSolid);
 
         // Assert
         shape.Should().NotBeNull();
@@ -300,7 +300,7 @@ public class BooleanFactoryTests : IDisposable
         var csgSolid = IfcMoq.CsgSolid(outerBool);
 
         // Act
-        var shape = _solidFactory.Build((IIfcSolidModel)csgSolid);
+        var shape = _solidFactory.Build(csgSolid);
 
         // Assert: result should be a valid shape (may be solid or compound)
         shape.Should().NotBeNull();

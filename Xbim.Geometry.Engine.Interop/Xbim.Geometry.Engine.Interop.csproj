@@ -17,7 +17,7 @@
   <!-- Native library build output directories (set via CMake build) -->
   <PropertyGroup>
     <NativeBuildRoot>$(MSBuildThisFileDirectory)..\Xbim.Geometry.Engine.Native\</NativeBuildRoot>
-    <WinX64NativeDir>$(NativeBuildRoot)build-vcpkg\Release\</WinX64NativeDir>
+    <WinX64NativeDir>$(NativeBuildRoot)build\Release\</WinX64NativeDir>
   </PropertyGroup>
 
   <ItemGroup>
@@ -61,8 +61,8 @@
   </ItemGroup>
 
   <!-- Linux x64 native libraries (when built on Linux) -->
-  <ItemGroup Condition="Exists('$(NativeBuildRoot)build-vcpkg/Release/libxbim_geometry_native.so')">
-    <None Include="$(NativeBuildRoot)build-vcpkg/Release/*.so*">
+  <ItemGroup Condition="Exists('$(NativeBuildRoot)build/Release/libxbim_geometry_native.so')">
+    <None Include="$(NativeBuildRoot)build/Release/*.so*">
       <Pack>true</Pack>
       <PackagePath>runtimes/linux-x64/native/</PackagePath>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>

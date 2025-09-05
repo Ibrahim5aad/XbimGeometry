@@ -748,6 +748,25 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out double outNormalZ);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_normal_at_point(
+            NativeShapeHandle faceHandle,
+            double pointX,
+            double pointY,
+            double pointZ,
+            double precision,
+            double tolerance,
+            out double outNormalX,
+            out double outNormalY,
+            out double outNormalZ);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_is_facing_away(
+            NativeShapeHandle faceHandle,
+            double dirX,
+            double dirY,
+            double dirZ);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_face_tolerance(
             NativeShapeHandle faceHandle,
             out double outTolerance);
@@ -900,7 +919,8 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeContextHandle ctx,
             double originX, double originY, double originZ,
             double normalX, double normalY, double normalZ,
-            out NativeSurfaceHandle outHandle);
+            out NativeSurfaceHandle outHandle,
+            out double outRefDirX, out double outRefDirY, out double outRefDirZ);
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_surface_build_cylindrical(
@@ -1032,8 +1052,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         internal static extern int xbim_face_fix(
             NativeShapeHandle faceHandle,
             double tolerance,
-            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] outFaces,
-            ref int outCount);
+            out NativeShapeHandle outHandle);
 
         #endregion
 

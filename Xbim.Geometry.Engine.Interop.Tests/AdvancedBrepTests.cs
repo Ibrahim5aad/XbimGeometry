@@ -49,7 +49,7 @@ public class AdvancedBrepTests : IDisposable
         var brep = IfcMoq.AdvancedBrep(shell);
 
         // Act
-        var shape = _solidFactory.Build((IIfcSolidModel)brep);
+        var shape = _solidFactory.Build(brep);
 
         // Assert
         shape.Should().NotBeNull();
@@ -68,7 +68,7 @@ public class AdvancedBrepTests : IDisposable
         var brep = IfcMoq.AdvancedBrep(shell);
 
         // Act
-        var shape = _solidFactory.Build((IIfcSolidModel)brep);
+        var shape = _solidFactory.Build(brep);
 
         // Assert: a box should have 6 faces
         shape.Should().NotBeNull();
@@ -84,7 +84,7 @@ public class AdvancedBrepTests : IDisposable
         var brep = IfcMoq.AdvancedBrep(shell);
 
         // Act
-        var shape = _solidFactory.Build((IIfcSolidModel)brep);
+        var shape = _solidFactory.Build(brep);
 
         // Assert
         shape.Should().NotBeNull();
@@ -99,7 +99,7 @@ public class AdvancedBrepTests : IDisposable
         var brep = IfcMoq.AdvancedBrep(shell);
 
         // Act
-        var shape = _solidFactory.Build((IIfcSolidModel)brep);
+        var shape = _solidFactory.Build(brep);
         var box = shape.Bounds();
 
         // Assert: bounding box should match the box dimensions

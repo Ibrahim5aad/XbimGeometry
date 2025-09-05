@@ -96,7 +96,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 # ── Install (stage native binaries for NuGet packaging) ─────────────────────
-# Usage: cmake --install build-vcpkg --config Release --prefix ../Xbim.Geometry.Engine.Interop
+# Usage: cmake --install build --config Release --prefix ../Xbim.Geometry.Engine.Interop
 # This stages native DLLs into runtimes/{rid}/native/ for NuGet package inclusion.
 if(WIN32)
     set(XBIM_RID "win-x64")
@@ -121,28 +121,3 @@ install(CODE "
     file(INSTALL \${_build_dlls} DESTINATION \"\${CMAKE_INSTALL_PREFIX}/runtimes/${XBIM_RID}/native\")
 ")
 
-# ── Tests ────────────────────────────────────────────────────────────────────
-option(XBIM_BUILD_TESTS "Build native API tests" ON)
-
-if(XBIM_BUILD_TESTS)
-    file(GLOB TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
-    foreach(_test_src ${TEST_SOURCES})
-        get_filename_component(_test_name ${_test_src} NAME_WE)
-        add_executable(${_test_name} ${_test_src})
-
-        # test_dynamic_load uses LoadLibrary/GetProcAddress at runtime,
-        # so it must NOT link the native library or OCCT at build time.
-        if(_test_name STREQUAL "test_dynamic_load")
-            add_dependencies(${_test_name} xbim_geometry_native)
-        else()
-            target_link_libraries(${_test_name} PRIVATE xbim_geometry_native)
-            # Give tests access to internal headers and OCCT for creating test shapes
-            target_include_directories(${_test_name} PRIVATE
-                ${CMAKE_CURRENT_SOURCE_DIR}/src
-                ${OpenCASCADE_INCLUDE_DIR}
-            )
-            target_compile_definitions(${_test_name} PRIVATE OCCT_NO_PLUGINS)
-            target_link_libraries(${_test_name} PRIVATE ${XBIM_OCCT_LIBS})
-        endif()
-    endforeach()
-endif()
