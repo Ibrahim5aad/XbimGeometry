@@ -90,19 +90,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
 
             // Collect inner wire handles
-            IntPtr[] innerWireHandles;
-            if (wires.Length > 1)
-            {
-                innerWireHandles = wires
-                    .Skip(1)
-                    .Cast<Wire>()
-                    .Select(w => w.Handle.DangerousGetHandle())
-                    .ToArray();
-            }
-            else
-            {
-                innerWireHandles = Array.Empty<IntPtr>();
-            }
+            var innerWireSources = wires.Length > 1
+                ? wires.Skip(1).Cast<Wire>().Select(w => w.Handle).ToArray()
+                : Array.Empty<NativeShapeHandle>();
+            using var innerWireHandles = new NativeHandleArray(innerWireSources);
 
             int result = XbimGeometryNativeApi.xbim_face_build_advanced(
                 ContextHandle,
@@ -112,7 +103,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 xx, xy, xz,
                 radius,
                 outerWire.Handle,
-                innerWireHandles,
+                innerWireHandles.Ptrs,
                 innerWireHandles.Length,
                 _modelService.Precision,
                 1, // sameSense = true

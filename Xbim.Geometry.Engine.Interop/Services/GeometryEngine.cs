@@ -6,6 +6,7 @@ using Xbim.Common;
 using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Factories;
+using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Shapes;
@@ -719,28 +720,22 @@ namespace Xbim.Geometry.Engine.Interop.Services
             // For sets, build a compound from all elements
             if (geometryObject.IsSet && geometryObject is IEnumerable<IXbimGeometryObject> set)
             {
-                var handles = new List<IntPtr>();
-                var shapeRefs = new List<Shape>(); // keep alive for GC
+                var shapeHandles = new List<NativeShapeHandle>();
                 foreach (var item in set)
                 {
                     if (item is V5Shape v5Item)
-                    {
-                        var shape = (Shape)v5Item.Inner;
-                        shapeRefs.Add(shape);
-                        handles.Add(shape.Handle.DangerousGetHandle());
-                    }
+                        shapeHandles.Add(((Shape)v5Item.Inner).Handle);
                 }
 
-                if (handles.Count == 0)
+                if (shapeHandles.Count == 0)
                     return null;
 
+                using var nativeHandles = new NativeHandleArray(shapeHandles.ToArray());
                 int result = XbimGeometryNativeApi.xbim_compound_make(
                     _service.ContextHandle,
-                    handles.ToArray(),
-                    handles.Count,
+                    nativeHandles.Ptrs,
+                    nativeHandles.Length,
                     out var compoundHandle);
-
-                GC.KeepAlive(shapeRefs);
 
                 if (result != 0)
                 {

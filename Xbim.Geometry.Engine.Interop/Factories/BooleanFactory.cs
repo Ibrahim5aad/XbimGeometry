@@ -146,7 +146,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             {
                 // Transfer ownership: we take the handle out and the Shape wrapper
                 // should not dispose it. We use the handle directly.
-                return Shape.TakeHandle();
+                return Shape.DetachHandle();
             }
 
             throw new InvalidOperationException(

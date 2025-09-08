@@ -242,10 +242,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 // Build wire from edges
-                var ptrs = edgeHandles.Select(h => h.DangerousGetHandle()).ToArray();
+                using var nativeEdges = new NativeHandleArray(edgeHandles.ToArray());
                 int buildResult = XbimGeometryNativeApi.xbim_wire_build_from_edges(
                     ContextHandle,
-                    ptrs, ptrs.Length,
+                    nativeEdges.Ptrs, nativeEdges.Length,
                     out var resultWireHandle);
 
                 if (buildResult != 0)
@@ -315,11 +315,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXWire BuildFromLine(IIfcLine ifcLine)
         {
             var edge = (Edge)((EdgeFactory)_modelService.EdgeFactory).Build(ifcLine);
-            var edgeHandles = new IntPtr[] { edge.Handle.DangerousGetHandle() };
+            using var nativeEdges = new NativeHandleArray(new[] { edge.Handle });
 
             int result = XbimGeometryNativeApi.xbim_wire_build_from_edges(
                 ContextHandle,
-                edgeHandles, 1,
+                nativeEdges.Ptrs, 1,
                 out var wireHandle);
 
             if (result != 0)
@@ -332,11 +332,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXWire BuildFromCircle(IIfcCircle ifcCircle)
         {
             var edge = (Edge)((EdgeFactory)_modelService.EdgeFactory).Build(ifcCircle);
-            var edgeHandles = new IntPtr[] { edge.Handle.DangerousGetHandle() };
+            using var nativeEdges = new NativeHandleArray(new[] { edge.Handle });
 
             int result = XbimGeometryNativeApi.xbim_wire_build_from_edges(
                 ContextHandle,
-                edgeHandles, 1,
+                nativeEdges.Ptrs, 1,
                 out var wireHandle);
 
             if (result != 0)
@@ -349,11 +349,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXWire BuildFromEllipse(IIfcEllipse ifcEllipse)
         {
             var edge = (Edge)((EdgeFactory)_modelService.EdgeFactory).Build(ifcEllipse);
-            var edgeHandles = new IntPtr[] { edge.Handle.DangerousGetHandle() };
+            using var nativeEdges = new NativeHandleArray(new[] { edge.Handle });
 
             int result = XbimGeometryNativeApi.xbim_wire_build_from_edges(
                 ContextHandle,
-                edgeHandles, 1,
+                nativeEdges.Ptrs, 1,
                 out var wireHandle);
 
             if (result != 0)
@@ -368,10 +368,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             // Build edge from the B-spline curve via EdgeFactory, then wrap as wire
             var edge = (Edge)_modelService.EdgeFactory.Build(ifcBSpline);
 
-            var edgePtrs = new IntPtr[] { edge.Handle.DangerousGetHandle() };
+            using var nativeEdges = new NativeHandleArray(new[] { edge.Handle });
             int wireResult = XbimGeometryNativeApi.xbim_wire_build_from_edges(
                 ContextHandle,
-                edgePtrs, 1,
+                nativeEdges.Ptrs, 1,
                 out var wireHandle);
 
             if (wireResult != 0)

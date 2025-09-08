@@ -12,32 +12,11 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
     /// Base implementation of <see cref="IXShape"/> backed by a <see cref="NativeShapeHandle"/>.
     /// All shape type queries (type, validity, bounds, etc.) are delegated to native P/Invoke calls.
     /// </summary>
-    internal class Shape : IXShape
+    internal class Shape : NativeOwner<NativeShapeHandle>, IXShape
     {
-        private NativeShapeHandle _handle;
         private XShapeType? _cachedType;
 
-        internal Shape(NativeShapeHandle handle)
-        {
-            _handle = handle ?? throw new ArgumentNullException(nameof(handle));
-        }
-
-        internal NativeShapeHandle Handle =>
-            _handle ?? throw new ObjectDisposedException(nameof(Shape));
-
-        /// <summary>
-        /// Transfers ownership of the underlying handle out of this shape.
-        /// After calling this, the shape wrapper no longer owns or disposes the handle.
-        /// Used by <see cref="Factories.BooleanFactory"/> to pass intermediate
-        /// operand handles to native boolean operations without double-free.
-        /// </summary>
-        internal NativeShapeHandle TakeHandle()
-        {
-            var h = _handle ?? throw new ObjectDisposedException(nameof(Shape));
-            _handle = null!;
-            _disposed = true;
-            return h;
-        }
+        internal Shape(NativeShapeHandle handle) : base(handle) { }
 
         public XShapeType ShapeType
         {
@@ -184,39 +163,19 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         public bool IsEqual(IXShape other)
         {
             if (other is Shape ns)
-                return Handle.DangerousGetHandle() == ns.Handle.DangerousGetHandle();
+            {
+                XbimGeometryNativeApi.xbim_shape_is_same(Handle, ns.Handle, out int same);
+                return same != 0;
+            }
             return false;
         }
 
         public int ShapeHashCode()
         {
-            return Handle.DangerousGetHandle().GetHashCode();
+            XbimGeometryNativeApi.xbim_shape_hash_code(Handle, out int hash);
+            return hash;
         }
 
         public XOrientation Orientation => XOrientation.Forward;
-
-        #region IDisposable
-
-        private bool _disposed;
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_disposed) return;
-            _disposed = true;
-
-            if (disposing)
-            {
-                _handle?.Dispose();
-                _handle = null!;
-            }
-        }
-
-        #endregion
     }
 }

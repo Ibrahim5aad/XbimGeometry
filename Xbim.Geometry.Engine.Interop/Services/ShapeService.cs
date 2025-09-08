@@ -281,19 +281,18 @@ namespace Xbim.Geometry.Engine.Interop.Services
             if (shapeList.Count == 1)
                 return shapeList[0];
 
-            var ptrs = new IntPtr[shapeList.Count];
+            var handles = new NativeShapeHandle[shapeList.Count];
             for (int i = 0; i < shapeList.Count; i++)
             {
                 if (shapeList[i] is Shape ns)
-                    ptrs[i] = ns.Handle.DangerousGetHandle();
+                    handles[i] = ns.Handle;
                 else
                     throw new ArgumentException("All shapes must be Shape instances.");
             }
 
+            using var nativeHandles = new NativeHandleArray(handles);
             int result = XbimGeometryNativeApi.xbim_compound_make(
-                Context, ptrs, ptrs.Length, out var compoundHandle);
-
-            GC.KeepAlive(shapeList);
+                Context, nativeHandles.Ptrs, nativeHandles.Length, out var compoundHandle);
 
             if (result != 0)
                 throw new InvalidOperationException(

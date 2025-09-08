@@ -23,6 +23,7 @@
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
+#include <TopTools_ShapeMapHasher.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepGProp.hxx>
@@ -176,6 +177,53 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_reversed(
         return XBIM_ERROR;
     }
 
+    return XBIM_OK;
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_is_same(
+    XbimShapeHandle a,
+    XbimShapeHandle b,
+    int* outSame)
+{
+    xbim_clear_error();
+
+    if (!outSame)
+    {
+        xbim_set_error("xbim_shape_is_same: outSame is NULL");
+        return XBIM_INVALID_ARG;
+    }
+
+    if (!a || !b)
+    {
+        *outSame = (!a && !b) ? XBIM_TRUE : XBIM_FALSE;
+        return XBIM_OK;
+    }
+
+    *outSame = a->shape.IsSame(b->shape) ? XBIM_TRUE : XBIM_FALSE;
+    return XBIM_OK;
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_hash_code(
+    XbimShapeHandle handle,
+    int* outHash)
+{
+    xbim_clear_error();
+
+    if (!outHash)
+    {
+        xbim_set_error("xbim_shape_hash_code: outHash is NULL");
+        return XBIM_INVALID_ARG;
+    }
+
+    if (!handle || handle->shape.IsNull())
+    {
+        *outHash = 0;
+        return XBIM_OK;
+    }
+
+    TopTools_ShapeMapHasher hasher;
+    size_t h = hasher(handle->shape);
+    *outHash = static_cast<int>(h & 0x7FFFFFFF);
     return XBIM_OK;
 }
 

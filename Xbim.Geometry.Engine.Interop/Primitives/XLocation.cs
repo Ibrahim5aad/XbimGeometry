@@ -11,10 +11,8 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
     /// The matrix components are extracted from the native handle at construction time
     /// so that property access doesn't require P/Invoke round-trips.
     /// </summary>
-    internal class XLocation : IXLocation, IDisposable
+    internal class XLocation : NativeOwner<NativeLocationHandle>, IXLocation
     {
-        private NativeLocationHandle? _handle;
-
         // Rotation/scale matrix (3x3) - matches OCCT gp_Trsf HVectorialPart layout
         // Note: XLocation.h maps M11=Value(1,1), M12=Value(2,1), M13=Value(3,1) etc.
         // This is the OCCT convention where Value(row, col) and the matrix is stored column-major.
@@ -28,10 +26,8 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         /// Creates an XLocation from a native location handle.
         /// Takes ownership of the handle.
         /// </summary>
-        internal XLocation(NativeLocationHandle handle)
+        internal XLocation(NativeLocationHandle handle) : base(handle)
         {
-            _handle = handle ?? throw new ArgumentNullException(nameof(handle));
-
             // Extract the transform components from the native handle.
             // We need a native API to do this. For now, store the handle
             // and use identity defaults. The actual matrix extraction will
@@ -61,9 +57,8 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             double m21, double m22, double m23,
             double m31, double m32, double m33,
             double offsetX, double offsetY, double offsetZ,
-            double scale)
+            double scale) : base(handle)
         {
-            _handle = handle ?? throw new ArgumentNullException(nameof(handle));
             _m11 = m11; _m12 = m12; _m13 = m13;
             _m21 = m21; _m22 = m22; _m23 = m23;
             _m31 = m31; _m32 = m32; _m33 = m33;
@@ -74,12 +69,8 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         /// <summary>
         /// Creates an identity XLocation.
         /// </summary>
-        internal XLocation()
+        internal XLocation() : base(CreateIdentityHandle())
         {
-            int result = XbimGeometryNativeApi.xbim_location_create_identity(out var handle);
-            if (result != 0)
-                throw new InvalidOperationException("Failed to create identity location.");
-            _handle = handle;
             _m11 = 1; _m12 = 0; _m13 = 0;
             _m21 = 0; _m22 = 1; _m23 = 0;
             _m31 = 0; _m32 = 0; _m33 = 1;
@@ -87,11 +78,13 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             _scale = 1.0;
         }
 
-        /// <summary>
-        /// The underlying native location handle for P/Invoke calls.
-        /// </summary>
-        internal NativeLocationHandle Handle =>
-            _handle ?? throw new ObjectDisposedException(nameof(XLocation));
+        private static NativeLocationHandle CreateIdentityHandle()
+        {
+            int result = XbimGeometryNativeApi.xbim_location_create_identity(out var handle);
+            if (result != 0)
+                throw new InvalidOperationException("Failed to create identity location.");
+            return handle;
+        }
 
         #region IXMatrix
 
@@ -285,20 +278,6 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
 
             return new XLocation(translatedHandle, _m11, _m12, _m13, _m21, _m22, _m23, _m31, _m32, _m33,
                 x, y, z, _scale);
-        }
-
-        #endregion
-
-        #region IDisposable
-
-        private bool _disposed;
-
-        public void Dispose()
-        {
-            if (_disposed) return;
-            _disposed = true;
-            _handle?.Dispose();
-            _handle = null;
         }
 
         #endregion

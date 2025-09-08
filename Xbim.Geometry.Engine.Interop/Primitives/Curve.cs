@@ -9,30 +9,13 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
     /// Wraps a native curve handle (Geom_Curve) as an <see cref="IXCurve"/>.
     /// Provides access to curve type, parametric range, and point evaluation.
     /// </summary>
-    internal class Curve : IXCurve, IDisposable
+    internal class Curve : NativeOwner<NativeCurveHandle>, IXCurve
     {
-        private NativeCurveHandle _handle;
         private readonly XCurveType _curveType;
 
-        internal Curve(NativeCurveHandle handle, XCurveType curveType)
+        internal Curve(NativeCurveHandle handle, XCurveType curveType) : base(handle)
         {
-            _handle = handle ?? throw new ArgumentNullException(nameof(handle));
             _curveType = curveType;
-        }
-
-        internal NativeCurveHandle Handle =>
-            _handle ?? throw new ObjectDisposedException(nameof(Curve));
-
-        /// <summary>
-        /// Transfers ownership of the native handle to the caller.
-        /// After this call, Dispose() becomes a no-op.
-        /// </summary>
-        internal NativeCurveHandle DetachHandle()
-        {
-            var h = _handle ?? throw new ObjectDisposedException(nameof(Curve));
-            _handle = null!;
-            _disposed = true;
-            return h;
         }
 
         public XCurveType CurveType => _curveType;
@@ -129,19 +112,5 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
 
             return new XPoint(px, py, pz);
         }
-
-        #region IDisposable
-
-        private bool _disposed;
-
-        public void Dispose()
-        {
-            if (_disposed) return;
-            _disposed = true;
-            _handle?.Dispose();
-            _handle = null!;
-        }
-
-        #endregion
     }
 }

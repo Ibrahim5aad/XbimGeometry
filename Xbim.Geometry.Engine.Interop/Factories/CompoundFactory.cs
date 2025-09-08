@@ -50,29 +50,19 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (shapeList.Count == 0)
                 return CreateEmpty();
 
-            // Extract native handles - keep references alive to prevent GC during P/Invoke
-            var Shapes = new Shape[shapeList.Count];
-            var handlePtrs = new IntPtr[shapeList.Count];
-
+            var handles = new NativeShapeHandle[shapeList.Count];
             for (int i = 0; i < shapeList.Count; i++)
             {
                 if (shapeList[i] is Shape ns)
-                {
-                    Shapes[i] = ns;
-                    handlePtrs[i] = ns.Handle.DangerousGetHandle();
-                }
+                    handles[i] = ns.Handle;
                 else
-                {
                     throw new ArgumentException(
                         $"Shape at index {i} is not a Shape instance.", nameof(shapes));
-                }
             }
 
+            using var nativeHandles = new NativeHandleArray(handles);
             int result = XbimGeometryNativeApi.xbim_compound_make(
-                ContextHandle, handlePtrs, handlePtrs.Length, out var outHandle);
-
-            // Keep Shapes alive across the P/Invoke call
-            GC.KeepAlive(Shapes);
+                ContextHandle, nativeHandles.Ptrs, nativeHandles.Length, out var outHandle);
 
             if (result != 0)
                 throw new InvalidOperationException(

@@ -1,6 +1,6 @@
-using System;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
+using Xbim.Geometry.Engine.Interop.Internal;
 
 namespace Xbim.Geometry.Engine.Interop.Primitives
 {
@@ -8,30 +8,13 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
     /// Wraps a native surface handle (Geom_Surface) as an <see cref="IXSurface"/>.
     /// Provides access to surface type and periodicity information.
     /// </summary>
-    internal class Surface : IXSurface, IDisposable
+    internal class Surface : NativeOwner<NativeSurfaceHandle>, IXSurface
     {
-        private NativeSurfaceHandle _handle;
         private readonly XSurfaceType _surfaceType;
 
-        internal Surface(NativeSurfaceHandle handle, XSurfaceType surfaceType)
+        internal Surface(NativeSurfaceHandle handle, XSurfaceType surfaceType) : base(handle)
         {
-            _handle = handle ?? throw new ArgumentNullException(nameof(handle));
             _surfaceType = surfaceType;
-        }
-
-        internal NativeSurfaceHandle Handle =>
-            _handle ?? throw new ObjectDisposedException(nameof(Surface));
-
-        /// <summary>
-        /// Transfers ownership of the native handle to the caller.
-        /// After this call, Dispose() becomes a no-op.
-        /// </summary>
-        internal NativeSurfaceHandle DetachHandle()
-        {
-            var h = _handle ?? throw new ObjectDisposedException(nameof(Surface));
-            _handle = null!;
-            _disposed = true;
-            return h;
         }
 
         public XSurfaceType SurfaceType => _surfaceType;
@@ -39,20 +22,6 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         public bool IsUPeriodic => false; // TODO: query from native when available
 
         public bool IsVPeriodic => false; // TODO: query from native when available
-
-        #region IDisposable
-
-        private bool _disposed;
-
-        public void Dispose()
-        {
-            if (_disposed) return;
-            _disposed = true;
-            _handle?.Dispose();
-            _handle = null!;
-        }
-
-        #endregion
     }
 
     /// <summary>

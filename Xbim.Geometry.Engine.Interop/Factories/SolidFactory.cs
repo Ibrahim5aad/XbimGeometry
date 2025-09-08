@@ -494,12 +494,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         $"Closed shell requires at least 4 faces but only {faceHandles.Count} were built.");
 
                 // Use the combined sew+solid API which merges shared edges
-                var facePtrs = new IntPtr[faceHandles.Count];
-                for (int i = 0; i < faceHandles.Count; i++)
-                    facePtrs[i] = faceHandles[i].DangerousGetHandle();
+                using var nativeFaces = new NativeHandleArray(faceHandles.ToArray());
 
                 int result = XbimGeometryNativeApi.xbim_shell_build_closed_shell(
-                    ContextHandle, facePtrs, faceHandles.Count, tolerance, out var solidHandle);
+                    ContextHandle, nativeFaces.Ptrs, nativeFaces.Length, tolerance, out var solidHandle);
 
                 if (result != 0)
                     throw new InvalidOperationException(
@@ -577,9 +575,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 else
                 {
                     // Use advanced face build with inner wires (voids)
-                    var innerPtrs = new IntPtr[innerWireHandles.Count];
-                    for (int i = 0; i < innerWireHandles.Count; i++)
-                        innerPtrs[i] = innerWireHandles[i].DangerousGetHandle();
+                    using var nativeInnerWires = new NativeHandleArray(innerWireHandles.ToArray());
 
                     // surfaceType 0 = PLANE, sameSense 1 = true
                     // For planar faces inferred from wire, pass zero placement — the native
@@ -592,8 +588,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         1, 0, 0, // xDir
                         0,       // radius (N/A for plane)
                         outerWireHandle,
-                        innerPtrs,
-                        innerWireHandles.Count,
+                        nativeInnerWires.Ptrs,
+                        nativeInnerWires.Length,
                         tolerance,
                         1, // sameSense
                         out faceHandle);
@@ -746,12 +742,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Advanced BRep closed shell requires at least 4 faces but only {faceHandles.Count} were built.");
 
-                var facePtrs = new IntPtr[faceHandles.Count];
-                for (int i = 0; i < faceHandles.Count; i++)
-                    facePtrs[i] = faceHandles[i].DangerousGetHandle();
+                using var nativeFaces = new NativeHandleArray(faceHandles.ToArray());
 
                 int result = XbimGeometryNativeApi.xbim_shell_build_closed_shell(
-                    ContextHandle, facePtrs, faceHandles.Count, tolerance, out var solidHandle);
+                    ContextHandle, nativeFaces.Ptrs, nativeFaces.Length, tolerance, out var solidHandle);
 
                 if (result != 0)
                     throw new InvalidOperationException(
@@ -839,16 +833,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 // Build the face using the surface-handle variant
-                var innerPtrs = new IntPtr[innerWireHandles.Count];
-                for (int i = 0; i < innerWireHandles.Count; i++)
-                    innerPtrs[i] = innerWireHandles[i].DangerousGetHandle();
+                using var nativeInnerWires = new NativeHandleArray(innerWireHandles.ToArray());
 
                 int result = XbimGeometryNativeApi.xbim_face_build_advanced_with_surface(
                     ContextHandle,
                     surfaceHandle,
                     outerWireHandle,
-                    innerPtrs,
-                    innerWireHandles.Count,
+                    nativeInnerWires.Ptrs,
+                    nativeInnerWires.Length,
                     tolerance,
                     advancedFace.SameSense ? 1 : 0,
                     out var faceHandle);
@@ -954,12 +946,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 if (edgeHandles.Count == 0)
                     return null;
 
-                var edgePtrs = new IntPtr[edgeHandles.Count];
-                for (int i = 0; i < edgeHandles.Count; i++)
-                    edgePtrs[i] = edgeHandles[i].DangerousGetHandle();
+                using var nativeEdges = new NativeHandleArray(edgeHandles.ToArray());
 
                 int result = XbimGeometryNativeApi.xbim_wire_build_from_edges(
-                    ContextHandle, edgePtrs, edgeHandles.Count, out var wireHandle);
+                    ContextHandle, nativeEdges.Ptrs, nativeEdges.Length, out var wireHandle);
 
                 if (result != 0)
                 {
@@ -1087,12 +1077,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 // Assemble multiple shells into a compound
-                var ptrs = new IntPtr[shellHandles.Count];
-                for (int i = 0; i < shellHandles.Count; i++)
-                    ptrs[i] = shellHandles[i].DangerousGetHandle();
+                using var nativeShells = new NativeHandleArray(shellHandles.ToArray());
 
                 int result = XbimGeometryNativeApi.xbim_compound_make(
-                    ContextHandle, ptrs, shellHandles.Count, out var compoundHandle);
+                    ContextHandle, nativeShells.Ptrs, nativeShells.Length, out var compoundHandle);
 
                 if (result != 0)
                     throw new InvalidOperationException(
@@ -1132,13 +1120,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     return null;
                 }
 
-                var facePtrs = new IntPtr[faceHandles.Count];
-                for (int i = 0; i < faceHandles.Count; i++)
-                    facePtrs[i] = faceHandles[i].DangerousGetHandle();
+                using var nativeFaces = new NativeHandleArray(faceHandles.ToArray());
 
                 // Build raw shell from faces
                 int result = XbimGeometryNativeApi.xbim_shell_build_from_faces(
-                    ContextHandle, facePtrs, faceHandles.Count, tolerance, out var rawShellHandle);
+                    ContextHandle, nativeFaces.Ptrs, nativeFaces.Length, tolerance, out var rawShellHandle);
 
                 if (result != 0)
                 {

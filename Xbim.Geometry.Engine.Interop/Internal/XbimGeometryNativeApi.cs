@@ -85,6 +85,17 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeShapeHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_is_same(
+            NativeShapeHandle a,
+            NativeShapeHandle b,
+            out int outSame);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_hash_code(
+            NativeShapeHandle handle,
+            out int outHash);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_shape_bounding_box(
             NativeShapeHandle handle,
             out double minX, out double minY, out double minZ,

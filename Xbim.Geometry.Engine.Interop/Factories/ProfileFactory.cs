@@ -680,8 +680,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 return outerFace;
 
             // Build each inner curve as a closed face, then use with_voids to punch holes
-            var innerHandles = new List<IntPtr>();
-            var innerShapes = new List<IDisposable>();
+            var innerShapeHandles = new List<NativeShapeHandle>();
 
             try
             {
@@ -689,23 +688,21 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 {
                     NativeShapeHandle innerHandle = BuildClosedCurveAsShape(innerCurve);
                     if (innerHandle != null && !innerHandle.IsInvalid)
-                    {
-                        innerHandles.Add(innerHandle.DangerousGetHandle());
-                        innerShapes.Add(innerHandle);
-                    }
+                        innerShapeHandles.Add(innerHandle);
                 }
 
-                if (innerHandles.Count == 0)
+                if (innerShapeHandles.Count == 0)
                     return outerFace;
 
                 // Get the outer face handle
                 var outerShapeHandle = ((Face)outerFace).Handle;
 
+                using var nativeInnerHandles = new NativeHandleArray(innerShapeHandles.ToArray());
                 int result = XbimGeometryNativeApi.xbim_profile_build_with_voids(
                     ContextHandle,
                     outerShapeHandle,
-                    innerHandles.ToArray(),
-                    innerHandles.Count,
+                    nativeInnerHandles.Ptrs,
+                    nativeInnerHandles.Length,
                     out var resultHandle);
 
                 if (result != 0)
@@ -717,8 +714,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
             finally
             {
-                foreach (var shape in innerShapes)
-                    shape.Dispose();
+                foreach (var h in innerShapeHandles)
+                    h.Dispose();
             }
         }
 
@@ -791,24 +788,21 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"CompositeProfileDef #{compositeProfile.EntityLabel} has no profiles.");
 
-            var handles = new List<IntPtr>();
-            var shapes = new List<IDisposable>();
+            var faceShapes = new List<Face>();
 
             try
             {
                 foreach (var profile in profiles)
-                {
-                    var face = BuildFace(profile);
-                    var Face = (Face)face;
-                    handles.Add(Face.Handle.DangerousGetHandle());
-                    shapes.Add(Face);
-                }
+                    faceShapes.Add((Face)BuildFace(profile));
+
+                using var nativeHandles = new NativeHandleArray(
+                    faceShapes.ConvertAll(f => f.Handle).ToArray());
 
                 int result = XbimGeometryNativeApi.xbim_profile_build_composite(
                     ContextHandle,
-                    handles.ToArray(),
-                    handles.Count,
-                    out var NativeShapeHandle);
+                    nativeHandles.Ptrs,
+                    nativeHandles.Length,
+                    out var compositeHandle);
 
                 if (result != 0)
                     throw new InvalidOperationException(
@@ -817,12 +811,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 // Composite profiles produce a compound of faces, not a single face.
                 // We wrap directly as Face since the P/Invoke surface_area call
                 // works on compounds (it sums all face areas via BRepGProp).
-                return new Face(NativeShapeHandle);
+                return new Face(compositeHandle);
             }
             finally
             {
-                foreach (var shape in shapes)
-                    shape.Dispose();
+                foreach (var f in faceShapes)
+                    f.Dispose();
             }
         }
 
@@ -1102,9 +1096,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         private IXFace BuildFaceFrom2dCurves(List<NativeCurve2dHandle> curves, int entityLabel)
         {
-            IntPtr[] curvePtrs = curves.Select(c => c.DangerousGetHandle()).ToArray();
+            using var nativeCurves = new NativeHandleArray(curves.ToArray());
             int wireResult = XbimGeometryNativeApi.xbim_wire_build_from_2d_curves(
-                ContextHandle, curvePtrs, curvePtrs.Length,
+                ContextHandle, nativeCurves.Ptrs, nativeCurves.Length,
                 _modelService.Precision, _modelService.MinimumGap,
                 out var wireHandle);
 

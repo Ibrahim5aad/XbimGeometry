@@ -143,25 +143,22 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (toFace is not Face nsFace)
                 throw new ArgumentException("Face must be a Face instance.", nameof(toFace));
 
-            var wireShapes = new Shape[wires.Length];
-            var wirePtrs = new IntPtr[wires.Length];
+            var wireHandles = new NativeShapeHandle[wires.Length];
             for (int i = 0; i < wires.Length; i++)
             {
                 if (wires[i] is not Shape ws)
                     throw new ArgumentException($"Wire at index {i} must be a Shape instance.");
-                wireShapes[i] = ws;
-                wirePtrs[i] = ws.Handle.DangerousGetHandle();
+                wireHandles[i] = ws.Handle;
             }
 
+            using var nativeHandles = new NativeHandleArray(wireHandles);
             int result = XbimGeometryNativeApi.xbim_face_add_wires(
-                nsFace.Handle, wirePtrs, wires.Length, out var outHandle);
+                nsFace.Handle, nativeHandles.Ptrs, wires.Length, out var outHandle);
 
             if (result != 0)
                 throw new InvalidOperationException(
                     $"Failed to add wires to face: {XbimGeometryNativeApi.GetLastError()}");
 
-            // Keep wireShapes alive until after the call
-            GC.KeepAlive(wireShapes);
             return new Face(outHandle);
         }
 

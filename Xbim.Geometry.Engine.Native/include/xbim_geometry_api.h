@@ -227,6 +227,32 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_reversed(
     XbimShapeHandle* outHandle);
 
 /*
+ * Test whether two shape handles refer to the same underlying shape
+ * (same TShape pointer and location).
+ *
+ *   a, b      – the two shape handles to compare
+ *   outSame   – receives 1 if the shapes are the same, 0 otherwise
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_is_same(
+    XbimShapeHandle a,
+    XbimShapeHandle b,
+    int*            outSame);
+
+/*
+ * Compute a hash code for a shape suitable for use in hash tables.
+ *
+ *   handle   – the shape handle
+ *   outHash  – receives the hash code
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_hash_code(
+    XbimShapeHandle handle,
+    int*            outHash);
+
+/*
  * Compute the axis-aligned bounding box of a shape.
  *
  *   handle       – a valid shape handle
