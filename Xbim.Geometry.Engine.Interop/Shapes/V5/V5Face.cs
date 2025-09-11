@@ -22,13 +22,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes.V5
 
         public double Area => _face.Area;
 
-        public double Perimeter
-        {
-            get
-            {
-                throw new NotSupportedException("Face perimeter not yet supported.");
-            }
-        }
+        public double Perimeter => _face.Perimeter;
 
         public XbimVector3D Normal
         {

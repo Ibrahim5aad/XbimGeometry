@@ -498,6 +498,63 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_tolerance(
 }
 
 
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_get_curve(
+    XbimShapeHandle  edgeHandle,
+    XbimCurveHandle* outCurve,
+    double*          outParam1,
+    double*          outParam2)
+{
+    xbim_clear_error();
+    if (!outCurve || !outParam1 || !outParam2)
+    {
+        xbim_set_error("xbim_edge_get_curve: output pointer is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outCurve = nullptr;
+    *outParam1 = 0.0;
+    *outParam2 = 0.0;
+
+    if (!edgeHandle)
+    {
+        xbim_set_error("xbim_edge_get_curve: edgeHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        const TopoDS_Shape& shape = edgeHandle->shape;
+        if (shape.IsNull() || shape.ShapeType() != TopAbs_EDGE)
+        {
+            xbim_set_error("xbim_edge_get_curve: handle is not an edge");
+            return XBIM_INVALID_ARG;
+        }
+
+        Standard_Real p1, p2;
+        Handle(Geom_Curve) curve = BRep_Tool::Curve(TopoDS::Edge(shape), p1, p2);
+        if (curve.IsNull())
+        {
+            xbim_set_error("xbim_edge_get_curve: edge has no 3D curve");
+            return XBIM_NULL_SHAPE;
+        }
+
+        *outCurve = xbim_curve_create_from(curve);
+        if (!*outCurve)
+        {
+            xbim_set_error("xbim_edge_get_curve: memory allocation failed");
+            return XBIM_ERROR;
+        }
+        *outParam1 = p1;
+        *outParam2 = p2;
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_edge_get_curve: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
 XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_vertices(
     XbimShapeHandle edgeHandle,
     XbimShapeHandle* outStart,

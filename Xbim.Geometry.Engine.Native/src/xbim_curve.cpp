@@ -496,4 +496,24 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_d2(
     }
 }
 
+
+XBIM_EXPORT int XBIM_CALL xbim_curve_is_closed(
+    XbimCurveHandle handle,
+    double          tolerance)
+{
+    if (!handle || handle->curve.IsNull())
+        return XBIM_FALSE;
+
+    try
+    {
+        gp_Pnt pFirst = handle->curve->Value(handle->curve->FirstParameter());
+        gp_Pnt pLast  = handle->curve->Value(handle->curve->LastParameter());
+        return pFirst.Distance(pLast) <= tolerance ? XBIM_TRUE : XBIM_FALSE;
+    }
+    catch (const Standard_Failure&)
+    {
+        return XBIM_FALSE;
+    }
+}
+
 #pragma endregion

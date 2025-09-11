@@ -571,6 +571,46 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_area(
     }
 }
 
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_perimeter(
+    XbimShapeHandle faceHandle,
+    double*         outPerimeter)
+{
+    xbim_clear_error();
+
+    if (!outPerimeter)
+    {
+        xbim_set_error("xbim_face_perimeter: outPerimeter is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outPerimeter = 0.0;
+
+    if (!faceHandle)
+    {
+        xbim_set_error("xbim_face_perimeter: faceHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        const TopoDS_Shape& shape = faceHandle->shape;
+        if (shape.IsNull())
+        {
+            xbim_set_error("xbim_face_perimeter: shape is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        GProp_GProps gProps;
+        BRepGProp::LinearProperties(shape, gProps);
+        *outPerimeter = gProps.Mass();
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_face_perimeter: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_face_normal(
     XbimShapeHandle faceHandle,

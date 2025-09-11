@@ -1637,6 +1637,19 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_area(
     double*         outArea);
 
 /*
+ * Compute the total perimeter (sum of edge lengths) of a face via linear
+ * properties.
+ *
+ *   faceHandle   – a valid face shape handle
+ *   outPerimeter – receives the perimeter length on success
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_perimeter(
+    XbimShapeHandle faceHandle,
+    double*         outPerimeter);
+
+/*
  * Compute the outward-pointing normal of a face at a given parametric point.
  * If u and v are NaN, the normal is evaluated at the parametric centre.
  *
@@ -1982,6 +1995,24 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_vertices(
     XbimShapeHandle* outStart,
     XbimShapeHandle* outEnd);
 
+/*
+ * Extract the 3D curve geometry from an edge.
+ * Uses BRep_Tool::Curve to obtain the underlying Geom_Curve and its
+ * parameter range [p1, p2].
+ *
+ *   edgeHandle – a valid shape handle containing a TopoDS_Edge
+ *   outCurve   – receives the curve handle (caller owns, must destroy)
+ *   outParam1  – receives the first parameter
+ *   outParam2  – receives the last parameter
+ *
+ * Returns XBIM_OK on success; XBIM_NULL_SHAPE if the edge has no 3D curve.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_get_curve(
+    XbimShapeHandle  edgeHandle,
+    XbimCurveHandle* outCurve,
+    double*          outParam1,
+    double*          outParam2);
+
 #pragma endregion
 
 #pragma region Shell Operations
@@ -2210,6 +2241,16 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_d2(
     double*         outPx,  double* outPy,  double* outPz,
     double*         outD1x, double* outD1y, double* outD1z,
     double*         outD2x, double* outD2y, double* outD2z);
+
+/*
+ * Check whether a curve is closed (start point coincides with end point
+ * within the given tolerance).
+ *
+ * Returns XBIM_TRUE if closed, XBIM_FALSE otherwise.
+ */
+XBIM_EXPORT int XBIM_CALL xbim_curve_is_closed(
+    XbimCurveHandle handle,
+    double          tolerance);
 
 #pragma endregion
 

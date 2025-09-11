@@ -43,8 +43,12 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                throw new NotImplementedException(
-                    "Edge geometry extraction requires curve query infrastructure (CURVE phase).");
+                int result = XbimGeometryNativeApi.xbim_edge_get_curve(
+                    Handle, out var curveHandle, out _, out _);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to get edge curve: {XbimGeometryNativeApi.GetLastError()}");
+                return new Primitives.Curve(curveHandle, XCurveType.IfcLine);
             }
         }
 

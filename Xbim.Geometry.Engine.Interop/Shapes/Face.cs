@@ -28,6 +28,18 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             }
         }
 
+        public double Perimeter
+        {
+            get
+            {
+                int result = XbimGeometryNativeApi.xbim_face_perimeter(Handle, out double perimeter);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to compute face perimeter: {XbimGeometryNativeApi.GetLastError()}");
+                return perimeter;
+            }
+        }
+
         public double Tolerance
         {
             get

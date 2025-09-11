@@ -1,8 +1,8 @@
 using System;
-using System.Linq;
 using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Engine.Interop.Primitives;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes.V5
 {
@@ -44,7 +44,8 @@ namespace Xbim.Geometry.Engine.Interop.Shapes.V5
         {
             get
             {
-                throw new NotSupportedException("Edge curve geometry not yet supported.");
+                var curve = (Curve)((Edge)Inner).EdgeGeometry;
+                return new V5Curve(curve);
             }
         }
 

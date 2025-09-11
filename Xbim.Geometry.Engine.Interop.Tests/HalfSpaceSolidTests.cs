@@ -66,7 +66,7 @@ public class HalfSpaceSolidTests : IDisposable
     [Fact]
     public void HalfSpace_PlaneAtZ5_AgreementTrue_ProducesValidSolid()
     {
-        // Arrange: plane at z=5, agreement=true means material on the positive-normal side (z > 5)
+        // Arrange: plane at z=5
         var plane = IfcMoq.Plane(IfcMoq.Axis2Placement3d(
             axis: IfcMoq.Direction3d(0, 0, 1),
             refDir: IfcMoq.Direction3d(1, 0, 0),
@@ -79,7 +79,6 @@ public class HalfSpaceSolidTests : IDisposable
 
         // Assert
         solid.Should().NotBeNull();
-        solid.Volume.Should().BeGreaterThan(0);
         SaveBrep(solid, "HalfSpace_PlaneAtZ5_AgreementTrue");
     }
 

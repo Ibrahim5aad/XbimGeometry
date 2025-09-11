@@ -395,10 +395,10 @@ static bool build_halfspace_face_and_point(
             }
             gp_Ax3 ax3(ax2);
             Handle(Geom_CylindricalSurface) surface = new Geom_CylindricalSurface(ax3, radius);
-            gp_Dir normalDir = surface->Axis().Direction();
-            outPointInMaterial = surface->Location();
+            outPointInMaterial = surface->Location(); // centre = inside cylinder
             if (agreementFlag) // material is outside the cylinder
             {
+                gp_Dir normalDir = surface->Axis().Direction();
                 normalDir.Reverse();
                 gp_Vec displace(normalDir);
                 displace *= radius * 2;
@@ -416,10 +416,10 @@ static bool build_halfspace_face_and_point(
             }
             gp_Ax3 ax3(ax2);
             Handle(Geom_SphericalSurface) surface = new Geom_SphericalSurface(ax3, radius);
-            gp_Dir normalDir = surface->Axis().Direction();
-            outPointInMaterial = surface->Location();
+            outPointInMaterial = surface->Location(); // centre = inside sphere
             if (agreementFlag)
             {
+                gp_Dir normalDir = surface->Axis().Direction();
                 normalDir.Reverse();
                 gp_Vec displace(normalDir);
                 displace *= radius * 2;

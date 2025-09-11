@@ -654,6 +654,13 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeShapeHandle outStart,
             out NativeShapeHandle outEnd);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_edge_get_curve(
+            NativeShapeHandle edgeHandle,
+            out NativeCurveHandle outCurve,
+            out double outParam1,
+            out double outParam2);
+
         #endregion
 
         #region Wire
@@ -748,6 +755,11 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         internal static extern int xbim_face_area(
             NativeShapeHandle faceHandle,
             out double outArea);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_perimeter(
+            NativeShapeHandle faceHandle,
+            out double outPerimeter);
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_face_normal(
@@ -920,6 +932,11 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out double outPx, out double outPy, out double outPz,
             out double outD1x, out double outD1y, out double outD1z,
             out double outD2x, out double outD2y, out double outD2z);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_is_closed(
+            NativeCurveHandle handle,
+            double tolerance);
 
         #endregion
 
