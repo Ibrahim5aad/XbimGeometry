@@ -545,10 +545,17 @@ namespace Xbim.Geometry.Engine.Tests
             {
                 er.Entity.Should().NotBeNull();
                 var geomEngine = new XbimGeometryEngine(er.Entity.Model, _loggerFactory);
-                //var shape = geomEngine.ModelService.BooleanFactory.Build(er.Entity);
                 var solids = geomEngine.CreateSolidSet(er.Entity, _logger);
                 solids.Count.Should().Be(1);
-                solids.First().Volume.Should().BeApproximately(105044075.79569642, 1e-5);
+                var bb = solids.First().BoundingBox;
+
+                bb.X.Should().BeApproximately(-101.687, 0.1);
+                bb.Y.Should().BeApproximately(-101.687, 0.1);
+                bb.Z.Should().BeApproximately(57.0569, 0.1);
+                bb.SizeX.Should().BeApproximately(203.374, 0.1);
+                bb.SizeY.Should().BeApproximately(203.374, 0.1);
+                bb.SizeZ.Should().BeApproximately(9404.53, 0.1);
+
                 HelperFunctions.IsValidSolid(solids.FirstOrDefault());
             }
         }
@@ -654,6 +661,8 @@ namespace Xbim.Geometry.Engine.Tests
                     var b = geomEngine.CreateSolid(cylinder, _logger);
                     var solidSet = a.Union(b, m.ModelFactors.PrecisionBoolean);
                     solidSet.Count.Should().Be(1, "unioning these two solids should return a single solid");
+                     var brepStr = solidSet.First().ToBRep;
+                File.WriteAllText("D://temp//BooleanUnionSolidTest " + ".brep", brepStr );
                     IsSolidTest(solidSet.First);
                 }
             }

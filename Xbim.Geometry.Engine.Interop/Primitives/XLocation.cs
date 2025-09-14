@@ -13,9 +13,8 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
     /// </summary>
     internal class XLocation : NativeOwner<NativeLocationHandle>, IXLocation
     {
-        // Rotation/scale matrix (3x3) - matches OCCT gp_Trsf HVectorialPart layout
-        // Note: XLocation.h maps M11=Value(1,1), M12=Value(2,1), M13=Value(3,1) etc.
-        // This is the OCCT convention where Value(row, col) and the matrix is stored column-major.
+        // Rotation/scale matrix (3x3) - row-major layout matching XbimMatrix3D convention.
+        // Row 0 (M11,M12,M13) = X axis, Row 1 (M21,M22,M23) = Y axis, Row 2 (M31,M32,M33) = Z axis.
         private readonly double _m11, _m12, _m13;
         private readonly double _m21, _m22, _m23;
         private readonly double _m31, _m32, _m33;

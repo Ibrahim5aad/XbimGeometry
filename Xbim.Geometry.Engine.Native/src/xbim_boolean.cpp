@@ -28,10 +28,16 @@
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopTools_ListOfShape.hxx>
 #include <BRepAlgoAPI_BooleanOperation.hxx>
+#include <BRepAlgoAPI_Section.hxx>
+#include <BRepAlgo_FaceRestrictor.hxx>
 #include <BOPAlgo_PaveFiller.hxx>
 #include <BOPAlgo_Alerts.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <ShapeFix_Shape.hxx>
+#include <ShapeFix_ShapeTolerance.hxx>
+#include <ShapeFix_Wire.hxx>
+#include <ShapeAnalysis_FreeBounds.hxx>
+#include <TopTools_HSequenceOfShape.hxx>
 #include <Standard_Failure.hxx>
 #include <Standard_Type.hxx>
 #include <Precision.hxx>
@@ -343,6 +349,134 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_intersect(
 
     *outHandle = xbim_shape_create_from(result);
     return *outHandle ? XBIM_OK : XBIM_ERROR;
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_section(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     bodyHandle,
+    XbimShapeHandle     faceHandle,
+    double              tolerance,
+    XbimShapeHandle*    outHandle)
+{
+    xbim_clear_error();
+    if (!outHandle) { xbim_set_error("outHandle is NULL"); return XBIM_INVALID_ARG; }
+    *outHandle = nullptr;
+    if (!bodyHandle) { xbim_set_error("bodyHandle is NULL"); return XBIM_INVALID_HANDLE; }
+    if (!faceHandle) { xbim_set_error("faceHandle is NULL"); return XBIM_INVALID_HANDLE; }
+
+    try
+    {
+        const auto& body = bodyHandle->shape;
+        const auto& face = faceHandle->shape;
+
+        // Set tolerance on operands
+        ShapeFix_ShapeTolerance fixTol;
+        // Work on copies to avoid mutating the originals
+        TopoDS_Shape bodyWork = body;
+        TopoDS_Shape faceWork = face;
+        fixTol.SetTolerance(bodyWork, tolerance);
+        fixTol.SetTolerance(faceWork, tolerance);
+
+        // Perform section (edge intersection)
+        BRepAlgoAPI_Section boolOp(bodyWork, faceWork, false);
+        boolOp.ComputePCurveOn2(Standard_True);
+        boolOp.Build();
+
+        if (!boolOp.IsDone())
+        {
+            xbim_log_warning(ctx, "Boolean Section operation failed");
+            // Return empty compound
+            BRep_Builder b;
+            TopoDS_Compound empty;
+            b.MakeCompound(empty);
+            *outHandle = xbim_shape_create_from(empty);
+            return *outHandle ? XBIM_OK : XBIM_ERROR;
+        }
+
+        // Collect section edges
+        Handle(TopTools_HSequenceOfShape) edges = new TopTools_HSequenceOfShape();
+        for (TopExp_Explorer expl(boolOp.Shape(), TopAbs_EDGE); expl.More(); expl.Next())
+            edges->Append(TopoDS::Edge(expl.Current()));
+
+        if (edges->Length() == 0)
+        {
+            BRep_Builder b;
+            TopoDS_Compound empty;
+            b.MakeCompound(empty);
+            *outHandle = xbim_shape_create_from(empty);
+            return *outHandle ? XBIM_OK : XBIM_ERROR;
+        }
+
+        // Connect edges into wires, dispatch into closed/open
+        TopoDS_Compound open, closed;
+        BRep_Builder b;
+        b.MakeCompound(open);
+        b.MakeCompound(closed);
+
+        Handle(TopTools_HSequenceOfShape) wires = new TopTools_HSequenceOfShape();
+        ShapeAnalysis_FreeBounds::ConnectEdgesToWires(edges, tolerance, false, wires);
+        ShapeAnalysis_FreeBounds::DispatchWires(wires, closed, open);
+
+        // Retry with relaxed tolerances if no closed wires found
+        TopExp_Explorer closedCheck(closed, TopAbs_WIRE);
+        if (!closedCheck.More())
+        {
+            wires->Clear();
+            ShapeAnalysis_FreeBounds::ConnectEdgesToWires(edges, tolerance * 10, false, wires);
+            ShapeAnalysis_FreeBounds::DispatchWires(wires, closed, open);
+            TopExp_Explorer closedCheck2(closed, TopAbs_WIRE);
+            if (!closedCheck2.More())
+            {
+                wires->Clear();
+                ShapeAnalysis_FreeBounds::ConnectEdgesToWires(edges, tolerance * 100, false, wires);
+                ShapeAnalysis_FreeBounds::DispatchWires(wires, closed, open);
+            }
+        }
+
+        // Reconstruct faces from closed wires using BRepAlgo_FaceRestrictor
+        TopoDS_Shape aLocalS = boolOp.Shape2().Oriented(TopAbs_FORWARD);
+        BRepAlgo_FaceRestrictor fr;
+        fr.Init(TopoDS::Face(aLocalS), Standard_True, Standard_True);
+
+        for (TopExp_Explorer wireExp(closed, TopAbs_WIRE); wireExp.More(); wireExp.Next())
+        {
+            ShapeFix_Wire wireFixer(
+                TopoDS::Wire(wireExp.Current()),
+                TopoDS::Face(faceWork),
+                tolerance);
+            wireFixer.Perform();
+            fr.Add(wireFixer.Wire());
+        }
+
+        fr.Perform();
+        if (fr.IsDone())
+        {
+            TopAbs_Orientation orientationOfFace = boolOp.Shape2().Orientation();
+            TopoDS_Compound result;
+            b.MakeCompound(result);
+            for (; fr.More(); fr.Next())
+                b.Add(result, fr.Current().Oriented(orientationOfFace));
+
+            *outHandle = xbim_shape_create_from(result);
+            return *outHandle ? XBIM_OK : XBIM_ERROR;
+        }
+
+        xbim_log_warning(ctx, "Boolean Section: FaceRestrictor did not produce faces");
+        TopoDS_Compound empty;
+        b.MakeCompound(empty);
+        *outHandle = xbim_shape_create_from(empty);
+        return *outHandle ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "Boolean section failed");
+        return XBIM_ERROR;
+    }
+    catch (...)
+    {
+        xbim_set_error("Boolean section: unexpected error");
+        return XBIM_ERROR;
+    }
 }
 
 #pragma endregion

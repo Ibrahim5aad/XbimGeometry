@@ -243,20 +243,17 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to create location from axis2 placement: {XbimGeometryNativeApi.GetLastError()}");
 
-            // Reconstruct the transform matrix from the axis2 placement.
-            // The native side does: gp_Trsf.SetTransformation(gp_Ax3(origin, zDir, xDir), defaultAx3).Inverted()
-            // which gives us the local-to-global transform.
-            //
-            // For the matrix: column vectors are the local axes in global coordinates.
+            // Reconstruct the local-to-global transform matrix from the axis2 placement.
+            // Rows = local axes in global coordinates (same convention as XbimMatrix3D).
             // X axis = xDir (normalized), Z axis = zDir (normalized), Y axis = Z cross X
             double yx = zy * xz - zz * xy;
             double yy = zz * xx - zx * xz;
             double yz = zx * xy - zy * xx;
 
             return new XLocation(handle,
-                xx, yx, zx,   // column 1: what global X maps to
-                xy, yy, zy,   // column 2: what global Y maps to
-                xz, yz, zz,   // column 3: what global Z maps to
+                xx, xy, xz,   // row 0: X axis direction
+                yx, yy, yz,   // row 1: Y axis direction
+                zx, zy, zz,   // row 2: Z axis direction
                 ox, oy, oz,   // translation
                 1.0);         // uniform scale
         }
@@ -310,9 +307,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             double yDirY = xDirX;
 
             return new XLocation(handle,
-                xDirX, yDirX, 0,
-                xDirY, yDirY, 0,
-                0, 0, 1,
+                xDirX, xDirY, 0,   // row 0: X axis direction
+                yDirX, yDirY, 0,   // row 1: Y axis direction
+                0, 0, 1,           // row 2: Z axis direction
                 px, py, 0,
                 1.0);
         }

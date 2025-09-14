@@ -95,23 +95,35 @@ namespace Xbim.Geometry.Engine.Interop.Shapes.V5
             }
         }
 
-        public IXbimSolidSet Cut(IXbimSolidSet toCut, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use V6 BooleanFactory for boolean operations.");
-
         public IXbimSolidSet Cut(IXbimSolid toCut, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use V6 BooleanFactory for boolean operations.");
+            => ApplyToEach(s => s.Cut(toCut, tolerance, logger));
 
-        public IXbimSolidSet Union(IXbimSolidSet toUnion, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use V6 BooleanFactory for boolean operations.");
+        public IXbimSolidSet Cut(IXbimSolidSet toCut, double tolerance, ILogger logger = null)
+            => ApplyToEach(s => s.Cut(toCut, tolerance, logger));
 
         public IXbimSolidSet Union(IXbimSolid toUnion, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use V6 BooleanFactory for boolean operations.");
+            => ApplyToEach(s => s.Union(toUnion, tolerance, logger));
 
-        public IXbimSolidSet Intersection(IXbimSolidSet toIntersect, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use V6 BooleanFactory for boolean operations.");
+        public IXbimSolidSet Union(IXbimSolidSet toUnion, double tolerance, ILogger logger = null)
+            => ApplyToEach(s => s.Union(toUnion, tolerance, logger));
 
         public IXbimSolidSet Intersection(IXbimSolid toIntersect, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use V6 BooleanFactory for boolean operations.");
+            => ApplyToEach(s => s.Intersection(toIntersect, tolerance, logger));
+
+        public IXbimSolidSet Intersection(IXbimSolidSet toIntersect, double tolerance, ILogger logger = null)
+            => ApplyToEach(s => s.Intersection(toIntersect, tolerance, logger));
+
+        private V5SolidSet ApplyToEach(Func<IXbimSolid, IXbimSolidSet> op)
+        {
+            var results = new List<IXbimSolid>();
+            foreach (var solid in _solids)
+            {
+                var partial = op(solid);
+                foreach (var r in partial)
+                    results.Add(r);
+            }
+            return new V5SolidSet(results);
+        }
 
         public IXbimGeometryObject Transform(XbimMatrix3D matrix3D)
             => throw new NotSupportedException("Solid set transform not supported.");

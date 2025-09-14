@@ -3,6 +3,7 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
+using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes.V5
@@ -78,26 +79,43 @@ namespace Xbim.Geometry.Engine.Interop.Shapes.V5
             }
         }
 
-        public IXbimSolidSet Cut(IXbimSolidSet toCut, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use V6 BooleanFactory for boolean operations.");
-
         public IXbimSolidSet Cut(IXbimSolid toCut, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use V6 BooleanFactory for boolean operations.");
+            => PerformBoolean(XbimGeometryNativeApi.xbim_boolean_cut, toCut, tolerance);
 
-        public IXbimSolidSet Union(IXbimSolidSet toUnion, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use V6 BooleanFactory for boolean operations.");
+        public IXbimSolidSet Cut(IXbimSolidSet toCut, double tolerance, ILogger logger = null)
+            => PerformBooleanChained(XbimGeometryNativeApi.xbim_boolean_cut, toCut, tolerance);
 
         public IXbimSolidSet Union(IXbimSolid toUnion, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use V6 BooleanFactory for boolean operations.");
+            => PerformBoolean(XbimGeometryNativeApi.xbim_boolean_union, toUnion, tolerance);
 
-        public IXbimSolidSet Intersection(IXbimSolidSet toIntersect, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use V6 BooleanFactory for boolean operations.");
+        public IXbimSolidSet Union(IXbimSolidSet toUnion, double tolerance, ILogger logger = null)
+            => PerformBooleanChained(XbimGeometryNativeApi.xbim_boolean_union, toUnion, tolerance);
 
         public IXbimSolidSet Intersection(IXbimSolid toIntersect, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use V6 BooleanFactory for boolean operations.");
+            => PerformBoolean(XbimGeometryNativeApi.xbim_boolean_intersect, toIntersect, tolerance);
+
+        public IXbimSolidSet Intersection(IXbimSolidSet toIntersect, double tolerance, ILogger logger = null)
+            => PerformBooleanChained(XbimGeometryNativeApi.xbim_boolean_intersect, toIntersect, tolerance);
 
         public IXbimFaceSet Section(IXbimFace toSection, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use V6 BooleanFactory for section operations.");
+        {
+            if (!IsValid || !toSection.IsValid)
+                return new V5FaceSet(Array.Empty<IXbimFace>());
+
+            var faceHandle = ((V5Face)toSection).Inner.Handle;
+            int result = XbimGeometryNativeApi.xbim_boolean_section(
+                NativeContextHandle.NullHandle,
+                _solid.Handle, faceHandle, tolerance,
+                out var resultHandle);
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Section operation failed: {XbimGeometryNativeApi.GetLastError()}");
+
+            var shape = (Shape)NativeShapeWrapper.WrapShape(resultHandle);
+            var faceHandles = shape.GetSubShapeHandles(XShapeType.Face);
+            var v5Faces = faceHandles.Select(h => (IXbimFace)new V5Face(new Face(h))).ToArray();
+            return new V5FaceSet(v5Faces);
+        }
 
         public void SaveAsBrep(string fileName) => ((Shape)Inner).WriteBrep(fileName);
 
@@ -109,5 +127,52 @@ namespace Xbim.Geometry.Engine.Interop.Shapes.V5
                 return s.IsEqual(os);
             return false;
         }
+
+        #region Boolean helpers
+
+        private delegate int BooleanOp(
+            NativeContextHandle ctx,
+            NativeShapeHandle body,
+            NativeShapeHandle tool,
+            double fuzzyTolerance,
+            out int outHasWarnings,
+            out NativeShapeHandle outHandle);
+
+        private IXbimSolidSet PerformBoolean(BooleanOp op, IXbimSolid tool, double tolerance)
+        {
+            var toolHandle = ((V5Solid)tool).Inner.Handle;
+            int result = op(
+                NativeContextHandle.NullHandle,
+                _solid.Handle, toolHandle, tolerance,
+                out _, out var resultHandle);
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Boolean operation failed: {XbimGeometryNativeApi.GetLastError()}");
+
+            var shape = (Shape)NativeShapeWrapper.WrapShape(resultHandle);
+            return new V5SolidSet(shape);
+        }
+
+        private IXbimSolidSet PerformBooleanChained(BooleanOp op, IXbimSolidSet tools, double tolerance)
+        {
+            NativeShapeHandle bodyHandle = Inner.Handle;
+            foreach (var tool in tools)
+            {
+                var toolHandle = ((V5Solid)tool).Inner.Handle;
+                int result = op(
+                    NativeContextHandle.NullHandle,
+                    bodyHandle, toolHandle, tolerance,
+                    out _, out var resultHandle);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Boolean operation failed: {XbimGeometryNativeApi.GetLastError()}");
+                bodyHandle = resultHandle;
+            }
+
+            var shape = (Shape)NativeShapeWrapper.WrapShape(bodyHandle);
+            return new V5SolidSet(shape);
+        }
+
+        #endregion
     }
 }

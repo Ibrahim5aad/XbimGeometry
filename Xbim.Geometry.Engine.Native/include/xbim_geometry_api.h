@@ -1243,6 +1243,27 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_intersect(
     int*                outHasWarnings,
     XbimShapeHandle*    outHandle);
 
+/*
+ * Perform a boolean section of a solid with a face.
+ * Computes the intersection curves, assembles them into closed wires,
+ * and reconstructs faces on the section surface.
+ *
+ *   ctx          – a valid context handle (used for logging; may be NULL)
+ *   bodyHandle   – the solid to section (must not be NULL)
+ *   faceHandle   – the face to section with (must not be NULL)
+ *   tolerance    – geometric tolerance for edge/wire assembly
+ *   outHandle    – receives a compound of faces on success (may be empty)
+ *
+ * Returns XBIM_OK on success. The result compound may contain zero faces
+ * if the section plane does not intersect the solid interior.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_section(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     bodyHandle,
+    XbimShapeHandle     faceHandle,
+    double              tolerance,
+    XbimShapeHandle*    outHandle);
+
 #pragma endregion
 
 #pragma region Half-Space Operations

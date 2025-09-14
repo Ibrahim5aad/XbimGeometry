@@ -492,6 +492,14 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out int outHasWarnings,
             out NativeShapeHandle outHandle);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_boolean_section(
+            NativeContextHandle ctx,
+            NativeShapeHandle bodyHandle,
+            NativeShapeHandle faceHandle,
+            double tolerance,
+            out NativeShapeHandle outHandle);
+
         #endregion
 
         #region Half-Space Operations
