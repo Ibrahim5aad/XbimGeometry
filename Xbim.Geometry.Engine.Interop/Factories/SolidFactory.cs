@@ -1278,10 +1278,65 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             return NativeShapeWrapper.WrapSolid(outHandle);
         }
 
+        /// <summary>
+        /// Builds a compound of shells from a shell-based surface model by constructing
+        /// each open or closed shell from its connected face set and combining them.
+        /// </summary>
         public IXShape Build(IIfcShellBasedSurfaceModel ifcSurfaceModel)
         {
-            throw new NotImplementedException(
-                "Build(IIfcShellBasedSurfaceModel) requires shell factory support (TOPO-004).");
+            double tolerance = _modelService.Precision;
+            var shellHandles = new List<NativeShapeHandle>();
+
+            try
+            {
+                foreach (var ifcShell in ifcSurfaceModel.SbsmBoundary)
+                {
+                    // IIfcShell is a select type — cast to the concrete shell types
+                    IIfcConnectedFaceSet? faceSet = ifcShell as IIfcClosedShell
+                        ?? ifcShell as IIfcOpenShell as IIfcConnectedFaceSet;
+
+                    if (faceSet == null)
+                    {
+                        _logger.LogWarning(
+                            "ShellBasedSurfaceModel #{Label}: shell boundary item is not a recognized shell type, skipping.",
+                            ifcSurfaceModel.EntityLabel);
+                        continue;
+                    }
+
+                    var shellHandle = BuildShellFromConnectedFaceSet(faceSet, tolerance);
+                    if (shellHandle != null && !shellHandle.IsInvalid)
+                        shellHandles.Add(shellHandle);
+                }
+
+                if (shellHandles.Count == 0)
+                    throw new InvalidOperationException(
+                        $"ShellBasedSurfaceModel #{ifcSurfaceModel.EntityLabel}: no valid shells were built.");
+
+                if (shellHandles.Count == 1)
+                {
+                    var handle = shellHandles[0];
+                    shellHandles.Clear();
+                    return NativeShapeWrapper.WrapShape(handle);
+                }
+
+                // Assemble multiple shells into a compound
+                using var nativeShells = new NativeHandleArray(shellHandles.ToArray());
+
+                int result = XbimGeometryNativeApi.xbim_compound_make(
+                    ContextHandle, nativeShells.Ptrs, nativeShells.Length, out var compoundHandle);
+
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"ShellBasedSurfaceModel #{ifcSurfaceModel.EntityLabel}: failed to create compound: " +
+                        XbimGeometryNativeApi.GetLastError());
+
+                return NativeShapeWrapper.WrapShape(compoundHandle);
+            }
+            finally
+            {
+                foreach (var h in shellHandles)
+                    h.Dispose();
+            }
         }
 
         public IXShape Build(IIfcTessellatedItem ifcTessellatedItem)

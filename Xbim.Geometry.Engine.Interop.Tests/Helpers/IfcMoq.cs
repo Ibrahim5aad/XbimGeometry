@@ -1144,4 +1144,33 @@ internal static class IfcMoq
 
         return ClosedShell(bottom, top, front, back, left, right);
     }
+
+    /// <summary>
+    /// Creates an IIfcOpenShell with the given faces.
+    /// </summary>
+    public static IIfcOpenShell OpenShell(params IIfcFace[] faces)
+    {
+        var moq = MakeMoq<IIfcOpenShell>();
+        var faceSet = new ItemListMoq<IIfcFace>();
+        foreach (var f in faces)
+            faceSet.Add(f);
+        moq.SetupGet(s => s.CfsFaces).Returns(faceSet);
+        return moq.Object;
+    }
+
+    /// <summary>
+    /// Creates an IIfcShellBasedSurfaceModel from open or closed shells.
+    /// </summary>
+    public static IIfcShellBasedSurfaceModel ShellBasedSurfaceModel(
+        params IIfcShell[] shells)
+    {
+        var moq = MakeMoq<IIfcShellBasedSurfaceModel>();
+        var shellCollection = new ItemListMoq<IIfcShell>();
+        foreach (var s in shells)
+            shellCollection.Add(s);
+        moq.SetupGet(m => m.SbsmBoundary).Returns(shellCollection);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcShellBasedSurfaceModel)));
+        return moq.Object;
+    }
 }

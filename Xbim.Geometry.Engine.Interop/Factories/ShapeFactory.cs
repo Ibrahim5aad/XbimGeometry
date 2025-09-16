@@ -88,10 +88,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private IXShape BuildShellBasedSurfaceModel(IIfcShellBasedSurfaceModel model)
         {
-            // ShellBasedSurfaceModel requires decomposing IIfcFace into surface + wire topology,
-            // which is not yet supported. Requires IFC face → native face pipeline.
-            throw new NotSupportedException(
-                $"ShellBasedSurfaceModel #{model.EntityLabel}: IFC face topology decomposition not yet available.");
+            return _modelService.SolidFactory.Build(model);
         }
 
         #endregion
