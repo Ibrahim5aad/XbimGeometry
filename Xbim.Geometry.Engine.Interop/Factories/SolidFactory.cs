@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using Xbim.Common;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
@@ -8,6 +9,7 @@ using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Ifc4.Interfaces;
+using Xbim.Ifc4.MeasureResource;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
 {
@@ -1341,8 +1343,328 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXShape Build(IIfcTessellatedItem ifcTessellatedItem)
         {
-            throw new NotImplementedException(
-                "Build(IIfcTessellatedItem) requires tessellation support.");
+            return ifcTessellatedItem switch
+            {
+                IIfcTriangulatedFaceSet triangulated => BuildTriangulatedFaceSet(triangulated),
+                IIfcPolygonalFaceSet polygonal => BuildPolygonalFaceSet(polygonal),
+                _ => throw new NotSupportedException(
+                    $"Tessellated item type {ifcTessellatedItem.GetType().Name} is not supported.")
+            };
+        }
+
+        /// <summary>
+        /// Extracts 3D coordinates from an IFC coordinate list as a flat array of doubles [x0,y0,z0, x1,y1,z1, ...].
+        /// </summary>
+        private double[] ExtractCoordinates(IIfcCartesianPointList3D coordList)
+        {
+            var coordItems = coordList.CoordList;
+            var coords = new double[coordItems.Count * 3];
+            int i = 0;
+            foreach (var pt in coordItems)
+            {
+                // Each inner IItemSet<IfcLengthMeasure> has 3 values (X, Y, Z)
+                coords[i++] = pt[0];
+                coords[i++] = pt[1];
+                coords[i++] = pt[2];
+            }
+            return coords;
+        }
+
+        /// <summary>
+        /// Builds a shell (or solid if closed) from a triangulated face set by constructing
+        /// planar triangle faces from indexed coordinate data and sewing them together.
+        /// </summary>
+        private IXShape BuildTriangulatedFaceSet(IIfcTriangulatedFaceSet triangulated)
+        {
+            var coordList = triangulated.Coordinates;
+            if (coordList == null)
+                throw new InvalidOperationException(
+                    $"TriangulatedFaceSet #{triangulated.EntityLabel}: missing Coordinates.");
+
+            double tolerance = _modelService.Precision;
+            var coords = ExtractCoordinates(coordList);
+            int numCoords = coordList.CoordList.Count;
+            var faceHandles = new List<NativeShapeHandle>();
+
+            try
+            {
+                // Build a planar face for each triangle
+                foreach (var triangle in triangulated.CoordIndex)
+                {
+                    // CoordIndex contains 1-based indices
+                    var indices = new List<long>();
+                    foreach (var idx in triangle)
+                        indices.Add((long)idx);
+
+                    if (indices.Count < 3)
+                    {
+                        _logger.LogWarning("TriangulatedFaceSet #{Label}: skipping degenerate triangle with {Count} indices.",
+                            triangulated.EntityLabel, indices.Count);
+                        continue;
+                    }
+
+                    // Skip degenerate triangles (duplicate indices)
+                    if (indices[0] == indices[1] || indices[1] == indices[2] || indices[0] == indices[2])
+                        continue;
+
+                    // Extract 3 points from the coordinate array (convert 1-based to 0-based)
+                    var triCoords = new double[9];
+                    for (int i = 0; i < 3; i++)
+                    {
+                        int idx = (int)indices[i] - 1; // 1-based to 0-based
+                        if (idx < 0 || idx >= numCoords)
+                        {
+                            _logger.LogWarning("TriangulatedFaceSet #{Label}: index {Index} out of range.",
+                                triangulated.EntityLabel, indices[i]);
+                            goto nextTriangle;
+                        }
+                        triCoords[i * 3] = coords[idx * 3];
+                        triCoords[i * 3 + 1] = coords[idx * 3 + 1];
+                        triCoords[i * 3 + 2] = coords[idx * 3 + 2];
+                    }
+
+                    // Build a closed polygon wire from the 3 triangle vertices
+                    int result = XbimGeometryNativeApi.xbim_wire_build_polygon(
+                        ContextHandle, triCoords, 3, 1, out var wireHandle);
+
+                    if (result != 0)
+                    {
+                        _logger.LogWarning("TriangulatedFaceSet #{Label}: failed to build triangle wire: {Error}",
+                            triangulated.EntityLabel, XbimGeometryNativeApi.GetLastError());
+                        continue;
+                    }
+
+                    // Build a planar face from the triangle wire
+                    result = XbimGeometryNativeApi.xbim_face_build_from_wire(
+                        ContextHandle, wireHandle, out var faceHandle);
+
+                    wireHandle.Dispose();
+
+                    if (result != 0)
+                    {
+                        _logger.LogWarning("TriangulatedFaceSet #{Label}: failed to build triangle face: {Error}",
+                            triangulated.EntityLabel, XbimGeometryNativeApi.GetLastError());
+                        continue;
+                    }
+
+                    faceHandles.Add(faceHandle);
+                    nextTriangle:;
+                }
+
+                if (faceHandles.Count == 0)
+                    throw new InvalidOperationException(
+                        $"TriangulatedFaceSet #{triangulated.EntityLabel}: no valid faces were built.");
+
+                return AssembleTessellatedShell(faceHandles, triangulated.Closed.HasValue && (bool)triangulated.Closed.Value,
+                    tolerance, triangulated.EntityLabel);
+            }
+            finally
+            {
+                foreach (var h in faceHandles)
+                    h.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Builds a shell (or solid if closed) from a polygonal face set by constructing
+        /// planar polygon faces from indexed coordinate data and sewing them together.
+        /// </summary>
+        private IXShape BuildPolygonalFaceSet(IIfcPolygonalFaceSet polygonal)
+        {
+            var coordList = polygonal.Coordinates;
+            if (coordList == null)
+                throw new InvalidOperationException(
+                    $"PolygonalFaceSet #{polygonal.EntityLabel}: missing Coordinates.");
+
+            double tolerance = _modelService.Precision;
+            var coords = ExtractCoordinates(coordList);
+            int numCoords = coordList.CoordList.Count;
+            var faceHandles = new List<NativeShapeHandle>();
+
+            try
+            {
+                foreach (var face in polygonal.Faces)
+                {
+                    // Build the outer polygon wire from coordinate indices (1-based)
+                    var outerWire = BuildWireFromCoordIndices(face.CoordIndex, coords, numCoords, tolerance);
+                    if (outerWire == null)
+                    {
+                        _logger.LogWarning("PolygonalFaceSet #{Label}: skipping face with invalid outer loop.",
+                            polygonal.EntityLabel);
+                        continue;
+                    }
+
+                    NativeShapeHandle faceHandle;
+
+                    // Check for faces with voids
+                    if (face is IIfcIndexedPolygonalFaceWithVoids faceWithVoids
+                        && faceWithVoids.InnerCoordIndices.Count > 0)
+                    {
+                        var innerWires = new List<NativeShapeHandle>();
+                        try
+                        {
+                            foreach (var innerLoop in faceWithVoids.InnerCoordIndices)
+                            {
+                                var innerWire = BuildWireFromCoordIndices(innerLoop, coords, numCoords, tolerance);
+                                if (innerWire != null)
+                                    innerWires.Add(innerWire);
+                            }
+
+                            if (innerWires.Count > 0)
+                            {
+                                using var nativeInnerWires = new NativeHandleArray(innerWires.ToArray());
+
+                                int result = XbimGeometryNativeApi.xbim_face_build_advanced(
+                                    ContextHandle,
+                                    0, // PLANE
+                                    0, 0, 0, // origin (inferred)
+                                    0, 0, 1, // zDir
+                                    1, 0, 0, // xDir
+                                    0,       // radius
+                                    outerWire,
+                                    nativeInnerWires.Ptrs,
+                                    nativeInnerWires.Length,
+                                    tolerance,
+                                    1, // sameSense
+                                    out faceHandle);
+
+                                outerWire.Dispose();
+
+                                if (result != 0)
+                                {
+                                    _logger.LogWarning("PolygonalFaceSet #{Label}: failed to build face with voids: {Error}",
+                                        polygonal.EntityLabel, XbimGeometryNativeApi.GetLastError());
+                                    continue;
+                                }
+                            }
+                            else
+                            {
+                                // All inner wires failed — build simple face
+                                int result = XbimGeometryNativeApi.xbim_face_build_from_wire(
+                                    ContextHandle, outerWire, out faceHandle);
+                                outerWire.Dispose();
+
+                                if (result != 0)
+                                {
+                                    _logger.LogWarning("PolygonalFaceSet #{Label}: failed to build face: {Error}",
+                                        polygonal.EntityLabel, XbimGeometryNativeApi.GetLastError());
+                                    continue;
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            foreach (var w in innerWires)
+                                w.Dispose();
+                        }
+                    }
+                    else
+                    {
+                        // Simple face without voids
+                        int result = XbimGeometryNativeApi.xbim_face_build_from_wire(
+                            ContextHandle, outerWire, out faceHandle);
+                        outerWire.Dispose();
+
+                        if (result != 0)
+                        {
+                            _logger.LogWarning("PolygonalFaceSet #{Label}: failed to build face: {Error}",
+                                polygonal.EntityLabel, XbimGeometryNativeApi.GetLastError());
+                            continue;
+                        }
+                    }
+
+                    faceHandles.Add(faceHandle);
+                }
+
+                if (faceHandles.Count == 0)
+                    throw new InvalidOperationException(
+                        $"PolygonalFaceSet #{polygonal.EntityLabel}: no valid faces were built.");
+
+                return AssembleTessellatedShell(faceHandles, polygonal.Closed.HasValue && (bool)polygonal.Closed.Value,
+                    tolerance, polygonal.EntityLabel);
+            }
+            finally
+            {
+                foreach (var h in faceHandles)
+                    h.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Builds a closed polygon wire from an IFC coordinate index list and a pre-extracted
+        /// coordinate array.
+        /// </summary>
+        private NativeShapeHandle? BuildWireFromCoordIndices(
+            IItemSet<IfcPositiveInteger> indices,
+            double[] coords, int numCoords, double tolerance)
+        {
+            int count = indices.Count;
+            if (count < 3)
+                return null;
+
+            var polyCoords = new double[count * 3];
+            for (int i = 0; i < count; i++)
+            {
+                int idx = (int)(long)indices[i] - 1; // 1-based to 0-based
+                if (idx < 0 || idx >= numCoords)
+                    return null;
+
+                polyCoords[i * 3] = coords[idx * 3];
+                polyCoords[i * 3 + 1] = coords[idx * 3 + 1];
+                polyCoords[i * 3 + 2] = coords[idx * 3 + 2];
+            }
+
+            int result = XbimGeometryNativeApi.xbim_wire_build_polygon(
+                ContextHandle, polyCoords, count, 1, out var wireHandle);
+
+            if (result != 0)
+                return null;
+
+            return wireHandle;
+        }
+
+        /// <summary>
+        /// Assembles tessellated faces into a shell. If the tessellation is marked as closed,
+        /// attempts to create a solid; otherwise returns a sewn shell.
+        /// </summary>
+        private IXShape AssembleTessellatedShell(
+            List<NativeShapeHandle> faceHandles, bool isClosed, double tolerance, int entityLabel)
+        {
+            using var nativeFaces = new NativeHandleArray(faceHandles.ToArray());
+
+            if (isClosed && faceHandles.Count >= 4)
+            {
+                // Try to build as solid (sew + close)
+                int result = XbimGeometryNativeApi.xbim_shell_build_closed_shell(
+                    ContextHandle, nativeFaces.Ptrs, nativeFaces.Length, tolerance, out var solidHandle);
+
+                if (result == 0)
+                    return NativeShapeWrapper.WrapShape(solidHandle);
+
+                _logger.LogWarning(
+                    "TessellatedFaceSet #{Label}: closed shell conversion failed ({Error}), falling back to open shell.",
+                    entityLabel, XbimGeometryNativeApi.GetLastError());
+            }
+
+            // Build as open shell (sew only)
+            int shellResult = XbimGeometryNativeApi.xbim_shell_build_from_faces(
+                ContextHandle, nativeFaces.Ptrs, nativeFaces.Length, tolerance, out var rawShellHandle);
+
+            if (shellResult != 0)
+                throw new InvalidOperationException(
+                    $"TessellatedFaceSet #{entityLabel}: failed to build shell: {XbimGeometryNativeApi.GetLastError()}");
+
+            // Sew the shell
+            int sewResult = XbimGeometryNativeApi.xbim_shell_sew(
+                ContextHandle, rawShellHandle, tolerance, out _, out var sewedHandle);
+
+            rawShellHandle.Dispose();
+
+            if (sewResult != 0)
+                throw new InvalidOperationException(
+                    $"TessellatedFaceSet #{entityLabel}: failed to sew shell: {XbimGeometryNativeApi.GetLastError()}");
+
+            return NativeShapeWrapper.WrapShape(sewedHandle);
         }
 
         public IXShape Build(IIfcSectionedSpine ifcSectionedSpine)

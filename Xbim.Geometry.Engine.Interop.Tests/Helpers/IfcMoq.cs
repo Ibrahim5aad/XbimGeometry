@@ -1173,4 +1173,120 @@ internal static class IfcMoq
             .Returns(MetaData.ExpressType(typeof(IfcShellBasedSurfaceModel)));
         return moq.Object;
     }
+
+    // ── Tessellated item mocks ───────────────────────────────────────
+
+    /// <summary>
+    /// Creates an IIfcCartesianPointList3D from a flat array of (x,y,z) tuples.
+    /// </summary>
+    public static IIfcCartesianPointList3D CartesianPointList3D(params (double x, double y, double z)[] points)
+    {
+        var moq = MakeMoq<IIfcCartesianPointList3D>();
+        var coordList = new ItemListMoq<IItemSet<IfcLengthMeasure>>();
+        foreach (var (x, y, z) in points)
+        {
+            var row = new ItemListMoq<IfcLengthMeasure>();
+            row.Add(new IfcLengthMeasure(x));
+            row.Add(new IfcLengthMeasure(y));
+            row.Add(new IfcLengthMeasure(z));
+            coordList.Add(row);
+        }
+        moq.SetupGet(c => c.CoordList).Returns(coordList);
+        return moq.Object;
+    }
+
+    /// <summary>
+    /// Creates an IIfcTriangulatedFaceSet from coordinates and triangle indices (1-based).
+    /// </summary>
+    public static IIfcTriangulatedFaceSet TriangulatedFaceSet(
+        IIfcCartesianPointList3D coordinates,
+        (long i1, long i2, long i3)[] triangles,
+        bool? closed = null)
+    {
+        var moq = MakeMoq<IIfcTriangulatedFaceSet>();
+        moq.SetupGet(t => t.Coordinates).Returns(coordinates);
+
+        var coordIndex = new ItemListMoq<IItemSet<IfcPositiveInteger>>();
+        foreach (var (i1, i2, i3) in triangles)
+        {
+            var tri = new ItemListMoq<IfcPositiveInteger>();
+            tri.Add(new IfcPositiveInteger(i1));
+            tri.Add(new IfcPositiveInteger(i2));
+            tri.Add(new IfcPositiveInteger(i3));
+            coordIndex.Add(tri);
+        }
+        moq.SetupGet(t => t.CoordIndex).Returns(coordIndex);
+
+        if (closed.HasValue)
+            moq.SetupGet(t => t.Closed).Returns(new IfcBoolean(closed.Value));
+        else
+            moq.SetupGet(t => t.Closed).Returns((IfcBoolean?)null);
+
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcTriangulatedFaceSet)));
+        return moq.Object;
+    }
+
+    /// <summary>
+    /// Creates an IIfcIndexedPolygonalFace from 1-based coordinate indices.
+    /// </summary>
+    public static IIfcIndexedPolygonalFace IndexedPolygonalFace(params long[] indices)
+    {
+        var moq = MakeMoq<IIfcIndexedPolygonalFace>();
+        var coordIndex = new ItemListMoq<IfcPositiveInteger>();
+        foreach (var idx in indices)
+            coordIndex.Add(new IfcPositiveInteger(idx));
+        moq.SetupGet(f => f.CoordIndex).Returns(coordIndex);
+        return moq.Object;
+    }
+
+    /// <summary>
+    /// Creates an IIfcIndexedPolygonalFaceWithVoids from outer and inner 1-based index arrays.
+    /// </summary>
+    public static IIfcIndexedPolygonalFaceWithVoids IndexedPolygonalFaceWithVoids(
+        long[] outerIndices, params long[][] innerLoops)
+    {
+        var moq = MakeMoq<IIfcIndexedPolygonalFaceWithVoids>();
+        var coordIndex = new ItemListMoq<IfcPositiveInteger>();
+        foreach (var idx in outerIndices)
+            coordIndex.Add(new IfcPositiveInteger(idx));
+        moq.SetupGet(f => f.CoordIndex).Returns(coordIndex);
+
+        var innerCoordIndices = new ItemListMoq<IItemSet<IfcPositiveInteger>>();
+        foreach (var loop in innerLoops)
+        {
+            var innerLoop = new ItemListMoq<IfcPositiveInteger>();
+            foreach (var idx in loop)
+                innerLoop.Add(new IfcPositiveInteger(idx));
+            innerCoordIndices.Add(innerLoop);
+        }
+        moq.SetupGet(f => f.InnerCoordIndices).Returns(innerCoordIndices);
+        return moq.Object;
+    }
+
+    /// <summary>
+    /// Creates an IIfcPolygonalFaceSet from coordinates and faces.
+    /// </summary>
+    public static IIfcPolygonalFaceSet PolygonalFaceSet(
+        IIfcCartesianPointList3D coordinates,
+        IIfcIndexedPolygonalFace[] faces,
+        bool? closed = null)
+    {
+        var moq = MakeMoq<IIfcPolygonalFaceSet>();
+        moq.SetupGet(p => p.Coordinates).Returns(coordinates);
+
+        var faceList = new ItemListMoq<IIfcIndexedPolygonalFace>();
+        foreach (var f in faces)
+            faceList.Add(f);
+        moq.SetupGet(p => p.Faces).Returns(faceList);
+
+        if (closed.HasValue)
+            moq.SetupGet(p => p.Closed).Returns(new IfcBoolean(closed.Value));
+        else
+            moq.SetupGet(p => p.Closed).Returns((IfcBoolean?)null);
+
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcPolygonalFaceSet)));
+        return moq.Object;
+    }
 }
