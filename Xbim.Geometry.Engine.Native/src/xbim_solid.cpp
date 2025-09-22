@@ -14,6 +14,7 @@
  *   - Revolved area solid tapered (BRepOffsetAPI_MakePipeShell along arc)
  *   - Swept disk solid (BRepOffsetAPI_MakePipeShell with circular profile)
  *   - Fixed reference swept area solid (BRepOffsetAPI_MakePipeShell with ref surface)
+ *   - Sectioned spine (BRepOffsetAPI_MakePipeShell with multiple cross-sections)
  */
 
 #include <cmath>
@@ -78,6 +79,7 @@
 #include <TopoDS_Shell.hxx>
 #include <TopoDS_Solid.hxx>
 #include <Standard_Failure.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
 #include <Geom_Circle.hxx>
 #include <Geom_Plane.hxx>
 #include <Geom_Surface.hxx>
@@ -1402,6 +1404,201 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_fixed_reference_swept(
         xbim_log_occt_failure(ctx, e, "xbim_solid_build_fixed_reference_swept");
         const char* msg = e.GetMessageString();
         xbim_set_error(msg ? msg : "xbim_solid_build_fixed_reference_swept: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_sectioned_spine(
+    XbimContextHandle        ctx,
+    XbimShapeHandle          spineHandle,
+    const XbimShapeHandle*   sectionHandles,
+    int                      numSections,
+    double                   precision,
+    XbimShapeHandle*         outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_solid_build_sectioned_spine: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!spineHandle)
+    {
+        xbim_set_error("xbim_solid_build_sectioned_spine: spineHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    if (!sectionHandles || numSections < 2)
+    {
+        xbim_set_error("xbim_solid_build_sectioned_spine: need at least 2 section faces");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        const TopoDS_Shape& spineShape = spineHandle->shape;
+        if (spineShape.IsNull() || spineShape.ShapeType() != TopAbs_WIRE)
+        {
+            xbim_set_error("xbim_solid_build_sectioned_spine: spineHandle must be a valid wire");
+            return XBIM_INVALID_ARG;
+        }
+
+        TopoDS_Wire spineWire = TopoDS::Wire(spineShape);
+
+        /* Collect section faces */
+        std::vector<TopoDS_Face> sections(numSections);
+        for (int i = 0; i < numSections; ++i)
+        {
+            if (!sectionHandles[i])
+            {
+                xbim_set_error("xbim_solid_build_sectioned_spine: sectionHandles contains NULL at index");
+                return XBIM_INVALID_HANDLE;
+            }
+            const TopoDS_Shape& s = sectionHandles[i]->shape;
+            if (s.IsNull() || s.ShapeType() != TopAbs_FACE)
+            {
+                xbim_set_error("xbim_solid_build_sectioned_spine: section must be a valid face");
+                return XBIM_INVALID_ARG;
+            }
+            sections[i] = TopoDS::Face(s);
+        }
+
+        /* Build outer body: sweep outer wires along the spine */
+        BRepOffsetAPI_MakePipeShell outerPipe(spineWire);
+        outerPipe.SetTransitionMode(BRepBuilderAPI_Transformed);
+
+        for (int i = 0; i < numSections; ++i)
+        {
+            TopoDS_Wire outerWire = BRepTools::OuterWire(sections[i]);
+            outerPipe.Add(outerWire);
+        }
+
+        outerPipe.Build();
+        if (!outerPipe.IsDone())
+        {
+            BRepBuilderAPI_PipeError err = outerPipe.GetStatus();
+            xbim_set_error("xbim_solid_build_sectioned_spine: failed to build outer pipe shell");
+            xbim_log_error(ctx, "SectionedSpine outer pipe failed with error code %d", (int)err);
+            return XBIM_ERROR;
+        }
+
+        if (!outerPipe.MakeSolid())
+        {
+            xbim_set_error("xbim_solid_build_sectioned_spine: could not make outer pipe a solid");
+            return XBIM_ERROR;
+        }
+
+        TopoDS_Solid outerSolid = TopoDS::Solid(outerPipe.Shape());
+
+        /* Count inner wires (voids) in the first section — assume all sections
+           have the same hole topology (same count and ordering). */
+        std::vector<TopoDS_Wire> firstInners;
+        {
+            TopoDS_Wire firstOuter = BRepTools::OuterWire(sections[0]);
+            for (TopExp_Explorer exp(sections[0], TopAbs_WIRE); exp.More(); exp.Next())
+            {
+                TopoDS_Wire w = TopoDS::Wire(exp.Current());
+                if (!w.IsSame(firstOuter))
+                    firstInners.push_back(w);
+            }
+        }
+
+        if (!firstInners.empty())
+        {
+            int numHoles = (int)firstInners.size();
+
+            for (int holeIdx = 0; holeIdx < numHoles; ++holeIdx)
+            {
+                /* Collect the holeIdx-th inner wire from every section */
+                std::vector<TopoDS_Wire> innerWires(numSections);
+                bool allFound = true;
+                for (int si = 0; si < numSections; ++si)
+                {
+                    TopoDS_Wire sectionOuter = BRepTools::OuterWire(sections[si]);
+                    int innerCount = 0;
+                    bool found = false;
+                    for (TopExp_Explorer exp(sections[si], TopAbs_WIRE); exp.More(); exp.Next())
+                    {
+                        TopoDS_Wire w = TopoDS::Wire(exp.Current());
+                        if (!w.IsSame(sectionOuter))
+                        {
+                            if (innerCount == holeIdx)
+                            {
+                                innerWires[si] = w;
+                                found = true;
+                                break;
+                            }
+                            innerCount++;
+                        }
+                    }
+                    if (!found)
+                    {
+                        xbim_log_warning(ctx, "SectionedSpine: section %d missing inner wire %d — skipping hole", si, holeIdx);
+                        allFound = false;
+                        break;
+                    }
+                }
+
+                if (!allFound)
+                    continue;
+
+                BRepOffsetAPI_MakePipeShell innerPipe(spineWire);
+                innerPipe.SetTransitionMode(BRepBuilderAPI_Transformed);
+
+                for (int si = 0; si < numSections; ++si)
+                    innerPipe.Add(innerWires[si]);
+
+                innerPipe.Build();
+                if (!innerPipe.IsDone())
+                {
+                    xbim_log_warning(ctx, "SectionedSpine: failed to build inner pipe for hole %d — skipping", holeIdx);
+                    continue;
+                }
+
+                if (!innerPipe.MakeSolid())
+                {
+                    xbim_log_warning(ctx, "SectionedSpine: inner pipe for hole %d could not be made solid — skipping", holeIdx);
+                    continue;
+                }
+
+                TopoDS_Solid innerSolid = TopoDS::Solid(innerPipe.Shape());
+
+                BRepAlgoAPI_Cut cutter(outerSolid, innerSolid);
+                cutter.Build();
+                if (cutter.IsDone())
+                {
+                    outerSolid = TopoDS::Solid(cutter.Shape());
+                }
+                else
+                {
+                    xbim_log_warning(ctx, "SectionedSpine: boolean cut for hole %d failed — skipping", holeIdx);
+                }
+            }
+        }
+
+        /* Apply tolerance fix */
+        double prec = (precision > 0.0) ? precision : Precision::Confusion();
+        ShapeFix_ShapeTolerance tolFixer;
+        tolFixer.LimitTolerance(outerSolid, prec);
+        outerSolid.Closed(Standard_True);
+
+        *outHandle = xbim_shape_create_from(outerSolid);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_solid_build_sectioned_spine: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_solid_build_sectioned_spine");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_solid_build_sectioned_spine: OCCT exception");
         return XBIM_ERROR;
     }
 }

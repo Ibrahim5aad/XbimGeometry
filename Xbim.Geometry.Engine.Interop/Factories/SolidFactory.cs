@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.Logging;
 using Xbim.Common;
 using Xbim.Geometry.Abstractions;
@@ -1669,8 +1670,68 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXShape Build(IIfcSectionedSpine ifcSectionedSpine)
         {
-            throw new NotImplementedException(
-                "Build(IIfcSectionedSpine) requires sweep factory support.");
+            var crossSections = ifcSectionedSpine.CrossSections.ToList();
+            var positions = ifcSectionedSpine.CrossSectionPositions.ToList();
+
+            if (crossSections.Count < 2)
+                throw new InvalidOperationException(
+                    $"IfcSectionedSpine #{ifcSectionedSpine.EntityLabel} requires at least 2 cross-sections but has {crossSections.Count}.");
+
+            if (crossSections.Count != positions.Count)
+                throw new InvalidOperationException(
+                    $"IfcSectionedSpine #{ifcSectionedSpine.EntityLabel}: cross-section count ({crossSections.Count}) does not match position count ({positions.Count}).");
+
+            // Build the spine wire from the composite curve
+            var spineWire = (Wire)_modelService.WireFactory.Build(ifcSectionedSpine.SpineCurve);
+
+            var geometryFactory = (GeometryFactory)_modelService.GeometryFactory;
+            var movedFaceHandles = new List<NativeShapeHandle>();
+
+            try
+            {
+                // Build each cross-section face and move it to its placement position
+                for (int i = 0; i < crossSections.Count; i++)
+                {
+                    var face = (Face)_modelService.ProfileFactory.BuildFace(crossSections[i]);
+                    var location = geometryFactory.BuildLocationFromAxis3D(positions[i]);
+
+                    int moveResult = XbimGeometryNativeApi.xbim_shape_moved(
+                        face.Handle, location.Handle, out var movedHandle);
+
+                    if (moveResult != 0)
+                    {
+                        face.Handle.Dispose();
+                        location.Handle.Dispose();
+                        throw new InvalidOperationException(
+                            $"IfcSectionedSpine #{ifcSectionedSpine.EntityLabel}: failed to position cross-section {i}: {XbimGeometryNativeApi.GetLastError()}");
+                    }
+
+                    face.Handle.Dispose();
+                    location.Handle.Dispose();
+                    movedFaceHandles.Add(movedHandle);
+                }
+
+                using var nativeSections = new NativeHandleArray(movedFaceHandles.ToArray());
+
+                int result = XbimGeometryNativeApi.xbim_solid_build_sectioned_spine(
+                    ContextHandle,
+                    spineWire.Handle,
+                    nativeSections.Ptrs,
+                    nativeSections.Length,
+                    _modelService.Precision,
+                    out var solidHandle);
+
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build IfcSectionedSpine #{ifcSectionedSpine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                return NativeShapeWrapper.WrapSolid(solidHandle);
+            }
+            finally
+            {
+                foreach (var h in movedFaceHandles)
+                    h.Dispose();
+            }
         }
 
         #endregion

@@ -659,6 +659,31 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_fixed_reference_swept(
     XbimLocationHandle  locationHandle,
     XbimShapeHandle*    outHandle);
 
+/*
+ * Build a sectioned spine solid.
+ * Sweeps a series of pre-positioned cross-section faces along a spine wire
+ * using BRepOffsetAPI_MakePipeShell. Each section's outer wire is added to
+ * the pipe shell; inner wires (voids) are swept separately and cut from
+ * the outer body. The sections must already be moved to their final positions
+ * (caller handles IIfcAxis2Placement3D transforms).
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   spineHandle      – a shape handle containing a TopoDS_Wire (the spine curve)
+ *   sectionHandles   – array of shape handles, each containing a positioned TopoDS_Face
+ *   numSections      – number of elements in sectionHandles (must be >= 2)
+ *   precision        – model precision tolerance (> 0)
+ *   outHandle        – receives the new solid shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_sectioned_spine(
+    XbimContextHandle        ctx,
+    XbimShapeHandle          spineHandle,
+    const XbimShapeHandle*   sectionHandles,
+    int                      numSections,
+    double                   precision,
+    XbimShapeHandle*         outHandle);
+
 #pragma endregion
 
 #pragma region Parametric Profiles

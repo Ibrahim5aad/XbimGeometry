@@ -268,6 +268,15 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeLocationHandle locationHandle,
             out NativeShapeHandle outHandle);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_solid_build_sectioned_spine(
+            NativeContextHandle ctx,
+            NativeShapeHandle spineHandle,
+            [In] IntPtr[] sectionHandles,
+            int numSections,
+            double precision,
+            out NativeShapeHandle outHandle);
+
         #endregion
 
         #region Profiles

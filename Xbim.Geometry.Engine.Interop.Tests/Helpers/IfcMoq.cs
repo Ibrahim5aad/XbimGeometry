@@ -1289,4 +1289,58 @@ internal static class IfcMoq
             .Returns(MetaData.ExpressType(typeof(IfcPolygonalFaceSet)));
         return moq.Object;
     }
+
+    // ── Composite Curve mocks ────────────────────────────────────
+
+    /// <summary>
+    /// Creates a polyline-based composite curve containing a single segment.
+    /// </summary>
+    public static IIfcCompositeCurve CompositeCurveFromPolyline(
+        params (double x, double y, double z)[] points)
+    {
+        // Build the polyline segment
+        var polyMoq = MakeMoq<IIfcPolyline>();
+        var poly = polyMoq.Object;
+        foreach (var (x, y, z) in points)
+            poly.Points.Add(CartesianPoint3d(x, y, z));
+
+        // Wrap in a composite curve segment
+        var segMoq = MakeMoq<IIfcCompositeCurveSegment>();
+        segMoq.SetupGet(s => s.ParentCurve).Returns(poly);
+        segMoq.SetupGet(s => s.SameSense).Returns(true);
+
+        // Build the composite curve
+        var ccMoq = MakeMoq<IIfcCompositeCurve>();
+        var cc = ccMoq.Object;
+        cc.Segments.Add(segMoq.Object);
+        return cc;
+    }
+
+    // ── Sectioned Spine mocks ────────────────────────────────────
+
+    /// <summary>
+    /// Creates an IfcSectionedSpine with a polyline spine and positioned cross-sections.
+    /// </summary>
+    public static IIfcSectionedSpine SectionedSpine(
+        IIfcCompositeCurve spineCurve,
+        IIfcProfileDef[] crossSections,
+        IIfcAxis2Placement3D[] crossSectionPositions,
+        int entityLabel = 900)
+    {
+        var moq = MakeMoq<IIfcSectionedSpine>();
+        moq.SetupGet(x => x.SpineCurve).Returns(spineCurve);
+        moq.SetupGet(x => x.EntityLabel).Returns(entityLabel);
+
+        var sectionsList = new ItemListMoq<IIfcProfileDef>();
+        foreach (var s in crossSections)
+            sectionsList.Add(s);
+        moq.SetupGet(x => x.CrossSections).Returns(sectionsList);
+
+        var positionsList = new ItemListMoq<IIfcAxis2Placement3D>();
+        foreach (var p in crossSectionPositions)
+            positionsList.Add(p);
+        moq.SetupGet(x => x.CrossSectionPositions).Returns(positionsList);
+
+        return moq.Object;
+    }
 }
