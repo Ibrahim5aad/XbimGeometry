@@ -70,8 +70,36 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXCurve BuildSpiral(IfcSpiral curve, double startParam, double endParam)
         {
-            throw new NotImplementedException(
-                $"IfcSpiral #{curve.EntityLabel} requires IFC4x3 spiral support.");
+            ExtractSpiralPlacement2d(curve.Position,
+                out double placementX, out double placementY,
+                out double dirX, out double dirY);
+
+            if (curve is IfcClothoid clothoid)
+                return BuildClothoid(clothoid, startParam, endParam,
+                    placementX, placementY, dirX, dirY);
+
+            if (curve is IfcSineSpiral sineSpiral)
+                return BuildSineSpiral(sineSpiral, startParam, endParam,
+                    placementX, placementY, dirX, dirY);
+
+            if (curve is IfcCosineSpiral cosineSpiral)
+                return BuildCosineSpiral(cosineSpiral, startParam, endParam,
+                    placementX, placementY, dirX, dirY);
+
+            if (curve is IfcSecondOrderPolynomialSpiral secondOrder)
+                return BuildPolynomialSpiral(secondOrder, startParam, endParam,
+                    placementX, placementY, dirX, dirY);
+
+            if (curve is IfcThirdOrderPolynomialSpiral thirdOrder)
+                return BuildPolynomialSpiral(thirdOrder, startParam, endParam,
+                    placementX, placementY, dirX, dirY);
+
+            if (curve is IfcSeventhOrderPolynomialSpiral seventhOrder)
+                return BuildPolynomialSpiral(seventhOrder, startParam, endParam,
+                    placementX, placementY, dirX, dirY);
+
+            throw new NotSupportedException(
+                $"Spiral type {curve.GetType().Name} #{curve.EntityLabel} is not supported.");
         }
 
         public IXCurve BuildPolynomialCurve2d(IfcPolynomialCurve curve, double startParam, double endParam)
@@ -378,6 +406,184 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             throw new NotSupportedException(
                 $"Unsupported point list type in IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}.");
+        }
+
+        #endregion
+
+        #region Spirals
+
+        private static void ExtractSpiralPlacement2d(IfcAxis2Placement placement,
+            out double x, out double y, out double dirX, out double dirY)
+        {
+            x = 0.0;
+            y = 0.0;
+            dirX = 1.0;
+            dirY = 0.0;
+
+            if (placement is IIfcAxis2Placement2D axis2d)
+            {
+                x = axis2d.Location.Coordinates[0];
+                y = axis2d.Location.Coordinates[1];
+
+                if (axis2d.RefDirection != null)
+                {
+                    double rdx = axis2d.RefDirection.DirectionRatios[0];
+                    double rdy = axis2d.RefDirection.DirectionRatios[1];
+                    double mag = Math.Sqrt(rdx * rdx + rdy * rdy);
+                    if (mag > 1e-15)
+                    {
+                        dirX = rdx / mag;
+                        dirY = rdy / mag;
+                    }
+                }
+            }
+            else if (placement is IIfcAxis2Placement3D axis3d)
+            {
+                x = axis3d.Location.Coordinates[0];
+                y = axis3d.Location.Coordinates[1];
+
+                if (axis3d.RefDirection != null)
+                {
+                    dirX = axis3d.RefDirection.DirectionRatios[0];
+                    dirY = axis3d.RefDirection.DirectionRatios[1];
+                    double mag = Math.Sqrt(dirX * dirX + dirY * dirY);
+                    if (mag > 1e-15) { dirX /= mag; dirY /= mag; }
+                }
+            }
+        }
+
+        private Curve BuildClothoid(IfcClothoid clothoid, double startParam, double endParam,
+            double placementX, double placementY, double dirX, double dirY)
+        {
+            int result = XbimGeometryNativeApi.xbim_curve_build_clothoid(
+                ContextHandle,
+                (double)clothoid.ClothoidConstant,
+                startParam, endParam,
+                placementX, placementY,
+                dirX, dirY,
+                out var curveHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build clothoid #{clothoid.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new Curve(curveHandle, XCurveType.IfcClothoid);
+        }
+
+        private Curve BuildSineSpiral(IfcSineSpiral spiral, double startParam, double endParam,
+            double placementX, double placementY, double dirX, double dirY)
+        {
+            int result = XbimGeometryNativeApi.xbim_curve_build_sine_spiral(
+                ContextHandle,
+                (double)spiral.SineTerm,
+                spiral.LinearTerm.HasValue ? (double)spiral.LinearTerm.Value : 0.0,
+                spiral.ConstantTerm.HasValue ? (double)spiral.ConstantTerm.Value : 0.0,
+                startParam, endParam,
+                placementX, placementY,
+                dirX, dirY,
+                out var curveHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build sine spiral #{spiral.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new Curve(curveHandle, XCurveType.IfcSineSpiral);
+        }
+
+        private Curve BuildCosineSpiral(IfcCosineSpiral spiral, double startParam, double endParam,
+            double placementX, double placementY, double dirX, double dirY)
+        {
+            int result = XbimGeometryNativeApi.xbim_curve_build_cosine_spiral(
+                ContextHandle,
+                (double)spiral.CosineTerm,
+                spiral.ConstantTerm.HasValue ? (double)spiral.ConstantTerm.Value : 0.0,
+                startParam, endParam,
+                placementX, placementY,
+                dirX, dirY,
+                out var curveHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build cosine spiral #{spiral.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new Curve(curveHandle, XCurveType.IfcCosineSpiral);
+        }
+
+        private Curve BuildPolynomialSpiral(IfcSecondOrderPolynomialSpiral spiral,
+            double startParam, double endParam,
+            double placementX, double placementY, double dirX, double dirY)
+        {
+            // Second order: A0=ConstantTerm, A1=LinearTerm, A2=QuadraticTerm
+            var coefficients = new double[8];
+            var present = new int[8];
+
+            if (spiral.ConstantTerm.HasValue) { coefficients[0] = (double)spiral.ConstantTerm.Value; present[0] = 1; }
+            if (spiral.LinearTerm.HasValue) { coefficients[1] = (double)spiral.LinearTerm.Value; present[1] = 1; }
+            coefficients[2] = (double)spiral.QuadraticTerm; present[2] = 1;
+
+            return BuildPolynomialSpiralCore(coefficients, present, startParam, endParam,
+                placementX, placementY, dirX, dirY,
+                XCurveType.IfcSecondOrderPolynomialSpiral, spiral.EntityLabel);
+        }
+
+        private Curve BuildPolynomialSpiral(IfcThirdOrderPolynomialSpiral spiral,
+            double startParam, double endParam,
+            double placementX, double placementY, double dirX, double dirY)
+        {
+            // Third order: A0=ConstantTerm, A1=LinearTerm, A2=QuadraticTerm, A3=CubicTerm
+            var coefficients = new double[8];
+            var present = new int[8];
+
+            if (spiral.ConstantTerm.HasValue) { coefficients[0] = (double)spiral.ConstantTerm.Value; present[0] = 1; }
+            if (spiral.LinearTerm.HasValue) { coefficients[1] = (double)spiral.LinearTerm.Value; present[1] = 1; }
+            if (spiral.QuadraticTerm.HasValue) { coefficients[2] = (double)spiral.QuadraticTerm.Value; present[2] = 1; }
+            coefficients[3] = (double)spiral.CubicTerm; present[3] = 1;
+
+            return BuildPolynomialSpiralCore(coefficients, present, startParam, endParam,
+                placementX, placementY, dirX, dirY,
+                XCurveType.IfcThirdOrderPolynomialSpiral, spiral.EntityLabel);
+        }
+
+        private Curve BuildPolynomialSpiral(IfcSeventhOrderPolynomialSpiral spiral,
+            double startParam, double endParam,
+            double placementX, double placementY, double dirX, double dirY)
+        {
+            // Seventh order: A0..A7
+            var coefficients = new double[8];
+            var present = new int[8];
+
+            if (spiral.ConstantTerm.HasValue) { coefficients[0] = (double)spiral.ConstantTerm.Value; present[0] = 1; }
+            if (spiral.LinearTerm.HasValue) { coefficients[1] = (double)spiral.LinearTerm.Value; present[1] = 1; }
+            if (spiral.QuadraticTerm.HasValue) { coefficients[2] = (double)spiral.QuadraticTerm.Value; present[2] = 1; }
+            if (spiral.CubicTerm.HasValue) { coefficients[3] = (double)spiral.CubicTerm.Value; present[3] = 1; }
+            if (spiral.QuarticTerm.HasValue) { coefficients[4] = (double)spiral.QuarticTerm.Value; present[4] = 1; }
+            if (spiral.QuinticTerm.HasValue) { coefficients[5] = (double)spiral.QuinticTerm.Value; present[5] = 1; }
+            if (spiral.SexticTerm.HasValue) { coefficients[6] = (double)spiral.SexticTerm.Value; present[6] = 1; }
+            coefficients[7] = (double)spiral.SepticTerm; present[7] = 1;
+
+            return BuildPolynomialSpiralCore(coefficients, present, startParam, endParam,
+                placementX, placementY, dirX, dirY,
+                XCurveType.IfcSeventhOrderPolynomialSpiral, spiral.EntityLabel);
+        }
+
+        private Curve BuildPolynomialSpiralCore(double[] coefficients, int[] present,
+            double startParam, double endParam,
+            double placementX, double placementY, double dirX, double dirY,
+            XCurveType curveType, int entityLabel)
+        {
+            int result = XbimGeometryNativeApi.xbim_curve_build_polynomial_spiral(
+                ContextHandle,
+                coefficients, present, 8,
+                startParam, endParam,
+                placementX, placementY,
+                dirX, dirY,
+                out var curveHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build polynomial spiral #{entityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new Curve(curveHandle, curveType);
         }
 
         #endregion

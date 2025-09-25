@@ -2798,6 +2798,85 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_reverse(XbimCurve2dHandle handle);
 
 #pragma endregion
 
+#pragma region Spiral Curve Construction
+
+/*
+ * Build a clothoid (Euler spiral) as a 3D B-spline approximation.
+ * The clothoid is evaluated in the local 2D coordinate system defined by
+ * the placement, then fit to a 3D B-spline in the XY plane.
+ *
+ * clothoidConstant – the A parameter controlling rate of curvature change
+ * startParam/endParam – arc length parameter range
+ * placementX/Y – origin of the local coordinate system
+ * dirX/dirY – reference direction (X axis) of the local coordinate system
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_clothoid(
+    XbimContextHandle   ctx,
+    double              clothoidConstant,
+    double              startParam,
+    double              endParam,
+    double              placementX,
+    double              placementY,
+    double              dirX,
+    double              dirY,
+    XbimCurveHandle*    outHandle);
+
+/*
+ * Build a sine spiral as a 3D B-spline approximation.
+ * Curvature: kappa(s) = L/C0 + sign(L1)*(L/L1)^2*(s/L) + (L/S)*sin(2*pi*s/L)
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_sine_spiral(
+    XbimContextHandle   ctx,
+    double              sineTerm,
+    double              linearTerm,
+    double              constantTerm,
+    double              startParam,
+    double              endParam,
+    double              placementX,
+    double              placementY,
+    double              dirX,
+    double              dirY,
+    XbimCurveHandle*    outHandle);
+
+/*
+ * Build a cosine spiral as a 3D B-spline approximation.
+ * Curvature: kappa(s) = L/C0 + (L/Ct)*cos(pi*s/L)
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_cosine_spiral(
+    XbimContextHandle   ctx,
+    double              cosineTerm,
+    double              constantTerm,
+    double              startParam,
+    double              endParam,
+    double              placementX,
+    double              placementY,
+    double              dirX,
+    double              dirY,
+    XbimCurveHandle*    outHandle);
+
+/*
+ * Build a polynomial spiral as a 3D B-spline approximation.
+ * Supports 2nd, 3rd, and 7th order polynomial spirals via coefficient arrays.
+ *
+ * coefficients – array of coefficient values (A0 through A7)
+ * coefficientPresent – parallel array of flags (nonzero = coefficient is active)
+ * numCoefficients – number of entries in both arrays (max 8)
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_polynomial_spiral(
+    XbimContextHandle   ctx,
+    const double*       coefficients,
+    const int*          coefficientPresent,
+    int                 numCoefficients,
+    double              startParam,
+    double              endParam,
+    double              placementX,
+    double              placementY,
+    double              dirX,
+    double              dirY,
+    XbimCurveHandle*    outHandle);
+
+#pragma endregion
+
 #pragma region Wire from 2D Curves
 
 /*
