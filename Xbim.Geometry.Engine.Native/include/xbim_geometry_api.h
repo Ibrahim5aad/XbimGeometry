@@ -2772,6 +2772,53 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_arc_3pt(
     double x3, double y3,
     XbimCurve2dHandle*  outHandle);
 
+/*
+ * Build a 2D polynomial curve defined by separate X and Y coefficient vectors:
+ *   X(u) = sum(coeffsX[i] * u^i), Y(u) = sum(coeffsY[i] * u^i)
+ *
+ * coeffsX/coeffsY – coefficient arrays (index 0 = constant, index n = highest power)
+ * numCoeffsX/numCoeffsY – number of coefficients in each array
+ * placementX/Y – origin of the local coordinate system
+ * dirX/dirY – reference direction (X axis) of the local coordinate system
+ * firstParam/lastParam – parameter domain bounds
+ *
+ * Returns a 2D curve handle (Geom2d_BoundedCurve).
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_polynomial(
+    XbimContextHandle   ctx,
+    const double*       coeffsX,
+    int                 numCoeffsX,
+    const double*       coeffsY,
+    int                 numCoeffsY,
+    double              placementX,
+    double              placementY,
+    double              dirX,
+    double              dirY,
+    double              firstParam,
+    double              lastParam,
+    XbimCurve2dHandle*  outHandle);
+
+/*
+ * Build a 3D polynomial curve as a B-spline approximation.
+ * Same parameters as xbim_curve2d_build_polynomial, but evaluates the 2D polynomial
+ * curve, samples it, and fits a 3D B-spline in the XY plane (z=0).
+ *
+ * Returns a 3D curve handle (Geom_BSplineCurve).
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_polynomial(
+    XbimContextHandle   ctx,
+    const double*       coeffsX,
+    int                 numCoeffsX,
+    const double*       coeffsY,
+    int                 numCoeffsY,
+    double              placementX,
+    double              placementY,
+    double              dirX,
+    double              dirY,
+    double              firstParam,
+    double              lastParam,
+    XbimCurveHandle*    outHandle);
+
 #pragma endregion
 
 #pragma region Curve2d Queries

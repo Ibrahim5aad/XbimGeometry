@@ -104,8 +104,44 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXCurve BuildPolynomialCurve2d(IfcPolynomialCurve curve, double startParam, double endParam)
         {
-            throw new NotImplementedException(
-                $"IfcPolynomialCurve #{curve.EntityLabel} requires IFC4x3 polynomial curve support.");
+            if (curve.CoefficientsX == null || curve.CoefficientsY == null)
+                throw new InvalidOperationException(
+                    $"IfcPolynomialCurve #{curve.EntityLabel}: CoefficientsX and CoefficientsY must be defined.");
+
+            // Extract placement (IfcPolynomialCurve.Position is IfcPlacement, not IfcAxis2Placement)
+            double placementX = 0.0, placementY = 0.0, dirX = 1.0, dirY = 0.0;
+            if (curve.Position is IIfcAxis2Placement2D axis2d)
+            {
+                placementX = axis2d.Location.Coordinates[0];
+                placementY = axis2d.Location.Coordinates[1];
+
+                if (axis2d.RefDirection != null)
+                {
+                    double rdx = axis2d.RefDirection.DirectionRatios[0];
+                    double rdy = axis2d.RefDirection.DirectionRatios[1];
+                    double mag = Math.Sqrt(rdx * rdx + rdy * rdy);
+                    if (mag > 1e-15) { dirX = rdx / mag; dirY = rdy / mag; }
+                }
+            }
+
+            // Extract coefficient arrays
+            var coeffsX = curve.CoefficientsX.Select(c => (double)c.Value).ToArray();
+            var coeffsY = curve.CoefficientsY.Select(c => (double)c.Value).ToArray();
+
+            int result = XbimGeometryNativeApi.xbim_curve_build_polynomial(
+                ContextHandle,
+                coeffsX, coeffsX.Length,
+                coeffsY, coeffsY.Length,
+                placementX, placementY,
+                dirX, dirY,
+                startParam, endParam,
+                out var curveHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build polynomial curve #{curve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new Curve(curveHandle, XCurveType.IfcPolynomialCurve);
         }
 
         #region Line

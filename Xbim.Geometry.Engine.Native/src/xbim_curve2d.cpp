@@ -15,10 +15,13 @@
  */
 
 #include "xbim_curve2d.h"
+#include "xbim_curve.h"
 #include "xbim_context.h"
 #include "xbim_error.h"
 #include "xbim_logging.h"
+#include "Geom2d_Polynomial.h"
 
+#include <gp_Pnt.hxx>
 #include <gp_Pnt2d.hxx>
 #include <gp_Dir2d.hxx>
 #include <gp_Ax2d.hxx>
@@ -34,6 +37,11 @@
 #include <GCE2d_MakeArcOfCircle.hxx>
 #include <GCE2d_MakeArcOfEllipse.hxx>
 #include <Geom2dAPI_ProjectPointOnCurve.hxx>
+#include <TColgp_Array1OfPnt.hxx>
+#include <TColStd_Array1OfReal.hxx>
+#include <GeomAPI_PointsToBSpline.hxx>
+#include <Geom_BSplineCurve.hxx>
+#include <GeomAbs_Shape.hxx>
 #include <Standard_Failure.hxx>
 
 #pragma region Curve2d Helpers
@@ -415,6 +423,157 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_arc_3pt(
     {
         xbim_log_occt_failure(ctx, e, "xbim_curve2d_build_arc_3pt");
         xbim_set_error("xbim_curve2d_build_arc_3pt: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_polynomial(
+    XbimContextHandle ctx,
+    const double* coeffsX, int numCoeffsX,
+    const double* coeffsY, int numCoeffsY,
+    double placementX, double placementY,
+    double dirX, double dirY,
+    double firstParam, double lastParam,
+    XbimCurve2dHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve2d_build_polynomial: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!coeffsX || numCoeffsX < 1 || !coeffsY || numCoeffsY < 1)
+    {
+        xbim_set_error("xbim_curve2d_build_polynomial: coefficient arrays must be non-null with at least 1 element");
+        return XBIM_INVALID_ARG;
+    }
+
+    if (lastParam <= firstParam)
+    {
+        xbim_set_error("xbim_curve2d_build_polynomial: lastParam must be greater than firstParam");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        gp_Pnt2d origin(placementX, placementY);
+        gp_Dir2d refDir(dirX, dirY);
+        gp_Ax2d mainAxis(origin, refDir);
+        gp_Ax22d placement(mainAxis, true);
+
+        std::vector<Standard_Real> cx(coeffsX, coeffsX + numCoeffsX);
+        std::vector<Standard_Real> cy(coeffsY, coeffsY + numCoeffsY);
+
+        Handle(Geom2d_Polynomial) polyCurve =
+            new Geom2d_Polynomial(placement, cx, cy, firstParam, lastParam);
+
+        *outHandle = xbim_curve2d_create_from(polyCurve);
+        return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve2d_build_polynomial");
+        xbim_set_error("xbim_curve2d_build_polynomial: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_polynomial(
+    XbimContextHandle ctx,
+    const double* coeffsX, int numCoeffsX,
+    const double* coeffsY, int numCoeffsY,
+    double placementX, double placementY,
+    double dirX, double dirY,
+    double firstParam, double lastParam,
+    XbimCurveHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve_build_polynomial: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!coeffsX || numCoeffsX < 1 || !coeffsY || numCoeffsY < 1)
+    {
+        xbim_set_error("xbim_curve_build_polynomial: coefficient arrays must be non-null with at least 1 element");
+        return XBIM_INVALID_ARG;
+    }
+
+    if (lastParam <= firstParam)
+    {
+        xbim_set_error("xbim_curve_build_polynomial: lastParam must be greater than firstParam");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        gp_Pnt2d origin(placementX, placementY);
+        gp_Dir2d refDir(dirX, dirY);
+        gp_Ax2d mainAxis(origin, refDir);
+        gp_Ax22d placement(mainAxis, true);
+
+        std::vector<Standard_Real> cx(coeffsX, coeffsX + numCoeffsX);
+        std::vector<Standard_Real> cy(coeffsY, coeffsY + numCoeffsY);
+
+        Handle(Geom2d_Polynomial) polyCurve =
+            new Geom2d_Polynomial(placement, cx, cy, firstParam, lastParam);
+
+        // Move bounded curve to origin: translate start point to (0,0) and
+        // rotate initial tangent to align with X axis (matches legacy behavior)
+        {
+            gp_Pnt2d startPt;
+            gp_Vec2d tangent;
+            polyCurve->D1(firstParam, startPt, tangent);
+            tangent.Normalize();
+
+            gp_Trsf2d translation;
+            translation.SetTranslation(gp_Vec2d(-startPt.X(), -startPt.Y()));
+
+            double angle = std::atan2(tangent.Y(), tangent.X());
+            gp_Trsf2d rotation;
+            rotation.SetRotation(gp_Pnt2d(0.0, 0.0), -angle);
+
+            gp_Trsf2d combined = rotation * translation;
+            polyCurve->Transform(combined);
+        }
+
+        // Sample the 2D curve and fit to a 3D B-spline in the XY plane (z=0)
+        double span = std::abs(lastParam - firstParam);
+        int numSamples = std::max(200, static_cast<int>(span * 2) + 1);
+
+        TColgp_Array1OfPnt points(1, numSamples);
+        TColStd_Array1OfReal params(1, numSamples);
+
+        for (int i = 0; i < numSamples; i++)
+        {
+            double u = firstParam + (lastParam - firstParam) * i / (numSamples - 1);
+            gp_Pnt2d p2d;
+            polyCurve->D0(u, p2d);
+            points.SetValue(i + 1, gp_Pnt(p2d.X(), p2d.Y(), 0.0));
+            params.SetValue(i + 1, u);
+        }
+
+        GeomAPI_PointsToBSpline fitter(points, params, 3, 8, GeomAbs_C2, 1.0e-10);
+        if (!fitter.IsDone())
+        {
+            xbim_set_error("xbim_curve_build_polynomial: B-spline approximation failed");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_curve_create_from(fitter.Curve());
+        return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve_build_polynomial");
+        xbim_set_error("xbim_curve_build_polynomial: OCCT exception");
         return XBIM_ERROR;
     }
 }

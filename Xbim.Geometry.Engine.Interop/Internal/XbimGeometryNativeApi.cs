@@ -1197,6 +1197,30 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeCurve2dHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_polynomial(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] double[] coeffsX,
+            int numCoeffsX,
+            [MarshalAs(UnmanagedType.LPArray)] double[] coeffsY,
+            int numCoeffsY,
+            double placementX, double placementY,
+            double dirX, double dirY,
+            double firstParam, double lastParam,
+            out NativeCurve2dHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_build_polynomial(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] double[] coeffsX,
+            int numCoeffsX,
+            [MarshalAs(UnmanagedType.LPArray)] double[] coeffsY,
+            int numCoeffsY,
+            double placementX, double placementY,
+            double dirX, double dirY,
+            double firstParam, double lastParam,
+            out NativeCurveHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_curve2d_project_point(
             NativeContextHandle ctx,
             NativeCurve2dHandle curveHandle,
