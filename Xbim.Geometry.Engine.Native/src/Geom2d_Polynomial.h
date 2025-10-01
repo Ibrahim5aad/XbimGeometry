@@ -8,7 +8,6 @@
  * Inherits Geom2d_BoundedCurve for integration with OCCT's 2D curve infrastructure.
  * Supports D0 through D3 evaluation via polynomial differentiation (Horner's method).
  *
- * Ported from the legacy Xbim.Geometry.Engine C++/CLI extension.
  */
 
 #pragma once
