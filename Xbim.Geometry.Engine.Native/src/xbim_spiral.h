@@ -1,8 +1,8 @@
 /*
  * xbim_spiral.h
  *
- * IFC4x3 spiral curve implementations: clothoid, sine spiral, cosine spiral,
- * and polynomial spirals. Each spiral defines curvature as a function of arc
+ * IFC4x3 spiral curve implementations: sine spiral, cosine spiral, and
+ * polynomial spirals. Each spiral defines curvature as a function of arc
  * length and evaluates points via numerical integration (Simpson's rule).
  *
  * All spirals inherit Geom2d_Spiral (which inherits Geom2d_BoundedCurve)
@@ -28,35 +28,6 @@ enum XbimSpiralType
     XBIM_SPIRAL_SINE = 1,
     XBIM_SPIRAL_COSINE = 2,
     XBIM_SPIRAL_POLYNOMIAL = 3
-};
-
-/*
- * Clothoid (Euler spiral / Cornu spiral).
- * Curvature varies linearly with arc length: kappa(s) = s / A^2
- * Uses Fresnel integral evaluation via Simpson's rule.
- */
-class XbimClothoid : public Geom2d_Spiral
-{
-public:
-    XbimClothoid(const gp_Ax22d& placement, double clothoidConstant,
-                 double startParam, double endParam);
-
-    Standard_Real GetHeadingAt(Standard_Real s) const override;
-    Standard_Real GetCurvatureAt(Standard_Real s) const override;
-
-    /* Clothoid uses specialized Fresnel integral evaluation for D0. */
-    void D0(Standard_Real U, gp_Pnt2d& P) const override;
-
-    /* Specialized B-spline conversion with tighter tolerance. */
-    Handle(Geom_BSplineCurve) ToBSplineClothoid(int numSamplePoints = 0) const;
-
-    Handle(Geom2d_Geometry) Copy() const override;
-
-private:
-    double _clothoidConstant;
-
-    void FresnelIntegrals(double t, double& C, double& S) const;
-    void EvaluateClothoid(double s, double& x, double& y) const;
 };
 
 /*
