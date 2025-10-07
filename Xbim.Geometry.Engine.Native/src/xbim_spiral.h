@@ -1,8 +1,8 @@
 /*
  * xbim_spiral.h
  *
- * IFC4x3 spiral curve implementations: sine spiral, cosine spiral, and
- * polynomial spirals. Each spiral defines curvature as a function of arc
+ * IFC4x3 spiral curve implementations: cosine spiral and polynomial
+ * spirals. Each spiral defines curvature as a function of arc
  * length and evaluates points via numerical integration (Simpson's rule).
  *
  * All spirals inherit Geom2d_Spiral (which inherits Geom2d_BoundedCurve)
@@ -28,30 +28,6 @@ enum XbimSpiralType
     XBIM_SPIRAL_SINE = 1,
     XBIM_SPIRAL_COSINE = 2,
     XBIM_SPIRAL_POLYNOMIAL = 3
-};
-
-/*
- * Sine spiral.
- * Curvature: kappa(s) = L/C0 + sign(L1)*(L/L1)^2*(s/L) + (L/S)*sin(2*pi*s/L)
- * where L = arc length span, C0 = constantTerm, L1 = linearTerm, S = sineTerm
- */
-class XbimSineSpiral : public Geom2d_Spiral
-{
-public:
-    XbimSineSpiral(const gp_Ax22d& placement,
-                   double sineTerm, double linearTerm, double constantTerm,
-                   double startParam, double endParam);
-
-    Standard_Real GetHeadingAt(Standard_Real s) const override;
-    Standard_Real GetCurvatureAt(Standard_Real s) const override;
-
-    Handle(Geom2d_Geometry) Copy() const override;
-
-private:
-    double _sineTerm;
-    double _linearTerm;
-    double _constantTerm;
-    double _length;
 };
 
 /*

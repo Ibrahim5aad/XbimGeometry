@@ -15,6 +15,7 @@
 
 #include "xbim_spiral.h"
 #include "Geom2d_Clothoid.h"
+#include "Geom2d_SineSpiral.h"
 #include "xbim_curve.h"
 #include "xbim_context.h"
 #include "xbim_error.h"
@@ -30,64 +31,6 @@
 #include <algorithm>
 
 static inline double sign(double v) { return (v >= 0.0) ? 1.0 : -1.0; }
-
-#pragma region XbimSineSpiral
-
-XbimSineSpiral::XbimSineSpiral(const gp_Ax22d& placement,
-                               double sineTerm, double linearTerm, double constantTerm,
-                               double startParam, double endParam)
-    : Geom2d_Spiral(placement, startParam, endParam)
-    , _sineTerm(sineTerm)
-    , _linearTerm(linearTerm)
-    , _constantTerm(constantTerm)
-    , _length(endParam - startParam)
-{
-}
-
-Standard_Real XbimSineSpiral::GetHeadingAt(Standard_Real s) const
-{
-    // Heading angle = integral of curvature from 0 to s
-    // theta(s) = s/C0 + 0.5*sign(L1)*(s/L1)^2 + (-L/(2*pi*S))*(cos(2*pi*s/L) - 1)
-
-    double firstTerm = 0.0;
-    if (_constantTerm != 0.0)
-        firstTerm = s / _constantTerm;
-
-    double secondTerm = 0.0;
-    if (_linearTerm != 0.0)
-        secondTerm = 0.5 * sign(_linearTerm) * std::pow(s / _linearTerm, 2.0);
-
-    double thirdTerm = -1.0 * (_length / (2.0 * M_PI * _sineTerm)) *
-                       (std::cos(2.0 * M_PI * s / _length) - 1.0);
-
-    return firstTerm + secondTerm + thirdTerm;
-}
-
-Standard_Real XbimSineSpiral::GetCurvatureAt(Standard_Real s) const
-{
-    // kappa(s) = 1/C0 + sign(L1)/L1^2 * s + (2*pi/L) * (1/S) * cos(2*pi*s/L)
-    // This is the derivative of the heading angle with respect to s.
-
-    double firstTerm = 0.0;
-    if (_constantTerm != 0.0)
-        firstTerm = 1.0 / _constantTerm;
-
-    double secondTerm = 0.0;
-    if (_linearTerm != 0.0)
-        secondTerm = sign(_linearTerm) * s / (_linearTerm * _linearTerm);
-
-    double thirdTerm = (1.0 / _sineTerm) * std::sin(2.0 * M_PI * s / _length);
-
-    return firstTerm + secondTerm + thirdTerm;
-}
-
-Handle(Geom2d_Geometry) XbimSineSpiral::Copy() const
-{
-    return new XbimSineSpiral(_placement, _sineTerm, _linearTerm, _constantTerm,
-                              _startParam, _endParam);
-}
-
-#pragma endregion
 
 #pragma region XbimCosineSpiral
 
@@ -361,8 +304,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_sine_spiral(
         gp_Ax2d mainAxis(origin, refDir);
         gp_Ax22d placement(mainAxis, true);
 
-        XbimSineSpiral spiral(placement, sineTerm, linearTerm, constantTerm,
-                              startParam, endParam);
+        Geom2d_SineSpiral spiral(placement, sineTerm, linearTerm, constantTerm,
+                                 startParam, endParam);
         Handle(Geom_BSplineCurve) bspline = spiral.ToBSpline();
 
         if (bspline.IsNull())
