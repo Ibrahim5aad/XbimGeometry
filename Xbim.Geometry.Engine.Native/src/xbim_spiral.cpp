@@ -15,6 +15,7 @@
 
 #include "xbim_spiral.h"
 #include "Geom2d_Clothoid.h"
+#include "Geom2d_CosineSpiral.h"
 #include "Geom2d_SineSpiral.h"
 #include "xbim_curve.h"
 #include "xbim_context.h"
@@ -31,53 +32,6 @@
 #include <algorithm>
 
 static inline double sign(double v) { return (v >= 0.0) ? 1.0 : -1.0; }
-
-#pragma region XbimCosineSpiral
-
-XbimCosineSpiral::XbimCosineSpiral(const gp_Ax22d& placement,
-                                   double cosineTerm, double constantTerm,
-                                   double startParam, double endParam)
-    : Geom2d_Spiral(placement, startParam, endParam)
-    , _cosineTerm(cosineTerm)
-    , _constantTerm(constantTerm)
-    , _length(endParam - startParam)
-{
-}
-
-Standard_Real XbimCosineSpiral::GetHeadingAt(Standard_Real s) const
-{
-    // theta(s) = s/C0 + (L/(pi*Ct))*sin(pi*s/L)
-
-    double firstTerm = 0.0;
-    if (_constantTerm != 0.0)
-        firstTerm = s / _constantTerm;
-
-    double secondTerm = (_length / (M_PI * _cosineTerm)) * std::sin(M_PI * s / _length);
-
-    return firstTerm + secondTerm;
-}
-
-Standard_Real XbimCosineSpiral::GetCurvatureAt(Standard_Real s) const
-{
-    // kappa(s) = 1/C0 + (1/Ct)*cos(pi*s/L)
-    // Derivative of heading with respect to s.
-
-    double firstTerm = 0.0;
-    if (_constantTerm != 0.0)
-        firstTerm = 1.0 / _constantTerm;
-
-    double secondTerm = (1.0 / _cosineTerm) * std::cos(M_PI * s / _length);
-
-    return firstTerm + secondTerm;
-}
-
-Handle(Geom2d_Geometry) XbimCosineSpiral::Copy() const
-{
-    return new XbimCosineSpiral(_placement, _cosineTerm, _constantTerm,
-                                _startParam, _endParam);
-}
-
-#pragma endregion
 
 #pragma region XbimPolynomialSpiral
 
@@ -350,8 +304,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_cosine_spiral(
         gp_Ax2d mainAxis(origin, refDir);
         gp_Ax22d placement(mainAxis, true);
 
-        XbimCosineSpiral spiral(placement, cosineTerm, constantTerm,
-                                startParam, endParam);
+        Geom2d_CosineSpiral spiral(placement, cosineTerm, constantTerm,
+                                   startParam, endParam);
         Handle(Geom_BSplineCurve) bspline = spiral.ToBSpline();
 
         if (bspline.IsNull())
