@@ -1,10 +1,10 @@
 /*
  * xbim_spiral.cpp
  *
- * Implements IFC4x3 spiral curve types (clothoid, sine, cosine, polynomial)
- * and their C API exports. Each spiral is evaluated via numerical integration
- * (Simpson's rule) and converted to a 3D B-spline approximation for use in
- * the geometry pipeline.
+ * C API exports for IFC4x3 spiral curve types (clothoid, sine, cosine,
+ * polynomial). Each spiral is evaluated via numerical integration
+ * (Simpson's rule) and converted to a 3D B-spline approximation for use
+ * in the geometry pipeline.
  *
  * C API functions:
  *   - xbim_curve_build_clothoid: Build a clothoid (Euler spiral)
@@ -17,6 +17,7 @@
 #include "Geom2d_Clothoid.h"
 #include "Geom2d_CosineSpiral.h"
 #include "Geom2d_SineSpiral.h"
+#include "Geom2d_PolynomialSpiral.h"
 #include "xbim_curve.h"
 #include "xbim_context.h"
 #include "xbim_error.h"
@@ -30,156 +31,6 @@
 #include <Precision.hxx>
 
 #include <algorithm>
-
-static inline double sign(double v) { return (v >= 0.0) ? 1.0 : -1.0; }
-
-#pragma region XbimPolynomialSpiral
-
-XbimPolynomialSpiral::XbimPolynomialSpiral(const gp_Ax22d& placement,
-                                           const std::vector<std::optional<double>>& coefficients,
-                                           double startParam, double endParam)
-    : Geom2d_Spiral(placement, startParam, endParam)
-    , _coefficients(coefficients)
-{
-    _coefficients.resize(8);
-}
-
-Standard_Real XbimPolynomialSpiral::GetHeadingAt(Standard_Real s) const
-{
-    return CalculateTheta(s);
-}
-
-Standard_Real XbimPolynomialSpiral::GetCurvatureAt(Standard_Real s) const
-{
-    // Curvature is the derivative of heading:
-    // kappa(s) = sum over each coefficient term
-    double kappa = 0.0;
-
-    // A0 term: d/ds(t/A0) = 1/A0
-    if (_coefficients[0].has_value())
-        kappa += 1.0 / _coefficients[0].value();
-
-    // A1 term: d/ds(sign(A1)*t^2/(2*A1^2)) = sign(A1)*t/A1^2
-    if (_coefficients[1].has_value())
-    {
-        double A1 = _coefficients[1].value();
-        kappa += sign(A1) * s / (A1 * A1);
-    }
-
-    // A2 term: d/ds(t^3/(3*A2^3)) = t^2/A2^3
-    if (_coefficients[2].has_value())
-    {
-        double A2 = _coefficients[2].value();
-        kappa += (s * s) / (A2 * A2 * A2);
-    }
-
-    // A3 term: d/ds(sign(A3)*t^4/(4*A3^4)) = sign(A3)*t^3/A3^4
-    if (_coefficients[3].has_value())
-    {
-        double A3 = _coefficients[3].value();
-        kappa += sign(A3) * std::pow(s, 3.0) / std::pow(A3, 4.0);
-    }
-
-    // A4 term: d/ds(t^5/(5*A4^5)) = t^4/A4^5
-    if (_coefficients[4].has_value())
-    {
-        double A4 = _coefficients[4].value();
-        kappa += std::pow(s, 4.0) / std::pow(A4, 5.0);
-    }
-
-    // A5 term: d/ds(sign(A5)*t^6/(6*A5^6)) = sign(A5)*t^5/A5^6
-    if (_coefficients[5].has_value())
-    {
-        double A5 = _coefficients[5].value();
-        kappa += sign(A5) * std::pow(s, 5.0) / std::pow(A5, 6.0);
-    }
-
-    // A6 term: d/ds(t^7/(7*A6^7)) = t^6/A6^7
-    if (_coefficients[6].has_value())
-    {
-        double A6 = _coefficients[6].value();
-        kappa += std::pow(s, 6.0) / std::pow(A6, 7.0);
-    }
-
-    // A7 term: d/ds(sign(A7)*t^8/(8*A7^8)) = sign(A7)*t^7/A7^8
-    if (_coefficients[7].has_value())
-    {
-        double A7 = _coefficients[7].value();
-        kappa += sign(A7) * std::pow(s, 7.0) / std::pow(A7, 8.0);
-    }
-
-    return kappa;
-}
-
-double XbimPolynomialSpiral::CalculateTheta(double t) const
-{
-    double theta = 0.0;
-
-    // A0 term: theta += t / A0
-    if (_coefficients[0].has_value())
-    {
-        double A0 = _coefficients[0].value();
-        theta += t / A0;
-    }
-
-    // A1 term: theta += (A1 * t^2) / (2 * |A1|^3)  = sign(A1) * t^2 / (2 * A1^2)
-    if (_coefficients[1].has_value())
-    {
-        double A1 = _coefficients[1].value();
-        theta += sign(A1) * t * t / (2.0 * A1 * A1);
-    }
-
-    // A2 term: theta += t^3 / (3 * A2^3)
-    if (_coefficients[2].has_value())
-    {
-        double A2 = _coefficients[2].value();
-        theta += (t * t * t) / (3.0 * A2 * A2 * A2);
-    }
-
-    // A3 term: theta += (A3 * t^4) / (4 * |A3|^5)  = sign(A3) * t^4 / (4 * A3^4)
-    if (_coefficients[3].has_value())
-    {
-        double A3 = _coefficients[3].value();
-        theta += sign(A3) * std::pow(t, 4.0) / (4.0 * std::pow(A3, 4.0));
-    }
-
-    // A4 term: theta += t^5 / (5 * A4^5)
-    if (_coefficients[4].has_value())
-    {
-        double A4 = _coefficients[4].value();
-        theta += std::pow(t, 5.0) / (5.0 * std::pow(A4, 5.0));
-    }
-
-    // A5 term: theta += sign(A5) * t^6 / (6 * A5^6)
-    if (_coefficients[5].has_value())
-    {
-        double A5 = _coefficients[5].value();
-        theta += sign(A5) * std::pow(t, 6.0) / (6.0 * std::pow(A5, 6.0));
-    }
-
-    // A6 term: theta += t^7 / (7 * A6^7)
-    if (_coefficients[6].has_value())
-    {
-        double A6 = _coefficients[6].value();
-        theta += std::pow(t, 7.0) / (7.0 * std::pow(A6, 7.0));
-    }
-
-    // A7 term: theta += sign(A7) * t^8 / (8 * A7^8)
-    if (_coefficients[7].has_value())
-    {
-        double A7 = _coefficients[7].value();
-        theta += sign(A7) * std::pow(t, 8.0) / (8.0 * std::pow(A7, 8.0));
-    }
-
-    return theta;
-}
-
-Handle(Geom2d_Geometry) XbimPolynomialSpiral::Copy() const
-{
-    return new XbimPolynomialSpiral(_placement, _coefficients, _startParam, _endParam);
-}
-
-#pragma endregion
 
 #pragma region C API Exports
 
@@ -366,7 +217,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_polynomial_spiral(
                 coeffs[i] = coefficients[i];
         }
 
-        XbimPolynomialSpiral spiral(placement, coeffs, startParam, endParam);
+        Geom2d_PolynomialSpiral spiral(placement, coeffs, startParam, endParam);
         Handle(Geom_BSplineCurve) bspline = spiral.ToBSpline();
 
         if (bspline.IsNull())

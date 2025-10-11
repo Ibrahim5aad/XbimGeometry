@@ -1,23 +1,13 @@
 /*
  * xbim_spiral.h
  *
- * IFC4x3 polynomial spiral and spiral type enumeration. Polynomial
- * spirals define curvature as a function of arc length via coefficient
- * vectors and evaluate points via numerical integration (Simpson's rule).
- *
- * All spirals inherit Geom2d_Spiral (which inherits Geom2d_BoundedCurve)
- * and can be converted to 3D B-spline approximations for use in the
- * geometry pipeline.
+ * IFC4x3 spiral type enumeration and C API declarations for building
+ * spiral curves. All spiral types (clothoid, sine, cosine, polynomial)
+ * are now standalone Geom2d_Spiral subclasses in their own headers.
  */
 
 #ifndef XBIM_SPIRAL_H
 #define XBIM_SPIRAL_H
-
-#include "Geom2d_Spiral.h"
-
-#include <Geom_BSplineCurve.hxx>
-#include <vector>
-#include <optional>
 
 /*
  * Spiral type enumeration for the generic polynomial spiral builder.
@@ -28,30 +18,6 @@ enum XbimSpiralType
     XBIM_SPIRAL_SINE = 1,
     XBIM_SPIRAL_COSINE = 2,
     XBIM_SPIRAL_POLYNOMIAL = 3
-};
-
-/*
- * Polynomial spiral (handles 2nd, 3rd, and 7th order polynomial spirals).
- * Curvature defined by up to 8 coefficients (A0 through A7).
- * Each coefficient contributes a term to the curvature as a function of arc length.
- */
-class XbimPolynomialSpiral : public Geom2d_Spiral
-{
-public:
-    XbimPolynomialSpiral(const gp_Ax22d& placement,
-                         const std::vector<std::optional<double>>& coefficients,
-                         double startParam, double endParam);
-
-    Standard_Real GetHeadingAt(Standard_Real s) const override;
-    Standard_Real GetCurvatureAt(Standard_Real s) const override;
-
-    Handle(Geom2d_Geometry) Copy() const override;
-
-private:
-    std::vector<std::optional<double>> _coefficients; // A0 to A7
-
-    /* Analytical integral of curvature to get heading angle. */
-    double CalculateTheta(double t) const;
 };
 
 #endif /* XBIM_SPIRAL_H */

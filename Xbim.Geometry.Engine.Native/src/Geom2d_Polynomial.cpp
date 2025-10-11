@@ -1,11 +1,3 @@
-/*
- * Geom2d_Polynomial.cpp
- *
- * Implements the Geom2d_Polynomial bounded curve class.
- * Evaluates parametric polynomial curves X(u), Y(u) using Horner's method
- * and supports derivatives up to arbitrary order.
- */
-
 #include "Geom2d_Polynomial.h"
 
 Geom2d_Polynomial::Geom2d_Polynomial(

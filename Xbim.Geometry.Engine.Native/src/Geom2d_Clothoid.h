@@ -3,9 +3,7 @@
  *
  * Clothoid (Euler spiral / Cornu spiral) defined by a constant A.
  * Curvature varies linearly with arc length: kappa(s) = s / A^2.
- * Position is evaluated via Fresnel integrals (Simpson's rule), which
- * is more accurate for clothoids than the generic heading-based integration
- * in the Geom2d_Spiral base class.
+ * Position is evaluated via Fresnel integrals (Simpson's rule)
  */
 
 #pragma once

@@ -1,12 +1,3 @@
-/*
- * Geom2d_Clothoid.cpp
- *
- * Clothoid (Euler spiral) implementation. Position is evaluated via Fresnel
- * integrals using Simpson's rule numerical approximation, which is more
- * accurate for clothoids than the generic heading-based integration in the
- * base class.
- */
-
 #include "Geom2d_Clothoid.h"
 
 #include <gp_Pnt.hxx>
