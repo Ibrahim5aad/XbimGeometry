@@ -993,6 +993,44 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double dirX, double dirY,
             out NativeCurveHandle outHandle);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_clothoid(
+            NativeContextHandle ctx,
+            double clothoidConstant,
+            double startParam, double endParam,
+            double placementX, double placementY,
+            double dirX, double dirY,
+            out NativeCurve2dHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_sine_spiral(
+            NativeContextHandle ctx,
+            double sineTerm, double linearTerm, double constantTerm,
+            double startParam, double endParam,
+            double placementX, double placementY,
+            double dirX, double dirY,
+            out NativeCurve2dHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_cosine_spiral(
+            NativeContextHandle ctx,
+            double cosineTerm, double constantTerm,
+            double startParam, double endParam,
+            double placementX, double placementY,
+            double dirX, double dirY,
+            out NativeCurve2dHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_polynomial_spiral(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] double[] coefficients,
+            [MarshalAs(UnmanagedType.LPArray)] int[] coefficientPresent,
+            int numCoefficients,
+            double startParam, double endParam,
+            double placementX, double placementY,
+            double dirX, double dirY,
+            out NativeCurve2dHandle outHandle);
+
         #endregion
 
         #region Surface Construction

@@ -2922,6 +2922,76 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_polynomial_spiral(
     double              dirY,
     XbimCurveHandle*    outHandle);
 
+/*
+ * Build a clothoid (Euler spiral) as a 2D curve.
+ * Returns the native Geom2d_Clothoid without B-spline conversion,
+ * preserving exact evaluation via numerical integration.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_clothoid(
+    XbimContextHandle   ctx,
+    double              clothoidConstant,
+    double              startParam,
+    double              endParam,
+    double              placementX,
+    double              placementY,
+    double              dirX,
+    double              dirY,
+    XbimCurve2dHandle*  outHandle);
+
+/*
+ * Build a sine spiral as a 2D curve.
+ * Returns the native Geom2d_SineSpiral without B-spline conversion.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_sine_spiral(
+    XbimContextHandle   ctx,
+    double              sineTerm,
+    double              linearTerm,
+    double              constantTerm,
+    double              startParam,
+    double              endParam,
+    double              placementX,
+    double              placementY,
+    double              dirX,
+    double              dirY,
+    XbimCurve2dHandle*  outHandle);
+
+/*
+ * Build a cosine spiral as a 2D curve.
+ * Returns the native Geom2d_CosineSpiral without B-spline conversion.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_cosine_spiral(
+    XbimContextHandle   ctx,
+    double              cosineTerm,
+    double              constantTerm,
+    double              startParam,
+    double              endParam,
+    double              placementX,
+    double              placementY,
+    double              dirX,
+    double              dirY,
+    XbimCurve2dHandle*  outHandle);
+
+/*
+ * Build a polynomial spiral as a 2D curve.
+ * Returns the native Geom2d_PolynomialSpiral without B-spline conversion.
+ *
+ * coefficients – array of coefficient values (A0 through A7)
+ * coefficientPresent – parallel array of flags (nonzero = coefficient is active)
+ * numCoefficients – number of entries in both arrays (max 8)
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_polynomial_spiral(
+    XbimContextHandle   ctx,
+    const double*       coefficients,
+    const int*          coefficientPresent,
+    int                 numCoefficients,
+    double              startParam,
+    double              endParam,
+    double              placementX,
+    double              placementY,
+    double              dirX,
+    double              dirY,
+    XbimCurve2dHandle*  outHandle);
+
 #pragma endregion
 
 #pragma region Wire from 2D Curves
