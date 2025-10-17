@@ -20,6 +20,7 @@
 #include "xbim_error.h"
 #include "xbim_logging.h"
 #include "Geom2d_Polynomial.h"
+#include "Geom2d_Spiral.h"
 
 #include <gp_Pnt.hxx>
 #include <gp_Pnt2d.hxx>
@@ -28,21 +29,30 @@
 #include <gp_Ax22d.hxx>
 #include <gp_Circ2d.hxx>
 #include <gp_Elips2d.hxx>
+#include <gp_Trsf2d.hxx>
 #include <Precision.hxx>
 #include <Geom2d_Line.hxx>
 #include <Geom2d_Circle.hxx>
 #include <Geom2d_Ellipse.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
+#include <Geom2d_BSplineCurve.hxx>
+#include <Geom2d_BoundedCurve.hxx>
 #include <GCE2d_MakeSegment.hxx>
 #include <GCE2d_MakeArcOfCircle.hxx>
 #include <GCE2d_MakeArcOfEllipse.hxx>
 #include <Geom2dAPI_ProjectPointOnCurve.hxx>
+#include <Geom2dAPI_PointsToBSpline.hxx>
+#include <Geom2dConvert_CompCurveToBSplineCurve.hxx>
 #include <TColgp_Array1OfPnt.hxx>
+#include <TColgp_Array1OfPnt2d.hxx>
 #include <TColStd_Array1OfReal.hxx>
 #include <GeomAPI_PointsToBSpline.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <GeomAbs_Shape.hxx>
 #include <Standard_Failure.hxx>
+
+#include <algorithm>
+#include <cmath>
 
 #pragma region Curve2d Helpers
 
@@ -645,9 +655,298 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_reverse(XbimCurve2dHandle handle)
         handle->curve->Reverse();
         return XBIM_OK;
     }
-    catch (const Standard_Failure& e)
+    catch (const Standard_Failure&)
     {
         xbim_set_error("xbim_curve2d_reverse: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+#pragma endregion
+
+#pragma region Curve2d Transform
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_transform(
+    XbimCurve2dHandle handle,
+    double placementX, double placementY,
+    double dirX,       double dirY)
+{
+    xbim_clear_error();
+
+    if (!handle || handle->curve.IsNull())
+    {
+        xbim_set_error("xbim_curve2d_transform: handle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        gp_Pnt2d origin(placementX, placementY);
+        gp_Dir2d xDir(dirX, dirY);
+        gp_Ax2d axis(origin, xDir);
+        gp_Ax2d globalAxis(gp::Origin2d(), gp_Dir2d(1, 0));
+
+        gp_Trsf2d trsf;
+        trsf.SetTransformation(axis, globalAxis);
+
+        handle->curve->Transform(trsf);
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_curve2d_transform: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_move_to_origin(
+    XbimCurve2dHandle handle)
+{
+    xbim_clear_error();
+
+    if (!handle || handle->curve.IsNull())
+    {
+        xbim_set_error("xbim_curve2d_move_to_origin: handle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        gp_Pnt2d startPt;
+        handle->curve->D0(handle->curve->FirstParameter(), startPt);
+
+        if (startPt.Distance(gp::Origin2d()) < Precision::Confusion())
+            return XBIM_OK; /* already at origin */
+
+        gp_Trsf2d translation;
+        translation.SetTranslation(gp_Vec2d(-startPt.X(), -startPt.Y()));
+        handle->curve->Transform(translation);
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_curve2d_move_to_origin: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_translate_start_to_x(
+    XbimCurve2dHandle handle,
+    double            targetX)
+{
+    xbim_clear_error();
+
+    if (!handle || handle->curve.IsNull())
+    {
+        xbim_set_error("xbim_curve2d_translate_start_to_x: handle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        Handle(Geom2d_BSplineCurve) bspline =
+            Handle(Geom2d_BSplineCurve)::DownCast(handle->curve);
+        if (bspline.IsNull())
+        {
+            xbim_set_error("xbim_curve2d_translate_start_to_x: curve must be a B-spline");
+            return XBIM_INVALID_ARG;
+        }
+
+        gp_Pnt2d startPt;
+        bspline->D0(bspline->FirstParameter(), startPt);
+        double dx = targetX - startPt.X();
+
+        if (std::abs(dx) < Precision::Confusion())
+            return XBIM_OK;
+
+        /* Shift all poles in X */
+        for (int i = 1; i <= bspline->NbPoles(); ++i)
+        {
+            gp_Pnt2d pole = bspline->Pole(i);
+            bspline->SetPole(i, gp_Pnt2d(pole.X() + dx, pole.Y()));
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_curve2d_translate_start_to_x: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+#pragma endregion
+
+#pragma region Curve2d Composite
+
+/*
+ * Helper: approximates a bounded 2D curve to a B-spline by point sampling.
+ * Used for spirals, polynomials, and conic-like curves that can't be added
+ * directly to Geom2dConvert_CompCurveToBSplineCurve.
+ */
+static Handle(Geom2d_BSplineCurve) ApproximateCurve2d(
+    const Handle(Geom2d_Curve)& curve,
+    Standard_Real first, Standard_Real last,
+    int numPoints)
+{
+    if (numPoints < 2) numPoints = 200;
+
+    TColgp_Array1OfPnt2d points(1, numPoints);
+    double delta = (last - first) / (numPoints - 1);
+
+    for (int i = 1; i <= numPoints; ++i)
+    {
+        double u = first + (i - 1) * delta;
+        if (u > last) u = last;
+        gp_Pnt2d pt;
+        curve->D0(u, pt);
+        points.SetValue(i, pt);
+    }
+
+    Geom2dAPI_PointsToBSpline fitter(points, 8, 8, GeomAbs_CN);
+    return fitter.Curve();
+}
+
+
+/*
+ * Helper: determine if a 2D curve is a conic or wrapped conic (trimmed/offset).
+ */
+static bool IsConic2d(const Handle(Geom2d_Curve)& curve)
+{
+    if (curve.IsNull()) return false;
+
+    if (!Handle(Geom2d_Circle)::DownCast(curve).IsNull()) return true;
+    if (!Handle(Geom2d_Ellipse)::DownCast(curve).IsNull()) return true;
+
+    Handle(Geom2d_TrimmedCurve) trimmed = Handle(Geom2d_TrimmedCurve)::DownCast(curve);
+    if (!trimmed.IsNull())
+        return IsConic2d(trimmed->BasisCurve());
+
+    return false;
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_composite_bspline(
+    XbimContextHandle   ctx,
+    XbimCurve2dHandle*  curves,
+    int                 numCurves,
+    double              tolerance,
+    XbimCurve2dHandle*  outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve2d_build_composite_bspline: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!curves || numCurves < 1)
+    {
+        xbim_set_error("xbim_curve2d_build_composite_bspline: need at least 1 curve");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        Geom2dConvert_CompCurveToBSplineCurve converter(Convert_RationalC1);
+
+        gp_Pnt2d prevEnd;
+        bool hasPrev = false;
+
+        for (int i = 0; i < numCurves; ++i)
+        {
+            if (!curves[i] || curves[i]->curve.IsNull())
+            {
+                xbim_log_warning(ctx, "xbim_curve2d_build_composite_bspline: curve %d is NULL, skipping", i);
+                continue;
+            }
+
+            Handle(Geom2d_Curve) c = curves[i]->curve;
+            Handle(Geom2d_BoundedCurve) bounded = Handle(Geom2d_BoundedCurve)::DownCast(c);
+            if (bounded.IsNull())
+            {
+                xbim_log_warning(ctx, "xbim_curve2d_build_composite_bspline: curve %d is not bounded, skipping", i);
+                continue;
+            }
+
+            Standard_Real first = bounded->FirstParameter();
+            Standard_Real last = bounded->LastParameter();
+
+            /* Fill gap between segments with a line if needed */
+            if (hasPrev)
+            {
+                gp_Pnt2d startPt;
+                bounded->D0(first, startPt);
+                if (!prevEnd.IsEqual(startPt, tolerance))
+                {
+                    gp_Dir2d gapDir(gp_Vec2d(prevEnd, startPt));
+                    double gapLen = prevEnd.Distance(startPt);
+                    Handle(Geom2d_TrimmedCurve) gapLine = new Geom2d_TrimmedCurve(
+                        new Geom2d_Line(prevEnd, gapDir), 0.0, gapLen);
+                    converter.Add(gapLine, tolerance, false);
+                }
+            }
+
+            /* Try to add directly, approximate if needed */
+            Handle(Geom2d_BSplineCurve) toAdd;
+
+            Handle(Geom2d_Spiral) spiral = Handle(Geom2d_Spiral)::DownCast(bounded);
+            Handle(Geom2d_Polynomial) polynomial = Handle(Geom2d_Polynomial)::DownCast(bounded);
+
+            if (!polynomial.IsNull())
+            {
+                int n = std::max(1000, static_cast<int>(std::abs(last - first)));
+                toAdd = ApproximateCurve2d(bounded, first, last, n);
+            }
+            else if (!spiral.IsNull())
+            {
+                int n = spiral->GetIntegrationSteps();
+                toAdd = ApproximateCurve2d(bounded, first, last, n);
+            }
+            else if (IsConic2d(bounded))
+            {
+                int n = std::max(200, static_cast<int>(std::abs(last - first) * 10) + 1);
+                toAdd = ApproximateCurve2d(bounded, first, last, n);
+            }
+            else if (!converter.Add(bounded, tolerance, false))
+            {
+                int n = std::max(200, static_cast<int>(std::abs(last - first) * 10) + 1);
+                toAdd = ApproximateCurve2d(bounded, first, last, n);
+            }
+
+            if (!toAdd.IsNull())
+            {
+                if (!converter.Add(toAdd, tolerance, false))
+                {
+                    xbim_log_warning(ctx,
+                        "xbim_curve2d_build_composite_bspline: failed to add curve %d after approximation", i);
+                }
+            }
+
+            /* Track end point for gap filling */
+            bounded->D0(last, prevEnd);
+            hasPrev = true;
+        }
+
+        Handle(Geom2d_BSplineCurve) result = converter.BSplineCurve();
+        if (result.IsNull())
+        {
+            xbim_set_error("xbim_curve2d_build_composite_bspline: composite B-spline is null");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_curve2d_create_from(result);
+        return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve2d_build_composite_bspline");
+        xbim_set_error("xbim_curve2d_build_composite_bspline: OCCT exception");
         return XBIM_ERROR;
     }
 }

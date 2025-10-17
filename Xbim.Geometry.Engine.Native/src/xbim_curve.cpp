@@ -11,9 +11,11 @@
  */
 
 #include "xbim_curve.h"
+#include "xbim_curve2d.h"
 #include "xbim_context.h"
 #include "xbim_error.h"
 #include "xbim_logging.h"
+#include "Geom_GradientCurve.h"
 
 #include <gp_Pnt.hxx>
 #include <gp_Dir.hxx>
@@ -513,6 +515,59 @@ XBIM_EXPORT int XBIM_CALL xbim_curve_is_closed(
     catch (const Standard_Failure&)
     {
         return XBIM_FALSE;
+    }
+}
+
+#pragma endregion
+
+#pragma region Gradient Curve
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_gradient(
+    XbimContextHandle   ctx,
+    XbimCurve2dHandle   horizontalHandle,
+    XbimCurve2dHandle   heightFunctionHandle,
+    XbimCurveHandle*    outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve_build_gradient: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!horizontalHandle || horizontalHandle->curve.IsNull())
+    {
+        xbim_set_error("xbim_curve_build_gradient: horizontalHandle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    if (!heightFunctionHandle || heightFunctionHandle->curve.IsNull())
+    {
+        xbim_set_error("xbim_curve_build_gradient: heightFunctionHandle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        Handle(Geom_GradientCurve) gradientCurve = new Geom_GradientCurve(
+            horizontalHandle->curve, heightFunctionHandle->curve);
+
+        *outHandle = xbim_curve_create_from(gradientCurve);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_curve_build_gradient: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve_build_gradient");
+        xbim_set_error("xbim_curve_build_gradient: OCCT exception");
+        return XBIM_ERROR;
     }
 }
 

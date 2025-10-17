@@ -1269,6 +1269,36 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_curve2d_reverse(NativeCurve2dHandle handle);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_transform(
+            NativeCurve2dHandle handle,
+            double placementX, double placementY,
+            double dirX, double dirY);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_move_to_origin(
+            NativeCurve2dHandle handle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_translate_start_to_x(
+            NativeCurve2dHandle handle,
+            double targetX);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_composite_bspline(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] curves,
+            int numCurves,
+            double tolerance,
+            out NativeCurve2dHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_build_gradient(
+            NativeContextHandle ctx,
+            NativeCurve2dHandle horizontalHandle,
+            NativeCurve2dHandle heightFunctionHandle,
+            out NativeCurveHandle outHandle);
+
         #endregion
 
         #region Wire from 2D Curves

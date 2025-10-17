@@ -2843,6 +2843,73 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_project_point(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_reverse(XbimCurve2dHandle handle);
 
+/*
+ * Apply a 2D placement transform to a curve in-place.
+ * Transforms from the global origin/X-direction to the given placement.
+ * placementX/Y – origin of the local coordinate system
+ * dirX/dirY – reference direction (X axis) of the local coordinate system
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_transform(
+    XbimCurve2dHandle   handle,
+    double              placementX,
+    double              placementY,
+    double              dirX,
+    double              dirY);
+
+/*
+ * Translate a 2D curve so that its start point lies at the origin.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_move_to_origin(
+    XbimCurve2dHandle   handle);
+
+/*
+ * Translate a B-spline 2D curve's poles in X so that the start point's
+ * X coordinate equals targetX. Used to align the height function's
+ * distance-along axis with the horizontal projection.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_translate_start_to_x(
+    XbimCurve2dHandle   handle,
+    double              targetX);
+
+#pragma endregion
+
+#pragma region Curve2d Composite
+
+/*
+ * Join an array of bounded 2D curves into a single B-spline.
+ * Spirals, polynomials, and conics are approximated; other bounded curves are
+ * joined via Geom2dConvert_CompCurveToBSplineCurve. Gaps between segments
+ * are filled with line segments up to the specified tolerance.
+ *
+ * curves     – array of XbimCurve2dHandle (each must be a bounded curve)
+ * numCurves  – number of curves in the array
+ * tolerance  – gap-filling tolerance
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_composite_bspline(
+    XbimContextHandle   ctx,
+    XbimCurve2dHandle*  curves,
+    int                 numCurves,
+    double              tolerance,
+    XbimCurve2dHandle*  outHandle);
+
+#pragma endregion
+
+#pragma region Gradient Curve Construction
+
+/*
+ * Build a 3D gradient curve from a horizontal 2D projection and a height
+ * function (also 2D). The resulting 3D curve evaluates as:
+ *   P(u) = (horizontal.X(u), horizontal.Y(u), heightFunction.Y(u))
+ *
+ * Used for road/railway vertical alignment profiles (IfcGradientCurve).
+ * Both input curves must be valid XbimCurve2dHandles.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_gradient(
+    XbimContextHandle   ctx,
+    XbimCurve2dHandle   horizontalHandle,
+    XbimCurve2dHandle   heightFunctionHandle,
+    XbimCurveHandle*    outHandle);
+
 #pragma endregion
 
 #pragma region Spiral Curve Construction
