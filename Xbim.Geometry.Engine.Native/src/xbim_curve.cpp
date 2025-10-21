@@ -12,10 +12,12 @@
 
 #include "xbim_curve.h"
 #include "xbim_curve2d.h"
+#include "xbim_location.h"
 #include "xbim_context.h"
 #include "xbim_error.h"
 #include "xbim_logging.h"
 #include "Geom_GradientCurve.h"
+#include "Geom_SegmentedReferenceCurve.h"
 
 #include <gp_Pnt.hxx>
 #include <gp_Dir.hxx>
@@ -567,6 +569,141 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_gradient(
     {
         xbim_log_occt_failure(ctx, e, "xbim_curve_build_gradient");
         xbim_set_error("xbim_curve_build_gradient: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+#pragma endregion
+
+#pragma region Segmented Reference Curve
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_segmented_reference(
+    XbimContextHandle   ctx,
+    XbimCurveHandle     gradientCurveHandle,
+    XbimCurve2dHandle*  segmentCurves,
+    XbimLocationHandle* segmentLocations,
+    int                 numSegments,
+    XbimLocationHandle  endPointLocation,
+    XbimCurveHandle*    outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve_build_segmented_reference: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!gradientCurveHandle || gradientCurveHandle->curve.IsNull())
+    {
+        xbim_set_error("xbim_curve_build_segmented_reference: gradientCurveHandle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    Handle(Geom_GradientCurve) gradientCurve =
+        Handle(Geom_GradientCurve)::DownCast(gradientCurveHandle->curve);
+    if (gradientCurve.IsNull())
+    {
+        xbim_set_error("xbim_curve_build_segmented_reference: handle does not wrap a Geom_GradientCurve");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        std::vector<std::pair<Handle(Geom2d_Curve), TopLoc_Location>> superElevation;
+
+        if (numSegments > 0 && segmentCurves && segmentLocations)
+        {
+            superElevation.reserve(numSegments);
+            for (int i = 0; i < numSegments; ++i)
+            {
+                if (!segmentCurves[i] || segmentCurves[i]->curve.IsNull())
+                {
+                    xbim_set_error("xbim_curve_build_segmented_reference: null segment curve at index");
+                    return XBIM_INVALID_ARG;
+                }
+                if (!segmentLocations[i])
+                {
+                    xbim_set_error("xbim_curve_build_segmented_reference: null segment location at index");
+                    return XBIM_INVALID_ARG;
+                }
+
+                superElevation.emplace_back(
+                    segmentCurves[i]->curve,
+                    segmentLocations[i]->location);
+            }
+        }
+
+        TopLoc_Location endLoc;
+        bool hasEndPoint = false;
+        if (endPointLocation)
+        {
+            endLoc = endPointLocation->location;
+            hasEndPoint = true;
+        }
+
+        Handle(Geom_SegmentedReferenceCurve) segRef =
+            new Geom_SegmentedReferenceCurve(
+                gradientCurve, superElevation, endLoc, hasEndPoint);
+
+        *outHandle = xbim_curve_create_from(segRef);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_curve_build_segmented_reference: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve_build_segmented_reference");
+        xbim_set_error("xbim_curve_build_segmented_reference: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_get_superelevation_and_tilt(
+    XbimCurveHandle curveHandle,
+    double          parameter,
+    double*         outSuperElevation,
+    double*         outCantTilt)
+{
+    xbim_clear_error();
+
+    if (!curveHandle || curveHandle->curve.IsNull())
+    {
+        xbim_set_error("xbim_curve_get_superelevation_and_tilt: null handle");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    if (!outSuperElevation || !outCantTilt)
+    {
+        xbim_set_error("xbim_curve_get_superelevation_and_tilt: null output parameter");
+        return XBIM_INVALID_ARG;
+    }
+
+    Handle(Geom_SegmentedReferenceCurve) segRef =
+        Handle(Geom_SegmentedReferenceCurve)::DownCast(curveHandle->curve);
+    if (segRef.IsNull())
+    {
+        xbim_set_error("xbim_curve_get_superelevation_and_tilt: handle does not wrap a Geom_SegmentedReferenceCurve");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        auto [superElev, cantTilt] = segRef->GetSuperelevationAndCantTiltAt(parameter);
+        *outSuperElevation = superElev;
+        *outCantTilt = cantTilt;
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(nullptr, e, "xbim_curve_get_superelevation_and_tilt");
+        xbim_set_error("xbim_curve_get_superelevation_and_tilt: OCCT exception");
         return XBIM_ERROR;
     }
 }

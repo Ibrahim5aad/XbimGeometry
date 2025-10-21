@@ -1299,6 +1299,23 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeCurve2dHandle heightFunctionHandle,
             out NativeCurveHandle outHandle);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_build_segmented_reference(
+            NativeContextHandle ctx,
+            NativeCurveHandle gradientCurveHandle,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] segmentCurves,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] segmentLocations,
+            int numSegments,
+            NativeLocationHandle endPointLocation,
+            out NativeCurveHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_get_superelevation_and_tilt(
+            NativeCurveHandle curveHandle,
+            double parameter,
+            out double outSuperElevation,
+            out double outCantTilt);
+
         #endregion
 
         #region Wire from 2D Curves

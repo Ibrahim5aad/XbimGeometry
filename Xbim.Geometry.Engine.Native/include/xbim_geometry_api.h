@@ -2910,6 +2910,43 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_gradient(
     XbimCurve2dHandle   heightFunctionHandle,
     XbimCurveHandle*    outHandle);
 
+/*
+ * Build a segmented reference curve from a gradient curve and superelevation
+ * segments. Each superelevation segment is a 2D curve paired with a location
+ * transform encoding the segment's starting superelevation and cant tilt.
+ *
+ *   ctx                 – context handle for logging
+ *   gradientCurveHandle – base gradient curve (must wrap a Geom_GradientCurve)
+ *   segmentCurves       – array of XbimCurve2dHandle for superelevation segments
+ *   segmentLocations    – array of XbimLocationHandle for segment placements
+ *   numSegments         – number of segments (length of both arrays)
+ *   endPointLocation    – optional end point location (NULL for no end point)
+ *   outHandle           – receives the new curve handle on success
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_segmented_reference(
+    XbimContextHandle   ctx,
+    XbimCurveHandle     gradientCurveHandle,
+    XbimCurve2dHandle*  segmentCurves,
+    XbimLocationHandle* segmentLocations,
+    int                 numSegments,
+    XbimLocationHandle  endPointLocation,
+    XbimCurveHandle*    outHandle);
+
+/*
+ * Query superelevation and cant tilt at a given parameter on a segmented
+ * reference curve.
+ *
+ *   curveHandle       – must wrap a Geom_SegmentedReferenceCurve
+ *   parameter         – distance-along parameter
+ *   outSuperElevation – receives the superelevation value
+ *   outCantTilt       – receives the cant tilt angle (radians)
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_get_superelevation_and_tilt(
+    XbimCurveHandle curveHandle,
+    double          parameter,
+    double*         outSuperElevation,
+    double*         outCantTilt);
+
 #pragma endregion
 
 #pragma region Spiral Curve Construction

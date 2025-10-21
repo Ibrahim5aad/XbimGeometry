@@ -34,6 +34,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXCurve Build(IIfcCurve curve)
         {
+            if (curve is IfcSegmentedReferenceCurve ifcSegRef)
+                return BuildSegmentedReferenceCurve(ifcSegRef);
+
             if (curve is IfcGradientCurve ifcGradient)
                 return BuildGradientCurve(ifcGradient);
 
@@ -882,6 +885,156 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             // The EndPoint is typically not used in most files.
             // When present, it defines a trailing constant-height segment.
             // For now, skip this — the gradient curve is valid without it.
+        }
+
+        #endregion
+
+        #region Segmented Reference Curve
+
+        private Curve BuildSegmentedReferenceCurve(IfcSegmentedReferenceCurve ifcSegRef)
+        {
+            // Step 1: Build the base gradient curve
+            if (ifcSegRef.BaseCurve is not IfcGradientCurve ifcGradient)
+                throw new InvalidOperationException(
+                    $"IfcSegmentedReferenceCurve #{ifcSegRef.EntityLabel}: BaseCurve must be an IfcGradientCurve.");
+
+            var gradientCurve = BuildGradientCurve(ifcGradient);
+            var gradientHandle = gradientCurve.Handle;
+
+            // Step 2: Build superelevation segments (2D rate-of-change curves + placement locations)
+            var segCurveHandles = new List<NativeCurve2dHandle>();
+            var segLocationHandles = new List<NativeLocationHandle>();
+
+            try
+            {
+                foreach (var segment in ifcSegRef.Segments)
+                {
+                    if (segment is not IfcCurveSegment curveSegment)
+                        continue;
+
+                    // Build the 2D rate-of-change curve for this superelevation segment
+                    var segHandle = BuildCurveSegment2d(curveSegment);
+                    if (segHandle == null || segHandle.IsInvalid)
+                        continue;
+
+                    // Transform the segment with its placement (same as gradient curve segments)
+                    if (curveSegment.Placement is IIfcAxis2Placement2D axis2d)
+                    {
+                        double px = axis2d.Location.Coordinates[0];
+                        double py = axis2d.Location.Coordinates[1];
+                        double dx = 1.0, dy = 0.0;
+                        if (axis2d.RefDirection != null)
+                        {
+                            dx = axis2d.RefDirection.DirectionRatios[0];
+                            dy = axis2d.RefDirection.DirectionRatios[1];
+                            double mag = Math.Sqrt(dx * dx + dy * dy);
+                            if (mag > 1e-15) { dx /= mag; dy /= mag; }
+                        }
+
+                        XbimGeometryNativeApi.xbim_curve2d_transform(segHandle, px, py, dx, dy);
+                    }
+
+                    segCurveHandles.Add(segHandle);
+
+                    // Build location from the segment's placement — encodes starting
+                    // superelevation (Y translation) and cant tilt (rotation around X)
+                    var locHandle = BuildSegmentLocation(curveSegment.Placement);
+                    segLocationHandles.Add(locHandle);
+                }
+
+                // Step 3: Build the optional endpoint location
+                NativeLocationHandle endPointHandle = NativeLocationHandle.NullHandle;
+                if (ifcSegRef.EndPoint is IIfcPlacement endPlacement)
+                    endPointHandle = BuildPlacementLocation(endPlacement);
+
+                // Step 4: Create the segmented reference curve
+                var curvePtrs = segCurveHandles.Select(h => h.DangerousGetHandle()).ToArray();
+                var locPtrs = segLocationHandles.Select(h => h.DangerousGetHandle()).ToArray();
+
+                int result = XbimGeometryNativeApi.xbim_curve_build_segmented_reference(
+                    ContextHandle,
+                    gradientHandle,
+                    curvePtrs,
+                    locPtrs,
+                    curvePtrs.Length,
+                    endPointHandle,
+                    out var outHandle);
+
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"IfcSegmentedReferenceCurve #{ifcSegRef.EntityLabel}: failed to build: {XbimGeometryNativeApi.GetLastError()}");
+
+                return new Curve(outHandle, XCurveType.IfcSegmentedReferenceCurve);
+            }
+            finally
+            {
+                GC.KeepAlive(segCurveHandles);
+                GC.KeepAlive(segLocationHandles);
+                GC.KeepAlive(gradientCurve);
+            }
+        }
+
+        private NativeLocationHandle BuildSegmentLocation(IIfcPlacement placement)
+        {
+            if (placement is IIfcAxis2Placement3D axis3d)
+            {
+                double ox = axis3d.Location.Coordinates[0];
+                double oy = axis3d.Location.Coordinates.Count > 1 ? axis3d.Location.Coordinates[1] : 0.0;
+                double oz = axis3d.Location.Coordinates.Count > 2 ? axis3d.Location.Coordinates[2] : 0.0;
+
+                double zx = 0, zy = 0, zz = 1;
+                if (axis3d.Axis != null)
+                {
+                    zx = axis3d.Axis.DirectionRatios[0];
+                    zy = axis3d.Axis.DirectionRatios[1];
+                    zz = axis3d.Axis.DirectionRatios[2];
+                }
+
+                double xx = 1, xy = 0, xz = 0;
+                if (axis3d.RefDirection != null)
+                {
+                    xx = axis3d.RefDirection.DirectionRatios[0];
+                    xy = axis3d.RefDirection.DirectionRatios[1];
+                    xz = axis3d.RefDirection.DirectionRatios[2];
+                }
+
+                int r = XbimGeometryNativeApi.xbim_location_create_from_axis2(
+                    ox, oy, oz, zx, zy, zz, xx, xy, xz, out var locHandle);
+                if (r != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to create location from Axis2Placement3D: {XbimGeometryNativeApi.GetLastError()}");
+                return locHandle;
+            }
+
+            if (placement is IIfcAxis2Placement2D axis2d)
+            {
+                double ox = axis2d.Location.Coordinates[0];
+                double oy = axis2d.Location.Coordinates.Count > 1 ? axis2d.Location.Coordinates[1] : 0.0;
+
+                double dx = 1, dy = 0;
+                if (axis2d.RefDirection != null)
+                {
+                    dx = axis2d.RefDirection.DirectionRatios[0];
+                    dy = axis2d.RefDirection.DirectionRatios[1];
+                }
+
+                // Map 2D placement to 3D: XY plane with Z-up, rotation encodes cant tilt
+                int r = XbimGeometryNativeApi.xbim_location_create_from_axis2(
+                    ox, oy, 0.0, 0.0, 0.0, 1.0, dx, dy, 0.0, out var locHandle);
+                if (r != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to create location from Axis2Placement2D: {XbimGeometryNativeApi.GetLastError()}");
+                return locHandle;
+            }
+
+            // Fallback: identity location
+            XbimGeometryNativeApi.xbim_location_create_identity(out var identityHandle);
+            return identityHandle;
+        }
+
+        private NativeLocationHandle BuildPlacementLocation(IIfcPlacement placement)
+        {
+            return BuildSegmentLocation(placement);
         }
 
         #endregion
