@@ -1259,6 +1259,38 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeCurveHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_parameters(
+            NativeCurve2dHandle handle,
+            out double outFirst,
+            out double outLast);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_length(
+            NativeCurve2dHandle handle,
+            out double outLength);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_value(
+            NativeCurve2dHandle handle,
+            double u,
+            out double outX, out double outY);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_d1(
+            NativeCurve2dHandle handle,
+            double u,
+            out double outPx, out double outPy,
+            out double outDx, out double outDy);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_d2(
+            NativeCurve2dHandle handle,
+            double u,
+            out double outPx, out double outPy,
+            out double outD1x, out double outD1y,
+            out double outD2x, out double outD2y);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_curve2d_project_point(
             NativeContextHandle ctx,
             NativeCurve2dHandle curveHandle,
@@ -1277,6 +1309,10 @@ namespace Xbim.Geometry.Engine.Interop.Internal
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_curve2d_move_to_origin(
+            NativeCurve2dHandle handle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_align_to_origin(
             NativeCurve2dHandle handle);
 
         [DllImport(Lib, CallingConvention = CC)]

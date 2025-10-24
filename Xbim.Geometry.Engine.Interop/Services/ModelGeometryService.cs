@@ -358,6 +358,9 @@ namespace Xbim.Geometry.Engine.Interop.Services
             if (_disposed) return;
             _disposed = true;
 
+            _curveFactory?.Dispose();
+            _curveFactory = null;
+
             _contextHandle?.Dispose();
             _contextHandle = null;
 

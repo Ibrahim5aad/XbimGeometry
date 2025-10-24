@@ -5,6 +5,8 @@ using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Factories;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Ifc4.Interfaces;
+using Xbim.Ifc4x3.GeometricConstraintResource;
+using Xbim.Ifc4x3.GeometryResource;
 
 namespace Xbim.Geometry.Engine.Interop.Services
 {
@@ -40,8 +42,13 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXLocation BuildLocation(IIfcObjectPlacement placement, bool adjustWcs)
         {
-            if (placement is IIfcLocalPlacement localPlacement)
-                return BuildLocalPlacement(localPlacement, adjustWcs);
+            // Grid placement: delegate to geometry factory (no WCS adjustment)
+            if (placement is IIfcGridPlacement)
+                return _geometryFactory.BuildLocation(placement);
+
+            // Local and linear placements: traverse the hierarchy with WCS adjustment
+            if (placement is IIfcLocalPlacement || placement is IfcLinearPlacement)
+                return BuildPlacement(placement, adjustWcs);
 
             _logger.LogWarning(
                 "Placement type {Type} is not supported, returning identity.",
@@ -85,50 +92,110 @@ namespace Xbim.Geometry.Engine.Interop.Services
             }
         }
 
-        private IXLocation BuildLocalPlacement(IIfcLocalPlacement placement, bool adjustWcs)
+        /// <summary>
+        /// Traverses a placement hierarchy that may contain both local and linear
+        /// placements, composing the transforms and optionally adjusting for WCS.
+        /// </summary>
+        private IXLocation BuildPlacement(IIfcObjectPlacement placement, bool adjustWcs)
         {
             XLocation? accumulated = null;
-            var current = placement;
+            int rootId = adjustWcs ? _rootId : -1;
 
-            while (current != null)
+            var localPlacement = placement as IIfcLocalPlacement;
+            var linearPlacement = placement as IfcLinearPlacement;
+
+            while (localPlacement != null || linearPlacement != null)
             {
                 XLocation stepLocation;
 
-                if (adjustWcs && current.EntityLabel == _rootId)
+                if (localPlacement != null)
                 {
-                    // At root: use identity (the WCS offset is stripped)
-                    stepLocation = new XLocation();
-                }
-                else if (current.RelativePlacement is IIfcAxis2Placement3D axis3D)
-                {
-                    stepLocation = _geometryFactory.BuildLocationFromAxis3D(axis3D);
-                }
-                else
-                {
-                    _logger.LogWarning(
-                        "Non-3D relative placement in #{Label}, using identity.",
-                        current.EntityLabel);
-                    stepLocation = new XLocation();
-                }
+                    if (localPlacement.EntityLabel == rootId)
+                    {
+                        stepLocation = new XLocation();
+                    }
+                    else if (localPlacement.RelativePlacement is IIfcAxis2Placement3D axis3D)
+                    {
+                        stepLocation = _geometryFactory.BuildLocationFromAxis3D(axis3D);
+                    }
+                    else
+                    {
+                        _logger.LogWarning(
+                            "Non-3D relative placement in #{Label}, using identity.",
+                            localPlacement.EntityLabel);
+                        stepLocation = new XLocation();
+                    }
 
-                if (accumulated == null)
-                {
-                    accumulated = stepLocation;
-                }
-                else
-                {
-                    // PreMultiply: accumulated = stepLocation * accumulated
-                    var composed = (XLocation)stepLocation.Multiplied(accumulated);
-                    accumulated.Dispose();
-                    stepLocation.Dispose();
-                    accumulated = composed;
-                }
+                    accumulated = ComposeLocation(accumulated, stepLocation);
 
-                // Navigate up the placement hierarchy
-                current = current.PlacementRelTo as IIfcLocalPlacement;
+                    // Navigate up: PlacementRelTo can be local or linear
+                    EvaluateNextPlacement(localPlacement.PlacementRelTo,
+                        out localPlacement, out linearPlacement);
+                }
+                else if (linearPlacement != null)
+                {
+                    if (linearPlacement.RelativePlacement is IfcAxis2PlacementLinear axisLinear)
+                    {
+                        stepLocation = (XLocation)_geometryFactory.BuildLocation(axisLinear);
+
+                        if (linearPlacement.EntityLabel == rootId)
+                        {
+                            // Keep orientation, strip translation
+                            var adjusted = (XLocation)stepLocation.Translated(0, 0, 0);
+                            stepLocation.Dispose();
+                            stepLocation = adjusted;
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning(
+                            "IfcLinearPlacement #{Label} has no IfcAxis2PlacementLinear, using identity.",
+                            linearPlacement.EntityLabel);
+                        stepLocation = new XLocation();
+                    }
+
+                    accumulated = ComposeLocation(accumulated, stepLocation);
+
+                    // Navigate up: PlacementRelTo can be local or linear
+                    EvaluateNextPlacement(linearPlacement.PlacementRelTo,
+                        out localPlacement, out linearPlacement);
+                }
             }
 
             return accumulated ?? new XLocation();
+        }
+
+        private static XLocation ComposeLocation(XLocation? accumulated, XLocation stepLocation)
+        {
+            if (accumulated == null)
+                return stepLocation;
+
+            var composed = (XLocation)stepLocation.Multiplied(accumulated);
+            accumulated.Dispose();
+            stepLocation.Dispose();
+            return composed;
+        }
+
+        private static void EvaluateNextPlacement(
+            IIfcObjectPlacement? placementRelTo,
+            out IIfcLocalPlacement? nextLocal,
+            out IfcLinearPlacement? nextLinear)
+        {
+            if (placementRelTo is IIfcLocalPlacement lp)
+            {
+                nextLocal = lp;
+                nextLinear = null;
+            }
+            else if (placementRelTo is IfcLinearPlacement linP)
+            {
+                nextLocal = null;
+                nextLinear = linP;
+            }
+            else
+            {
+                nextLocal = null;
+                nextLinear = null;
+            }
         }
     }
 }

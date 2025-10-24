@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Ifc;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4x3.GeometricModelResource;
@@ -18,6 +19,7 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
     {
         private readonly IXbimGeometryServicesFactory _factory;
         private readonly ILoggerFactory _loggerFactory;
+        private readonly string _brepOutputDir;
         private const double Tolerance = 1e-5;
 
 
@@ -25,9 +27,22 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
         {
             _factory = factory;
             _loggerFactory = loggerFactory;
+            _brepOutputDir = Path.Combine(
+                    Path.GetDirectoryName(typeof(IfcSectionedSolidHorizontalTests).Assembly.Location)!,
+                    "BrepOutput");
+            Directory.CreateDirectory(_brepOutputDir);
         }
 
-
+        private void SaveBrep(IXShape shape, string name)
+        {
+            #if DEBUG
+            if (shape is Shape ns)
+            {
+                var path = Path.Combine(_brepOutputDir, $"{name}.brep");
+                ns.WriteBrep(path);
+            }
+            #endif
+        }
 
         [Theory]
         [InlineData(@"TestFiles\IFC4x3\Viadotto Acerno.ifc", 160615)]
@@ -42,7 +57,7 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
 
             // Act
             var xSolid = modelSvc.SolidFactory.Build(solid);
-
+        SaveBrep(xSolid, $"IfcSectionedSolidHorizontal_{solidId}");
             // Assert
             xSolid.Should().NotBeNull();
         }

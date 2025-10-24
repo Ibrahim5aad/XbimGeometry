@@ -40,8 +40,10 @@
 #include <GCE2d_MakeSegment.hxx>
 #include <GCE2d_MakeArcOfCircle.hxx>
 #include <GCE2d_MakeArcOfEllipse.hxx>
+#include <Geom2dAdaptor_Curve.hxx>
 #include <Geom2dAPI_ProjectPointOnCurve.hxx>
 #include <Geom2dAPI_PointsToBSpline.hxx>
+#include <GCPnts_AbscissaPoint.hxx>
 #include <Geom2dConvert_CompCurveToBSplineCurve.hxx>
 #include <TColgp_Array1OfPnt.hxx>
 #include <TColgp_Array1OfPnt2d.hxx>
@@ -592,6 +594,200 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_polynomial(
 
 #pragma region Curve2d Queries
 
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_parameters(
+    XbimCurve2dHandle handle,
+    double*           outFirst,
+    double*           outLast)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_curve2d_parameters: null handle");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!outFirst || !outLast)
+    {
+        xbim_set_error("xbim_curve2d_parameters: null output parameter");
+        return XBIM_INVALID_ARG;
+    }
+
+    const Handle(Geom2d_Curve)& c = handle->curve;
+    if (c.IsNull())
+    {
+        xbim_set_error("xbim_curve2d_parameters: curve is null");
+        return XBIM_ERROR;
+    }
+
+    *outFirst = c->FirstParameter();
+    *outLast  = c->LastParameter();
+    return XBIM_OK;
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_length(
+    XbimCurve2dHandle handle,
+    double*           outLength)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_curve2d_length: null handle");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!outLength)
+    {
+        xbim_set_error("xbim_curve2d_length: null output parameter");
+        return XBIM_INVALID_ARG;
+    }
+
+    const Handle(Geom2d_Curve)& c = handle->curve;
+    if (c.IsNull())
+    {
+        xbim_set_error("xbim_curve2d_length: curve is null");
+        return XBIM_ERROR;
+    }
+
+    try
+    {
+        Geom2dAdaptor_Curve adaptor(c);
+        *outLength = GCPnts_AbscissaPoint::Length(adaptor);
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_curve2d_length: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_value(
+    XbimCurve2dHandle handle,
+    double            u,
+    double*           outX, double* outY)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_curve2d_value: null handle");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    const Handle(Geom2d_Curve)& c = handle->curve;
+    if (c.IsNull())
+    {
+        xbim_set_error("xbim_curve2d_value: curve is null");
+        return XBIM_ERROR;
+    }
+
+    try
+    {
+        gp_Pnt2d pt;
+        c->D0(u, pt);
+        if (outX) *outX = pt.X();
+        if (outY) *outY = pt.Y();
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_curve2d_value: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_d1(
+    XbimCurve2dHandle handle,
+    double            u,
+    double*           outPx, double* outPy,
+    double*           outDx, double* outDy)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_curve2d_d1: null handle");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    const Handle(Geom2d_Curve)& c = handle->curve;
+    if (c.IsNull())
+    {
+        xbim_set_error("xbim_curve2d_d1: curve is null");
+        return XBIM_ERROR;
+    }
+
+    try
+    {
+        gp_Pnt2d pt;
+        gp_Vec2d v1;
+        c->D1(u, pt, v1);
+
+        if (outPx) *outPx = pt.X();
+        if (outPy) *outPy = pt.Y();
+        if (outDx) *outDx = v1.X();
+        if (outDy) *outDy = v1.Y();
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_curve2d_d1: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_d2(
+    XbimCurve2dHandle handle,
+    double            u,
+    double*           outPx,  double* outPy,
+    double*           outD1x, double* outD1y,
+    double*           outD2x, double* outD2y)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_curve2d_d2: null handle");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    const Handle(Geom2d_Curve)& c = handle->curve;
+    if (c.IsNull())
+    {
+        xbim_set_error("xbim_curve2d_d2: curve is null");
+        return XBIM_ERROR;
+    }
+
+    try
+    {
+        gp_Pnt2d pt;
+        gp_Vec2d v1, v2;
+        c->D2(u, pt, v1, v2);
+
+        if (outPx)  *outPx  = pt.X();
+        if (outPy)  *outPy  = pt.Y();
+        if (outD1x) *outD1x = v1.X();
+        if (outD1y) *outD1y = v1.Y();
+        if (outD2x) *outD2x = v2.X();
+        if (outD2y) *outD2y = v2.Y();
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_curve2d_d2: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_project_point(
     XbimContextHandle ctx,
     XbimCurve2dHandle curveHandle,
@@ -728,6 +924,44 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_move_to_origin(
     catch (const Standard_Failure&)
     {
         xbim_set_error("xbim_curve2d_move_to_origin: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_align_to_origin(
+    XbimCurve2dHandle handle)
+{
+    xbim_clear_error();
+
+    if (!handle || handle->curve.IsNull())
+    {
+        xbim_set_error("xbim_curve2d_align_to_origin: handle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        gp_Pnt2d startPt;
+        gp_Vec2d tangent;
+        handle->curve->D1(handle->curve->FirstParameter(), startPt, tangent);
+        tangent.Normalize();
+
+        gp_Trsf2d translation;
+        translation.SetTranslation(gp_Vec2d(-startPt.X(), -startPt.Y()));
+
+        double angle = std::atan2(tangent.Y(), tangent.X());
+        gp_Trsf2d rotation;
+        rotation.SetRotation(gp_Pnt2d(0.0, 0.0), -angle);
+
+        gp_Trsf2d combined = rotation * translation;
+        handle->curve->Transform(combined);
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_curve2d_align_to_origin: OCCT exception");
         return XBIM_ERROR;
     }
 }

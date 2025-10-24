@@ -41,18 +41,20 @@ void Geom2d_Clothoid::D0(Standard_Real U, gp_Pnt2d& P) const
 void Geom2d_Clothoid::FresnelIntegrals(double t, double& C, double& S) const
 {
     // Simpson's rule integration of Fresnel integrals:
-    // C(t) = integral(cos(pi/2 * u^2), u=0..t)
-    // S(t) = integral(sin(pi/2 * u^2), u=0..t)
+    // C(t) = integral(cos(sign(A) * pi/2 * u^2), u=0..t)
+    // S(t) = integral(sin(sign(A) * pi/2 * u^2), u=0..t)
+    // The sign of A affects the sin component (odd function).
     int N = std::max(_integrationSteps, 1000);
     if (N % 2 != 0) N++;
 
+    double signA = (_clothoidConstant >= 0) ? 1.0 : -1.0;
     double dt = t / N;
     double sumC = 0.0, sumS = 0.0;
 
     for (int i = 0; i <= N; i++)
     {
         double u = i * dt;
-        double arg = (M_PI / 2.0) * u * u;
+        double arg = signA * (M_PI / 2.0) * u * u;
 
         double weight;
         if (i == 0 || i == N)

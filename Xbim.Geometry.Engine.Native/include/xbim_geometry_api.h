@@ -2824,6 +2824,54 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_polynomial(
 #pragma region Curve2d Queries
 
 /*
+ * Get the parametric range of a 2D curve.
+ *   outFirst/outLast – receive the first and last parameter values
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_parameters(
+    XbimCurve2dHandle handle,
+    double*           outFirst,
+    double*           outLast);
+
+/*
+ * Compute the arc length of a 2D curve over its full parameter range.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_length(
+    XbimCurve2dHandle handle,
+    double*           outLength);
+
+/*
+ * Evaluate a point on the 2D curve at parameter u.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_value(
+    XbimCurve2dHandle handle,
+    double            u,
+    double*           outX, double* outY);
+
+/*
+ * Evaluate point and first derivative at parameter u on a 2D curve.
+ *   outPx/outPy – point coordinates
+ *   outDx/outDy – first derivative vector
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_d1(
+    XbimCurve2dHandle handle,
+    double            u,
+    double*           outPx, double* outPy,
+    double*           outDx, double* outDy);
+
+/*
+ * Evaluate point, first derivative, and second derivative at parameter u on a 2D curve.
+ *   outPx/outPy     – point coordinates
+ *   outD1x/outD1y   – first derivative vector
+ *   outD2x/outD2y   – second derivative vector
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_d2(
+    XbimCurve2dHandle handle,
+    double            u,
+    double*           outPx,  double* outPy,
+    double*           outD1x, double* outD1y,
+    double*           outD2x, double* outD2y);
+
+/*
  * Project a 2D point onto a curve and return the parameter.
  * Uses Geom2dLib_Tool::Parameter.
  */
@@ -2860,6 +2908,13 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_transform(
  * Translate a 2D curve so that its start point lies at the origin.
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_move_to_origin(
+    XbimCurve2dHandle   handle);
+
+/*
+ * Translate the start point to the origin AND rotate so the starting
+ * tangent aligns with the positive X axis.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_align_to_origin(
     XbimCurve2dHandle   handle);
 
 /*

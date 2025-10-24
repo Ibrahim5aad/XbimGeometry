@@ -6,6 +6,7 @@ using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Ifc4.Interfaces;
+using Xbim.Ifc4x3.GeometricConstraintResource;
 using Xbim.Ifc4x3.GeometryResource;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
@@ -37,8 +38,126 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXPoint BuildPoint3d(IfcPointByDistanceExpression pointByDistanceExpression)
         {
-            throw new NotImplementedException(
-                "IfcPointByDistanceExpression requires curve evaluation (Ifc4x3 alignment support).");
+            return EvaluatePointByDistanceExpression(pointByDistanceExpression,
+                out _, out _, out _, out _, out _, out _);
+        }
+
+        /// <summary>
+        /// Evaluates a point on a curve from an IfcPointByDistanceExpression,
+        /// returning the offset-applied position along with the local coordinate frame
+        /// (tangent and axis vectors, including superelevation rotation).
+        /// </summary>
+        internal XPoint EvaluatePointByDistanceExpression(
+            IfcPointByDistanceExpression pointExpr,
+            out double tangentX, out double tangentY, out double tangentZ,
+            out double axisX, out double axisY, out double axisZ)
+        {
+            // Build the basis curve
+            using var curve = (Curve)_modelService.CurveFactory.Build(pointExpr.BasisCurve);
+            var curveHandle = curve.Handle;
+
+            // Get curve length for parameter normalization
+            int lengthResult = XbimGeometryNativeApi.xbim_curve_length(curveHandle, out double curveLength);
+            if (lengthResult != 0)
+                throw new InvalidOperationException(
+                    $"IfcPointByDistanceExpression #{pointExpr.EntityLabel}: " +
+                    $"failed to compute curve length: {XbimGeometryNativeApi.GetLastError()}");
+
+            // Determine the curve evaluation parameter from DistanceAlong
+            double len;
+            var distanceAlong = pointExpr.DistanceAlong;
+            bool isConic = pointExpr.BasisCurve is IIfcConic;
+
+            if (distanceAlong is IIfcLengthMeasure lengthMeasure)
+            {
+                len = lengthMeasure.Value;
+            }
+            else if (distanceAlong is Xbim.Ifc4x3.MeasureResource.IfcParameterValue parameterValue)
+            {
+                double paramVal = (double)parameterValue.Value;
+                if (isConic)
+                    len = paramVal * _modelService.RadianFactor;
+                else
+                    len = paramVal * curveLength;
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    $"IfcPointByDistanceExpression #{pointExpr.EntityLabel}: " +
+                    "DistanceAlong must be IfcLengthMeasure or IfcParameterValue.");
+            }
+
+            // Evaluate point and first derivative (tangent) at the parameter
+            int d1Result = XbimGeometryNativeApi.xbim_curve_d1(curveHandle, len,
+                out double px, out double py, out double pz,
+                out double tx, out double ty, out double tz);
+            if (d1Result != 0)
+                throw new InvalidOperationException(
+                    $"IfcPointByDistanceExpression #{pointExpr.EntityLabel}: " +
+                    $"failed to evaluate curve at u={len}: {XbimGeometryNativeApi.GetLastError()}");
+
+            // Normalize tangent
+            Normalize(ref tx, ref ty, ref tz);
+
+            // Compute local coordinate frame: y = up × tangent, axis = tangent × y
+            double yx = -ty, yy = tx, yz = 0; // (0,0,1) × (tx,ty,tz)
+            Normalize(ref yx, ref yy, ref yz);
+
+            double ax = ty * yz - tz * yy;
+            double ay = tz * yx - tx * yz;
+            double az = tx * yy - ty * yx;
+            Normalize(ref ax, ref ay, ref az);
+
+            // Apply superelevation/cant tilt if basis curve is a segmented reference curve
+            int superResult = XbimGeometryNativeApi.xbim_curve_get_superelevation_and_tilt(
+                curveHandle, len, out _, out double cantTilt);
+            if (superResult == 0)
+            {
+                RotateAroundAxis(ref ax, ref ay, ref az, tx, ty, tz, cantTilt);
+                RotateAroundAxis(ref yx, ref yy, ref yz, tx, ty, tz, cantTilt);
+            }
+
+            // Output the local coordinate frame (before offset translation)
+            tangentX = tx; tangentY = ty; tangentZ = tz;
+            axisX = ax; axisY = ay; axisZ = az;
+
+            // Apply lateral offset (along y)
+            if (pointExpr.OffsetLateral.HasValue)
+            {
+                double lateralOffset = (double)pointExpr.OffsetLateral.Value.Value;
+                if (lateralOffset != 0.0)
+                {
+                    px += yx * lateralOffset;
+                    py += yy * lateralOffset;
+                    pz += yz * lateralOffset;
+                }
+            }
+
+            // Apply vertical offset (along axis)
+            if (pointExpr.OffsetVertical.HasValue)
+            {
+                double verticalOffset = (double)pointExpr.OffsetVertical.Value.Value;
+                if (verticalOffset != 0.0)
+                {
+                    px += ax * verticalOffset;
+                    py += ay * verticalOffset;
+                    pz += az * verticalOffset;
+                }
+            }
+
+            // Apply longitudinal offset (along tangent)
+            if (pointExpr.OffsetLongitudinal.HasValue)
+            {
+                double longOffset = (double)pointExpr.OffsetLongitudinal.Value.Value;
+                if (longOffset != 0.0)
+                {
+                    px += tx * longOffset;
+                    py += ty * longOffset;
+                    pz += tz * longOffset;
+                }
+            }
+
+            return new XPoint(px, py, pz);
         }
 
         /// <summary>
@@ -221,13 +340,62 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXLocation BuildLocation(IfcAxis2PlacementLinear linearPlacement)
         {
-            throw new NotImplementedException(
-                "IfcAxis2PlacementLinear requires curve evaluation (Ifc4x3 alignment support).");
+            if (linearPlacement.Location is not IfcPointByDistanceExpression pointExpr)
+                throw new InvalidOperationException(
+                    $"IfcAxis2PlacementLinear #{linearPlacement.EntityLabel}: " +
+                    "Location must be an IfcPointByDistanceExpression.");
+
+            var loc = EvaluatePointByDistanceExpression(pointExpr,
+                out double tx, out double ty, out double tz,
+                out double ax, out double ay, out double az);
+
+            // Override tangent with RefDirection if specified
+            if (linearPlacement.RefDirection != null)
+            {
+                if (!BuildDirection3d(linearPlacement.RefDirection, out tx, out ty, out tz))
+                    throw new InvalidOperationException(
+                        $"IfcAxis2PlacementLinear #{linearPlacement.EntityLabel}: " +
+                        "RefDirection is invalid.");
+                Normalize(ref tx, ref ty, ref tz);
+            }
+
+            // Override axis with Axis if specified
+            if (linearPlacement.Axis != null)
+            {
+                if (!BuildDirection3d(linearPlacement.Axis, out ax, out ay, out az))
+                    throw new InvalidOperationException(
+                        $"IfcAxis2PlacementLinear #{linearPlacement.EntityLabel}: " +
+                        "Axis direction is invalid.");
+                Normalize(ref ax, ref ay, ref az);
+            }
+
+            // Create location: Z direction = axis, X direction = tangent
+            int result = XbimGeometryNativeApi.xbim_location_create_from_axis2(
+                loc.X, loc.Y, loc.Z,
+                ax, ay, az,    // Z direction (axis)
+                tx, ty, tz,    // X direction (tangent/refDir)
+                out var handle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"IfcAxis2PlacementLinear #{linearPlacement.EntityLabel}: " +
+                    $"failed to create location: {XbimGeometryNativeApi.GetLastError()}");
+
+            // Y = Z × X
+            double yx = ay * tz - az * ty;
+            double yy = az * tx - ax * tz;
+            double yz = ax * ty - ay * tx;
+
+            return new XLocation(handle,
+                tx, ty, tz,    // row 0: X axis (tangent)
+                yx, yy, yz,    // row 1: Y axis
+                ax, ay, az,    // row 2: Z axis
+                loc.X, loc.Y, loc.Z,
+                1.0);
         }
 
         /// <summary>
         /// Creates a native location handle from an IIfcAxis2Placement3D.
-        /// Ports the C++/CLI GeometryFactory::ToLocation(IIfcAxis2Placement3D).
         /// </summary>
         internal XLocation BuildLocationFromAxis3D(IIfcAxis2Placement3D axis3D)
         {
@@ -260,7 +428,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         /// <summary>
         /// Creates a native location handle from an IIfcAxis2Placement2D.
-        /// Ports the C++/CLI GeometryFactory::ToLocation(IIfcAxis2Placement2D).
         /// </summary>
         internal XLocation BuildLocationFromAxis2D(IIfcAxis2Placement2D axis2D)
         {
@@ -316,58 +483,299 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         /// <summary>
         /// Converts an IIfcObjectPlacement hierarchy to a composed location handle.
-        /// Traverses the placement tree iteratively (matching C++/CLI GeometryFactory::ToTransform).
-        /// Handles IIfcLocalPlacement with IIfcAxis2Placement3D.
-        /// Grid placements and linear placements are not yet supported.
+        /// Traverses the placement tree iteratively, handling local placements,
+        /// linear placements (Ifc4x3), and grid placements.
         /// </summary>
         internal XLocation ToLocation(IIfcObjectPlacement objPlacement)
         {
             XLocation? accumulated = null;
 
             var localPlacement = objPlacement as IIfcLocalPlacement;
+            var linearPlacement = objPlacement as IfcLinearPlacement;
+            var gridPlacement = objPlacement as IIfcGridPlacement;
 
-            while (localPlacement != null)
+            while (localPlacement != null || linearPlacement != null || gridPlacement != null)
             {
-                var axis3D = localPlacement.RelativePlacement as IIfcAxis2Placement3D;
-                if (axis3D == null)
+                if (localPlacement != null)
                 {
-                    _logger.LogWarning("Object placement with non-3D relative placement not supported, using identity.");
-                    break;
-                }
+                    if (localPlacement.RelativePlacement is not IIfcAxis2Placement3D axis3D)
+                    {
+                        _logger.LogWarning("Object placement with non-3D relative placement not supported, using identity.");
+                        break;
+                    }
 
-                var stepLocation = BuildLocationFromAxis3D(axis3D);
+                    var stepLocation = BuildLocationFromAxis3D(axis3D);
+                    accumulated = ComposeLocation(accumulated, stepLocation);
 
-                if (accumulated == null)
-                {
-                    accumulated = stepLocation;
+                    // Navigate up: PlacementRelTo can be local or linear
+                    EvaluateNextPlacement(localPlacement.PlacementRelTo,
+                        out localPlacement, out linearPlacement);
+                    gridPlacement = null;
                 }
-                else
+                else if (linearPlacement != null)
                 {
-                    // PreMultiply: accumulated = stepLocation * accumulated
-                    // This matches the C++/CLI trsf.PreMultiply(relTrsf) pattern
-                    var composed = (XLocation)stepLocation.Multiplied(accumulated);
-                    accumulated.Dispose();
-                    stepLocation.Dispose();
-                    accumulated = composed;
-                }
+                    if (linearPlacement.RelativePlacement is IfcAxis2PlacementLinear axisLinear)
+                    {
+                        var stepLocation = (XLocation)BuildLocation(axisLinear);
+                        accumulated = ComposeLocation(accumulated, stepLocation);
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException(
+                            "RelativePlacement for IfcLinearPlacement must be specified.");
+                    }
 
-                // Navigate up the placement hierarchy
-                if (localPlacement.PlacementRelTo is IIfcLocalPlacement parent)
-                {
-                    localPlacement = parent;
+                    // Navigate up: PlacementRelTo can be local or linear
+                    EvaluateNextPlacement(linearPlacement.PlacementRelTo,
+                        out localPlacement, out linearPlacement);
+                    gridPlacement = null;
                 }
-                else
+                else if (gridPlacement != null)
                 {
+                    var stepLocation = BuildLocationFromGridPlacement(gridPlacement);
+                    if (stepLocation != null)
+                        accumulated = ComposeLocation(accumulated, stepLocation);
+
+                    // Grid placement doesn't chain further in the same way
                     localPlacement = null;
+                    linearPlacement = null;
+                    gridPlacement = null;
                 }
             }
 
             return accumulated ?? new XLocation();
         }
 
-        #endregion
+        /// <summary>
+        /// Composes a new step location onto the accumulated transform.
+        /// Matches the legacy trsf.PreMultiply(relTrsf) pattern.
+        /// </summary>
+        private static XLocation ComposeLocation(XLocation? accumulated, XLocation stepLocation)
+        {
+            if (accumulated == null)
+                return stepLocation;
 
-        #region Transform Building
+            var composed = (XLocation)stepLocation.Multiplied(accumulated);
+            accumulated.Dispose();
+            stepLocation.Dispose();
+            return composed;
+        }
+
+        /// <summary>
+        /// Navigates up the placement hierarchy, determining whether the next
+        /// placement is a local or linear placement.
+        /// </summary>
+        private static void EvaluateNextPlacement(
+            IIfcObjectPlacement? placementRelTo,
+            out IIfcLocalPlacement? nextLocal,
+            out IfcLinearPlacement? nextLinear)
+        {
+            if (placementRelTo is IIfcLocalPlacement lp)
+            {
+                nextLocal = lp;
+                nextLinear = null;
+            }
+            else if (placementRelTo is IfcLinearPlacement linP)
+            {
+                nextLocal = null;
+                nextLinear = linP;
+            }
+            else
+            {
+                nextLocal = null;
+                nextLinear = null;
+            }
+        }
+
+        /// <summary>
+        /// Builds a location from an IIfcGridPlacement by computing the grid axis
+        /// intersection, applying offsets and the grid's own object placement.
+        /// </summary>
+        private XLocation? BuildLocationFromGridPlacement(IIfcGridPlacement gridPlacement)
+        {
+            var vi = gridPlacement.PlacementLocation;
+            if (vi == null)
+            {
+                _logger.LogWarning("Grid placement has no PlacementLocation, using identity.");
+                return null;
+            }
+
+            var axes = vi.IntersectingAxes.ToList();
+            if (axes.Count < 2)
+            {
+                _logger.LogWarning("Grid placement needs at least 2 intersecting axes.");
+                return null;
+            }
+
+            // Compute 2D intersection of the two grid axis curves
+            if (!TryIntersectGridAxes(axes[0], axes[1], out double ix, out double iy))
+            {
+                _logger.LogWarning("Could not compute grid axis intersection for grid placement.");
+                return null;
+            }
+
+            // Determine ref direction
+            double refDirX = 1, refDirY = 0;
+            if (gridPlacement.PlacementRefDirection == null)
+            {
+                // Default: tangent of first axis at intersection
+                if (TryGetGridAxisTangentAt(axes[0], out double tanX, out double tanY))
+                {
+                    refDirX = tanX;
+                    refDirY = tanY;
+                }
+            }
+            else if (gridPlacement.PlacementRefDirection is IIfcDirection dir)
+            {
+                refDirX = dir.DirectionRatios[0];
+                refDirY = dir.DirectionRatios.Count > 1 ? dir.DirectionRatios[1] : 0;
+                double mag = Math.Sqrt(refDirX * refDirX + refDirY * refDirY);
+                if (mag > 1e-15) { refDirX /= mag; refDirY /= mag; }
+            }
+            else if (gridPlacement.PlacementRefDirection is IIfcVirtualGridIntersection v2)
+            {
+                var axes2 = v2.IntersectingAxes.ToList();
+                if (axes2.Count >= 2 &&
+                    TryIntersectGridAxes(axes2[0], axes2[1], out double ix2, out double iy2))
+                {
+                    double vx = ix - ix2, vy = iy - iy2;
+                    double mag = Math.Sqrt(vx * vx + vy * vy);
+                    if (mag > 1e-15) { refDirX = vx / mag; refDirY = vy / mag; }
+                }
+            }
+
+            // Apply offset distances via 2D transform
+            double offX = 0, offY = 0, offZ = 0;
+            var offsets = vi.OffsetDistances.ToList();
+            if (offsets.Count > 0) offX = offsets[0];
+            if (offsets.Count > 1) offY = offsets[1];
+            if (offsets.Count > 2) offZ = offsets[2];
+
+            // Transform offsets by the ref direction (2D rotation)
+            double perpX = -refDirY, perpY = refDirX;
+            double finalX = ix + refDirX * offX + perpX * offY;
+            double finalY = iy + refDirY * offX + perpY * offY;
+
+            // Build the translation location
+            int result = XbimGeometryNativeApi.xbim_location_create_from_axis2(
+                finalX, finalY, offZ,
+                0, 0, 1,
+                1, 0, 0,
+                out var handle);
+
+            if (result != 0)
+            {
+                _logger.LogWarning("Failed to create grid placement location: {Error}",
+                    XbimGeometryNativeApi.GetLastError());
+                return null;
+            }
+
+            var gridLoc = new XLocation(handle,
+                1, 0, 0,
+                0, 1, 0,
+                0, 0, 1,
+                finalX, finalY, offZ,
+                1.0);
+
+            // Apply the grid's own object placement
+            IIfcGrid? grid = axes[0].PartOfU.FirstOrDefault()
+                          ?? axes[0].PartOfV.FirstOrDefault()
+                          ?? axes[0].PartOfW.FirstOrDefault();
+
+            if (grid?.ObjectPlacement != null)
+            {
+                var gridObjLoc = ToLocation(grid.ObjectPlacement);
+                var composed = ComposeLocation(gridLoc, gridObjLoc);
+                return composed;
+            }
+
+            return gridLoc;
+        }
+
+        /// <summary>
+        /// Attempts to compute the 2D intersection of two grid axis curves.
+        /// Supports line-based grid axes (the common case).
+        /// </summary>
+        private bool TryIntersectGridAxes(IIfcGridAxis axis1, IIfcGridAxis axis2,
+            out double ix, out double iy)
+        {
+            ix = 0; iy = 0;
+
+            if (!TryGetLineFromGridAxis(axis1, out double o1x, out double o1y, out double d1x, out double d1y))
+                return false;
+            if (!TryGetLineFromGridAxis(axis2, out double o2x, out double o2y, out double d2x, out double d2y))
+                return false;
+
+            // Solve: o1 + t*d1 = o2 + s*d2 for t
+            // d1x*t - d2x*s = o2x - o1x
+            // d1y*t - d2y*s = o2y - o1y
+            double det = d1x * (-d2y) - d1y * (-d2x);
+            if (Math.Abs(det) < 1e-15)
+            {
+                _logger.LogWarning("Grid axes are parallel, cannot compute intersection.");
+                return false;
+            }
+
+            double bx = o2x - o1x;
+            double by = o2y - o1y;
+            double t = (bx * (-d2y) - by * (-d2x)) / det;
+
+            ix = o1x + t * d1x;
+            iy = o1y + t * d1y;
+            return true;
+        }
+
+        /// <summary>
+        /// Extracts a 2D line (origin + direction) from a grid axis curve.
+        /// </summary>
+        private bool TryGetLineFromGridAxis(IIfcGridAxis gridAxis,
+            out double ox, out double oy, out double dx, out double dy)
+        {
+            ox = oy = dx = dy = 0;
+
+            var axisCurve = gridAxis.AxisCurve;
+            if (axisCurve is IIfcTrimmedCurve trimmed)
+                axisCurve = trimmed.BasisCurve;
+
+            if (axisCurve is IIfcLine line)
+            {
+                ox = line.Pnt.Coordinates[0];
+                oy = line.Pnt.Coordinates.Count > 1 ? line.Pnt.Coordinates[1] : 0;
+                dx = line.Dir.Orientation.DirectionRatios[0];
+                dy = line.Dir.Orientation.DirectionRatios.Count > 1
+                    ? line.Dir.Orientation.DirectionRatios[1] : 0;
+                double mag = Math.Sqrt(dx * dx + dy * dy);
+                if (mag > 1e-15) { dx /= mag; dy /= mag; }
+                return true;
+            }
+
+            if (axisCurve is IIfcPolyline polyline && polyline.Points.Count >= 2)
+            {
+                var p0 = polyline.Points[0];
+                var p1 = polyline.Points[polyline.Points.Count - 1];
+                ox = p0.Coordinates[0];
+                oy = p0.Coordinates.Count > 1 ? p0.Coordinates[1] : 0;
+                dx = p1.Coordinates[0] - ox;
+                dy = (p1.Coordinates.Count > 1 ? p1.Coordinates[1] : 0) - oy;
+                double mag = Math.Sqrt(dx * dx + dy * dy);
+                if (mag > 1e-15) { dx /= mag; dy /= mag; return true; }
+            }
+
+            _logger.LogWarning("Grid axis curve type {Type} is not supported for intersection.",
+                axisCurve?.GetType().Name ?? "null");
+            return false;
+        }
+
+        /// <summary>
+        /// Computes the tangent direction of a grid axis at a given 2D point.
+        /// For line-based axes, this is simply the line direction.
+        /// </summary>
+        private bool TryGetGridAxisTangentAt(IIfcGridAxis gridAxis,
+            out double tanX, out double tanY)
+        {
+            return TryGetLineFromGridAxis(gridAxis, out _, out _, out tanX, out tanY);
+        }
+
 
         public IXMatrix BuildTransform(IIfcCartesianTransformationOperator transOp)
         {
@@ -536,9 +944,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             return matrix;
         }
 
-        #endregion
-
-        #region BuildMapTransform
 
         public void BuildMapTransform(
             IIfcCartesianTransformationOperator transform,
@@ -550,9 +955,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             matrix = BuildTransform(transform);
         }
 
-        #endregion
-
-        #region Not Yet Implemented (depend on other factories)
 
         public bool IsFacingAwayFrom(IXFace face, IXDirection direction)
         {
@@ -611,6 +1013,33 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 y /= mag;
                 z /= mag;
             }
+        }
+
+        /// <summary>
+        /// Rotates vector (vx,vy,vz) around unit axis (kx,ky,kz) by the given angle
+        /// using Rodrigues' rotation formula.
+        /// </summary>
+        private static void RotateAroundAxis(
+            ref double vx, ref double vy, ref double vz,
+            double kx, double ky, double kz,
+            double angle)
+        {
+            double cosA = Math.Cos(angle);
+            double sinA = Math.Sin(angle);
+            double dot = vx * kx + vy * ky + vz * kz;
+
+            // k × v
+            double cx = ky * vz - kz * vy;
+            double cy = kz * vx - kx * vz;
+            double cz = kx * vy - ky * vx;
+
+            double nx = vx * cosA + cx * sinA + kx * dot * (1 - cosA);
+            double ny = vy * cosA + cy * sinA + ky * dot * (1 - cosA);
+            double nz = vz * cosA + cz * sinA + kz * dot * (1 - cosA);
+
+            vx = nx;
+            vy = ny;
+            vz = nz;
         }
 
         private static bool DirectionsEqual(double ax, double ay, double az, double bx, double by, double bz)

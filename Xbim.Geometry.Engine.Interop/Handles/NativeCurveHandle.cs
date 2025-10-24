@@ -16,6 +16,21 @@ namespace Xbim.Geometry.Engine.Interop.Handles
 
         public NativeCurveHandle() : base(IntPtr.Zero, ownsHandle: true) { }
 
+        private NativeCurveHandle(IntPtr existingHandle, bool ownsHandle) : base(IntPtr.Zero, ownsHandle)
+        {
+            SetHandle(existingHandle);
+        }
+
+        /// <summary>
+        /// Creates a non-owning handle that references an existing native curve pointer.
+        /// The caller must ensure the owning handle outlives this borrowed reference.
+        /// Disposing the borrowed handle is safe and does not release the native resource.
+        /// </summary>
+        internal static NativeCurveHandle Borrowed(IntPtr ptr)
+        {
+            return new NativeCurveHandle(ptr, ownsHandle: false);
+        }
+
         public override bool IsInvalid => handle == IntPtr.Zero;
 
         protected override bool ReleaseHandle()
