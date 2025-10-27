@@ -103,28 +103,19 @@ namespace Xbim.Geometry.Engine.Interop.Services
             var native = shape as Shape
                 ?? throw new ArgumentException("Shape must be a Shape.", nameof(shape));
 
-            // Build location from the rotation part of the matrix
-            int result = XbimGeometryNativeApi.xbim_location_create_from_axis2(
-                transformMatrix.OffsetX, transformMatrix.OffsetY, transformMatrix.OffsetZ,
-                transformMatrix.M31, transformMatrix.M32, transformMatrix.M33,
-                transformMatrix.M11, transformMatrix.M12, transformMatrix.M13,
-                out var locHandle);
+            int result = XbimGeometryNativeApi.xbim_shape_gtransform(
+                native.Handle,
+                transformMatrix.M11, transformMatrix.M12, transformMatrix.M13, transformMatrix.OffsetX,
+                transformMatrix.M21, transformMatrix.M22, transformMatrix.M23, transformMatrix.OffsetY,
+                transformMatrix.M31, transformMatrix.M32, transformMatrix.M33, transformMatrix.OffsetZ,
+                transformMatrix.ScaleX, transformMatrix.ScaleY, transformMatrix.ScaleZ,
+                out var transformedHandle);
 
             if (result != 0)
                 throw new InvalidOperationException(
-                    $"Failed to create transform location: {XbimGeometryNativeApi.GetLastError()}");
+                    $"Failed to transform shape: {XbimGeometryNativeApi.GetLastError()}");
 
-            using (locHandle)
-            {
-                result = XbimGeometryNativeApi.xbim_shape_moved(
-                    native.Handle, locHandle, out var movedHandle);
-
-                if (result != 0)
-                    throw new InvalidOperationException(
-                        $"Failed to transform shape: {XbimGeometryNativeApi.GetLastError()}");
-
-                return NativeShapeWrapper.WrapShape(movedHandle);
-            }
+            return NativeShapeWrapper.WrapShape(transformedHandle);
         }
 
         public void Triangulate(IXShape shape) { /* handled by meshing pipeline */ }
@@ -233,30 +224,20 @@ namespace Xbim.Geometry.Engine.Interop.Services
             var native = shape as Shape
                 ?? throw new ArgumentException("Shape must be a Shape.", nameof(shape));
 
-            // Create a uniform scaling transform: identity rotation with scale on diagonal
-            int result = XbimGeometryNativeApi.xbim_location_create_from_axis2(
-                0, 0, 0, 0, 0, 1, 1, 0, 0, out var locHandle);
+            // Identity rotation + uniform scale via gp_GTrsf
+            int result = XbimGeometryNativeApi.xbim_shape_gtransform(
+                native.Handle,
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                scale, scale, scale,
+                out var scaledHandle);
 
             if (result != 0)
-                throw new InvalidOperationException("Failed to create scale location.");
+                throw new InvalidOperationException(
+                    $"Failed to scale shape: {XbimGeometryNativeApi.GetLastError()}");
 
-            using (locHandle)
-            {
-                // Move to origin, scale, move back — for uniform scale, BRepBuilderAPI_Transform is better
-                // but we don't have a dedicated native API. Use compound-based scaling workaround:
-                // Build a scaled copy by moving shape to scaled location.
-                // This is a limitation — true scaling needs a native xbim_shape_scaled API.
-                _logger.LogWarning("Uniform scaling via location transform has limited precision; a native scale API is needed for full support.");
-
-                result = XbimGeometryNativeApi.xbim_shape_moved(
-                    native.Handle, locHandle, out var movedHandle);
-
-                if (result != 0)
-                    throw new InvalidOperationException(
-                        $"Failed to scale shape: {XbimGeometryNativeApi.GetLastError()}");
-
-                return NativeShapeWrapper.WrapShape(movedHandle);
-            }
+            return NativeShapeWrapper.WrapShape(scaledHandle);
         }
 
         public bool IsFacingAwayFrom(IXFace face, IXDirection direction)

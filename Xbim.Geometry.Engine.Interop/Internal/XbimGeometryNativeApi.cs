@@ -153,6 +153,15 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeLocationHandle locationHandle,
             out NativeShapeHandle outHandle);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_gtransform(
+            NativeShapeHandle shapeHandle,
+            double m11, double m12, double m13, double offsetX,
+            double m21, double m22, double m23, double offsetY,
+            double m31, double m32, double m33, double offsetZ,
+            double scaleX, double scaleY, double scaleZ,
+            out NativeShapeHandle outHandle);
+
         #endregion
 
         #region CSG Solid Primitives
@@ -903,7 +912,9 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeContextHandle ctx,
             double centerX, double centerY, double centerZ,
             double normalX, double normalY, double normalZ,
-            double majorRadius, double minorRadius,
+            double xDirX, double xDirY, double xDirZ,
+            double semiAxis1, double semiAxis2,
+            out int outRotated,
             out NativeCurveHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
@@ -954,6 +965,17 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         internal static extern int xbim_curve_is_closed(
             NativeCurveHandle handle,
             double tolerance);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_reverse(NativeCurveHandle handle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_build_composite_bspline(
+            NativeContextHandle ctx,
+            [In] IntPtr[] curves,
+            int numCurves,
+            double tolerance,
+            out NativeCurveHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_curve_build_clothoid(

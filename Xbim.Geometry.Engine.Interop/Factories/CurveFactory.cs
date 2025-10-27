@@ -137,13 +137,15 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 ifcEllipse.Position,
                 out double ox, out double oy, out double oz,
                 out double zx, out double zy, out double zz,
-                out _, out _, out _);
+                out double xx, out double xy, out double xz);
 
             int result = XbimGeometryNativeApi.xbim_curve_build_ellipse_3d(
                 ContextHandle,
                 ox, oy, oz,
                 zx, zy, zz,
+                xx, xy, xz,
                 ifcEllipse.SemiAxis1, ifcEllipse.SemiAxis2,
+                out _,
                 out var NativeCurveHandle);
 
             if (result != 0)
@@ -276,17 +278,50 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private Curve BuildCompositeCurve(IIfcCompositeCurve ifcComposite)
         {
-            // Build each segment, then compose.
-            // For now, build the first valid segment as a simplification.
-            // Full composite curve support requires wire-level composition.
-            foreach (var segment in ifcComposite.Segments)
-            {
-                if (segment.ParentCurve != null)
-                    return (Curve)Build(segment.ParentCurve);
-            }
+            var segmentCurves = new List<Curve>();
 
-            throw new InvalidOperationException(
-                $"IIfcCompositeCurve #{ifcComposite.EntityLabel} has no valid segments.");
+            try
+            {
+                foreach (var segment in ifcComposite.Segments)
+                {
+                    if (segment.ParentCurve == null)
+                        continue;
+
+                    var segCurve = (Curve)Build(segment.ParentCurve);
+
+                    if (!segment.SameSense)
+                    {
+                        int reverseResult = XbimGeometryNativeApi.xbim_curve_reverse(segCurve.Handle);
+                        if (reverseResult != 0)
+                            throw new InvalidOperationException(
+                                $"Failed to reverse composite curve segment: {XbimGeometryNativeApi.GetLastError()}");
+                    }
+
+                    segmentCurves.Add(segCurve);
+                }
+
+                if (segmentCurves.Count == 0)
+                    throw new InvalidOperationException(
+                        $"IIfcCompositeCurve #{ifcComposite.EntityLabel} has no valid segments.");
+
+                using var nativeSegments = new NativeHandleArray(
+                    segmentCurves.Select(c => c.Handle).ToArray());
+                int result = XbimGeometryNativeApi.xbim_curve_build_composite_bspline(
+                    ContextHandle, nativeSegments.Ptrs, nativeSegments.Length,
+                    _modelService.MinimumGap,
+                    out var compositeHandle);
+
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                return new Curve(compositeHandle, XCurveType.IfcCompositeCurve);
+            }
+            finally
+            {
+                foreach (var c in segmentCurves)
+                    c.Dispose();
+            }
         }
 
         private Curve BuildIndexedPolyCurve(IIfcIndexedPolyCurve ifcIndexed)
@@ -426,9 +461,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         $"IfcGradientCurve #{ifcGradient.EntityLabel}: no valid height function segments.");
 
                 // Step 3: Join height segments into composite 2D B-spline
-                var segPtrs = heightSegmentHandles.Select(h => h.DangerousGetHandle()).ToArray();
+                using var nativeHeightSegs = new NativeHandleArray(heightSegmentHandles.ToArray());
                 int compositeResult = XbimGeometryNativeApi.xbim_curve2d_build_composite_bspline(
-                    ContextHandle, segPtrs, segPtrs.Length,
+                    ContextHandle, nativeHeightSegs.Ptrs, nativeHeightSegs.Length,
                     _modelService.MinimumGap,
                     out var heightFunctionHandle);
 
@@ -458,9 +493,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
             finally
             {
-                // Keep segment handles alive until composite is built
-                // (DangerousGetHandle pattern — handles must not be GC'd while native holds pointers)
-                GC.KeepAlive(heightSegmentHandles);
+                foreach (var h in heightSegmentHandles)
+                    h.Dispose();
             }
         }
 
@@ -506,9 +540,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         throw new InvalidOperationException(
                             $"IfcGradientCurve #{ifcGradient.EntityLabel}: BaseCurve has no valid segments.");
 
-                    var segPtrs = segHandles.Select(h => h.DangerousGetHandle()).ToArray();
+                    using var nativeSegs = new NativeHandleArray(segHandles.ToArray());
                     int result = XbimGeometryNativeApi.xbim_curve2d_build_composite_bspline(
-                        ContextHandle, segPtrs, segPtrs.Length,
+                        ContextHandle, nativeSegs.Ptrs, nativeSegs.Length,
                         _modelService.MinimumGap,
                         out var compositeHandle);
 
@@ -520,7 +554,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
                 finally
                 {
-                    GC.KeepAlive(segHandles);
+                    foreach (var h in segHandles)
+                        h.Dispose();
                 }
             }
 
@@ -754,15 +789,15 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     endPointHandle = BuildPlacementLocation(endPlacement);
 
                 // Step 4: Create the segmented reference curve
-                var curvePtrs = segCurveHandles.Select(h => h.DangerousGetHandle()).ToArray();
-                var locPtrs = segLocationHandles.Select(h => h.DangerousGetHandle()).ToArray();
+                using var nativeCurves = new NativeHandleArray(segCurveHandles.ToArray());
+                using var nativeLocs = new NativeHandleArray(segLocationHandles.ToArray());
 
                 int result = XbimGeometryNativeApi.xbim_curve_build_segmented_reference(
                     ContextHandle,
                     gradientHandle,
-                    curvePtrs,
-                    locPtrs,
-                    curvePtrs.Length,
+                    nativeCurves.Ptrs,
+                    nativeLocs.Ptrs,
+                    nativeCurves.Length,
                     endPointHandle,
                     out var outHandle);
 
@@ -774,9 +809,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
             finally
             {
-                GC.KeepAlive(segCurveHandles);
-                GC.KeepAlive(segLocationHandles);
-                GC.KeepAlive(gradientCurve);
+                foreach (var h in segCurveHandles)
+                    h.Dispose();
+                foreach (var h in segLocationHandles)
+                    h.Dispose();
+                gradientCurve?.Dispose();
             }
         }
 
@@ -1055,13 +1092,13 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private Curve GetOrBuildCached(int entityLabel, Func<Curve> builder)
         {
             if (_curveCache.TryGetValue(entityLabel, out var entry))
-                return new Curve(NativeCurveHandle.Borrowed(entry.Handle.DangerousGetHandle()), entry.CurveType);
+                return new Curve(NativeCurveHandle.Borrowed(entry.Handle), entry.CurveType);
 
             var built = builder();
             var curveType = built.CurveType;
             var owningHandle = built.DetachHandle();
             _curveCache[entityLabel] = (owningHandle, curveType);
-            return new Curve(NativeCurveHandle.Borrowed(owningHandle.DangerousGetHandle()), curveType);
+            return new Curve(NativeCurveHandle.Borrowed(owningHandle), curveType);
         }
 
         public void Dispose()

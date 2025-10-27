@@ -387,6 +387,29 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_moved(
     XbimLocationHandle  locationHandle,
     XbimShapeHandle*    outHandle);
 
+/*
+ * Apply a general affine transformation (gp_GTrsf) to a shape, producing a
+ * new transformed shape. Supports non-uniform scaling via ScaleX/Y/Z.
+ *
+ * The 3x4 matrix (m11..m33 + offsets) encodes rotation/reflection and
+ * translation. If scaleX, scaleY, and scaleZ are all non-zero, a separate
+ * scale transform is multiplied in.
+ *
+ *   shapeHandle                 – source shape
+ *   m11..m33, offsetX/Y/Z      – 3x4 affine matrix
+ *   scaleX, scaleY, scaleZ     – non-uniform scale factors (0 = no scale)
+ *   outHandle                  – receives the new transformed shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_gtransform(
+    XbimShapeHandle shapeHandle,
+    double m11, double m12, double m13, double offsetX,
+    double m21, double m22, double m23, double offsetY,
+    double m31, double m32, double m33, double offsetZ,
+    double scaleX, double scaleY, double scaleZ,
+    XbimShapeHandle* outHandle);
+
 #pragma endregion
 
 #pragma region CSG Solid Primitives
@@ -2183,15 +2206,19 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_circle_3d(
     XbimCurveHandle* outHandle);
 
 /*
- * Build a 3D ellipse curve from center, axis normal, and semi-axes.
- * If majorRadius < minorRadius, the values are swapped internally.
+ * Build a 3D ellipse curve from center, axis placement, and IFC semi-axes.
+ * Uses Geom_EllipseWithSemiAxes to handle IFC semantics: when semiAxis1
+ * (along X) is smaller than semiAxis2 (along Y), the placement is rotated
+ * by -PI/2 so OCCT's major axis aligns with IFC's SemiAxis2 direction.
  *
  *   ctx              – a valid context handle (used for logging; may be NULL)
  *   centerX/Y/Z      – center point of the ellipse
  *   normalX/Y/Z      – axis normal direction (defines the plane)
- *   majorRadius      – semi-major axis length (must be positive)
- *   minorRadius      – semi-minor axis length (must be positive)
- *   outHandle        – receives the new curve handle
+ *   xDirX/Y/Z        – X reference direction (SemiAxis1 direction)
+ *   semiAxis1         – IFC SemiAxis1 length (along X, must be positive)
+ *   semiAxis2         – IFC SemiAxis2 length (along Y, must be positive)
+ *   outRotated        – receives 1 if axes were swapped (may be NULL)
+ *   outHandle         – receives the new curve handle
  *
  * Returns XBIM_OK on success.
  */
@@ -2199,7 +2226,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_ellipse_3d(
     XbimContextHandle ctx,
     double centerX,  double centerY,  double centerZ,
     double normalX,  double normalY,  double normalZ,
-    double majorRadius, double minorRadius,
+    double xDirX,    double xDirY,    double xDirZ,
+    double semiAxis1, double semiAxis2,
+    int* outRotated,
     XbimCurveHandle* outHandle);
 
 /*
@@ -2297,6 +2326,35 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_d2(
 XBIM_EXPORT int XBIM_CALL xbim_curve_is_closed(
     XbimCurveHandle handle,
     double          tolerance);
+
+/*
+ * Reverse the direction of a curve in-place.
+ *
+ *   handle – a valid curve handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_reverse(XbimCurveHandle handle);
+
+/*
+ * Join multiple bounded 3D curves into a single B-spline curve.
+ * Curves that cannot be added directly are approximated via point sampling.
+ * Gaps between non-contiguous segments are filled with linear segments.
+ *
+ *   ctx       – a valid context handle (used for logging; may be NULL)
+ *   curves    – array of curve handles (must wrap bounded curves)
+ *   numCurves – number of curves in the array (>= 1)
+ *   tolerance – gap tolerance for joining segments
+ *   outHandle – receives the composite B-spline curve handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_composite_bspline(
+    XbimContextHandle   ctx,
+    XbimCurveHandle*    curves,
+    int                 numCurves,
+    double              tolerance,
+    XbimCurveHandle*    outHandle);
 
 #pragma endregion
 

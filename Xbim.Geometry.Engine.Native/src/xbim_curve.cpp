@@ -18,6 +18,7 @@
 #include "xbim_logging.h"
 #include "Geom_GradientCurve.h"
 #include "Geom_SegmentedReferenceCurve.h"
+#include "Geom_EllipseWithSemiAxes.h"
 
 #include <gp_Pnt.hxx>
 #include <gp_Dir.hxx>
@@ -36,6 +37,10 @@
 #include <TColStd_Array1OfInteger.hxx>
 #include <GeomAdaptor_Curve.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
+#include <GeomConvert_CompCurveToBSplineCurve.hxx>
+#include <GeomAPI_PointsToBSpline.hxx>
+#include <Geom_BoundedCurve.hxx>
+#include <Geom_TrimmedCurve.hxx>
 #include <Standard_Failure.hxx>
 
 #pragma region Curve Helpers
@@ -159,7 +164,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_ellipse_3d(
     XbimContextHandle ctx,
     double centerX,  double centerY,  double centerZ,
     double normalX,  double normalY,  double normalZ,
-    double majorRadius, double minorRadius,
+    double xDirX,    double xDirY,    double xDirZ,
+    double semiAxis1, double semiAxis2,
+    int* outRotated,
     XbimCurveHandle* outHandle)
 {
     xbim_clear_error();
@@ -171,9 +178,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_ellipse_3d(
     }
     *outHandle = nullptr;
 
-    if (majorRadius <= Precision::Confusion() || minorRadius <= Precision::Confusion())
+    if (semiAxis1 <= Precision::Confusion() || semiAxis2 <= Precision::Confusion())
     {
-        xbim_set_error("xbim_curve_build_ellipse_3d: radii must be positive");
+        xbim_set_error("xbim_curve_build_ellipse_3d: semi-axes must be positive");
         return XBIM_INVALID_ARG;
     }
 
@@ -181,16 +188,14 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_ellipse_3d(
     {
         gp_Pnt center(centerX, centerY, centerZ);
         gp_Dir normal(normalX, normalY, normalZ);
-        gp_Ax2 ax2(center, normal);
+        gp_Dir xDir(xDirX, xDirY, xDirZ);
+        gp_Ax2 ax2(center, normal, xDir);
 
-        /* OCCT requires majorRadius >= minorRadius for Geom_Ellipse.
-         * If the caller's semi-axes are swapped, we swap them. */
-        double major = majorRadius;
-        double minor = minorRadius;
-        if (minor > major)
-            std::swap(major, minor);
+        Handle(Geom_EllipseWithSemiAxes) ellipse =
+            new Geom_EllipseWithSemiAxes(ax2, semiAxis1, semiAxis2);
 
-        Handle(Geom_Ellipse) ellipse = new Geom_Ellipse(ax2, major, minor);
+        if (outRotated)
+            *outRotated = ellipse->IsRotated() ? 1 : 0;
 
         *outHandle = xbim_curve_create_from(ellipse);
         if (!*outHandle)
@@ -704,6 +709,173 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_get_superelevation_and_tilt(
     {
         xbim_log_occt_failure(nullptr, e, "xbim_curve_get_superelevation_and_tilt");
         xbim_set_error("xbim_curve_get_superelevation_and_tilt: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+#pragma endregion
+
+#pragma region Composite Curve
+
+/*
+ * Approximate a 3D curve by sampling points and fitting a B-spline.
+ * Used for curves that cannot be added directly to
+ * GeomConvert_CompCurveToBSplineCurve.
+ */
+static Handle(Geom_BSplineCurve) ApproximateCurve3d(
+    const Handle(Geom_Curve)& curve,
+    Standard_Real first, Standard_Real last,
+    int numPoints)
+{
+    if (numPoints < 2) numPoints = 200;
+
+    TColgp_Array1OfPnt points(1, numPoints);
+    double delta = (last - first) / (numPoints - 1);
+
+    for (int i = 1; i <= numPoints; ++i)
+    {
+        double u = first + (i - 1) * delta;
+        if (u > last) u = last;
+        points.SetValue(i, curve->Value(u));
+    }
+
+    GeomAPI_PointsToBSpline fitter(points, 3, 8, GeomAbs_C2, 1.0e-6);
+    if (!fitter.IsDone())
+        return Handle(Geom_BSplineCurve)();
+
+    return fitter.Curve();
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_reverse(XbimCurveHandle handle)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_curve_reverse: null handle");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    if (handle->curve.IsNull())
+    {
+        xbim_set_error("xbim_curve_reverse: curve is null");
+        return XBIM_ERROR;
+    }
+
+    try
+    {
+        handle->curve->Reverse();
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_curve_reverse: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_composite_bspline(
+    XbimContextHandle   ctx,
+    XbimCurveHandle*    curves,
+    int                 numCurves,
+    double              tolerance,
+    XbimCurveHandle*    outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve_build_composite_bspline: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!curves || numCurves < 1)
+    {
+        xbim_set_error("xbim_curve_build_composite_bspline: need at least 1 curve");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        GeomConvert_CompCurveToBSplineCurve converter(Convert_RationalC1);
+
+        gp_Pnt prevEnd;
+        bool hasPrev = false;
+
+        for (int i = 0; i < numCurves; ++i)
+        {
+            if (!curves[i] || curves[i]->curve.IsNull())
+            {
+                xbim_log_warning(ctx, "xbim_curve_build_composite_bspline: curve %d is NULL, skipping", i);
+                continue;
+            }
+
+            Handle(Geom_Curve) c = curves[i]->curve;
+            Handle(Geom_BoundedCurve) bounded = Handle(Geom_BoundedCurve)::DownCast(c);
+            if (bounded.IsNull())
+            {
+                xbim_log_warning(ctx, "xbim_curve_build_composite_bspline: curve %d is not bounded, skipping", i);
+                continue;
+            }
+
+            Standard_Real first = bounded->FirstParameter();
+            Standard_Real last = bounded->LastParameter();
+
+            /* Fill gap between segments with a line if needed */
+            if (hasPrev)
+            {
+                gp_Pnt startPt = bounded->Value(first);
+                if (!prevEnd.IsEqual(startPt, tolerance))
+                {
+                    gp_Dir gapDir(gp_Vec(prevEnd, startPt));
+                    double gapLen = prevEnd.Distance(startPt);
+                    Handle(Geom_TrimmedCurve) gapLine = new Geom_TrimmedCurve(
+                        new Geom_Line(prevEnd, gapDir), 0.0, gapLen);
+                    converter.Add(gapLine, tolerance, Standard_False);
+                }
+            }
+
+            /* Try to add directly, approximate if needed */
+            Handle(Geom_BSplineCurve) toAdd;
+
+            if (!converter.Add(bounded, tolerance, Standard_False))
+            {
+                int n = std::max(200, static_cast<int>(std::abs(last - first) * 10) + 1);
+                toAdd = ApproximateCurve3d(bounded, first, last, n);
+            }
+
+            if (!toAdd.IsNull())
+            {
+                if (!converter.Add(toAdd, tolerance, Standard_False))
+                {
+                    xbim_log_warning(ctx,
+                        "xbim_curve_build_composite_bspline: failed to add curve %d after approximation", i);
+                }
+            }
+
+            /* Track end point for gap filling */
+            prevEnd = bounded->Value(last);
+            hasPrev = true;
+        }
+
+        Handle(Geom_BSplineCurve) result = converter.BSplineCurve();
+        if (result.IsNull())
+        {
+            xbim_set_error("xbim_curve_build_composite_bspline: composite B-spline is null");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_curve_create_from(result);
+        return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve_build_composite_bspline");
+        xbim_set_error("xbim_curve_build_composite_bspline: OCCT exception");
         return XBIM_ERROR;
     }
 }

@@ -35,6 +35,8 @@
 #include <BinTools.hxx>
 #include <ShapeAnalysis.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
+#include <gp_GTrsf.hxx>
+#include <BRepBuilderAPI_GTransform.hxx>
 
 #pragma region Shape Helpers
 
@@ -909,6 +911,91 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_unify_domain(
     {
         const char* msg = e.GetMessageString();
         xbim_set_error(msg ? msg : "xbim_shape_unify_domain: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_gtransform(
+    XbimShapeHandle shapeHandle,
+    double m11, double m12, double m13, double offsetX,
+    double m21, double m22, double m23, double offsetY,
+    double m31, double m32, double m33, double offsetZ,
+    double scaleX, double scaleY, double scaleZ,
+    XbimShapeHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_shape_gtransform: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!shapeHandle)
+    {
+        xbim_set_error("xbim_shape_gtransform: shapeHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (shapeHandle->shape.IsNull())
+    {
+        xbim_set_error("xbim_shape_gtransform: shape is null");
+        return XBIM_NULL_SHAPE;
+    }
+
+    try
+    {
+        gp_GTrsf trsf;
+        trsf.SetValue(1, 1, m11);
+        trsf.SetValue(1, 2, m12);
+        trsf.SetValue(1, 3, m13);
+        trsf.SetValue(1, 4, offsetX);
+        trsf.SetValue(2, 1, m21);
+        trsf.SetValue(2, 2, m22);
+        trsf.SetValue(2, 3, m23);
+        trsf.SetValue(2, 4, offsetY);
+        trsf.SetValue(3, 1, m31);
+        trsf.SetValue(3, 2, m32);
+        trsf.SetValue(3, 3, m33);
+        trsf.SetValue(3, 4, offsetZ);
+
+        if (scaleX != 0 && scaleY != 0 && scaleZ != 0)
+        {
+            gp_GTrsf scale;
+            scale.SetValue(1, 1, scaleX);
+            scale.SetValue(2, 2, scaleY);
+            scale.SetValue(3, 3, scaleZ);
+            trsf = trsf.Multiplied(scale);
+        }
+
+        BRepBuilderAPI_GTransform transformer(shapeHandle->shape, trsf, Standard_True);
+        if (!transformer.IsDone())
+        {
+            xbim_set_error("xbim_shape_gtransform: BRepBuilderAPI_GTransform failed");
+            return XBIM_ERROR;
+        }
+
+        const TopoDS_Shape& result = transformer.Shape();
+        if (result.IsNull())
+        {
+            xbim_set_error("xbim_shape_gtransform: result shape is null");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_shape_create_from(result);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_shape_gtransform: allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_shape_gtransform: OCCT exception");
         return XBIM_ERROR;
     }
 }
