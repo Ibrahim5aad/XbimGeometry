@@ -41,6 +41,10 @@
 #include <GeomAPI_PointsToBSpline.hxx>
 #include <Geom_BoundedCurve.hxx>
 #include <Geom_TrimmedCurve.hxx>
+#include <GC_MakeArcOfCircle.hxx>
+#include <GC_MakeArcOfEllipse.hxx>
+#include <GC_MakeCircle.hxx>
+#include <GC_MakeSegment.hxx>
 #include <Standard_Failure.hxx>
 
 #pragma region Curve Helpers
@@ -299,6 +303,245 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_bspline(
     {
         xbim_log_occt_failure(ctx, e, "xbim_curve_build_bspline");
         xbim_set_error("xbim_curve_build_bspline: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_trimmed_3d(
+    XbimContextHandle ctx,
+    XbimCurveHandle   basisHandle,
+    double u1, double u2,
+    int sense,
+    XbimCurveHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve_build_trimmed_3d: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!basisHandle || basisHandle->curve.IsNull())
+    {
+        xbim_set_error("xbim_curve_build_trimmed_3d: basisHandle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        bool sameSense = (sense != 0);
+        Handle(Geom_Curve) basis = basisHandle->curve;
+
+        /* Circle: use GC_MakeArcOfCircle for proper arc construction */
+        Handle(Geom_Circle) circle = Handle(Geom_Circle)::DownCast(basis);
+        if (!circle.IsNull())
+        {
+            if (!sameSense)
+            {
+                double tmp = u1;
+                u1 = u2;
+                u2 = tmp;
+            }
+            GC_MakeArcOfCircle arcMaker(circle->Circ(), u1, u2, sameSense);
+            if (!arcMaker.IsDone())
+            {
+                xbim_set_error("xbim_curve_build_trimmed_3d: GC_MakeArcOfCircle failed");
+                return XBIM_ERROR;
+            }
+            *outHandle = xbim_curve_create_from(arcMaker.Value());
+            return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+        }
+
+        /* Ellipse with semi-axes: convert IFC trim parameters, then arc */
+        Handle(Geom_EllipseWithSemiAxes) ellipse =
+            Handle(Geom_EllipseWithSemiAxes)::DownCast(basis);
+        if (!ellipse.IsNull())
+        {
+            u1 = ellipse->ConvertIfcTrimParameter(u1);
+            u2 = ellipse->ConvertIfcTrimParameter(u2);
+            GC_MakeArcOfEllipse arcMaker(ellipse->Elips(), u1, u2, sameSense);
+            if (!arcMaker.IsDone())
+            {
+                xbim_set_error("xbim_curve_build_trimmed_3d: GC_MakeArcOfEllipse failed");
+                return XBIM_ERROR;
+            }
+            Handle(Geom_TrimmedCurve) arc = arcMaker.Value();
+            if (!sameSense)
+                arc->Reverse();
+            *outHandle = xbim_curve_create_from(arc);
+            return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+        }
+
+        /* Generic: Geom_TrimmedCurve with adjustable periodicity */
+        Handle(Geom_TrimmedCurve) trimmed =
+            new Geom_TrimmedCurve(basis, u1, u2, sameSense, /* theAdjustPeriodic */ true);
+
+        *outHandle = xbim_curve_create_from(trimmed);
+        return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve_build_trimmed_3d");
+        xbim_set_error("xbim_curve_build_trimmed_3d: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_trimmed_line_3d(
+    XbimContextHandle ctx,
+    double x1, double y1, double z1,
+    double x2, double y2, double z2,
+    XbimCurveHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve_build_trimmed_line_3d: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    try
+    {
+        gp_Pnt start(x1, y1, z1);
+        gp_Pnt end(x2, y2, z2);
+        gp_Vec dir(start, end);
+
+        if (dir.Magnitude() < Precision::Confusion())
+        {
+            xbim_set_error("xbim_curve_build_trimmed_line_3d: start and end points are identical");
+            return XBIM_INVALID_ARG;
+        }
+
+        gp_Lin line(start, dir);
+        Handle(Geom_Line) hLine = new Geom_Line(line);
+        Handle(Geom_TrimmedCurve) trimmed =
+            new Geom_TrimmedCurve(hLine, 0.0, dir.Magnitude());
+
+        *outHandle = xbim_curve_create_from(trimmed);
+        return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve_build_trimmed_line_3d");
+        xbim_set_error("xbim_curve_build_trimmed_line_3d: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_circle_3pt_3d(
+    XbimContextHandle ctx,
+    double x1, double y1, double z1,
+    double x2, double y2, double z2,
+    double x3, double y3, double z3,
+    XbimCurveHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve_build_circle_3pt_3d: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    try
+    {
+        gp_Pnt p1(x1, y1, z1);
+        gp_Pnt p2(x2, y2, z2);
+        gp_Pnt p3(x3, y3, z3);
+
+        /* Check for coincident points */
+        if (p1.Distance(p2) < Precision::Confusion() ||
+            p2.Distance(p3) < Precision::Confusion() ||
+            p1.Distance(p3) < Precision::Confusion())
+        {
+            xbim_set_error("xbim_curve_build_circle_3pt_3d: two or more points are coincident");
+            return XBIM_INVALID_ARG;
+        }
+
+        GC_MakeCircle circleMaker(p1, p2, p3);
+        if (!circleMaker.IsDone())
+        {
+            /* Points are likely collinear — caller should handle fallback */
+            xbim_set_error("xbim_curve_build_circle_3pt_3d: circle could not be built from 3 points (collinear?)");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_curve_create_from(circleMaker.Value());
+        return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve_build_circle_3pt_3d");
+        xbim_set_error("xbim_curve_build_circle_3pt_3d: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_arc_of_circle_3d(
+    XbimContextHandle ctx,
+    XbimCurveHandle   circleHandle,
+    double u1, double u2,
+    int sense,
+    XbimCurveHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve_build_arc_of_circle_3d: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!circleHandle || circleHandle->curve.IsNull())
+    {
+        xbim_set_error("xbim_curve_build_arc_of_circle_3d: circleHandle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        Handle(Geom_Circle) circle =
+            Handle(Geom_Circle)::DownCast(circleHandle->curve);
+        if (circle.IsNull())
+        {
+            xbim_set_error("xbim_curve_build_arc_of_circle_3d: handle does not contain a Geom_Circle");
+            return XBIM_INVALID_ARG;
+        }
+
+        bool sameSense = (sense != 0);
+
+        /* Match legacy: if !sense, swap parameters */
+        if (!sameSense)
+        {
+            double tmp = u1;
+            u1 = u2;
+            u2 = tmp;
+        }
+
+        GC_MakeArcOfCircle arcMaker(circle->Circ(), u1, u2, sameSense);
+        if (!arcMaker.IsDone())
+        {
+            xbim_set_error("xbim_curve_build_arc_of_circle_3d: GC_MakeArcOfCircle failed");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_curve_create_from(arcMaker.Value());
+        return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve_build_arc_of_circle_3d");
+        xbim_set_error("xbim_curve_build_arc_of_circle_3d: OCCT exception");
         return XBIM_ERROR;
     }
 }

@@ -2260,6 +2260,83 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_bspline(
     XbimCurveHandle*  outHandle);
 
 /*
+ * Build a trimmed 3D curve from a basis curve and parameter range.
+ * Handles circle (GC_MakeArcOfCircle), ellipse with IFC semi-axis conversion
+ * (GC_MakeArcOfEllipse + ConvertIfcTrimParameter), and generic curves
+ * (Geom_TrimmedCurve).
+ *
+ *   ctx         – a valid context handle (used for logging; may be NULL)
+ *   basisHandle – the unbounded or periodic basis curve to trim
+ *   u1/u2       – trim parameter values
+ *   sense       – nonzero for same-sense, zero for reversed
+ *   outHandle   – receives the trimmed curve handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_trimmed_3d(
+    XbimContextHandle   ctx,
+    XbimCurveHandle     basisHandle,
+    double u1, double u2,
+    int sense,
+    XbimCurveHandle*    outHandle);
+
+/*
+ * Build a bounded 3D line segment between two points.
+ * Creates a Geom_Line from start to end, then trims it from 0 to the distance.
+ *
+ *   ctx          – a valid context handle (used for logging; may be NULL)
+ *   x1/y1/z1     – start point
+ *   x2/y2/z2     – end point
+ *   outHandle    – receives the trimmed line handle
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if points are coincident.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_trimmed_line_3d(
+    XbimContextHandle   ctx,
+    double x1, double y1, double z1,
+    double x2, double y2, double z2,
+    XbimCurveHandle*    outHandle);
+
+/*
+ * Build a 3D circle from three non-collinear points.
+ * Uses GC_MakeCircle. Returns XBIM_ERROR if points are collinear (caller
+ * should handle the fallback to a line segment).
+ *
+ *   ctx          – a valid context handle (used for logging; may be NULL)
+ *   x1/y1/z1     – first point
+ *   x2/y2/z2     – second point (mid-arc)
+ *   x3/y3/z3     – third point
+ *   outHandle    – receives the circle handle (full circle, not trimmed)
+ *
+ * Returns XBIM_OK on success; XBIM_ERROR if collinear.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_circle_3pt_3d(
+    XbimContextHandle   ctx,
+    double x1, double y1, double z1,
+    double x2, double y2, double z2,
+    double x3, double y3, double z3,
+    XbimCurveHandle*    outHandle);
+
+/*
+ * Build a circular arc (Geom_TrimmedCurve) from a 3D circle and parameter range.
+ * Uses GC_MakeArcOfCircle. If !sense, parameters are swapped (legacy behavior).
+ *
+ *   ctx          – a valid context handle (used for logging; may be NULL)
+ *   circleHandle – a handle wrapping a Geom_Circle
+ *   u1/u2        – trim parameter values (radians)
+ *   sense        – nonzero for same-sense, zero for reversed
+ *   outHandle    – receives the arc handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_arc_of_circle_3d(
+    XbimContextHandle   ctx,
+    XbimCurveHandle     circleHandle,
+    double u1, double u2,
+    int sense,
+    XbimCurveHandle*    outHandle);
+
+/*
  * Destroy a curve handle and free its resources.
  * Passing NULL is a safe no-op.
  */

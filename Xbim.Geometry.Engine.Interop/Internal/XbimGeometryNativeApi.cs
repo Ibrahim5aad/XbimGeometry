@@ -930,6 +930,37 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeCurveHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_build_trimmed_3d(
+            NativeContextHandle ctx,
+            NativeCurveHandle basisHandle,
+            double u1, double u2,
+            int sense,
+            out NativeCurveHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_build_trimmed_line_3d(
+            NativeContextHandle ctx,
+            double x1, double y1, double z1,
+            double x2, double y2, double z2,
+            out NativeCurveHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_build_circle_3pt_3d(
+            NativeContextHandle ctx,
+            double x1, double y1, double z1,
+            double x2, double y2, double z2,
+            double x3, double y3, double z3,
+            out NativeCurveHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_build_arc_of_circle_3d(
+            NativeContextHandle ctx,
+            NativeCurveHandle circleHandle,
+            double u1, double u2,
+            int sense,
+            out NativeCurveHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_curve_parameters(
             NativeCurveHandle handle,
             out double outFirst,
