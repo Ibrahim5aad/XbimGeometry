@@ -998,6 +998,14 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double tolerance);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_project_point_3d(
+            NativeContextHandle ctx,
+            NativeCurveHandle curveHandle,
+            double px, double py, double pz,
+            double tolerance,
+            out double outParam);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_curve_reverse(NativeCurveHandle handle);
 
         [DllImport(Lib, CallingConvention = CC)]

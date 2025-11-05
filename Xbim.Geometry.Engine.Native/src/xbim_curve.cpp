@@ -46,6 +46,7 @@
 #include <GC_MakeCircle.hxx>
 #include <GC_MakeSegment.hxx>
 #include <Standard_Failure.hxx>
+#include <GeomLib_Tool.hxx>
 
 #pragma region Curve Helpers
 
@@ -765,6 +766,51 @@ XBIM_EXPORT int XBIM_CALL xbim_curve_is_closed(
     catch (const Standard_Failure&)
     {
         return XBIM_FALSE;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_project_point_3d(
+    XbimContextHandle ctx,
+    XbimCurveHandle   curveHandle,
+    double px, double py, double pz,
+    double tolerance,
+    double* outParam)
+{
+    xbim_clear_error();
+
+    if (!outParam)
+    {
+        xbim_set_error("xbim_curve_project_point_3d: outParam is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outParam = 0.0;
+
+    if (!curveHandle || curveHandle->curve.IsNull())
+    {
+        xbim_set_error("xbim_curve_project_point_3d: curveHandle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        gp_Pnt pnt(px, py, pz);
+        double param = 0.0;
+
+        if (!GeomLib_Tool::Parameter(curveHandle->curve, pnt, tolerance, param))
+        {
+            xbim_set_error("xbim_curve_project_point_3d: point projection found no solution");
+            return XBIM_ERROR;
+        }
+
+        *outParam = param;
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve_project_point_3d");
+        xbim_set_error("xbim_curve_project_point_3d: OCCT exception");
+        return XBIM_ERROR;
     }
 }
 

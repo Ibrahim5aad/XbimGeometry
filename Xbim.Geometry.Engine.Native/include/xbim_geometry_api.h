@@ -2405,6 +2405,25 @@ XBIM_EXPORT int XBIM_CALL xbim_curve_is_closed(
     double          tolerance);
 
 /*
+ * Project a 3D point onto a curve and return the curve parameter.
+ * Uses GeomLib_Tool::Parameter.
+ *
+ *   ctx         – context handle (used for logging; may be NULL)
+ *   curveHandle – a valid 3D curve handle
+ *   px, py, pz  – the point to project
+ *   tolerance   – projection tolerance
+ *   outParam    – receives the parameter value on the curve
+ *
+ * Returns XBIM_OK on success, XBIM_ERROR if the point cannot be projected.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_project_point_3d(
+    XbimContextHandle   ctx,
+    XbimCurveHandle     curveHandle,
+    double px, double py, double pz,
+    double tolerance,
+    double* outParam);
+
+/*
  * Reverse the direction of a curve in-place.
  *
  *   handle – a valid curve handle

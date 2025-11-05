@@ -30,7 +30,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 return BuildBSpline(ifcBSpline);
 
             if (curve is IIfcTrimmedCurve ifcTrimmed)
-                return Build(ifcTrimmed.BasisCurve);
+                return BuildTrimmedCurve3d(ifcTrimmed);
 
             if (curve is IIfcPolyline ifcPolyline)
                 return BuildPolylineAsBSpline(ifcPolyline);
@@ -237,6 +237,128 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     $"Failed to build polyline as B-spline #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new Curve(nativeCurveHandle, XCurveType.IfcPolyline);
+        }
+
+        #endregion
+
+        #region TrimmedCurve
+
+        /// <summary>
+        /// Builds a trimmed curve from an IFC trimmed curve entity.
+        /// Parses Trim1/Trim2 values (Cartesian and/or parametric), respects MasterRepresentation
+        /// and SenseAgreement, and dispatches to the appropriate native trim builder.
+        /// </summary>
+        private Curve BuildTrimmedCurve3d(IIfcTrimmedCurve ifcTrimmed)
+        {
+            // Formal proposition: NoTrimOfBoundedCurves
+            if (ifcTrimmed.BasisCurve is IIfcBoundedCurve)
+                _logger.LogDebug("IIfcTrimmedCurve #{Label}: Formal Proposition NoTrimOfBoundedCurves violated — " +
+                    "already bounded curves should not be trimmed, but processing continues.", ifcTrimmed.EntityLabel);
+
+            // Build the basis curve
+            var basisCurve = (Curve)BuildCurve3d(ifcTrimmed.BasisCurve);
+
+            bool isConic = ifcTrimmed.BasisCurve is IIfcConic;
+            bool sense = ifcTrimmed.SenseAgreement;
+            bool preferCartesian = ifcTrimmed.MasterRepresentation == Xbim.Ifc4.Interfaces.IfcTrimmingPreference.CARTESIAN;
+
+            // Parse trim selects
+            double u1 = double.NegativeInfinity;
+            double u2 = double.PositiveInfinity;
+            IIfcCartesianPoint? cp1 = null;
+            IIfcCartesianPoint? cp2 = null;
+
+            foreach (var trim in ifcTrimmed.Trim1)
+            {
+                if (trim is IIfcCartesianPoint pt)
+                    cp1 = pt;
+                else if (trim is Xbim.Ifc4.MeasureResource.IfcParameterValue pv)
+                    u1 = (double)pv;
+            }
+
+            foreach (var trim in ifcTrimmed.Trim2)
+            {
+                if (trim is IIfcCartesianPoint pt)
+                    cp2 = pt;
+                else if (trim is Xbim.Ifc4.MeasureResource.IfcParameterValue pv)
+                    u2 = (double)pv;
+            }
+
+            // Resolve trim parameters
+            if ((preferCartesian && cp1 != null && cp2 != null) ||
+                (cp1 != null && cp2 != null &&
+                 (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))))
+            {
+                // Use Cartesian points projected onto the basis curve
+                var p1 = GeometryFactory.BuildPoint3d(cp1);
+                var p2 = GeometryFactory.BuildPoint3d(cp2);
+
+                int r1 = XbimGeometryNativeApi.xbim_curve_project_point_3d(
+                    ContextHandle, basisCurve.Handle,
+                    p1.X, p1.Y, p1.Z, _modelService.MinimumGap, out u1);
+                if (r1 != 0)
+                    throw new InvalidOperationException(
+                        $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Trim Point1 is not on the basis curve.");
+
+                int r2 = XbimGeometryNativeApi.xbim_curve_project_point_3d(
+                    ContextHandle, basisCurve.Handle,
+                    p2.X, p2.Y, p2.Z, _modelService.MinimumGap, out u2);
+                if (r2 != 0)
+                    throw new InvalidOperationException(
+                        $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Trim Point2 is not on the basis curve.");
+            }
+            else if (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))
+            {
+                throw new InvalidOperationException(
+                    $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: TrimValuesConsistent — " +
+                    "either a single value is specified for Trim, or the two trimming values are of different type.");
+            }
+            else
+            {
+                // Use parametric values, adjusting for conics
+                if (isConic)
+                {
+                    u1 *= _modelService.RadianFactor;
+                    u2 *= _modelService.RadianFactor;
+                }
+            }
+
+            // Sanity check
+            if (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))
+                throw new InvalidOperationException(
+                    $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: error converting trim points.");
+
+            // Handle equal parameters
+            if (Math.Abs(u1 - u2) < _modelService.Precision)
+            {
+                if (isConic)
+                {
+                    // Equal params on a conic → return a full circle/ellipse
+                    u1 = 0.0;
+                    u2 = Math.PI * 2.0;
+                    sense = true;
+                }
+                else
+                {
+                    basisCurve.Dispose();
+                    _logger.LogInformation("IIfcTrimmedCurve #{Label}: parametric trim points are equal on non-conic — empty curve.",
+                        ifcTrimmed.BasisCurve.EntityLabel);
+                    throw new InvalidOperationException(
+                        $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: trim parameters are equal on a non-conic basis, resulting in an empty curve.");
+                }
+            }
+
+            // Build trimmed curve
+            int trimResult = XbimGeometryNativeApi.xbim_curve_build_trimmed_3d(
+                ContextHandle, basisCurve.Handle, u1, u2, sense ? 1 : 0, out var trimHandle);
+
+            basisCurve.Dispose();
+
+            if (trimResult != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build trimmed curve #{ifcTrimmed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new Curve(trimHandle, XCurveType.IfcTrimmedCurve);
         }
 
         #endregion
