@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
+using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Ifc4.Interfaces;
@@ -24,10 +25,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (curve is IIfcEllipse ifcEllipse)
                 return BuildEllipse2d(ifcEllipse);
 
-            // TODO: CURVE-R005 — Implement 2D TrimmedCurve
-            if (curve is IIfcTrimmedCurve)
-                throw new NotSupportedException(
-                    $"2D IfcTrimmedCurve #{curve.EntityLabel} is not yet supported. See CURVE-R005.");
+            if (curve is IIfcTrimmedCurve ifcTrimmed)
+                return BuildTrimmedCurve2d(ifcTrimmed);
 
             // TODO: CURVE-R009 — Implement 2D BSpline
             if (curve is IIfcBSplineCurveWithKnots)
@@ -185,6 +184,161 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     $"Failed to build 2D ellipse #{ifcEllipse.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new Curve2d(nativeHandle, XCurveType.IfcEllipse);
+        }
+
+        #endregion
+
+        #region TrimmedCurve2d
+
+        /// <summary>
+        /// Builds a 2D trimmed curve from an IFC trimmed curve entity.
+        /// Parses Trim1/Trim2 values (Cartesian and/or parametric), respects MasterRepresentation
+        /// and SenseAgreement, and dispatches to the appropriate native 2D trim builder.
+        /// For circle basis curves, uses arc-of-circle construction; for ellipse, arc-of-ellipse;
+        /// for other curves, generic parametric trimming.
+        /// </summary>
+        private Curve2d BuildTrimmedCurve2d(IIfcTrimmedCurve ifcTrimmed)
+        {
+            // Formal proposition: NoTrimOfBoundedCurves — stricter in 2D (throw, not warn)
+            if (ifcTrimmed.BasisCurve is IIfcBoundedCurve)
+                throw new InvalidOperationException(
+                    $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Formal Proposition NoTrimOfBoundedCurves — " +
+                    "already bounded curves shall not be trimmed.");
+
+            // Build the 2D basis curve
+            var basisCurve = (Curve2d)BuildCurve2d(ifcTrimmed.BasisCurve);
+
+            bool isConic = ifcTrimmed.BasisCurve is IIfcConic;
+            bool isCircle = ifcTrimmed.BasisCurve is IIfcCircle;
+            bool isEllipse = ifcTrimmed.BasisCurve is IIfcEllipse;
+            bool sense = ifcTrimmed.SenseAgreement;
+            bool preferCartesian = ifcTrimmed.MasterRepresentation == IfcTrimmingPreference.CARTESIAN;
+
+            // Parse trim selects
+            double u1 = double.NegativeInfinity;
+            double u2 = double.PositiveInfinity;
+            IIfcCartesianPoint? cp1 = null;
+            IIfcCartesianPoint? cp2 = null;
+
+            foreach (var trim in ifcTrimmed.Trim1)
+            {
+                if (trim is IIfcCartesianPoint pt)
+                    cp1 = pt;
+                else if (trim is Xbim.Ifc4.MeasureResource.IfcParameterValue pv)
+                    u1 = (double)pv;
+            }
+
+            foreach (var trim in ifcTrimmed.Trim2)
+            {
+                if (trim is IIfcCartesianPoint pt)
+                    cp2 = pt;
+                else if (trim is Xbim.Ifc4.MeasureResource.IfcParameterValue pv)
+                    u2 = (double)pv;
+            }
+
+            // Resolve trim parameters
+            if ((preferCartesian && cp1 != null && cp2 != null) ||
+                (cp1 != null && cp2 != null &&
+                 (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))))
+            {
+                // Use Cartesian points projected onto the 2D basis curve
+                double px1 = cp1.Coordinates[0];
+                double py1 = cp1.Coordinates[1];
+                double px2 = cp2.Coordinates[0];
+                double py2 = cp2.Coordinates[1];
+
+                int r1 = XbimGeometryNativeApi.xbim_curve2d_project_point(
+                    ContextHandle, basisCurve.Handle,
+                    px1, py1, _modelService.MinimumGap, out u1);
+                if (r1 != 0)
+                {
+                    basisCurve.Dispose();
+                    throw new InvalidOperationException(
+                        $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Trim Point1 is not on the 2D basis curve.");
+                }
+
+                int r2 = XbimGeometryNativeApi.xbim_curve2d_project_point(
+                    ContextHandle, basisCurve.Handle,
+                    px2, py2, _modelService.MinimumGap, out u2);
+                if (r2 != 0)
+                {
+                    basisCurve.Dispose();
+                    throw new InvalidOperationException(
+                        $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Trim Point2 is not on the 2D basis curve.");
+                }
+            }
+            else if (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))
+            {
+                basisCurve.Dispose();
+                throw new InvalidOperationException(
+                    $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: TrimValuesConsistent — " +
+                    "either a single value is specified for Trim, or the two trimming values are of different type.");
+            }
+            else
+            {
+                // Use parametric values, adjusting for conics
+                if (isConic)
+                {
+                    u1 *= _modelService.RadianFactor;
+                    u2 *= _modelService.RadianFactor;
+                }
+            }
+
+            // Sanity check
+            if (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))
+            {
+                basisCurve.Dispose();
+                throw new InvalidOperationException(
+                    $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: error converting trim points.");
+            }
+
+            // Handle equal parameters
+            if (Math.Abs(u1 - u2) < _modelService.Precision)
+            {
+                if (isConic)
+                {
+                    // Equal params on a conic → build a full circle/ellipse
+                    u1 = 0.0;
+                    u2 = Math.PI * 2.0;
+                    sense = true;
+                }
+                else
+                {
+                    basisCurve.Dispose();
+                    _logger.LogInformation("IIfcTrimmedCurve #{Label}: parametric trim points are equal on non-conic — empty curve.",
+                        ifcTrimmed.BasisCurve.EntityLabel);
+                    throw new InvalidOperationException(
+                        $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: trim parameters are equal on a non-conic basis, resulting in an empty curve.");
+                }
+            }
+
+            // Build trimmed curve using specialized native functions based on basis type
+            int trimResult;
+            NativeCurve2dHandle trimHandle;
+
+            if (isCircle)
+            {
+                trimResult = XbimGeometryNativeApi.xbim_curve2d_build_arc_of_circle(
+                    ContextHandle, basisCurve.Handle, u1, u2, sense ? 1 : 0, out trimHandle);
+            }
+            else if (isEllipse)
+            {
+                trimResult = XbimGeometryNativeApi.xbim_curve2d_build_arc_of_ellipse(
+                    ContextHandle, basisCurve.Handle, u1, u2, sense ? 1 : 0, out trimHandle);
+            }
+            else
+            {
+                trimResult = XbimGeometryNativeApi.xbim_curve2d_build_trimmed(
+                    ContextHandle, basisCurve.Handle, u1, u2, sense ? 1 : 0, out trimHandle);
+            }
+
+            basisCurve.Dispose();
+
+            if (trimResult != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build 2D trimmed curve #{ifcTrimmed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new Curve2d(trimHandle, XCurveType.IfcTrimmedCurve);
         }
 
         #endregion
