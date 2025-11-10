@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
+using Xbim.Ifc4.GeometryResource;
 using Xbim.Ifc4.Interfaces;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
@@ -415,87 +417,180 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private Curve BuildIndexedPolyCurve(IIfcIndexedPolyCurve ifcIndexed)
         {
-            // Extract points from the coordinate list
-            var coordList = ifcIndexed.Points;
-            if (coordList is IIfcCartesianPointList3D pointList3D)
+            // Extract 3D points from the coordinate list (IFC indices are 1-based)
+            var points = ExtractPoints3d(ifcIndexed);
+            var segments = new List<NativeCurveHandle>();
+
+            try
             {
-                var coordData = pointList3D.CoordList;
-                int numPoints = coordData.Count;
-                var polesXYZ = new double[numPoints * 3];
-
-                for (int i = 0; i < numPoints; i++)
+                if (ifcIndexed.Segments != null && ifcIndexed.Segments.Any())
                 {
-                    var coords = coordData[i];
-                    polesXYZ[i * 3 + 0] = coords[0];
-                    polesXYZ[i * 3 + 1] = coords[1];
-                    polesXYZ[i * 3 + 2] = coords.Count > 2 ? coords[2] : 0.0;
+                    foreach (var segment in ifcIndexed.Segments)
+                    {
+                        if (segment is IfcArcIndex arcIndex)
+                        {
+                            var indices = (System.Collections.IList)arcIndex.Value;
+                            if (indices.Count != 3)
+                                throw new InvalidOperationException(
+                                    $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: ArcIndex must have exactly 3 indices.");
+
+                            int i1 = (int)(long)indices[0]! - 1;
+                            int i2 = (int)(long)indices[1]! - 1;
+                            int i3 = (int)(long)indices[2]! - 1;
+
+                            var (sx, sy, sz) = points[i1];
+                            var (mx, my, mz) = points[i2];
+                            var (ex, ey, ez) = points[i3];
+
+                            // Try to build a circle through 3 points
+                            int circResult = XbimGeometryNativeApi.xbim_curve_build_circle_3pt_3d(
+                                ContextHandle, sx, sy, sz, mx, my, mz, ex, ey, ez,
+                                out var circleHandle);
+
+                            if (circResult == 0)
+                            {
+                                // Project start and end points onto the circle to get trim parameters
+                                int r1 = XbimGeometryNativeApi.xbim_curve_project_point_3d(
+                                    ContextHandle, circleHandle, sx, sy, sz, _modelService.MinimumGap, out double u1);
+                                int r2 = XbimGeometryNativeApi.xbim_curve_project_point_3d(
+                                    ContextHandle, circleHandle, ex, ey, ez, _modelService.MinimumGap, out double u2);
+
+                                if (r1 != 0 || r2 != 0)
+                                {
+                                    circleHandle.Dispose();
+                                    throw new InvalidOperationException(
+                                        $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: failed to project arc endpoints onto circle.");
+                                }
+
+                                int trimResult = XbimGeometryNativeApi.xbim_curve_build_trimmed_3d(
+                                    ContextHandle, circleHandle, u1, u2, 1, out var arcHandle);
+
+                                circleHandle.Dispose();
+
+                                if (trimResult != 0)
+                                    throw new InvalidOperationException(
+                                        $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: failed to trim arc segment: {XbimGeometryNativeApi.GetLastError()}");
+
+                                segments.Add(arcHandle);
+                            }
+                            else
+                            {
+                                // Collinear points — fallback to a line from start to end
+                                _logger.LogInformation(
+                                    "IIfcIndexedPolyCurve #{Label}: ArcIndex handled as LineIndex (collinear points).",
+                                    ifcIndexed.EntityLabel);
+
+                                int lineResult = XbimGeometryNativeApi.xbim_curve_build_trimmed_line_3d(
+                                    ContextHandle, sx, sy, sz, ex, ey, ez, out var lineHandle);
+
+                                if (lineResult != 0)
+                                    throw new InvalidOperationException(
+                                        $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: failed to build fallback line for ArcIndex: {XbimGeometryNativeApi.GetLastError()}");
+
+                                segments.Add(lineHandle);
+                            }
+                        }
+                        else if (segment is IfcLineIndex lineIndex)
+                        {
+                            var indices = (System.Collections.IList)lineIndex.Value;
+                            if (indices.Count < 2)
+                                throw new InvalidOperationException(
+                                    $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: LineIndex must have at least 2 indices.");
+
+                            for (int p = 0; p < indices.Count - 1; p++)
+                            {
+                                int idx1 = (int)(long)indices[p]! - 1;
+                                int idx2 = (int)(long)indices[p + 1]! - 1;
+
+                                var (x1, y1, z1) = points[idx1];
+                                var (x2, y2, z2) = points[idx2];
+
+                                int lineResult = XbimGeometryNativeApi.xbim_curve_build_trimmed_line_3d(
+                                    ContextHandle, x1, y1, z1, x2, y2, z2, out var lineHandle);
+
+                                if (lineResult != 0)
+                                    throw new InvalidOperationException(
+                                        $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: failed to build line segment: {XbimGeometryNativeApi.GetLastError()}");
+
+                                segments.Add(lineHandle);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // No segments — connect all points sequentially with straight lines
+                    for (int p = 0; p < points.Count - 1; p++)
+                    {
+                        var (x1, y1, z1) = points[p];
+                        var (x2, y2, z2) = points[p + 1];
+
+                        int lineResult = XbimGeometryNativeApi.xbim_curve_build_trimmed_line_3d(
+                            ContextHandle, x1, y1, z1, x2, y2, z2, out var lineHandle);
+
+                        if (lineResult != 0)
+                            throw new InvalidOperationException(
+                                $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: failed to build sequential line segment: {XbimGeometryNativeApi.GetLastError()}");
+
+                        segments.Add(lineHandle);
+                    }
                 }
 
-                // Build as degree-1 B-spline
-                var knots = new double[numPoints];
-                var multiplicities = new int[numPoints];
-                for (int i = 0; i < numPoints; i++)
-                {
-                    knots[i] = (double)i / (numPoints - 1);
-                    multiplicities[i] = 1;
-                }
-                multiplicities[0] = 2;
-                multiplicities[numPoints - 1] = 2;
+                if (segments.Count == 0)
+                    throw new InvalidOperationException(
+                        $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel} has no valid segments.");
 
-                int result = XbimGeometryNativeApi.xbim_curve_build_bspline(
-                    ContextHandle,
-                    polesXYZ, numPoints,
-                    knots, numPoints,
-                    multiplicities,
-                    1,
-                    null,
-                    out var nativeCurveHandle);
+                // Single segment — no need for composite joining
+                if (segments.Count == 1)
+                {
+                    var singleHandle = segments[0];
+                    segments.Clear(); // prevent dispose of the returned handle
+                    return new Curve(singleHandle, XCurveType.IfcIndexedPolyCurve);
+                }
+
+                // Join all segments into a single B-spline via CompCurveToBSplineCurve
+                using var nativeSegments = new NativeHandleArray(
+                    segments.Select(s => (SafeHandle)s).ToArray());
+                int result = XbimGeometryNativeApi.xbim_curve_build_composite_bspline(
+                    ContextHandle, nativeSegments.Ptrs, nativeSegments.Length,
+                    _modelService.MinimumGap,
+                    out var compositeHandle);
 
                 if (result != 0)
                     throw new InvalidOperationException(
-                        $"Failed to build indexed poly curve #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+                        $"Failed to join IndexedPolyCurve segments #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new Curve(nativeCurveHandle, XCurveType.IfcIndexedPolyCurve);
+                return new Curve(compositeHandle, XCurveType.IfcIndexedPolyCurve);
+            }
+            finally
+            {
+                foreach (var s in segments)
+                    s.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Extracts 3D point coordinates from an IIfcIndexedPolyCurve's point list.
+        /// Handles both IIfcCartesianPointList3D (native 3D) and IIfcCartesianPointList2D (Z=0).
+        /// </summary>
+        private static List<(double x, double y, double z)> ExtractPoints3d(IIfcIndexedPolyCurve ifcIndexed)
+        {
+            var coordList = ifcIndexed.Points;
+
+            if (coordList is IIfcCartesianPointList3D pointList3D)
+            {
+                var points = new List<(double, double, double)>(pointList3D.CoordList.Count);
+                foreach (var coords in pointList3D.CoordList)
+                    points.Add((coords[0], coords[1], coords.Count > 2 ? coords[2] : 0.0));
+                return points;
             }
 
             if (coordList is IIfcCartesianPointList2D pointList2D)
             {
-                var coordData = pointList2D.CoordList;
-                int numPoints = coordData.Count;
-                var polesXYZ = new double[numPoints * 3];
-
-                for (int i = 0; i < numPoints; i++)
-                {
-                    var coords = coordData[i];
-                    polesXYZ[i * 3 + 0] = coords[0];
-                    polesXYZ[i * 3 + 1] = coords[1];
-                    polesXYZ[i * 3 + 2] = 0.0;
-                }
-
-                var knots = new double[numPoints];
-                var multiplicities = new int[numPoints];
-                for (int i = 0; i < numPoints; i++)
-                {
-                    knots[i] = (double)i / (numPoints - 1);
-                    multiplicities[i] = 1;
-                }
-                multiplicities[0] = 2;
-                multiplicities[numPoints - 1] = 2;
-
-                int result = XbimGeometryNativeApi.xbim_curve_build_bspline(
-                    ContextHandle,
-                    polesXYZ, numPoints,
-                    knots, numPoints,
-                    multiplicities,
-                    1,
-                    null,
-                    out var nativeCurveHandle);
-
-                if (result != 0)
-                    throw new InvalidOperationException(
-                        $"Failed to build indexed poly curve 2D #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
-
-                return new Curve(nativeCurveHandle, XCurveType.IfcIndexedPolyCurve);
+                var points = new List<(double, double, double)>(pointList2D.CoordList.Count);
+                foreach (var coords in pointList2D.CoordList)
+                    points.Add((coords[0], coords[1], 0.0));
+                return points;
             }
 
             throw new NotSupportedException(

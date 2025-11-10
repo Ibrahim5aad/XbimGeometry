@@ -59,7 +59,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXCurve BuildDirectrix(IIfcCurve curve, double? startParam, double? endParam)
         {
-            // Build the full curve, trimming will be handled at the sweep level
             return Build(curve);
         }
 
