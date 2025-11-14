@@ -196,49 +196,117 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         #region Polyline
 
+        /// <summary>
+        /// Builds a polyline from an IFC polyline entity. Two-point polylines produce a single
+        /// trimmed line segment. Multi-point polylines are built as individual trimmed line segments
+        /// joined into a composite B-spline, with degenerate (zero-length) segments skipped.
+        /// </summary>
         private Curve BuildPolylineAsBSpline(IIfcPolyline ifcPolyline)
         {
-            // Build polyline as a degree-1 B-spline (piecewise linear)
-            var points = ifcPolyline.Points;
-            int numPoles = points.Count;
+            var ifcPoints = ifcPolyline.Points;
+            int pointCount = ifcPoints.Count;
 
-            if (numPoles < 2)
+            if (pointCount < 2)
                 throw new InvalidOperationException(
                     $"IIfcPolyline #{ifcPolyline.EntityLabel} has fewer than 2 points.");
 
-            var polesXYZ = new double[numPoles * 3];
-            for (int i = 0; i < numPoles; i++)
+            double precision = _modelService.Precision;
+
+            if (pointCount == 2)
             {
-                var cp = points[i];
-                polesXYZ[i * 3 + 0] = cp.Coordinates[0];
-                polesXYZ[i * 3 + 1] = cp.Coordinates[1];
-                polesXYZ[i * 3 + 2] = (int)cp.Dim == 3 ? (double)cp.Coordinates[2] : 0.0;
+                var p0 = GeometryFactory.BuildPoint3d(ifcPoints[0]);
+                var p1 = GeometryFactory.BuildPoint3d(ifcPoints[1]);
+
+                double dist = Math.Sqrt(
+                    (p1.X - p0.X) * (p1.X - p0.X) +
+                    (p1.Y - p0.Y) * (p1.Y - p0.Y) +
+                    (p1.Z - p0.Z) * (p1.Z - p0.Z));
+
+                if (dist < precision)
+                {
+                    _logger.LogInformation(
+                        "IIfcPolyline #{Label}: only 2 identical points — ignored.",
+                        ifcPolyline.EntityLabel);
+                    throw new InvalidOperationException(
+                        $"IIfcPolyline #{ifcPolyline.EntityLabel} has only 2 identical points.");
+                }
+
+                int lineResult = XbimGeometryNativeApi.xbim_curve_build_trimmed_line_3d(
+                    ContextHandle, p0.X, p0.Y, p0.Z, p1.X, p1.Y, p1.Z, out var lineHandle);
+
+                if (lineResult != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build polyline line segment #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                return new Curve(lineHandle, XCurveType.IfcPolyline);
             }
 
-            var knots = new double[numPoles];
-            var multiplicities = new int[numPoles];
-            for (int i = 0; i < numPoles; i++)
+            // 3+ points: build individual trimmed lines, skip degenerate segments
+            var segments = new List<NativeCurveHandle>();
+            try
             {
-                knots[i] = (double)i / (numPoles - 1);
-                multiplicities[i] = 1;
+                var pts = new (double X, double Y, double Z)[pointCount];
+                for (int i = 0; i < pointCount; i++)
+                {
+                    var p = GeometryFactory.BuildPoint3d(ifcPoints[i]);
+                    pts[i] = (p.X, p.Y, p.Z);
+                }
+
+                int lastIdx = 0;
+                for (int i = 1; i < pointCount; i++)
+                {
+                    var start = pts[lastIdx];
+                    var end = pts[i];
+
+                    double dist = Math.Sqrt(
+                        (end.X - start.X) * (end.X - start.X) +
+                        (end.Y - start.Y) * (end.Y - start.Y) +
+                        (end.Z - start.Z) * (end.Z - start.Z));
+
+                    if (dist < precision)
+                        continue; // skip degenerate segment
+
+                    int lineResult = XbimGeometryNativeApi.xbim_curve_build_trimmed_line_3d(
+                        ContextHandle, start.X, start.Y, start.Z, end.X, end.Y, end.Z,
+                        out var lineHandle);
+
+                    if (lineResult != 0)
+                        throw new InvalidOperationException(
+                            $"Failed to build polyline segment #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                    segments.Add(lineHandle);
+                    lastIdx = i;
+                }
+
+                if (segments.Count == 0)
+                    throw new InvalidOperationException(
+                        $"IIfcPolyline #{ifcPolyline.EntityLabel} has no non-degenerate segments.");
+
+                if (segments.Count == 1)
+                {
+                    var singleHandle = segments[0];
+                    segments.Clear();
+                    return new Curve(singleHandle, XCurveType.IfcPolyline);
+                }
+
+                using var nativeSegments = new NativeHandleArray(
+                    segments.Select(s => (SafeHandle)s).ToArray());
+                int result = XbimGeometryNativeApi.xbim_curve_build_composite_bspline(
+                    ContextHandle, nativeSegments.Ptrs, nativeSegments.Length,
+                    _modelService.MinimumGap,
+                    out var compositeHandle);
+
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build polyline #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                return new Curve(compositeHandle, XCurveType.IfcPolyline);
             }
-            multiplicities[0] = 2; // clamp start
-            multiplicities[numPoles - 1] = 2; // clamp end
-
-            int result = XbimGeometryNativeApi.xbim_curve_build_bspline(
-                ContextHandle,
-                polesXYZ, numPoles,
-                knots, numPoles,
-                multiplicities,
-                1, // degree 1
-                null,
-                out var nativeCurveHandle);
-
-            if (result != 0)
-                throw new InvalidOperationException(
-                    $"Failed to build polyline as B-spline #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
-
-            return new Curve(nativeCurveHandle, XCurveType.IfcPolyline);
+            finally
+            {
+                foreach (var s in segments)
+                    s.Dispose();
+            }
         }
 
         #endregion

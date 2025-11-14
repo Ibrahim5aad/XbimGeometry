@@ -40,10 +40,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (curve is IIfcIndexedPolyCurve ifcIndexedPoly)
                 return BuildIndexedPolyCurve2d(ifcIndexedPoly);
 
-            // TODO: CURVE-R008 — Implement 2D Polyline
-            if (curve is IIfcPolyline)
-                throw new NotSupportedException(
-                    $"2D IfcPolyline #{curve.EntityLabel} is not yet supported. See CURVE-R008.");
+            if (curve is IIfcPolyline ifcPolyline)
+                return BuildPolyline2d(ifcPolyline);
 
             // TODO: CURVE-R010 — Implement 2D CompositeCurve
             if (curve is IIfcCompositeCurve)
@@ -341,6 +339,118 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     $"Failed to build 2D trimmed curve #{ifcTrimmed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new Curve2d(trimHandle, XCurveType.IfcTrimmedCurve);
+        }
+
+        #endregion
+
+        #region Polyline2d
+
+        /// <summary>
+        /// Builds a 2D polyline from an IFC polyline entity. Two-point polylines produce a single
+        /// trimmed line segment. Multi-point polylines are built as individual trimmed line segments
+        /// joined into a composite B-spline, with degenerate (zero-length) segments skipped.
+        /// </summary>
+        private Curve2d BuildPolyline2d(IIfcPolyline ifcPolyline)
+        {
+            var ifcPoints = ifcPolyline.Points;
+            int pointCount = ifcPoints.Count;
+
+            if (pointCount < 2)
+                throw new InvalidOperationException(
+                    $"IIfcPolyline #{ifcPolyline.EntityLabel} has fewer than 2 points.");
+
+            double precision = _modelService.Precision;
+
+            // Extract 2D coordinates
+            var pts = new (double X, double Y)[pointCount];
+            for (int i = 0; i < pointCount; i++)
+            {
+                var coords = ifcPoints[i].Coordinates;
+                pts[i] = (coords[0], coords[1]);
+            }
+
+            if (pointCount == 2)
+            {
+                double dist = Math.Sqrt(
+                    (pts[1].X - pts[0].X) * (pts[1].X - pts[0].X) +
+                    (pts[1].Y - pts[0].Y) * (pts[1].Y - pts[0].Y));
+
+                if (dist < precision)
+                {
+                    _logger.LogInformation(
+                        "IIfcPolyline #{Label}: only 2 identical points — ignored.",
+                        ifcPolyline.EntityLabel);
+                    throw new InvalidOperationException(
+                        $"IIfcPolyline #{ifcPolyline.EntityLabel} has only 2 identical points.");
+                }
+
+                int lineResult = XbimGeometryNativeApi.xbim_curve2d_build_line(
+                    ContextHandle, pts[0].X, pts[0].Y, pts[1].X, pts[1].Y, out var lineHandle);
+
+                if (lineResult != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build 2D polyline line segment #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                return new Curve2d(lineHandle, XCurveType.IfcPolyline);
+            }
+
+            // 3+ points: build individual 2D lines, skip degenerate segments
+            var segments = new List<NativeCurve2dHandle>();
+            try
+            {
+                int lastIdx = 0;
+                for (int i = 1; i < pointCount; i++)
+                {
+                    var start = pts[lastIdx];
+                    var end = pts[i];
+
+                    double dist = Math.Sqrt(
+                        (end.X - start.X) * (end.X - start.X) +
+                        (end.Y - start.Y) * (end.Y - start.Y));
+
+                    if (dist < precision)
+                        continue; // skip degenerate segment
+
+                    int lineResult = XbimGeometryNativeApi.xbim_curve2d_build_line(
+                        ContextHandle, start.X, start.Y, end.X, end.Y, out var lineHandle);
+
+                    if (lineResult != 0)
+                        throw new InvalidOperationException(
+                            $"Failed to build 2D polyline segment #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                    segments.Add(lineHandle);
+                    lastIdx = i;
+                }
+
+                if (segments.Count == 0)
+                    throw new InvalidOperationException(
+                        $"IIfcPolyline #{ifcPolyline.EntityLabel} has no non-degenerate 2D segments.");
+
+                if (segments.Count == 1)
+                {
+                    var singleHandle = segments[0];
+                    segments.Clear();
+                    return new Curve2d(singleHandle, XCurveType.IfcPolyline);
+                }
+
+                using var nativeSegments = new NativeHandleArray(
+                    segments.Select(s => (SafeHandle)s).ToArray());
+                int result = XbimGeometryNativeApi.xbim_curve2d_build_composite_bspline(
+                    ContextHandle, nativeSegments.Ptrs, nativeSegments.Length,
+                    _modelService.MinimumGap,
+                    out var compositeHandle);
+
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build 2D polyline #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                return new Curve2d(compositeHandle, XCurveType.IfcPolyline);
+            }
+            finally
+            {
+                foreach (var s in segments)
+                    s.Dispose();
+            }
         }
 
         #endregion
