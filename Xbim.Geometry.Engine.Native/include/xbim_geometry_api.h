@@ -3082,6 +3082,33 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_translate_start_to_x(
 
 #pragma endregion
 
+#pragma region Curve2d BSpline
+
+/*
+ * Build a 2D B-spline curve from control points, knots, multiplicities, and degree.
+ * If weights is non-NULL, builds a rational (NURBS) B-spline.
+ *
+ * polesXY         – flat array of 2D control points [x0, y0, x1, y1, ...]
+ * numPoles        – number of control points (polesXY has numPoles * 2 elements)
+ * knots           – distinct knot values
+ * numKnots        – number of distinct knots
+ * multiplicities  – multiplicity for each knot (parallel to knots, same length)
+ * degree          – polynomial degree (>= 1)
+ * weights         – per-pole weights for rational B-spline (NULL for non-rational)
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_bspline(
+    XbimContextHandle   ctx,
+    const double*       polesXY,
+    int                 numPoles,
+    const double*       knots,
+    int                 numKnots,
+    const int*          multiplicities,
+    int                 degree,
+    const double*       weights,
+    XbimCurve2dHandle*  outHandle);
+
+#pragma endregion
+
 #pragma region Curve2d Composite
 
 /*

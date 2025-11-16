@@ -1092,6 +1092,18 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double dirX, double dirY,
             out NativeCurve2dHandle outHandle);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_bspline(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] double[] polesXY,
+            int numPoles,
+            [MarshalAs(UnmanagedType.LPArray)] double[] knots,
+            int numKnots,
+            [MarshalAs(UnmanagedType.LPArray)] int[] multiplicities,
+            int degree,
+            [MarshalAs(UnmanagedType.LPArray)] double[]? weights,
+            out NativeCurve2dHandle outHandle);
+
         #endregion
 
         #region Surface Construction

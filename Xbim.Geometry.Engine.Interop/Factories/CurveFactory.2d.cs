@@ -32,10 +32,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (curve is IIfcTrimmedCurve ifcTrimmed)
                 return BuildTrimmedCurve2d(ifcTrimmed);
 
-            // TODO: CURVE-R009 — Implement 2D BSpline
-            if (curve is IIfcBSplineCurveWithKnots)
-                throw new NotSupportedException(
-                    $"2D IfcBSplineCurveWithKnots #{curve.EntityLabel} is not yet supported. See CURVE-R009.");
+            if (curve is IIfcBSplineCurveWithKnots ifcBSpline)
+                return BuildBSpline2d(ifcBSpline);
 
             if (curve is IIfcIndexedPolyCurve ifcIndexedPoly)
                 return BuildIndexedPolyCurve2d(ifcIndexedPoly);
@@ -184,6 +182,69 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     $"Failed to build 2D ellipse #{ifcEllipse.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new Curve2d(nativeHandle, XCurveType.IfcEllipse);
+        }
+
+        #endregion
+
+        #region BSpline2d
+
+        /// <summary>
+        /// Builds a 2D B-spline curve from an IFC B-spline entity. Extracts 2D control points,
+        /// knots, multiplicities, degree, and optional weights (for rational B-splines).
+        /// </summary>
+        private Curve2d BuildBSpline2d(IIfcBSplineCurveWithKnots ifcBSpline)
+        {
+            var controlPoints = ifcBSpline.ControlPointsList;
+            int numPoles = controlPoints.Count;
+            var polesXY = new double[numPoles * 2];
+
+            for (int i = 0; i < numPoles; i++)
+            {
+                var cp = controlPoints[i];
+                polesXY[i * 2 + 0] = cp.Coordinates[0];
+                polesXY[i * 2 + 1] = cp.Coordinates[1];
+            }
+
+            var knotValues = ifcBSpline.Knots.ToArray();
+            int numKnots = knotValues.Length;
+            var knots = new double[numKnots];
+            for (int i = 0; i < numKnots; i++)
+                knots[i] = knotValues[i];
+
+            var multValues = ifcBSpline.KnotMultiplicities.ToArray();
+            var multiplicities = new int[multValues.Length];
+            for (int i = 0; i < multValues.Length; i++)
+                multiplicities[i] = (int)multValues[i];
+
+            int degree = (int)ifcBSpline.Degree;
+
+            double[]? weights = null;
+            if (ifcBSpline is IIfcRationalBSplineCurveWithKnots rational)
+            {
+                var weightValues = rational.WeightsData;
+                weights = new double[weightValues.Count];
+                for (int i = 0; i < weightValues.Count; i++)
+                    weights[i] = weightValues[i];
+            }
+
+            int result = XbimGeometryNativeApi.xbim_curve2d_build_bspline(
+                ContextHandle,
+                polesXY, numPoles,
+                knots, numKnots,
+                multiplicities,
+                degree,
+                weights,
+                out var nativeHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build 2D B-spline curve #{ifcBSpline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            var curveType = ifcBSpline is IIfcRationalBSplineCurveWithKnots
+                ? XCurveType.IfcRationalBSplineCurveWithKnots
+                : XCurveType.IfcBSplineCurveWithKnots;
+
+            return new Curve2d(nativeHandle, curveType);
         }
 
         #endregion

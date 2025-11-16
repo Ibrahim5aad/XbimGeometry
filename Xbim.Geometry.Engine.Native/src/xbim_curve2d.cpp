@@ -48,6 +48,7 @@
 #include <TColgp_Array1OfPnt.hxx>
 #include <TColgp_Array1OfPnt2d.hxx>
 #include <TColStd_Array1OfReal.hxx>
+#include <TColStd_Array1OfInteger.hxx>
 #include <GeomAPI_PointsToBSpline.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <GeomAbs_Shape.hxx>
@@ -1060,6 +1061,95 @@ static bool IsConic2d(const Handle(Geom2d_Curve)& curve)
         return IsConic2d(trimmed->BasisCurve());
 
     return false;
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_bspline(
+    XbimContextHandle   ctx,
+    const double*       polesXY,
+    int                 numPoles,
+    const double*       knots,
+    int                 numKnots,
+    const int*          multiplicities,
+    int                 degree,
+    const double*       weights,
+    XbimCurve2dHandle*  outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve2d_build_bspline: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!polesXY || numPoles < 2)
+    {
+        xbim_set_error("xbim_curve2d_build_bspline: invalid poles");
+        return XBIM_INVALID_ARG;
+    }
+    if (!knots || numKnots < 2)
+    {
+        xbim_set_error("xbim_curve2d_build_bspline: invalid knots");
+        return XBIM_INVALID_ARG;
+    }
+    if (!multiplicities)
+    {
+        xbim_set_error("xbim_curve2d_build_bspline: multiplicities is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    if (degree < 1)
+    {
+        xbim_set_error("xbim_curve2d_build_bspline: degree must be >= 1");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        /* Convert flat arrays to OCCT 1-based arrays */
+        TColgp_Array1OfPnt2d poles(1, numPoles);
+        for (int i = 0; i < numPoles; i++)
+            poles.SetValue(i + 1, gp_Pnt2d(polesXY[i * 2], polesXY[i * 2 + 1]));
+
+        TColStd_Array1OfReal knotArr(1, numKnots);
+        for (int i = 0; i < numKnots; i++)
+            knotArr.SetValue(i + 1, knots[i]);
+
+        TColStd_Array1OfInteger multArr(1, numKnots);
+        for (int i = 0; i < numKnots; i++)
+            multArr.SetValue(i + 1, multiplicities[i]);
+
+        Handle(Geom2d_BSplineCurve) bspline;
+
+        if (weights)
+        {
+            TColStd_Array1OfReal weightArr(1, numPoles);
+            for (int i = 0; i < numPoles; i++)
+                weightArr.SetValue(i + 1, weights[i]);
+
+            bspline = new Geom2d_BSplineCurve(poles, weightArr, knotArr, multArr, degree);
+        }
+        else
+        {
+            bspline = new Geom2d_BSplineCurve(poles, knotArr, multArr, degree);
+        }
+
+        *outHandle = xbim_curve2d_create_from(bspline);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_curve2d_build_bspline: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve2d_build_bspline");
+        xbim_set_error("xbim_curve2d_build_bspline: OCCT exception");
+        return XBIM_ERROR;
+    }
 }
 
 
