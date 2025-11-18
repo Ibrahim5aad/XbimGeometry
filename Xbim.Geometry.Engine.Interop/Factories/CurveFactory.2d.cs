@@ -41,10 +41,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (curve is IIfcPolyline ifcPolyline)
                 return BuildPolyline2d(ifcPolyline);
 
-            // TODO: CURVE-R010 — Implement 2D CompositeCurve
-            if (curve is IIfcCompositeCurve)
-                throw new NotSupportedException(
-                    $"2D IfcCompositeCurve #{curve.EntityLabel} is not yet supported. See CURVE-R010.");
+            if (curve is IIfcCompositeCurve ifcComposite)
+                return BuildCompositeCurve2d(ifcComposite);
 
             // TODO: CURVE-R011 — Implement 2D OffsetCurve
             if (curve is IIfcOffsetCurve2D)
@@ -511,6 +509,74 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             {
                 foreach (var s in segments)
                     s.Dispose();
+            }
+        }
+
+        #endregion
+
+        #region CompositeCurve2d
+
+        /// <summary>
+        /// Builds a 2D composite curve by building each segment as a 2D curve, applying
+        /// SameSense reversal, and joining all segments into a single composite B-spline.
+        /// Skips consecutive duplicate segments (ArchiCAD bug workaround).
+        /// </summary>
+        private Curve2d BuildCompositeCurve2d(IIfcCompositeCurve ifcComposite)
+        {
+            var segmentCurves = new List<Curve2d>();
+
+            try
+            {
+                int lastLabel = -1;
+                foreach (var segment in ifcComposite.Segments)
+                {
+                    // ArchiCAD bug workaround: skip consecutive duplicate segments (same EntityLabel)
+                    if (segment.EntityLabel == lastLabel)
+                    {
+                        _logger.LogInformation(
+                            "IIfcCompositeCurve #{Label}: skipping duplicate segment #{SegLabel} (ArchiCAD bug).",
+                            ifcComposite.EntityLabel, segment.EntityLabel);
+                        continue;
+                    }
+                    lastLabel = segment.EntityLabel;
+
+                    if (segment.ParentCurve == null)
+                        continue;
+
+                    var segCurve = (Curve2d)BuildCurve2d(segment.ParentCurve);
+
+                    if (!segment.SameSense)
+                    {
+                        int reverseResult = XbimGeometryNativeApi.xbim_curve2d_reverse(segCurve.Handle);
+                        if (reverseResult != 0)
+                            throw new InvalidOperationException(
+                                $"Failed to reverse 2D composite curve segment: {XbimGeometryNativeApi.GetLastError()}");
+                    }
+
+                    segmentCurves.Add(segCurve);
+                }
+
+                if (segmentCurves.Count == 0)
+                    throw new InvalidOperationException(
+                        $"IIfcCompositeCurve #{ifcComposite.EntityLabel} has no valid 2D segments.");
+
+                using var nativeSegments = new NativeHandleArray(
+                    segmentCurves.Select(c => (SafeHandle)c.Handle).ToArray());
+                int result = XbimGeometryNativeApi.xbim_curve2d_build_composite_bspline(
+                    ContextHandle, nativeSegments.Ptrs, nativeSegments.Length,
+                    _modelService.MinimumGap,
+                    out var compositeHandle);
+
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build 2D composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                return new Curve2d(compositeHandle, XCurveType.IfcCompositeCurve);
+            }
+            finally
+            {
+                foreach (var c in segmentCurves)
+                    c.Dispose();
             }
         }
 

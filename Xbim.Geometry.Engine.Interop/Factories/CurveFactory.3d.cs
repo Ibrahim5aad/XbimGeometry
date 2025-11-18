@@ -441,8 +441,19 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             try
             {
+                int lastLabel = -1;
                 foreach (var segment in ifcComposite.Segments)
                 {
+                    // ArchiCAD bug workaround: skip consecutive duplicate segments (same EntityLabel)
+                    if (segment.EntityLabel == lastLabel)
+                    {
+                        _logger.LogInformation(
+                            "IIfcCompositeCurve #{Label}: skipping duplicate segment #{SegLabel} (ArchiCAD bug).",
+                            ifcComposite.EntityLabel, segment.EntityLabel);
+                        continue;
+                    }
+                    lastLabel = segment.EntityLabel;
+
                     if (segment.ParentCurve == null)
                         continue;
 
