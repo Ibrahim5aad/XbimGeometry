@@ -44,10 +44,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (curve is IIfcCompositeCurve ifcComposite)
                 return BuildCompositeCurve2d(ifcComposite);
 
-            // TODO: CURVE-R011 — Implement 2D OffsetCurve
-            if (curve is IIfcOffsetCurve2D)
-                throw new NotSupportedException(
-                    $"2D IfcOffsetCurve2D #{curve.EntityLabel} is not yet supported. See CURVE-R011.");
+            if (curve is IIfcOffsetCurve2D ifcOffset2D)
+                return BuildOffsetCurve2d(ifcOffset2D);
 
             throw new NotSupportedException(
                 $"2D curve type {curve.ExpressType.ExpressName} #{curve.EntityLabel} is not yet supported.");
@@ -723,6 +721,32 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             throw new NotSupportedException(
                 $"2D IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel} requires IIfcCartesianPointList2D, " +
                 $"but found {coordList?.GetType().Name ?? "null"}.");
+        }
+
+        #endregion
+
+        #region OffsetCurve2d
+
+        /// <summary>
+        /// Builds a 2D offset curve from an IFC offset curve 2D entity.
+        /// Offsets the basis curve by the specified distance in the 2D plane.
+        /// </summary>
+        private Curve2d BuildOffsetCurve2d(IIfcOffsetCurve2D ifcOffset)
+        {
+            var basisCurve = (Curve2d)BuildCurve2d(ifcOffset.BasisCurve);
+
+            int result = XbimGeometryNativeApi.xbim_curve2d_build_offset(
+                ContextHandle, basisCurve.Handle,
+                ifcOffset.Distance,
+                out var offsetHandle);
+
+            basisCurve.Dispose();
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build 2D offset curve #{ifcOffset.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new Curve2d(offsetHandle, XCurveType.IfcOffsetCurve2D);
         }
 
         #endregion

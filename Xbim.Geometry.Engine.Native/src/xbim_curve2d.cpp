@@ -53,6 +53,7 @@
 #include <Geom_BSplineCurve.hxx>
 #include <GeomAbs_Shape.hxx>
 #include <Standard_Failure.hxx>
+#include <Geom2d_OffsetCurve.hxx>
 
 #include <algorithm>
 #include <cmath>
@@ -1271,6 +1272,53 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_composite_bspline(
     {
         xbim_log_occt_failure(ctx, e, "xbim_curve2d_build_composite_bspline");
         xbim_set_error("xbim_curve2d_build_composite_bspline: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+#pragma endregion
+
+#pragma region Offset Curve 2D
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_offset(
+    XbimContextHandle  ctx,
+    XbimCurve2dHandle  basisHandle,
+    double             offset,
+    XbimCurve2dHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve2d_build_offset: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!basisHandle || basisHandle->curve.IsNull())
+    {
+        xbim_set_error("xbim_curve2d_build_offset: basisHandle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        Handle(Geom2d_OffsetCurve) offsetCurve =
+            new Geom2d_OffsetCurve(basisHandle->curve, offset);
+
+        if (offsetCurve.IsNull())
+        {
+            xbim_set_error("xbim_curve2d_build_offset: resulting offset curve is null");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_curve2d_create_from(offsetCurve);
+        return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve2d_build_offset");
+        xbim_set_error("xbim_curve2d_build_offset: OCCT exception");
         return XBIM_ERROR;
     }
 }

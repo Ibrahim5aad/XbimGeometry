@@ -1017,6 +1017,14 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeCurveHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_build_offset_3d(
+            NativeContextHandle ctx,
+            NativeCurveHandle basisHandle,
+            double offset,
+            double refDirX, double refDirY, double refDirZ,
+            out NativeCurveHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_curve_build_clothoid(
             NativeContextHandle ctx,
             double clothoidConstant,
@@ -1399,6 +1407,13 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             [MarshalAs(UnmanagedType.LPArray)] IntPtr[] curves,
             int numCurves,
             double tolerance,
+            out NativeCurve2dHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_offset(
+            NativeContextHandle ctx,
+            NativeCurve2dHandle basisHandle,
+            double offset,
             out NativeCurve2dHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]

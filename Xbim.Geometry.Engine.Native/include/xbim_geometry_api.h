@@ -2452,6 +2452,25 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_composite_bspline(
     double              tolerance,
     XbimCurveHandle*    outHandle);
 
+/*
+ * Build a 3D offset curve from a basis curve, an offset distance, and a
+ * reference direction vector. Uses Geom_OffsetCurve(basis, offset, refDir).
+ *
+ *   ctx         – a valid context handle (used for logging; may be NULL)
+ *   basisHandle – the basis curve to offset
+ *   offset      – offset distance (positive = towards refDir cross tangent)
+ *   refDirX/Y/Z – reference direction defining the offset plane normal
+ *   outHandle   – receives the new offset curve handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_offset_3d(
+    XbimContextHandle ctx,
+    XbimCurveHandle   basisHandle,
+    double            offset,
+    double            refDirX, double refDirY, double refDirZ,
+    XbimCurveHandle*  outHandle);
+
 #pragma endregion
 
 #pragma region Surface Operations
@@ -3127,6 +3146,23 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_composite_bspline(
     int                 numCurves,
     double              tolerance,
     XbimCurve2dHandle*  outHandle);
+
+/*
+ * Build a 2D offset curve from a basis 2D curve and an offset distance.
+ * Uses Geom2d_OffsetCurve(basis, offset).
+ *
+ *   ctx         – a valid context handle (used for logging; may be NULL)
+ *   basisHandle – the 2D basis curve to offset
+ *   offset      – offset distance (positive = left of curve direction)
+ *   outHandle   – receives the new 2D offset curve handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_offset(
+    XbimContextHandle  ctx,
+    XbimCurve2dHandle  basisHandle,
+    double             offset,
+    XbimCurve2dHandle* outHandle);
 
 #pragma endregion
 

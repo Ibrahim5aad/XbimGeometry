@@ -47,6 +47,7 @@
 #include <GC_MakeSegment.hxx>
 #include <Standard_Failure.hxx>
 #include <GeomLib_Tool.hxx>
+#include <Geom_OffsetCurve.hxx>
 
 #pragma region Curve Helpers
 
@@ -1061,6 +1062,52 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_reverse(XbimCurveHandle handle)
     {
         xbim_set_error(e.GetMessageString() ? e.GetMessageString()
                        : "xbim_curve_reverse: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_offset_3d(
+    XbimContextHandle ctx,
+    XbimCurveHandle   basisHandle,
+    double            offset,
+    double            refDirX, double refDirY, double refDirZ,
+    XbimCurveHandle*  outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve_build_offset_3d: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!basisHandle || basisHandle->curve.IsNull())
+    {
+        xbim_set_error("xbim_curve_build_offset_3d: basisHandle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        gp_Dir refDir(refDirX, refDirY, refDirZ);
+        Handle(Geom_OffsetCurve) offsetCurve =
+            new Geom_OffsetCurve(basisHandle->curve, offset, refDir);
+
+        if (offsetCurve.IsNull())
+        {
+            xbim_set_error("xbim_curve_build_offset_3d: resulting offset curve is null");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_curve_create_from(offsetCurve);
+        return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve_build_offset_3d");
+        xbim_set_error("xbim_curve_build_offset_3d: OCCT exception");
         return XBIM_ERROR;
     }
 }

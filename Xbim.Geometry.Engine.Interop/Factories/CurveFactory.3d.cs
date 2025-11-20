@@ -43,6 +43,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (curve is IIfcIndexedPolyCurve ifcIndexed)
                 return BuildIndexedPolyCurve(ifcIndexed);
 
+            if (curve is IIfcOffsetCurve3D ifcOffset3D)
+                return BuildOffsetCurve3d(ifcOffset3D);
+
+            if (curve is IIfcOffsetCurve2D ifcOffset2Dto3D)
+                return BuildOffsetCurve2dAs3d(ifcOffset2Dto3D);
+
             throw new NotSupportedException(
                 $"3D curve type {curve.ExpressType.ExpressName} #{curve.EntityLabel} is not yet supported.");
         }
@@ -674,6 +680,65 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             throw new NotSupportedException(
                 $"Unsupported point list type in IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}.");
+        }
+
+        #endregion
+
+        #region OffsetCurve
+
+        /// <summary>
+        /// Builds a 3D offset curve from an IFC offset curve 3D entity.
+        /// Offsets the basis curve by the specified distance in the direction
+        /// defined by the reference direction vector.
+        /// </summary>
+        private Curve BuildOffsetCurve3d(IIfcOffsetCurve3D ifcOffset)
+        {
+            var basisCurve = (Curve)BuildCurve3d(ifcOffset.BasisCurve);
+
+            if (!GeometryFactory.BuildDirection3d(ifcOffset.RefDirection,
+                    out double refDirX, out double refDirY, out double refDirZ))
+            {
+                basisCurve.Dispose();
+                throw new InvalidOperationException(
+                    $"IIfcOffsetCurve3D #{ifcOffset.EntityLabel}: RefDirection is invalid.");
+            }
+
+            int result = XbimGeometryNativeApi.xbim_curve_build_offset_3d(
+                ContextHandle, basisCurve.Handle,
+                ifcOffset.Distance,
+                refDirX, refDirY, refDirZ,
+                out var offsetHandle);
+
+            basisCurve.Dispose();
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build 3D offset curve #{ifcOffset.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new Curve(offsetHandle, XCurveType.IfcOffsetCurve3D);
+        }
+
+        /// <summary>
+        /// Builds a 2D offset curve as a 3D curve in the XY plane.
+        /// Uses gp::DZ() (0,0,1) as the reference direction since the curve lies in 2D.
+        /// </summary>
+        private Curve BuildOffsetCurve2dAs3d(IIfcOffsetCurve2D ifcOffset)
+        {
+            var basisCurve = (Curve)BuildCurve3d(ifcOffset.BasisCurve);
+
+            int result = XbimGeometryNativeApi.xbim_curve_build_offset_3d(
+                ContextHandle, basisCurve.Handle,
+                ifcOffset.Distance,
+                0.0, 0.0, 1.0,
+                out var offsetHandle);
+
+            basisCurve.Dispose();
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build 2D-as-3D offset curve #{ifcOffset.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new Curve(offsetHandle, XCurveType.IfcOffsetCurve2D);
         }
 
         #endregion
