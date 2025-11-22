@@ -2880,6 +2880,16 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_line(
     XbimCurve2dHandle*  outHandle);
 
 /*
+ * Build an unbounded 2D line (Geom2d_Line) from origin and direction.
+ * Used for IfcLine basis curves where trimming requires an infinite line.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_unbounded_line(
+    XbimContextHandle   ctx,
+    double originX, double originY,
+    double dirX,    double dirY,
+    XbimCurve2dHandle*  outHandle);
+
+/*
  * Build a 2D circle (Geom2d_Circle) from center, radius, and reference direction.
  * The reference direction defines the X axis of the circle's local coordinate system.
  */

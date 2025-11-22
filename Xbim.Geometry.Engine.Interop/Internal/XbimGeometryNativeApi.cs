@@ -1268,6 +1268,13 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeCurve2dHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_unbounded_line(
+            NativeContextHandle ctx,
+            double originX, double originY,
+            double dirX, double dirY,
+            out NativeCurve2dHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_curve2d_build_circle(
             NativeContextHandle ctx,
             double cx, double cy,

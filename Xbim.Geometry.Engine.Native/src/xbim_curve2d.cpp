@@ -134,6 +134,45 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_line(
     }
 }
 
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_unbounded_line(
+    XbimContextHandle ctx,
+    double originX, double originY,
+    double dirX,    double dirY,
+    XbimCurve2dHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve2d_build_unbounded_line: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    try
+    {
+        gp_Pnt2d origin(originX, originY);
+        gp_Dir2d dir(dirX, dirY);
+
+        Handle(Geom2d_Line) line = new Geom2d_Line(origin, dir);
+
+        *outHandle = xbim_curve2d_create_from(line);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_curve2d_build_unbounded_line: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve2d_build_unbounded_line");
+        xbim_set_error("xbim_curve2d_build_unbounded_line: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_circle(
     XbimContextHandle ctx,

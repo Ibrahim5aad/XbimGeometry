@@ -54,10 +54,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         #region Line2d
 
         /// <summary>
-        /// Builds a 2D line from an IFC line entity. Computes the endpoint from the
-        /// origin plus direction scaled by magnitude.
+        /// Builds an unbounded 2D line from an IFC line entity.
+        /// The line's direction magnitude is stored on the returned Line2d
+        /// for use in trim parameter conversion.
         /// </summary>
-        private Curve2d BuildLine2d(IIfcLine ifcLine)
+        private Line2d BuildLine2d(IIfcLine ifcLine)
         {
             var coords = ifcLine.Pnt.Coordinates;
             double ox = coords[0];
@@ -75,22 +76,20 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             dx /= mag;
             dy /= mag;
 
-            // Compute endpoint: origin + direction * magnitude
-            double magnitude = ifcLine.Dir.Magnitude;
-            double ex = ox + dx * magnitude;
-            double ey = oy + dy * magnitude;
-
-            int result = XbimGeometryNativeApi.xbim_curve2d_build_line(
+            int result = XbimGeometryNativeApi.xbim_curve2d_build_unbounded_line(
                 ContextHandle,
                 ox, oy,
-                ex, ey,
+                dx, dy,
                 out var nativeHandle);
 
             if (result != 0)
                 throw new InvalidOperationException(
                     $"Failed to build 2D line #{ifcLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Curve2d(nativeHandle, XCurveType.IfcLine);
+            return new Line2d(nativeHandle,
+                new XPoint(ox, oy),
+                new XVector(dx, dy),
+                ifcLine.Dir.Magnitude);
         }
 
         #endregion
@@ -101,7 +100,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// Builds a 2D circle from an IFC circle entity with center, radius, and
         /// reference direction extracted from a 2D axis placement.
         /// </summary>
-        private Curve2d BuildCircle2d(IIfcCircle ifcCircle)
+        private Circle2d BuildCircle2d(IIfcCircle ifcCircle)
         {
             if (ifcCircle.Radius <= 0)
                 throw new InvalidOperationException(
@@ -135,7 +134,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build 2D circle #{ifcCircle.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Curve2d(nativeHandle, XCurveType.IfcCircle);
+            var position = new XAxis2Placement2d(
+                new XPoint(cx, cy),
+                new XDirection(refDirX, refDirY));
+            return new Circle2d(nativeHandle, ifcCircle.Radius, position);
         }
 
         #endregion
@@ -147,7 +149,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// reference direction extracted from a 2D axis placement. The native function
         /// handles automatic semi-axis swapping when SemiAxis1 &lt; SemiAxis2.
         /// </summary>
-        private Curve2d BuildEllipse2d(IIfcEllipse ifcEllipse)
+        private Ellipse2d BuildEllipse2d(IIfcEllipse ifcEllipse)
         {
             if (ifcEllipse.Position is not IIfcAxis2Placement2D axis2d)
                 throw new InvalidOperationException(
@@ -177,7 +179,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build 2D ellipse #{ifcEllipse.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Curve2d(nativeHandle, XCurveType.IfcEllipse);
+            var position = new XAxis2Placement2d(
+                new XPoint(cx, cy),
+                new XDirection(refDirX, refDirY));
+            return new Ellipse2d(nativeHandle, ifcEllipse.SemiAxis1, ifcEllipse.SemiAxis2, position);
         }
 
         #endregion
@@ -188,7 +193,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// Builds a 2D B-spline curve from an IFC B-spline entity. Extracts 2D control points,
         /// knots, multiplicities, degree, and optional weights (for rational B-splines).
         /// </summary>
-        private Curve2d BuildBSpline2d(IIfcBSplineCurveWithKnots ifcBSpline)
+        private BSplineCurve2d BuildBSpline2d(IIfcBSplineCurveWithKnots ifcBSpline)
         {
             var controlPoints = ifcBSpline.ControlPointsList;
             int numPoles = controlPoints.Count;
@@ -240,7 +245,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 ? XCurveType.IfcRationalBSplineCurveWithKnots
                 : XCurveType.IfcBSplineCurveWithKnots;
 
-            return new Curve2d(nativeHandle, curveType);
+            bool isRational = ifcBSpline is IIfcRationalBSplineCurveWithKnots;
+            return new BSplineCurve2d(nativeHandle, curveType,
+                XGeometricContinuity.GeomAbs_CN, false, isRational);
         }
 
         #endregion
@@ -254,7 +261,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// For circle basis curves, uses arc-of-circle construction; for ellipse, arc-of-ellipse;
         /// for other curves, generic parametric trimming.
         /// </summary>
-        private Curve2d BuildTrimmedCurve2d(IIfcTrimmedCurve ifcTrimmed)
+        private TrimmedCurve2d BuildTrimmedCurve2d(IIfcTrimmedCurve ifcTrimmed)
         {
             // Formal proposition: NoTrimOfBoundedCurves — stricter in 2D (throw, not warn)
             if (ifcTrimmed.BasisCurve is IIfcBoundedCurve)
@@ -262,140 +269,140 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Formal Proposition NoTrimOfBoundedCurves — " +
                     "already bounded curves shall not be trimmed.");
 
-            // Build the 2D basis curve
+            // Build the 2D basis curve — ownership transfers to TrimmedCurve2d on success
             var basisCurve = (Curve2d)BuildCurve2d(ifcTrimmed.BasisCurve);
-
-            bool isConic = ifcTrimmed.BasisCurve is IIfcConic;
-            bool isCircle = ifcTrimmed.BasisCurve is IIfcCircle;
-            bool isEllipse = ifcTrimmed.BasisCurve is IIfcEllipse;
-            bool sense = ifcTrimmed.SenseAgreement;
-            bool preferCartesian = ifcTrimmed.MasterRepresentation == IfcTrimmingPreference.CARTESIAN;
-
-            // Parse trim selects
-            double u1 = double.NegativeInfinity;
-            double u2 = double.PositiveInfinity;
-            IIfcCartesianPoint? cp1 = null;
-            IIfcCartesianPoint? cp2 = null;
-
-            foreach (var trim in ifcTrimmed.Trim1)
+            try
             {
-                if (trim is IIfcCartesianPoint pt)
-                    cp1 = pt;
-                else if (trim is Xbim.Ifc4.MeasureResource.IfcParameterValue pv)
-                    u1 = (double)pv;
-            }
+                bool isConic = ifcTrimmed.BasisCurve is IIfcConic;
+                bool isCircle = ifcTrimmed.BasisCurve is IIfcCircle;
+                bool isEllipse = ifcTrimmed.BasisCurve is IIfcEllipse;
+                bool sense = ifcTrimmed.SenseAgreement;
+                bool preferCartesian = ifcTrimmed.MasterRepresentation == IfcTrimmingPreference.CARTESIAN;
 
-            foreach (var trim in ifcTrimmed.Trim2)
-            {
-                if (trim is IIfcCartesianPoint pt)
-                    cp2 = pt;
-                else if (trim is Xbim.Ifc4.MeasureResource.IfcParameterValue pv)
-                    u2 = (double)pv;
-            }
+                // Parse trim selects
+                double u1 = double.NegativeInfinity;
+                double u2 = double.PositiveInfinity;
+                IIfcCartesianPoint? cp1 = null;
+                IIfcCartesianPoint? cp2 = null;
 
-            // Resolve trim parameters
-            if ((preferCartesian && cp1 != null && cp2 != null) ||
-                (cp1 != null && cp2 != null &&
-                 (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))))
-            {
-                // Use Cartesian points projected onto the 2D basis curve
-                double px1 = cp1.Coordinates[0];
-                double py1 = cp1.Coordinates[1];
-                double px2 = cp2.Coordinates[0];
-                double py2 = cp2.Coordinates[1];
-
-                int r1 = XbimGeometryNativeApi.xbim_curve2d_project_point(
-                    ContextHandle, basisCurve.Handle,
-                    px1, py1, _modelService.MinimumGap, out u1);
-                if (r1 != 0)
+                foreach (var trim in ifcTrimmed.Trim1)
                 {
-                    basisCurve.Dispose();
+                    if (trim is IIfcCartesianPoint pt)
+                        cp1 = pt;
+                    else if (trim is Xbim.Ifc4.MeasureResource.IfcParameterValue pv)
+                        u1 = (double)pv;
+                }
+
+                foreach (var trim in ifcTrimmed.Trim2)
+                {
+                    if (trim is IIfcCartesianPoint pt)
+                        cp2 = pt;
+                    else if (trim is Xbim.Ifc4.MeasureResource.IfcParameterValue pv)
+                        u2 = (double)pv;
+                }
+
+                // Resolve trim parameters
+                if ((preferCartesian && cp1 != null && cp2 != null) ||
+                    (cp1 != null && cp2 != null &&
+                     (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))))
+                {
+                    // Use Cartesian points projected onto the 2D basis curve
+                    double px1 = cp1.Coordinates[0];
+                    double py1 = cp1.Coordinates[1];
+                    double px2 = cp2.Coordinates[0];
+                    double py2 = cp2.Coordinates[1];
+
+                    int r1 = XbimGeometryNativeApi.xbim_curve2d_project_point(
+                        ContextHandle, basisCurve.Handle,
+                        px1, py1, _modelService.MinimumGap, out u1);
+                    if (r1 != 0)
+                        throw new InvalidOperationException(
+                            $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Trim Point1 is not on the 2D basis curve.");
+
+                    int r2 = XbimGeometryNativeApi.xbim_curve2d_project_point(
+                        ContextHandle, basisCurve.Handle,
+                        px2, py2, _modelService.MinimumGap, out u2);
+                    if (r2 != 0)
+                        throw new InvalidOperationException(
+                            $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Trim Point2 is not on the 2D basis curve.");
+                }
+                else if (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))
+                {
                     throw new InvalidOperationException(
-                        $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Trim Point1 is not on the 2D basis curve.");
-                }
-
-                int r2 = XbimGeometryNativeApi.xbim_curve2d_project_point(
-                    ContextHandle, basisCurve.Handle,
-                    px2, py2, _modelService.MinimumGap, out u2);
-                if (r2 != 0)
-                {
-                    basisCurve.Dispose();
-                    throw new InvalidOperationException(
-                        $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Trim Point2 is not on the 2D basis curve.");
-                }
-            }
-            else if (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))
-            {
-                basisCurve.Dispose();
-                throw new InvalidOperationException(
-                    $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: TrimValuesConsistent — " +
-                    "either a single value is specified for Trim, or the two trimming values are of different type.");
-            }
-            else
-            {
-                // Use parametric values, adjusting for conics
-                if (isConic)
-                {
-                    u1 *= _modelService.RadianFactor;
-                    u2 *= _modelService.RadianFactor;
-                }
-            }
-
-            // Sanity check
-            if (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))
-            {
-                basisCurve.Dispose();
-                throw new InvalidOperationException(
-                    $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: error converting trim points.");
-            }
-
-            // Handle equal parameters
-            if (Math.Abs(u1 - u2) < _modelService.Precision)
-            {
-                if (isConic)
-                {
-                    // Equal params on a conic → build a full circle/ellipse
-                    u1 = 0.0;
-                    u2 = Math.PI * 2.0;
-                    sense = true;
+                        $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: TrimValuesConsistent — " +
+                        "either a single value is specified for Trim, or the two trimming values are of different type.");
                 }
                 else
                 {
-                    basisCurve.Dispose();
-                    _logger.LogInformation("IIfcTrimmedCurve #{Label}: parametric trim points are equal on non-conic — empty curve.",
-                        ifcTrimmed.BasisCurve.EntityLabel);
-                    throw new InvalidOperationException(
-                        $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: trim parameters are equal on a non-conic basis, resulting in an empty curve.");
+                    // Use parametric values, converting from IFC to OCCT parameter space
+                    if (isConic)
+                    {
+                        u1 *= _modelService.RadianFactor;
+                        u2 *= _modelService.RadianFactor;
+                    }
+                    else if (ifcTrimmed.BasisCurve is IIfcLine ifcBaseLine)
+                    {
+                        // IFC line parameters are scaled by the direction vector magnitude
+                        u1 *= ifcBaseLine.Dir.Magnitude;
+                        u2 *= ifcBaseLine.Dir.Magnitude;
+                    }
                 }
+
+                // Sanity check
+                if (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))
+                    throw new InvalidOperationException(
+                        $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: error converting trim points.");
+
+                // Handle equal parameters
+                if (Math.Abs(u1 - u2) < _modelService.Precision)
+                {
+                    if (isConic)
+                    {
+                        // Equal params on a conic → build a full circle/ellipse
+                        u1 = 0.0;
+                        u2 = Math.PI * 2.0;
+                        sense = true;
+                    }
+                    else
+                    {
+                        _logger.LogInformation("IIfcTrimmedCurve #{Label}: parametric trim points are equal on non-conic — empty curve.",
+                            ifcTrimmed.BasisCurve.EntityLabel);
+                        throw new InvalidOperationException(
+                            $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: trim parameters are equal on a non-conic basis, resulting in an empty curve.");
+                    }
+                }
+
+                // Build trimmed curve using specialized native functions based on basis type
+                int trimResult;
+                NativeCurve2dHandle trimHandle;
+
+                if (isCircle)
+                {
+                    trimResult = XbimGeometryNativeApi.xbim_curve2d_build_arc_of_circle(
+                        ContextHandle, basisCurve.Handle, u1, u2, sense ? 1 : 0, out trimHandle);
+                }
+                else if (isEllipse)
+                {
+                    trimResult = XbimGeometryNativeApi.xbim_curve2d_build_arc_of_ellipse(
+                        ContextHandle, basisCurve.Handle, u1, u2, sense ? 1 : 0, out trimHandle);
+                }
+                else
+                {
+                    trimResult = XbimGeometryNativeApi.xbim_curve2d_build_trimmed(
+                        ContextHandle, basisCurve.Handle, u1, u2, sense ? 1 : 0, out trimHandle);
+                }
+
+                if (trimResult != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build 2D trimmed curve #{ifcTrimmed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                return new TrimmedCurve2d(trimHandle, basisCurve);
             }
-
-            // Build trimmed curve using specialized native functions based on basis type
-            int trimResult;
-            NativeCurve2dHandle trimHandle;
-
-            if (isCircle)
+            catch
             {
-                trimResult = XbimGeometryNativeApi.xbim_curve2d_build_arc_of_circle(
-                    ContextHandle, basisCurve.Handle, u1, u2, sense ? 1 : 0, out trimHandle);
+                basisCurve.Dispose();
+                throw;
             }
-            else if (isEllipse)
-            {
-                trimResult = XbimGeometryNativeApi.xbim_curve2d_build_arc_of_ellipse(
-                    ContextHandle, basisCurve.Handle, u1, u2, sense ? 1 : 0, out trimHandle);
-            }
-            else
-            {
-                trimResult = XbimGeometryNativeApi.xbim_curve2d_build_trimmed(
-                    ContextHandle, basisCurve.Handle, u1, u2, sense ? 1 : 0, out trimHandle);
-            }
-
-            basisCurve.Dispose();
-
-            if (trimResult != 0)
-                throw new InvalidOperationException(
-                    $"Failed to build 2D trimmed curve #{ifcTrimmed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
-
-            return new Curve2d(trimHandle, XCurveType.IfcTrimmedCurve);
         }
 
         #endregion
@@ -407,7 +414,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// trimmed line segment. Multi-point polylines are built as individual trimmed line segments
         /// joined into a composite B-spline, with degenerate (zero-length) segments skipped.
         /// </summary>
-        private Curve2d BuildPolyline2d(IIfcPolyline ifcPolyline)
+        private BoundedCurve2d BuildPolyline2d(IIfcPolyline ifcPolyline)
         {
             var ifcPoints = ifcPolyline.Points;
             int pointCount = ifcPoints.Count;
@@ -448,7 +455,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build 2D polyline line segment #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new Curve2d(lineHandle, XCurveType.IfcPolyline);
+                return new BoundedCurve2d(lineHandle, XCurveType.IfcPolyline);
             }
 
             // 3+ points: build individual 2D lines, skip degenerate segments
@@ -487,7 +494,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 {
                     var singleHandle = segments[0];
                     segments.Clear();
-                    return new Curve2d(singleHandle, XCurveType.IfcPolyline);
+                    return new BoundedCurve2d(singleHandle, XCurveType.IfcPolyline);
                 }
 
                 using var nativeSegments = new NativeHandleArray(
@@ -501,7 +508,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build 2D polyline #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new Curve2d(compositeHandle, XCurveType.IfcPolyline);
+                return new BoundedCurve2d(compositeHandle, XCurveType.IfcPolyline);
             }
             finally
             {
@@ -519,7 +526,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// SameSense reversal, and joining all segments into a single composite B-spline.
         /// Skips consecutive duplicate segments (ArchiCAD bug workaround).
         /// </summary>
-        private Curve2d BuildCompositeCurve2d(IIfcCompositeCurve ifcComposite)
+        private BoundedCurve2d BuildCompositeCurve2d(IIfcCompositeCurve ifcComposite)
         {
             var segmentCurves = new List<Curve2d>();
 
@@ -569,7 +576,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build 2D composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new Curve2d(compositeHandle, XCurveType.IfcCompositeCurve);
+                return new BoundedCurve2d(compositeHandle, XCurveType.IfcCompositeCurve);
             }
             finally
             {
@@ -588,7 +595,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// LineIndex segments (consecutive point-to-point lines), and the no-segments case
         /// (sequential lines through all points). Joins segments into a single composite B-spline.
         /// </summary>
-        private Curve2d BuildIndexedPolyCurve2d(IIfcIndexedPolyCurve ifcIndexed)
+        private BoundedCurve2d BuildIndexedPolyCurve2d(IIfcIndexedPolyCurve ifcIndexed)
         {
             var points = ExtractPoints2d(ifcIndexed);
             var segments = new List<NativeCurve2dHandle>();
@@ -679,7 +686,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 {
                     var singleHandle = segments[0];
                     segments.Clear(); // prevent dispose of the returned handle
-                    return new Curve2d(singleHandle, XCurveType.IfcIndexedPolyCurve);
+                    return new BoundedCurve2d(singleHandle, XCurveType.IfcIndexedPolyCurve);
                 }
 
                 // Join all segments into a single B-spline
@@ -694,7 +701,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to join 2D IndexedPolyCurve segments #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new Curve2d(compositeHandle, XCurveType.IfcIndexedPolyCurve);
+                return new BoundedCurve2d(compositeHandle, XCurveType.IfcIndexedPolyCurve);
             }
             finally
             {
@@ -733,14 +740,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         private Curve2d BuildOffsetCurve2d(IIfcOffsetCurve2D ifcOffset)
         {
-            var basisCurve = (Curve2d)BuildCurve2d(ifcOffset.BasisCurve);
+            using var basisCurve = (Curve2d)BuildCurve2d(ifcOffset.BasisCurve);
 
             int result = XbimGeometryNativeApi.xbim_curve2d_build_offset(
                 ContextHandle, basisCurve.Handle,
                 ifcOffset.Distance,
                 out var offsetHandle);
-
-            basisCurve.Dispose();
 
             if (result != 0)
                 throw new InvalidOperationException(
