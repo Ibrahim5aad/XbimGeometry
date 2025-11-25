@@ -83,13 +83,13 @@ void Geom2d_Clothoid::EvaluateClothoid(double s, double& x, double& y) const
     FresnelIntegrals(t, C, S);
 
     // Compute Fresnel values at start point
-    double t0 = _startParam / sqrtPiA;
-    double C0, S0;
-    FresnelIntegrals(t0, C0, S0);
+    // double t0 = _startParam / sqrtPiA;
+    // double C0, S0;
+    // FresnelIntegrals(t0, C0, S0);
 
     // Absolute position minus start position
-    double dx = sqrtPiA * (C - C0);
-    double dy = sqrtPiA * (S - S0);
+    double dx = sqrtPiA * C;
+    double dy = sqrtPiA * S;
 
     // Rotate by negative heading angle at startParam to align the tangent
     // at startParam with the local X axis

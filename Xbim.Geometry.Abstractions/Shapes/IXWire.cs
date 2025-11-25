@@ -1,6 +1,6 @@
 ﻿namespace Xbim.Geometry.Abstractions
 {
-    public interface IXWire: IXShape
+    public interface IXWire : IXShape
     {
         //Length in default model units, use IXGeometryPropertyService to get lengths in a specific imperial or metric unit system
         double Length { get; }

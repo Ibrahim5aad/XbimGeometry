@@ -483,8 +483,19 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     }
                     lastLabel = segment.EntityLabel;
 
+                    // Reparametrised segments with non-unit ParamLength are unsupported
+                    if (segment is IIfcReparametrisedCompositeCurveSegment reparam
+                        && (double)reparam.ParamLength != 1.0)
+                        throw new InvalidOperationException(
+                            $"IIfcReparametrisedCompositeCurveSegment #{segment.EntityLabel} is currently unsupported (ParamLength != 1).");
+
                     if (segment.ParentCurve == null)
                         continue;
+
+                    // Composite curve segments must be bounded curves
+                    if (!IsBoundedCurve(segment.ParentCurve))
+                        throw new InvalidOperationException(
+                            "Composite curve is invalid, only curve segments that are bounded curves are permitted.");
 
                     var segCurve = (Curve)Build(segment.ParentCurve);
 

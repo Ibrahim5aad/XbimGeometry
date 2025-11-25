@@ -86,7 +86,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"IfcGradientCurve #{ifcGradient.EntityLabel}: failed to build gradient curve: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new Curve(curveHandle, XCurveType.IfcGradientCurve);
+                return new GradientCurve(curveHandle, ContextHandle, _modelService.Precision);
             }
             finally
             {
@@ -203,7 +203,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             {
                 var handle = BuildSpiralInternal(spiral, startParam, endParam);
                 if (handle != null && !handle.IsInvalid)
-                    XbimGeometryNativeApi.xbim_curve2d_move_to_origin(handle);
+                    XbimGeometryNativeApi.xbim_curve2d_align_to_origin(handle);
                 return handle;
             }
 
@@ -212,7 +212,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             {
                 var handle = BuildPolynomialCurve(polyCurve, startParam, endParam);
                 if (handle != null && !handle.IsInvalid)
-                    XbimGeometryNativeApi.xbim_curve2d_move_to_origin(handle);
+                    XbimGeometryNativeApi.xbim_curve2d_align_to_origin(handle);
                 return handle;
             }
 
@@ -263,7 +263,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
 
             // Move to origin for consistent joining
-            XbimGeometryNativeApi.xbim_curve2d_move_to_origin(handle);
+            XbimGeometryNativeApi.xbim_curve2d_align_to_origin(handle);
             return handle;
         }
 
@@ -301,7 +301,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var arcHandle);
             if (arcResult != 0) return null;
 
-            XbimGeometryNativeApi.xbim_curve2d_move_to_origin(arcHandle);
+            XbimGeometryNativeApi.xbim_curve2d_align_to_origin(arcHandle);
             return arcHandle;
         }
 

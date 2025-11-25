@@ -339,7 +339,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_arc_of_circle(
 
         bool sameSense = (sense != 0);
 
-        // Match legacy: if !sense, swap parameters
         if (!sameSense)
         {
             double tmp = u1;

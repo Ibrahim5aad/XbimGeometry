@@ -9,6 +9,7 @@ namespace Xbim.Geometry.Abstractions
         //calculates the bounding box of the shape
         IXAxisAlignedBoundingBox Bounds();
         string BrepString();
+        void WriteBrep(string filePath);
         bool IsValidShape();
         bool IsClosed { get; }
         bool IsEmptyShape();

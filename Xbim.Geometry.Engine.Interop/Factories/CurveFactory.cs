@@ -62,6 +62,24 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             return Build(curve);
         }
 
+        #region Helpers
+
+        /// <summary>
+        /// Returns whether an IFC curve is bounded. Unbounded curves (lines, pcurves,
+        /// surface curves) are not valid as composite curve segments.
+        /// </summary>
+        private static bool IsBoundedCurve(IIfcCurve curve)
+        {
+            if (curve is IIfcLine) return false;
+            if (curve is IIfcOffsetCurve3D oc3d) return IsBoundedCurve(oc3d.BasisCurve);
+            if (curve is IIfcOffsetCurve2D oc2d) return IsBoundedCurve(oc2d.BasisCurve);
+            if (curve is IIfcPcurve) return false;
+            if (curve is IIfcSurfaceCurve) return false;
+            return true;
+        }
+
+        #endregion
+
         #region Cache
 
         /// <summary>
@@ -77,7 +95,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var curveType = built.CurveType;
             var owningHandle = built.DetachHandle();
             _curveCache[entityLabel] = (owningHandle, curveType);
-            return new Curve(NativeCurveHandle.Borrowed(owningHandle), curveType);
+            if (curveType is XCurveType.IfcGradientCurve)
+                return new GradientCurve(NativeCurveHandle.Borrowed(owningHandle), ContextHandle, _modelService.Precision);
+            else
+                return new Curve(NativeCurveHandle.Borrowed(owningHandle), curveType);
         }
 
         public void Dispose()

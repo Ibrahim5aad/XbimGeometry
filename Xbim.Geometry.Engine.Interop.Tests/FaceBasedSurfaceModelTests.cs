@@ -32,13 +32,10 @@ public class FaceBasedSurfaceModelTests : IDisposable
 
     private void SaveBrep(IXShape shape, string name)
     {
-        #if DEBUG
-        if (shape is Shape ns)
-        {
-            var path = Path.Combine(_brepOutputDir, $"{name}.brep");
-            ns.WriteBrep(path);
-        }
-        #endif
+#if DEBUG
+        var path = Path.Combine(_brepOutputDir, $"{name}.brep");
+        shape.WriteBrep(path);
+#endif
     }
 
     [Fact]

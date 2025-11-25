@@ -23,12 +23,25 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
     {
         private readonly IXbimGeometryServicesFactory _factory;
         private readonly ILoggerFactory _loggerFactory;
-
+        private readonly string _brepOutputDir;
 
         public IfcGradientCurveTests(IXbimGeometryServicesFactory factory, ILoggerFactory loggerFactory)
         {
             _factory = factory;
             _loggerFactory = loggerFactory;
+            _brepOutputDir = Path.Combine(
+                Path.GetDirectoryName(typeof(BooleanFactoryTests).Assembly.Location)!,
+                "BrepOutput");
+            Directory.CreateDirectory(_brepOutputDir);
+        }
+
+
+        private void SaveBrep(IXShape shape, string name)
+        {
+#if DEBUG
+            var path = Path.Combine(_brepOutputDir, $"{name}.brep");
+            shape.WriteBrep(path);
+#endif
         }
 
         [Theory]
@@ -79,10 +92,16 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
             foreach (var curve in curves)
             {
                 // Act
-                var xCurve = modelSvc.CurveFactory.Build(curve);
+                var gradient = modelSvc.CurveFactory.Build(curve);
 
                 // Assert
-                xCurve.Should().NotBeNull();
+                gradient.Should().BeAssignableTo<IXGradientCurve>();
+
+                var wire = ((IXGradientCurve)gradient).ToWire();
+
+                wire.Should().NotBeNull();
+
+                SaveBrep(wire, $"IfcGradientCurve_{Path.GetFileNameWithoutExtension(filePath)}_{curve.EntityLabel}");
 
                 // further tests, if the curve is used in a placement, we want to check that the placement is valid
                 var referencing = GetReferencingEntity(curve);
