@@ -2770,6 +2770,21 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_write_brep(
     XbimShapeHandle handle,
     const char*     filePath);
 
+/**
+ * Write a shape to a binary STL file.
+ *
+ *   handle     – a valid shape handle
+ *   filePath   – output file path (.stl)
+ *   deflection – tessellation chord deviation; smaller = finer mesh (0.1 is typical)
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if handle is NULL;
+ * XBIM_NULL_SHAPE if the shape is null; XBIM_ERROR on I/O or OCCT failure.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_write_stl(
+    XbimShapeHandle handle,
+    const char*     filePath,
+    double          deflection);
+
 /*
  * Serialize a shape to an OCCT BRep ASCII string.
  *

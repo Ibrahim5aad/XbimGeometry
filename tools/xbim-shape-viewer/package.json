@@ -1,0 +1,60 @@
+{
+  "name": "xbim-shape-viewer",
+  "displayName": "xbim Shape Viewer",
+  "description": "View OCCT shapes during debugging",
+  "version": "0.2.0",
+  "publisher": "xbim",
+  "engines": {
+    "vscode": "^1.79.0"
+  },
+  "categories": ["Debuggers"],
+  "activationEvents": ["onDebug"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "xbim.viewShape",
+        "title": "View Shape 3D (OCCT window)"
+      },
+      {
+        "command": "xbim.viewShapeInline",
+        "title": "View Shape 3D (inline panel)"
+      },
+      {
+        "command": "xbim.dumpBrep",
+        "title": "Dump Shape to BREP"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "xbim.viewShapeInline",
+          "when": "inDebugMode",
+          "group": "xbim@1"
+        },
+        {
+          "command": "xbim.viewShape",
+          "when": "inDebugMode",
+          "group": "xbim@2"
+        },
+        {
+          "command": "xbim.dumpBrep",
+          "when": "inDebugMode",
+          "group": "xbim@3"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "xbim.viewShapeInline",
+        "key": "ctrl+alt+v",
+        "when": "inDebugMode && editorTextFocus"
+      },
+      {
+        "command": "xbim.viewShape",
+        "key": "ctrl+alt+shift+v",
+        "when": "inDebugMode && editorTextFocus"
+      }
+    ]
+  }
+}

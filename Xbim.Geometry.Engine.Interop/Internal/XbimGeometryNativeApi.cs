@@ -116,6 +116,12 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeShapeHandle handle,
             [MarshalAs(UnmanagedType.LPStr)] string filePath);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_write_stl(
+            NativeShapeHandle handle,
+            [MarshalAs(UnmanagedType.LPStr)] string filePath,
+            double deflection);
+
         #endregion
 
         #region Location

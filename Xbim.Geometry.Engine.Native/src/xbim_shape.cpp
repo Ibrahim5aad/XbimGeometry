@@ -13,8 +13,10 @@
 
 #include <new>
 #include <sstream>
+#include <fstream>
 #include <cstring>
 #include <cstdlib>
+#include <cstdint>
 
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
@@ -32,6 +34,9 @@
 #include <Bnd_Box.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepTools.hxx>
+#include <BRepMesh_IncrementalMesh.hxx>
+#include <Poly_Triangulation.hxx>
+#include <TopLoc_Location.hxx>
 #include <BinTools.hxx>
 #include <ShapeAnalysis.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
@@ -646,6 +651,107 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_write_brep(
     {
         const char* msg = e.GetMessageString();
         xbim_set_error(msg ? msg : "xbim_shape_write_brep: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_write_stl(
+    XbimShapeHandle handle,
+    const char*     filePath,
+    double          deflection)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_shape_write_stl: handle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!filePath)
+    {
+        xbim_set_error("xbim_shape_write_stl: filePath is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    if (handle->shape.IsNull())
+    {
+        xbim_set_error("xbim_shape_write_stl: shape is null");
+        return XBIM_NULL_SHAPE;
+    }
+    if (deflection <= 0.0) deflection = 0.1;
+
+    try
+    {
+        BRepMesh_IncrementalMesh mesher(handle->shape, deflection);
+        if (!mesher.IsDone())
+        {
+            xbim_set_error("xbim_shape_write_stl: tessellation failed");
+            return XBIM_ERROR;
+        }
+
+        // Count triangles
+        uint32_t totalTriangles = 0;
+        for (TopExp_Explorer ex(handle->shape, TopAbs_FACE); ex.More(); ex.Next())
+        {
+            TopLoc_Location loc;
+            auto tri = BRep_Tool::Triangulation(TopoDS::Face(ex.Current()), loc);
+            if (!tri.IsNull()) totalTriangles += tri->NbTriangles();
+        }
+
+        // Write binary STL
+        std::ofstream ofs(filePath, std::ios::binary);
+        if (!ofs)
+        {
+            xbim_set_error("xbim_shape_write_stl: cannot open file for writing");
+            return XBIM_ERROR;
+        }
+
+        char header[80] = {};
+        snprintf(header, sizeof(header), "xbim - %u triangles", totalTriangles);
+        ofs.write(header, 80);
+        ofs.write(reinterpret_cast<const char*>(&totalTriangles), 4);
+
+        for (TopExp_Explorer ex(handle->shape, TopAbs_FACE); ex.More(); ex.Next())
+        {
+            TopoDS_Face face = TopoDS::Face(ex.Current());
+            TopLoc_Location loc;
+            auto tri = BRep_Tool::Triangulation(face, loc);
+            if (tri.IsNull()) continue;
+
+            gp_Trsf trsf = loc.Transformation();
+            bool reversed = (face.Orientation() == TopAbs_REVERSED);
+
+            for (int i = 1; i <= tri->NbTriangles(); ++i)
+            {
+                int n1, n2, n3;
+                tri->Triangle(i).Get(n1, n2, n3);
+                if (reversed) std::swap(n2, n3);
+
+                gp_Pnt p1 = tri->Node(n1).Transformed(trsf);
+                gp_Pnt p2 = tri->Node(n2).Transformed(trsf);
+                gp_Pnt p3 = tri->Node(n3).Transformed(trsf);
+
+                gp_Vec v1(p1, p2), v2(p1, p3);
+                gp_Vec normal = v1.Crossed(v2);
+                if (normal.Magnitude() > 1e-10) normal.Normalize();
+
+                float buf[12];
+                buf[0]  = (float)normal.X(); buf[1]  = (float)normal.Y(); buf[2]  = (float)normal.Z();
+                buf[3]  = (float)p1.X();     buf[4]  = (float)p1.Y();     buf[5]  = (float)p1.Z();
+                buf[6]  = (float)p2.X();     buf[7]  = (float)p2.Y();     buf[8]  = (float)p2.Z();
+                buf[9]  = (float)p3.X();     buf[10] = (float)p3.Y();     buf[11] = (float)p3.Z();
+                ofs.write(reinterpret_cast<const char*>(buf), 48);
+
+                uint16_t attr = 0;
+                ofs.write(reinterpret_cast<const char*>(&attr), 2);
+            }
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_shape_write_stl: OCCT exception");
         return XBIM_ERROR;
     }
 }

@@ -10,6 +10,7 @@ namespace Xbim.Geometry.Abstractions
         IXAxisAlignedBoundingBox Bounds();
         string BrepString();
         void WriteBrep(string filePath);
+        void WriteStl(string filePath);
         bool IsValidShape();
         bool IsClosed { get; }
         bool IsEmptyShape();

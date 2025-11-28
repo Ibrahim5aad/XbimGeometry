@@ -33,9 +33,7 @@ namespace Xbim.Geometry.Engine.Interop
         private readonly IXbimGeometryServicesFactory factory;
         private readonly ILogger _logger;
         private readonly ILoggerFactory _loggerFactory;
-
         private GeometryEngineOptions _engineOptions;
-
 
 
         static XbimGeometryEngine()
@@ -221,10 +219,8 @@ namespace Xbim.Geometry.Engine.Interop
             }
         }
 
-
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
         public IXbimGeometryObject Create(IIfcGeometricRepresentationItem ifcRepresentation, ILogger logger)
-
         {
             using (new Tracer(LogHelper.CurrentFunctionName(), this._logger, ifcRepresentation))
             {

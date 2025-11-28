@@ -55,7 +55,6 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         /// <summary>
         /// Writes this shape to a .brep file in OCCT ASCII BRep format.
-        /// Useful for debugging and visual inspection in CAD Assistant or FreeCAD.
         /// </summary>
         public void WriteBrep(string filePath)
         {
@@ -63,6 +62,17 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             if (result != 0)
                 throw new InvalidOperationException(
                     $"Failed to write BRep file '{filePath}': {XbimGeometryNativeApi.GetLastError()}");
+        }
+
+        /// <summary>
+        /// Writes this shape to a binary STL file.
+        /// </summary>
+        public void WriteStl(string filePath)
+        {
+            int result = XbimGeometryNativeApi.xbim_shape_write_stl(Handle, filePath, 0.1);
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to write STL file '{filePath}': {XbimGeometryNativeApi.GetLastError()}");
         }
 
         public bool IsValidShape()
