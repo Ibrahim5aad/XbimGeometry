@@ -23,6 +23,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         // Caches owning handles for expensive-to-build gradient and segmented reference curves.
         // Keyed by IFC entity label. Callers receive borrowed (non-owning) Curve wrappers.
+        private readonly object _cacheLock = new();
         private readonly Dictionary<int, (NativeCurveHandle Handle, XCurveType CurveType)> _curveCache = new();
 
         public CurveFactory(ModelGeometryService modelService, ILogger logger)
@@ -88,24 +89,30 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         private Curve GetOrBuildCached(int entityLabel, Func<Curve> builder)
         {
-            if (_curveCache.TryGetValue(entityLabel, out var entry))
-                return new Curve(NativeCurveHandle.Borrowed(entry.Handle), entry.CurveType);
+            lock (_cacheLock)
+            {
+                if (_curveCache.TryGetValue(entityLabel, out var entry))
+                    return new Curve(NativeCurveHandle.Borrowed(entry.Handle), entry.CurveType);
 
-            var built = builder();
-            var curveType = built.CurveType;
-            var owningHandle = built.DetachHandle();
-            _curveCache[entityLabel] = (owningHandle, curveType);
-            if (curveType is XCurveType.IfcGradientCurve)
-                return new GradientCurve(NativeCurveHandle.Borrowed(owningHandle), ContextHandle, _modelService.Precision);
-            else
-                return new Curve(NativeCurveHandle.Borrowed(owningHandle), curveType);
+                var built = builder();
+                var curveType = built.CurveType;
+                var owningHandle = built.DetachHandle();
+                _curveCache[entityLabel] = (owningHandle, curveType);
+                if (curveType is XCurveType.IfcGradientCurve)
+                    return new GradientCurve(NativeCurveHandle.Borrowed(owningHandle), ContextHandle, _modelService.Precision);
+                else
+                    return new Curve(NativeCurveHandle.Borrowed(owningHandle), curveType);
+            }
         }
 
         public void Dispose()
         {
-            foreach (var entry in _curveCache.Values)
-                entry.Handle.Dispose();
-            _curveCache.Clear();
+            lock (_cacheLock)
+            {
+                foreach (var entry in _curveCache.Values)
+                    entry.Handle.Dispose();
+                _curveCache.Clear();
+            }
         }
 
         #endregion

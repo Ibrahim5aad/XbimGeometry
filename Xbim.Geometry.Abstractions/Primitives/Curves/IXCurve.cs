@@ -1,6 +1,8 @@
-﻿namespace Xbim.Geometry.Abstractions
+﻿using System;
+
+namespace Xbim.Geometry.Abstractions
 {
-    public interface IXCurve
+    public interface IXCurve : IDisposable
     {
         XCurveType CurveType { get; }
         bool Is3d { get; }

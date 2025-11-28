@@ -228,9 +228,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 return BuildCircleCurveSegment2d(circle, startParam, endParam, length);
             }
 
-            _logger.LogWarning("Unsupported curve segment parent type {Type} for #{Label}",
-                parentCurve.GetType().Name, segment.EntityLabel);
-            return null;
+            return BuildGenericCurveSegment2d(segment, parentCurve, startParam, endParam, length);
         }
 
         private NativeCurve2dHandle? BuildLineCurveSegment2d(
@@ -303,6 +301,40 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             XbimGeometryNativeApi.xbim_curve2d_align_to_origin(arcHandle);
             return arcHandle;
+        }
+
+        private NativeCurve2dHandle? BuildGenericCurveSegment2d(
+            IfcCurveSegment segment, IIfcCurve parentCurve,
+            double startParam, double endParam, double length)
+        {
+            using var curve2d = (Curve2d)BuildCurve2d(parentCurve);
+
+            if (parentCurve is IIfcEllipse)
+            {
+                curve2d.Dispose();
+                throw new NotSupportedException(
+                    $"IfcEllipse is not supported as CurveSegment parent (#{segment.EntityLabel}).");
+            }
+
+            bool sameSense = length >= 0;
+
+            int trimResult = XbimGeometryNativeApi.xbim_curve2d_build_trimmed(
+                ContextHandle, curve2d.Handle, startParam, endParam, sameSense ? 1 : 0,
+                out var trimHandle);
+
+            if (trimResult != 0)
+            {
+                _logger.LogWarning("Failed to trim generic curve segment #{Label}: {Error}",
+                    segment.EntityLabel, XbimGeometryNativeApi.GetLastError());
+                return null;
+            }
+
+            int alignResult = XbimGeometryNativeApi.xbim_curve2d_align_to_origin(trimHandle);
+            if (alignResult != 0)
+                throw new InvalidOperationException(
+                    $"Failed to align curve to origin: {XbimGeometryNativeApi.GetLastError()}");
+
+            return trimHandle;
         }
 
         private void AlignHeightFunction(
