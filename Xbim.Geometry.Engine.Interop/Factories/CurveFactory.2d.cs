@@ -18,7 +18,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// Routes an IFC curve entity to the appropriate 2D curve builder based on its type.
         /// Returns a <see cref="Curve2d"/> wrapper with Is3d=false.
         /// </summary>
-        private IXCurve BuildCurve2d(IIfcCurve curve)
+        internal IXCurve BuildCurve2d(IIfcCurve curve)
         {
             if (curve is IIfcLine ifcLine)
                 return BuildLine2d(ifcLine);
