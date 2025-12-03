@@ -306,6 +306,21 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         #region Single-Curve Wires
 
+        private IXWire WrapEdgeAsWire(NativeShapeHandle edgeHandle, string curveDescription)
+        {
+            using var nativeEdges = new NativeHandleArray(new[] { edgeHandle });
+            int result = XbimGeometryNativeApi.xbim_wire_build_from_edges(
+                ContextHandle,
+                nativeEdges.Ptrs, 1,
+                out var wireHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build wire from {curveDescription}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new Wire(wireHandle);
+        }
+
         private IXWire BuildFromTrimmedCurve(IIfcTrimmedCurve ifcTrimmed)
         {
             // Build the basis curve as a wire (trimming handled at curve level)
@@ -315,70 +330,25 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXWire BuildFromLine(IIfcLine ifcLine)
         {
             var edge = (Edge)((EdgeFactory)_modelService.EdgeFactory).Build(ifcLine);
-            using var nativeEdges = new NativeHandleArray(new[] { edge.Handle });
-
-            int result = XbimGeometryNativeApi.xbim_wire_build_from_edges(
-                ContextHandle,
-                nativeEdges.Ptrs, 1,
-                out var wireHandle);
-
-            if (result != 0)
-                throw new InvalidOperationException(
-                    $"Failed to build wire from line #{ifcLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
-
-            return new Wire(wireHandle);
+            return WrapEdgeAsWire(edge.Handle, $"line #{ifcLine.EntityLabel}");
         }
 
         private IXWire BuildFromCircle(IIfcCircle ifcCircle)
         {
             var edge = (Edge)((EdgeFactory)_modelService.EdgeFactory).Build(ifcCircle);
-            using var nativeEdges = new NativeHandleArray(new[] { edge.Handle });
-
-            int result = XbimGeometryNativeApi.xbim_wire_build_from_edges(
-                ContextHandle,
-                nativeEdges.Ptrs, 1,
-                out var wireHandle);
-
-            if (result != 0)
-                throw new InvalidOperationException(
-                    $"Failed to build wire from circle #{ifcCircle.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
-
-            return new Wire(wireHandle);
+            return WrapEdgeAsWire(edge.Handle, $"circle #{ifcCircle.EntityLabel}");
         }
 
         private IXWire BuildFromEllipse(IIfcEllipse ifcEllipse)
         {
             var edge = (Edge)((EdgeFactory)_modelService.EdgeFactory).Build(ifcEllipse);
-            using var nativeEdges = new NativeHandleArray(new[] { edge.Handle });
-
-            int result = XbimGeometryNativeApi.xbim_wire_build_from_edges(
-                ContextHandle,
-                nativeEdges.Ptrs, 1,
-                out var wireHandle);
-
-            if (result != 0)
-                throw new InvalidOperationException(
-                    $"Failed to build wire from ellipse #{ifcEllipse.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
-
-            return new Wire(wireHandle);
+            return WrapEdgeAsWire(edge.Handle, $"ellipse #{ifcEllipse.EntityLabel}");
         }
 
         private IXWire BuildFromBSpline(IIfcBSplineCurveWithKnots ifcBSpline)
         {
-            // Build edge from the B-spline curve via EdgeFactory, then wrap as wire
             var edge = (Edge)_modelService.EdgeFactory.Build(ifcBSpline);
-
-            using var nativeEdges = new NativeHandleArray(new[] { edge.Handle });
-            int wireResult = XbimGeometryNativeApi.xbim_wire_build_from_edges(
-                ContextHandle,
-                nativeEdges.Ptrs, 1,
-                out var wireHandle);
-
-            if (wireResult != 0)
-                throw new InvalidOperationException(
-                    $"Failed to build wire from B-spline edge #{ifcBSpline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
-
-            return new Wire(wireHandle);
+            return WrapEdgeAsWire(edge.Handle, $"B-spline #{ifcBSpline.EntityLabel}");
         }
 
         #endregion
