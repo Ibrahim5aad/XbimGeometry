@@ -199,19 +199,33 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                     if (indices.Length == 3)
                     {
-                        // Arc segment (3 indices: start, mid, end)
-                        // Approximate with a line segment from start to end
+                        // Arc segment (3 indices: start, mid, end) — build circular arc through all 3 points
                         int startIdx = (int)(indices[0] - 1);
+                        int midIdx = (int)(indices[1] - 1);
                         int endIdx = (int)(indices[2] - 1);
 
-                        int r = XbimGeometryNativeApi.xbim_edge_build_line(
+                        int r = XbimGeometryNativeApi.xbim_edge_build_circle_arc_3pt(
                             ContextHandle,
                             allPointsXYZ[startIdx * 3], allPointsXYZ[startIdx * 3 + 1], allPointsXYZ[startIdx * 3 + 2],
+                            allPointsXYZ[midIdx * 3], allPointsXYZ[midIdx * 3 + 1], allPointsXYZ[midIdx * 3 + 2],
                             allPointsXYZ[endIdx * 3], allPointsXYZ[endIdx * 3 + 1], allPointsXYZ[endIdx * 3 + 2],
                             out var edgeHandle);
+
                         if (r != 0)
-                            throw new InvalidOperationException(
-                                $"Failed to build arc edge in indexed poly curve #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+                        {
+                            // Collinear points — fall back to a straight line from start to end
+                            _logger.LogInformation("Arc segment in IndexedPolyCurve #{EntityLabel} has collinear points, using line fallback",
+                                ifcIndexed.EntityLabel);
+                            r = XbimGeometryNativeApi.xbim_edge_build_line(
+                                ContextHandle,
+                                allPointsXYZ[startIdx * 3], allPointsXYZ[startIdx * 3 + 1], allPointsXYZ[startIdx * 3 + 2],
+                                allPointsXYZ[endIdx * 3], allPointsXYZ[endIdx * 3 + 1], allPointsXYZ[endIdx * 3 + 2],
+                                out edgeHandle);
+                            if (r != 0)
+                                throw new InvalidOperationException(
+                                    $"Failed to build fallback line edge in indexed poly curve #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+                        }
+
                         edgeHandles.Add(edgeHandle);
                     }
                     else
@@ -329,19 +343,19 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private IXWire BuildFromLine(IIfcLine ifcLine)
         {
-            var edge = (Edge)((EdgeFactory)_modelService.EdgeFactory).Build(ifcLine);
+            var edge = (Edge)_modelService.EdgeFactory.Build(ifcLine);
             return WrapEdgeAsWire(edge.Handle, $"line #{ifcLine.EntityLabel}");
         }
 
         private IXWire BuildFromCircle(IIfcCircle ifcCircle)
         {
-            var edge = (Edge)((EdgeFactory)_modelService.EdgeFactory).Build(ifcCircle);
+            var edge = (Edge)_modelService.EdgeFactory.Build(ifcCircle);
             return WrapEdgeAsWire(edge.Handle, $"circle #{ifcCircle.EntityLabel}");
         }
 
         private IXWire BuildFromEllipse(IIfcEllipse ifcEllipse)
         {
-            var edge = (Edge)((EdgeFactory)_modelService.EdgeFactory).Build(ifcEllipse);
+            var edge = (Edge)_modelService.EdgeFactory.Build(ifcEllipse);
             return WrapEdgeAsWire(edge.Handle, $"ellipse #{ifcEllipse.EntityLabel}");
         }
 
