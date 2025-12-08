@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Services;
+using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Ifc4.Interfaces;
 
@@ -337,8 +339,62 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private IXWire BuildFromTrimmedCurve(IIfcTrimmedCurve ifcTrimmed)
         {
-            // Build the basis curve as a wire (trimming handled at curve level)
-            return Build(ifcTrimmed.BasisCurve);
+            var curveFactory = (CurveFactory)_modelService.CurveFactory;
+            var builtCurve = curveFactory.Build(ifcTrimmed);
+
+            if (builtCurve.Is3d)
+            {
+                var curve3d = (Curve)builtCurve;
+                try
+                {
+                    var startPt = curve3d.GetPoint(curve3d.FirstParameter);
+                    var endPt = curve3d.GetPoint(curve3d.LastParameter);
+
+                    int r = XbimGeometryNativeApi.xbim_edge_build_from_curve_handle(
+                        ContextHandle,
+                        curve3d.Handle,
+                        startPt.X, startPt.Y, startPt.Z,
+                        endPt.X, endPt.Y, endPt.Z,
+                        1, _modelService.Precision,
+                        out var edgeHandle);
+
+                    if (r != 0)
+                        throw new InvalidOperationException(
+                            $"Failed to build edge from trimmed curve #{ifcTrimmed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                    return WrapEdgeAsWire(edgeHandle, $"trimmed curve #{ifcTrimmed.EntityLabel}");
+                }
+                finally
+                {
+                    curve3d.Dispose();
+                }
+            }
+            else
+            {
+                var curve2d = (Curve2d)builtCurve;
+                NativeCurve2dHandle curveHandle = null;
+                try
+                {
+                    curveHandle = curve2d.DetachHandle();
+                    using var curveArray = new NativeHandleArray(new SafeHandle[] { curveHandle });
+                    int r = XbimGeometryNativeApi.xbim_wire_build_from_2d_curves(
+                        ContextHandle,
+                        curveArray.Ptrs, 1,
+                        _modelService.Precision,
+                        _modelService.MinimumGap,
+                        out var wireHandle);
+
+                    if (r != 0)
+                        throw new InvalidOperationException(
+                            $"Failed to build wire from 2D trimmed curve #{ifcTrimmed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                    return new Wire(wireHandle);
+                }
+                finally
+                {
+                    curveHandle?.Dispose();
+                }
+            }
         }
 
         private IXWire BuildFromLine(IIfcLine ifcLine)
