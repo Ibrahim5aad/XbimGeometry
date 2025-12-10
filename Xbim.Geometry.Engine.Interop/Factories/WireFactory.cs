@@ -283,7 +283,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private IXWire BuildFromCompositeCurve(IIfcCompositeCurve ifcComposite)
         {
-            var edgeHandles = new List<NativeShapeHandle>();
+            var segmentWires = new List<Wire>();
+            var allEdgeHandles = new List<NativeShapeHandle>();
             try
             {
                 foreach (var segment in ifcComposite.Segments)
@@ -291,30 +292,58 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     var parentCurve = segment.ParentCurve;
                     if (parentCurve == null) continue;
 
-                    // Build each segment as a wire, then extract its edges
-                    var segWire = Build(parentCurve);
-                    // For simplicity, use the wire handle directly as an edge equivalent
-                    edgeHandles.Add(((Wire)segWire).Handle);
+                    // Build each segment as a wire
+                    var segWire = (Wire)Build(parentCurve);
+                    segmentWires.Add(segWire);
+
+                    // Extract edges from the segment wire
+                    var segEdges = segWire.GetSubShapeHandles(XShapeType.Edge);
+
+                    if (!segment.SameSense)
+                    {
+                        // Reverse edge order and reverse each edge orientation
+                        var reversedEdges = new List<NativeShapeHandle>();
+                        for (int i = segEdges.Length - 1; i >= 0; i--)
+                        {
+                            int rr = XbimGeometryNativeApi.xbim_shape_reversed(
+                                segEdges[i], out var reversedEdge);
+                            if (rr != 0)
+                                throw new InvalidOperationException(
+                                    $"Failed to reverse edge in composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+                            reversedEdges.Add(reversedEdge);
+                            segEdges[i].Dispose();
+                        }
+                        allEdgeHandles.AddRange(reversedEdges);
+                    }
+                    else
+                    {
+                        allEdgeHandles.AddRange(segEdges);
+                    }
                 }
 
-                if (edgeHandles.Count == 0)
+                if (allEdgeHandles.Count == 0)
                     throw new InvalidOperationException(
                         $"IIfcCompositeCurve #{ifcComposite.EntityLabel} has no valid segments.");
 
-                // If we only got one segment, return it directly
-                if (edgeHandles.Count == 1)
-                    return new Wire(edgeHandles[0]);
+                // Build combined wire from all edges
+                using var nativeEdges = new NativeHandleArray(allEdgeHandles.ToArray());
+                int buildResult = XbimGeometryNativeApi.xbim_wire_build_from_edges(
+                    ContextHandle,
+                    nativeEdges.Ptrs, nativeEdges.Length,
+                    out var wireHandle);
 
-                // Build wire from multiple edges/wires
-                // The wire handles ARE the segment wires - just return the first for now
-                // Full composite wire building needs the sew/merge approach
-                return new Wire(edgeHandles[0]);
+                if (buildResult != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build wire from composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                return new Wire(wireHandle);
             }
-            catch
+            finally
             {
-                foreach (var h in edgeHandles)
+                foreach (var h in allEdgeHandles)
                     h.Dispose();
-                throw;
+                foreach (var w in segmentWires)
+                    w.Dispose();
             }
         }
 
