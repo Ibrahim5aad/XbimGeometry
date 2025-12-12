@@ -85,6 +85,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (ifcCurve is IIfcBSplineCurveWithKnots ifcBSpline)
                 return BuildFromBSpline(ifcBSpline);
 
+            if (ifcCurve is IIfcOffsetCurve2D || ifcCurve is IIfcOffsetCurve3D)
+                return BuildFromOffsetCurve(ifcCurve);
+
             throw new NotSupportedException(
                 $"Wire from curve type {ifcCurve.ExpressType.ExpressName} #{ifcCurve.EntityLabel} is not yet supported.");
         }
@@ -368,8 +371,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private IXWire BuildFromTrimmedCurve(IIfcTrimmedCurve ifcTrimmed)
         {
-            var curveFactory = (CurveFactory)_modelService.CurveFactory;
-            var builtCurve = curveFactory.Build(ifcTrimmed);
+            var builtCurve = _modelService.CurveFactory.Build(ifcTrimmed);
 
             if (builtCurve.Is3d)
             {
@@ -448,6 +450,65 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             var edge = (Edge)_modelService.EdgeFactory.Build(ifcBSpline);
             return WrapEdgeAsWire(edge.Handle, $"B-spline #{ifcBSpline.EntityLabel}");
+        }
+
+        private IXWire BuildFromOffsetCurve(IIfcCurve ifcCurve)
+        {
+            var builtCurve = _modelService.CurveFactory.Build(ifcCurve);
+
+            if (builtCurve.Is3d)
+            {
+                var curve3d = (Curve)builtCurve;
+                try
+                {
+                    var startPt = curve3d.GetPoint(curve3d.FirstParameter);
+                    var endPt = curve3d.GetPoint(curve3d.LastParameter);
+
+                    int r = XbimGeometryNativeApi.xbim_edge_build_from_curve_handle(
+                        ContextHandle,
+                        curve3d.Handle,
+                        startPt.X, startPt.Y, startPt.Z,
+                        endPt.X, endPt.Y, endPt.Z,
+                        1, _modelService.Precision,
+                        out var edgeHandle);
+
+                    if (r != 0)
+                        throw new InvalidOperationException(
+                            $"Failed to build edge from offset curve #{ifcCurve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                    return WrapEdgeAsWire(edgeHandle, $"offset curve #{ifcCurve.EntityLabel}");
+                }
+                finally
+                {
+                    curve3d.Dispose();
+                }
+            }
+            else
+            {
+                var curve2d = (Curve2d)builtCurve;
+                NativeCurve2dHandle curveHandle = null;
+                try
+                {
+                    curveHandle = curve2d.DetachHandle();
+                    using var curveArray = new NativeHandleArray(new SafeHandle[] { curveHandle });
+                    int r = XbimGeometryNativeApi.xbim_wire_build_from_2d_curves(
+                        ContextHandle,
+                        curveArray.Ptrs, 1,
+                        _modelService.Precision,
+                        _modelService.MinimumGap,
+                        out var wireHandle);
+
+                    if (r != 0)
+                        throw new InvalidOperationException(
+                            $"Failed to build wire from 2D offset curve #{ifcCurve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                    return new Wire(wireHandle);
+                }
+                finally
+                {
+                    curveHandle?.Dispose();
+                }
+            }
         }
 
         #endregion
