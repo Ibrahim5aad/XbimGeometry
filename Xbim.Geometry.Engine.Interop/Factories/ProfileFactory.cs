@@ -79,8 +79,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXWire BuildWire(IIfcProfileDef profileDef)
         {
-            throw new NotImplementedException(
-                "BuildWire requires wire factory and topology support (TOPO-002).");
+            return _modelService.WireFactory.Build(profileDef);
         }
 
         public IXEdge BuildEdge(IIfcProfileDef profileDef)

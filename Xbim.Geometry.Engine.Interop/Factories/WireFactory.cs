@@ -94,13 +94,15 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXWire Build(IIfcProfileDef ifcProfileDef)
         {
-            // Build the profile as a face, then extract the outer wire
             var face = (Face)_modelService.ProfileFactory.BuildFace(ifcProfileDef);
-            // For now, the face itself contains the profile shape.
-            // Wire extraction from faces requires TOPO-008 traversal API.
-            // Build a wire directly from the profile outline instead.
-            throw new NotImplementedException(
-                $"Wire from profile #{ifcProfileDef.EntityLabel} requires face wire extraction support (TOPO-008).");
+            try
+            {
+                return face.OuterBound;
+            }
+            finally
+            {
+                face.Dispose();
+            }
         }
 
         #region Polyline
