@@ -94,6 +94,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXWire Build(IIfcProfileDef ifcProfileDef)
         {
+            // Open profiles have no face — build wire directly from their curve
+            if (ifcProfileDef is IIfcCenterLineProfileDef centerLine)
+                return BuildCenterLineProfileWire(centerLine);
+
+            if (ifcProfileDef is IIfcArbitraryOpenProfileDef openProfile)
+                return BuildOpenProfileWire(openProfile);
+
+            // All other profile types: build face, extract outer wire
             var face = (Face)_modelService.ProfileFactory.BuildFace(ifcProfileDef);
             try
             {
@@ -510,6 +518,122 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 {
                     curveHandle?.Dispose();
                 }
+            }
+        }
+
+        #endregion
+
+        #region Profile Wires
+
+        private IXWire BuildOpenProfileWire(IIfcArbitraryOpenProfileDef openProfile)
+        {
+            if (openProfile.ProfileType != Xbim.Ifc4.Interfaces.IfcProfileTypeEnum.CURVE)
+                throw new InvalidOperationException(
+                    $"IfcArbitraryOpenProfileDef #{openProfile.EntityLabel} must have ProfileType=CURVE.");
+
+            var curve = openProfile.Curve;
+            if (curve == null)
+                throw new InvalidOperationException(
+                    $"IfcArbitraryOpenProfileDef #{openProfile.EntityLabel} has no Curve.");
+
+            return Build(curve);
+        }
+
+        private IXWire BuildCenterLineProfileWire(IIfcCenterLineProfileDef centerLine)
+        {
+            if (centerLine.Thickness <= 0)
+                throw new InvalidOperationException(
+                    $"IfcCenterLineProfileDef #{centerLine.EntityLabel} has invalid thickness.");
+
+            var curveFactory = (CurveFactory)_modelService.CurveFactory;
+
+            // Build center line as 2D curve
+            var centre = (Curve2d)curveFactory.BuildCurve2d(centerLine.Curve);
+            NativeCurve2dHandle aCurveHandle = null;
+            NativeCurve2dHandle bCurveHandle = null;
+            NativeCurve2dHandle lineAEndToBEnd = null;
+            NativeCurve2dHandle lineBStartToAStart = null;
+
+            try
+            {
+                // Verify center line is open (not closed)
+                var centreStart = centre.GetPoint(centre.FirstParameter);
+                var centreEnd = centre.GetPoint(centre.LastParameter);
+                double dist = Math.Sqrt(
+                    (centreStart.X - centreEnd.X) * (centreStart.X - centreEnd.X) +
+                    (centreStart.Y - centreEnd.Y) * (centreStart.Y - centreEnd.Y));
+
+                if (dist < _modelService.Precision)
+                    throw new InvalidOperationException(
+                        $"IfcCenterLineProfileDef #{centerLine.EntityLabel} must have an open curve for the centre line.");
+
+                // Build two offset curves at ±thickness/2
+                double halfThickness = centerLine.Thickness / 2.0;
+
+                int rA = XbimGeometryNativeApi.xbim_curve2d_build_offset(
+                    ContextHandle, centre.Handle, halfThickness, out aCurveHandle);
+                if (rA != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build offset curve A for IfcCenterLineProfileDef #{centerLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                int rB = XbimGeometryNativeApi.xbim_curve2d_build_offset(
+                    ContextHandle, centre.Handle, -halfThickness, out bCurveHandle);
+                if (rB != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build offset curve B for IfcCenterLineProfileDef #{centerLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                // Evaluate endpoints of both offset curves
+                int rAParams = XbimGeometryNativeApi.xbim_curve2d_parameters(aCurveHandle, out double aFirst, out double aLast);
+                if (rAParams != 0) throw new InvalidOperationException($"Failed to get offset curve A parameters: {XbimGeometryNativeApi.GetLastError()}");
+
+                int rBParams = XbimGeometryNativeApi.xbim_curve2d_parameters(bCurveHandle, out double bFirst, out double bLast);
+                if (rBParams != 0) throw new InvalidOperationException($"Failed to get offset curve B parameters: {XbimGeometryNativeApi.GetLastError()}");
+
+                XbimGeometryNativeApi.xbim_curve2d_value(aCurveHandle, aFirst, out double aStartX, out double aStartY);
+                XbimGeometryNativeApi.xbim_curve2d_value(aCurveHandle, aLast, out double aEndX, out double aEndY);
+                XbimGeometryNativeApi.xbim_curve2d_value(bCurveHandle, bFirst, out double bStartX, out double bStartY);
+                XbimGeometryNativeApi.xbim_curve2d_value(bCurveHandle, bLast, out double bEndX, out double bEndY);
+
+                // Build connecting lines
+                int rLine1 = XbimGeometryNativeApi.xbim_curve2d_build_line(
+                    ContextHandle, aEndX, aEndY, bEndX, bEndY, out lineAEndToBEnd);
+                if (rLine1 != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build connecting line for IfcCenterLineProfileDef #{centerLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                int rLine2 = XbimGeometryNativeApi.xbim_curve2d_build_line(
+                    ContextHandle, bStartX, bStartY, aStartX, aStartY, out lineBStartToAStart);
+                if (rLine2 != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build connecting line for IfcCenterLineProfileDef #{centerLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                // Reverse bCurve so it goes bEnd→bStart (completing the closed loop)
+                XbimGeometryNativeApi.xbim_curve2d_reverse(bCurveHandle);
+
+                // Assemble closed wire: aCurve → line(aEnd→bEnd) → bCurve(reversed) → line(bStart→aStart)
+                var allCurves = new SafeHandle[] { aCurveHandle, lineAEndToBEnd, bCurveHandle, lineBStartToAStart };
+                using var nativeCurves = new NativeHandleArray(allCurves);
+
+                int rWire = XbimGeometryNativeApi.xbim_wire_build_from_2d_curves(
+                    ContextHandle,
+                    nativeCurves.Ptrs, 4,
+                    _modelService.Precision,
+                    _modelService.MinimumGap,
+                    out var wireHandle);
+
+                if (rWire != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build wire for IfcCenterLineProfileDef #{centerLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                return new Wire(wireHandle);
+            }
+            finally
+            {
+                centre.Dispose();
+                aCurveHandle?.Dispose();
+                bCurveHandle?.Dispose();
+                lineAEndToBEnd?.Dispose();
+                lineBStartToAStart?.Dispose();
             }
         }
 
