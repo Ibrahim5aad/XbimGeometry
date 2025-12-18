@@ -1911,6 +1911,92 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_is_closed(
     double          tolerance,
     int*            outClosed);
 
+/*
+ * Project a 3D point onto a wire and return the parametric position.
+ * The parameter is accumulated arc-length across the wire's edges,
+ * matching the legacy NWireFactory::GetParameter behavior.
+ *
+ *   wireHandle – a valid shape handle containing a TopoDS_Wire
+ *   pointX/Y/Z – the 3D point to project
+ *   tolerance  – projection tolerance
+ *   outParam   – receives the parametric position on the wire
+ *
+ * Returns XBIM_OK on success; XBIM_ERROR if the point is not on the wire.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_get_parameter(
+    XbimShapeHandle wireHandle,
+    double          pointX,
+    double          pointY,
+    double          pointZ,
+    double          tolerance,
+    double*         outParam);
+
+/*
+ * Trim a wire by parametric range.
+ *
+ * For single-edge wires with angular conics (circle/ellipse), applies
+ * radianFactor conversion and normalizes to 0..2pi.  For multi-edge
+ * wires, walks intervals and trims first/last edges at boundaries.
+ *
+ *   ctx          – a valid context handle (used for logging; may be NULL)
+ *   wireHandle   – the basis wire to trim
+ *   u1           – start parameter
+ *   u2           – end parameter
+ *   sameSense    – 1 for same sense, 0 for opposite
+ *   tolerance    – geometric tolerance
+ *   radianFactor – angle-to-radians conversion factor (from context)
+ *   outHandle    – receives the trimmed wire
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed(
+    XbimContextHandle ctx,
+    XbimShapeHandle   wireHandle,
+    double            u1,
+    double            u2,
+    int               sameSense,
+    double            tolerance,
+    double            radianFactor,
+    XbimShapeHandle*  outHandle);
+
+/*
+ * Trim a wire with optional Cartesian point projection.
+ *
+ * If preferCartesian is true, projects p1 and p2 onto the wire to obtain
+ * parametric positions; otherwise uses u1/u2 directly.  Delegates to
+ * xbim_wire_build_trimmed for the actual trimming.
+ *
+ *   ctx             – a valid context handle (used for logging; may be NULL)
+ *   wireHandle      – the basis wire to trim
+ *   p1X/Y/Z         – first trim point (used if preferCartesian)
+ *   p2X/Y/Z         – second trim point (used if preferCartesian)
+ *   u1              – first parametric value (fallback)
+ *   u2              – second parametric value (fallback)
+ *   preferCartesian – 1 to project points, 0 to use parametric values
+ *   sameSense       – 1 for same sense, 0 for opposite
+ *   tolerance       – geometric tolerance
+ *   radianFactor    – angle-to-radians conversion factor
+ *   outHandle       – receives the trimmed wire
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed_by_points(
+    XbimContextHandle ctx,
+    XbimShapeHandle   wireHandle,
+    double            p1X,
+    double            p1Y,
+    double            p1Z,
+    double            p2X,
+    double            p2Y,
+    double            p2Z,
+    double            u1,
+    double            u2,
+    int               preferCartesian,
+    int               sameSense,
+    double            tolerance,
+    double            radianFactor,
+    XbimShapeHandle*  outHandle);
+
 #pragma endregion
 
 #pragma region Edge Operations
@@ -2021,6 +2107,63 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve_handle(
     int              sameSense,
     double           tolerance,
     XbimShapeHandle* outHandle);
+
+/*
+ * Build an edge from a pre-built 2D curve handle with start/end positions.
+ * Uses BRepLib_MakeEdge2d followed by BRepLib::BuildCurve3d to produce
+ * a valid BRep edge with both 2D and 3D curve representations.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   curve2dHandle    – a pre-built 2D curve handle
+ *   startX/Y         – coordinates of the start point (2D)
+ *   endX/Y           – coordinates of the end point (2D)
+ *   sameSense        – 1 if edge direction matches curve parametric direction
+ *   tolerance        – point proximity tolerance
+ *   outHandle        – receives the new edge shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve2d_handle(
+    XbimContextHandle  ctx,
+    XbimCurve2dHandle  curve2dHandle,
+    double startX, double startY,
+    double endX,   double endY,
+    int                sameSense,
+    double             tolerance,
+    XbimShapeHandle*   outHandle);
+
+/*
+ * Build an edge from a bounded 3D curve handle (circle, ellipse, BSpline, trimmed curve, etc.).
+ * The full parametric range of the curve is used.
+ * Fails with XBIM_INVALID_ARG for unbounded Geom_Line — callers must trim it first.
+ *
+ *   ctx        – a valid context handle (used for logging; may be NULL)
+ *   curveHandle – a pre-built 3D curve handle
+ *   outHandle  – receives the new edge shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_from_curve_handle(
+    XbimContextHandle ctx,
+    XbimCurveHandle   curveHandle,
+    XbimShapeHandle*  outHandle);
+
+/*
+ * Build an edge from a bounded 2D curve handle.
+ * The full parametric range of the curve is used.
+ * A 3D curve representation is generated via BRepLib::BuildCurve3d.
+ * Fails with XBIM_INVALID_ARG for unbounded Geom2d_Line.
+ *
+ *   ctx           – a valid context handle (used for logging; may be NULL)
+ *   curve2dHandle – a pre-built 2D curve handle
+ *   outHandle     – receives the new edge shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_from_curve2d_handle(
+    XbimContextHandle  ctx,
+    XbimCurve2dHandle  curve2dHandle,
+    XbimShapeHandle*   outHandle);
 
 /*
  * Compute the length of an edge.

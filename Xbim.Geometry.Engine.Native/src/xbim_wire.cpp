@@ -18,6 +18,7 @@
 
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
+#include <gp_Lin.hxx>
 #include <Precision.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Edge.hxx>
@@ -29,16 +30,23 @@
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepAdaptor_CompCurve.hxx>
+#include <BRepAdaptor_Curve.hxx>
+#include <BRepTools_WireExplorer.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
 #include <GProp_GProps.hxx>
 #include <BRepGProp.hxx>
 #include <TopTools_SequenceOfShape.hxx>
 #include <TopAbs_ShapeEnum.hxx>
+#include <TColStd_Array1OfReal.hxx>
 #include <BRepBuilderAPI_MakeEdge2d.hxx>
 #include <BRepLib.hxx>
 #include <ShapeFix_Edge.hxx>
 #include <Standard_Failure.hxx>
 #include <ShapeAnalysis.hxx>
+#include <Geom_TrimmedCurve.hxx>
+#include <Geom_Line.hxx>
+#include <GeomLib_Tool.hxx>
+#include <GeomAbs_CurveType.hxx>
 
 
 #pragma region Wire Construction
@@ -635,6 +643,391 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_contour_area(
     catch (const Standard_Failure&)
     {
         xbim_set_error("xbim_wire_contour_area: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+#pragma endregion
+
+#pragma region Wire Trimming
+
+/*
+ * Project a 3D point onto a wire's composite curve and return the
+ * parametric position along the wire.  The parameter is expressed in
+ * accumulated arc-length space (edge-by-edge) so that it can be used
+ * directly with xbim_wire_build_trimmed.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_get_parameter(
+    XbimShapeHandle wireHandle,
+    double          pointX,
+    double          pointY,
+    double          pointZ,
+    double          tolerance,
+    double*         outParam)
+{
+    xbim_clear_error();
+
+    if (!outParam)
+    {
+        xbim_set_error("xbim_wire_get_parameter: outParam is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outParam = 0.0;
+
+    if (!wireHandle)
+    {
+        xbim_set_error("xbim_wire_get_parameter: wireHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        const TopoDS_Shape& shape = wireHandle->shape;
+        if (shape.IsNull() || shape.ShapeType() != TopAbs_WIRE)
+        {
+            xbim_set_error("xbim_wire_get_parameter: handle is not a wire");
+            return XBIM_INVALID_ARG;
+        }
+
+        const TopoDS_Wire& wire = TopoDS::Wire(shape);
+        gp_Pnt pnt(pointX, pointY, pointZ);
+
+        double paramOffset = 0.0;
+        for (BRepTools_WireExplorer exp(wire); exp.More(); exp.Next())
+        {
+            const TopoDS_Edge& edge = TopoDS::Edge(exp.Current());
+            Standard_Real fpar = 0, lpar = 0;
+            TopLoc_Location aLoc;
+            Handle(Geom_Curve) aCurve = BRep_Tool::Curve(edge, aLoc, fpar, lpar);
+
+            if (aCurve.IsNull())
+            {
+                GProp_GProps gProps;
+                BRepGProp::LinearProperties(edge, gProps);
+                paramOffset += gProps.Mass();
+                continue;
+            }
+
+            Standard_Real u = 0;
+            if (GeomLib_Tool::Parameter(aCurve, pnt, tolerance, u))
+            {
+                *outParam = paramOffset + u;
+                return XBIM_OK;
+            }
+
+            GProp_GProps gProps;
+            BRepGProp::LinearProperties(edge, gProps);
+            paramOffset += gProps.Mass();
+        }
+
+        xbim_set_error("xbim_wire_get_parameter: point is not on the wire");
+        return XBIM_ERROR;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_wire_get_parameter: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+/*
+ * Trim a wire by parametric range.
+ *
+ * For single-interval wires (one edge), detects angular conics
+ * (circle/ellipse) and applies radianFactor conversion, then builds a
+ * trimmed curve.  For multi-interval wires, walks edges with
+ * BRepAdaptor_CompCurve, trims first/last edges at the boundaries, and
+ * takes intermediate edges whole.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed(
+    XbimContextHandle ctx,
+    XbimShapeHandle   wireHandle,
+    double            u1,
+    double            u2,
+    int               sameSense,
+    double            tolerance,
+    double            radianFactor,
+    XbimShapeHandle*  outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_wire_build_trimmed: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!wireHandle)
+    {
+        xbim_set_error("xbim_wire_build_trimmed: wireHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        const TopoDS_Shape& shape = wireHandle->shape;
+        if (shape.IsNull() || shape.ShapeType() != TopAbs_WIRE)
+        {
+            xbim_set_error("xbim_wire_build_trimmed: handle is not a wire");
+            return XBIM_INVALID_ARG;
+        }
+
+        const TopoDS_Wire& wire = TopoDS::Wire(shape);
+
+        BRepAdaptor_CompCurve cc(wire, Standard_True);
+        GeomAbs_Shape continuity = cc.Continuity();
+        int numIntervals = cc.NbIntervals(continuity);
+
+        double first = u1;
+        double last = u2;
+
+        if (numIntervals == 1)
+        {
+            /* Single-edge wire: detect conic for radian conversion */
+            TopoDS_Edge edge;
+            Standard_Real uoe;
+            cc.Edge((cc.FirstParameter() + cc.LastParameter()) * 0.5, edge, uoe);
+
+            Standard_Real fEdge, lEdge;
+            Handle(Geom_Curve) curve = BRep_Tool::Curve(edge, fEdge, lEdge);
+
+            /* Unwrap nested TrimmedCurves to get the basis */
+            if (!curve.IsNull())
+            {
+                Handle(Geom_TrimmedCurve) tc = Handle(Geom_TrimmedCurve)::DownCast(curve);
+                while (!tc.IsNull())
+                {
+                    curve = tc->BasisCurve();
+                    tc = Handle(Geom_TrimmedCurve)::DownCast(curve);
+                }
+            }
+
+            BRepAdaptor_Curve ec(edge);
+            const GeomAbs_CurveType ct = ec.GetType();
+            const bool isAngularConic = (ct == GeomAbs_Circle) || (ct == GeomAbs_Ellipse);
+
+            Standard_Real f = fEdge;
+            Standard_Real l = lEdge;
+
+            if (isAngularConic)
+            {
+                /* Convert IFC angle parameters to radians */
+                Standard_Real a1 = u1 * radianFactor;
+                Standard_Real a2 = u2 * radianFactor;
+
+                /* Normalize to 0..2π */
+                const Standard_Real per = 2.0 * M_PI;
+                auto norm = [&](Standard_Real a) {
+                    a = fmod(a, per);
+                    if (a < 0) a += per;
+                    return a;
+                };
+                a1 = norm(a1);
+                a2 = norm(a2);
+
+                if (!sameSense)
+                    std::swap(a1, a2);
+                if (a2 <= a1)
+                    a2 += per; /* allow wrap across 0 */
+
+                f = a1;
+                l = a2;
+            }
+            else
+            {
+                /* Use mapped parameters clamped to edge range */
+                f = std::max(fEdge, first);
+                l = std::min(lEdge, last);
+            }
+
+            /* Build trimmed wire if range is valid */
+            if (std::abs(f - l) > Precision::Confusion())
+            {
+                Handle(Geom_TrimmedCurve) trimmed = new Geom_TrimmedCurve(curve, f, l);
+                BRepBuilderAPI_MakeWire wm;
+                wm.Add(BRepBuilderAPI_MakeEdge(trimmed));
+
+                if (!wm.IsDone())
+                {
+                    xbim_set_error("xbim_wire_build_trimmed: could not build trimmed wire");
+                    return XBIM_NULL_SHAPE;
+                }
+
+                *outHandle = xbim_shape_create_from(wm.Wire());
+                return *outHandle ? XBIM_OK : XBIM_ERROR;
+            }
+
+            /* Range is degenerate — return empty */
+            xbim_set_error("xbim_wire_build_trimmed: degenerate trim range");
+            return XBIM_NULL_SHAPE;
+        }
+        else
+        {
+            /* Multi-edge wire: walk intervals and trim at boundaries */
+            BRepBuilderAPI_MakeWire wm;
+            TColStd_Array1OfReal res(1, numIntervals + 1);
+            cc.Intervals(res, continuity);
+
+            for (Standard_Integer i = 1; i <= numIntervals; i++)
+            {
+                Standard_Real fp = res.Value(i);
+                Standard_Real lp = res.Value(i + 1);
+
+                /* Skip intervals entirely outside the trim range */
+                if (first > lp)
+                    continue;
+                if (last < fp)
+                    continue;
+
+                /* Get the edge and its curve for this interval */
+                TopoDS_Edge edge;
+                Standard_Real uoe;
+                cc.Edge(fp, edge, uoe);
+
+                Standard_Real fEdge, lEdge;
+                Handle(Geom_Curve) curve = BRep_Tool::Curve(edge, fEdge, lEdge);
+
+                if (curve.IsNull())
+                    continue;
+
+                /* Determine if both trim points fall within this single edge */
+                if (first > fp && first < lp && last < lp)
+                {
+                    gp_Pnt pFirst = cc.Value(first);
+                    gp_Pnt pLast = cc.Value(last);
+                    double maxTol = BRep_Tool::MaxTolerance(edge, TopAbs_VERTEX);
+                    double uFirst, uLast;
+                    GeomLib_Tool::Parameter(curve, pFirst, maxTol, uFirst);
+                    GeomLib_Tool::Parameter(curve, pLast, maxTol, uLast);
+                    if (std::abs(uFirst - uLast) > Precision::Confusion())
+                    {
+                        Handle(Geom_TrimmedCurve) trimmed = new Geom_TrimmedCurve(curve, uFirst, uLast);
+                        wm.Add(BRepBuilderAPI_MakeEdge(trimmed));
+                    }
+                }
+                /* Trim from first to end of edge */
+                else if (first > fp && first < lp)
+                {
+                    gp_Pnt pFirst = cc.Value(first);
+                    double maxTol = BRep_Tool::MaxTolerance(edge, TopAbs_VERTEX);
+                    double uFirst;
+                    GeomLib_Tool::Parameter(curve, pFirst, maxTol, uFirst);
+                    if (std::abs(uFirst - lEdge) > Precision::Confusion())
+                    {
+                        Handle(Geom_TrimmedCurve) trimmed = new Geom_TrimmedCurve(curve, uFirst, lEdge);
+                        wm.Add(BRepBuilderAPI_MakeEdge(trimmed));
+                    }
+                    first = -1; /* mark as done */
+                }
+                /* Trim from start of edge to last */
+                else if (last < lp)
+                {
+                    gp_Pnt pLast = cc.Value(last);
+                    double maxTol = BRep_Tool::MaxTolerance(edge, TopAbs_VERTEX);
+                    double uLast;
+                    GeomLib_Tool::Parameter(curve, pLast, maxTol, uLast);
+                    if (std::abs(uLast - fEdge) > Precision::Confusion())
+                    {
+                        Handle(Geom_TrimmedCurve) trimmed = new Geom_TrimmedCurve(curve, fEdge, uLast);
+                        wm.Add(BRepBuilderAPI_MakeEdge(trimmed));
+                    }
+                }
+                else
+                {
+                    /* Take the whole edge */
+                    wm.Add(edge);
+                }
+            }
+
+            if (!wm.IsDone())
+            {
+                xbim_set_error("xbim_wire_build_trimmed: no edges after trimming");
+                return XBIM_NULL_SHAPE;
+            }
+
+            *outHandle = xbim_shape_create_from(wm.Wire());
+            return *outHandle ? XBIM_OK : XBIM_ERROR;
+        }
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_wire_build_trimmed");
+        xbim_set_error("xbim_wire_build_trimmed: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+/*
+ * Trim a wire using optional Cartesian point projection.
+ *
+ * If preferCartesian is true and the points are valid, projects them onto
+ * the wire to get parametric positions.  Otherwise falls back to using
+ * u1/u2 directly.  Delegates to xbim_wire_build_trimmed for the actual
+ * trimming.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed_by_points(
+    XbimContextHandle ctx,
+    XbimShapeHandle   wireHandle,
+    double            p1X,
+    double            p1Y,
+    double            p1Z,
+    double            p2X,
+    double            p2Y,
+    double            p2Z,
+    double            u1,
+    double            u2,
+    int               preferCartesian,
+    int               sameSense,
+    double            tolerance,
+    double            radianFactor,
+    XbimShapeHandle*  outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_wire_build_trimmed_by_points: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!wireHandle)
+    {
+        xbim_set_error("xbim_wire_build_trimmed_by_points: wireHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        double first = u1;
+        double last = u2;
+
+        if (preferCartesian)
+        {
+            double param1, param2;
+            XbimResult r1 = xbim_wire_get_parameter(wireHandle, p1X, p1Y, p1Z, tolerance, &param1);
+            XbimResult r2 = xbim_wire_get_parameter(wireHandle, p2X, p2Y, p2Z, tolerance, &param2);
+
+            if (r1 == XBIM_OK && r2 == XBIM_OK)
+            {
+                first = param1;
+                last = param2;
+            }
+            else
+            {
+                xbim_log_warning(ctx, "xbim_wire_build_trimmed_by_points: point projection failed, using parametric values");
+            }
+        }
+
+        return xbim_wire_build_trimmed(ctx, wireHandle, first, last, sameSense, tolerance, radianFactor, outHandle);
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_wire_build_trimmed_by_points");
+        xbim_set_error("xbim_wire_build_trimmed_by_points: OCCT exception");
         return XBIM_ERROR;
     }
 }

@@ -671,6 +671,28 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeShapeHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_edge_build_from_curve2d_handle(
+            NativeContextHandle ctx,
+            NativeCurve2dHandle curve2dHandle,
+            double startX, double startY,
+            double endX, double endY,
+            int sameSense,
+            double tolerance,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_edge_from_curve_handle(
+            NativeContextHandle ctx,
+            NativeCurveHandle curveHandle,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_edge_from_curve2d_handle(
+            NativeContextHandle ctx,
+            NativeCurve2dHandle curve2dHandle,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_edge_length(
             NativeShapeHandle edgeHandle,
             out double outLength);
@@ -735,6 +757,40 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         internal static extern int xbim_wire_contour_area(
             NativeShapeHandle wireHandle,
             out double outArea);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_get_parameter(
+            NativeShapeHandle wireHandle,
+            double pointX,
+            double pointY,
+            double pointZ,
+            double tolerance,
+            out double outParam);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_build_trimmed(
+            NativeContextHandle ctx,
+            NativeShapeHandle wireHandle,
+            double u1,
+            double u2,
+            int sameSense,
+            double tolerance,
+            double radianFactor,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_build_trimmed_by_points(
+            NativeContextHandle ctx,
+            NativeShapeHandle wireHandle,
+            double p1X, double p1Y, double p1Z,
+            double p2X, double p2Y, double p2Z,
+            double u1,
+            double u2,
+            int preferCartesian,
+            int sameSense,
+            double tolerance,
+            double radianFactor,
+            out NativeShapeHandle outHandle);
 
         #endregion
 
