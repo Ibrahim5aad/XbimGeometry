@@ -120,6 +120,57 @@ internal static class IfcMoq
         return modelMoq.Object;
     }
 
+    // ── Curve mocks ───────────────────────────────────────────────────
+
+    public static IIfcCircle IfcCircle3d(double radius = 10,
+        IIfcAxis2Placement3D? position = null)
+    {
+        var moq = MakeMoq<IIfcCircle>();
+        moq.SetupGet(c => c.Radius).Returns(radius);
+        var pos = position ?? Axis2Placement3d();
+        moq.SetupGet(c => c.Position).Returns(pos);
+        moq.SetupGet(c => c.Dim).Returns(new IfcDimensionCount(3));
+        moq.SetupGet(c => c.EntityLabel).Returns(1);
+        return moq.Object;
+    }
+
+    public static IIfcEllipse IfcEllipse3d(double semiAxis1 = 10, double semiAxis2 = 5,
+        IIfcAxis2Placement3D? position = null)
+    {
+        var moq = MakeMoq<IIfcEllipse>();
+        moq.SetupGet(e => e.SemiAxis1).Returns(semiAxis1);
+        moq.SetupGet(e => e.SemiAxis2).Returns(semiAxis2);
+        var pos = position ?? Axis2Placement3d();
+        moq.SetupGet(e => e.Position).Returns(pos);
+        moq.SetupGet(e => e.Dim).Returns(new IfcDimensionCount(3));
+        moq.SetupGet(e => e.EntityLabel).Returns(1);
+        return moq.Object;
+    }
+
+    public static IIfcTrimmedCurve IfcTrimmedCurve3d(
+        IIfcCurve basisCurve,
+        double param1, double param2,
+        bool senseAgreement = true,
+        IfcTrimmingPreference masterRepresentation = IfcTrimmingPreference.PARAMETER)
+    {
+        var moq = MakeMoq<IIfcTrimmedCurve>();
+        moq.SetupGet(c => c.BasisCurve).Returns(basisCurve);
+        moq.SetupGet(c => c.SenseAgreement).Returns(senseAgreement);
+        moq.SetupGet(c => c.MasterRepresentation).Returns(masterRepresentation);
+        moq.SetupGet(c => c.Dim).Returns(new IfcDimensionCount(3));
+        moq.SetupGet(c => c.EntityLabel).Returns(1);
+
+        var trim1 = new ItemListMoq<IIfcTrimmingSelect>();
+        trim1.Add(new IfcParameterValue(param1));
+        moq.SetupGet(c => c.Trim1).Returns(trim1);
+
+        var trim2 = new ItemListMoq<IIfcTrimmingSelect>();
+        trim2.Add(new IfcParameterValue(param2));
+        moq.SetupGet(c => c.Trim2).Returns(trim2);
+
+        return moq.Object;
+    }
+
     // ── CSG solid mocks ──────────────────────────────────────────────
 
     public static IIfcBlock Block(double xLen = 10, double yLen = 20, double zLen = 30,
@@ -963,6 +1014,7 @@ internal static class IfcMoq
         var moq = MakeMoq<IIfcLine>();
         moq.SetupGet(l => l.EntityLabel).Returns(label);
         moq.SetupGet(l => l.Pnt).Returns(CartesianPoint3d(ox, oy, oz));
+        moq.SetupGet(l => l.Dim).Returns(new IfcDimensionCount(3));
         var dirMoq = MakeMoq<IIfcVector>();
         dirMoq.SetupGet(v => v.Orientation).Returns(Direction3d(dx, dy, dz));
         dirMoq.SetupGet(v => v.Magnitude).Returns(magnitude);

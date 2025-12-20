@@ -9,6 +9,8 @@ using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Common;
+using Xbim.Common.Geometry;
 using Xbim.Ifc4.Interfaces;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
@@ -634,6 +636,141 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 bCurveHandle?.Dispose();
                 lineAEndToBEnd?.Dispose();
                 lineBStartToAStart?.Dispose();
+            }
+        }
+
+        #endregion
+
+        #region Directrix
+
+        /// <summary>
+        /// Builds a wire from a curve with optional parametric trimming, suitable for
+        /// use as a sweep directrix. Handles the polyline trim (0:1) workaround for
+        /// authoring tools that incorrectly set trim values.
+        /// </summary>
+        internal IXWire BuildDirectrixWire(IIfcCurve ifcCurve, double? startParam, double? endParam)
+        {
+            double start = startParam ?? double.NaN;
+            double end = endParam ?? double.NaN;
+
+            // Workaround: some authoring tools set polyline trim to (0, 1) meaning "entire line"
+            if (ifcCurve is IIfcPolyline &&
+                !double.IsNaN(start) && Math.Abs(start) < _modelService.Precision &&
+                !double.IsNaN(end) && Math.Abs(end - 1.0) < _modelService.Precision)
+            {
+                var modelFactors = _modelService.Model.ModelFactors as XbimModelFactors;
+                if (modelFactors != null && modelFactors.ApplyWorkAround("#PolylineTrimLengthOneForEntireLine"))
+                {
+                    _logger.LogDebug("Polyline trim (0:1) does not comply with schema, expanding to entire length");
+                    end = double.NaN;
+                }
+            }
+
+            // Composite and indexed poly curves need per-segment trimming (WIRE-010)
+            if (ifcCurve is IIfcCompositeCurve || ifcCurve is IIfcIndexedPolyCurve)
+                throw new NotImplementedException(
+                    $"Directrix trimming for {ifcCurve.ExpressType.ExpressName} #{ifcCurve.EntityLabel} is not yet implemented (WIRE-010).");
+
+            // Unbounded curves (IIfcLine) can't be built into a wire directly.
+            // Build the trimmed curve via CurveFactory, then wrap as wire.
+            if (ifcCurve is IIfcLine)
+                return BuildDirectrixFromCurveFactory(ifcCurve, start, end);
+
+            // Build full wire from the bounded curve
+            var wire = (Wire)Build(ifcCurve);
+
+            // If no trimming needed, return the wire as-is
+            if (double.IsNaN(start) && double.IsNaN(end))
+                return wire;
+
+            try
+            {
+                // trim
+                int result = XbimGeometryNativeApi.xbim_wire_build_trimmed(
+                    ContextHandle,
+                    wire.Handle,
+                    double.IsNaN(start) ? 0.0 : start,
+                    double.IsNaN(end) ? double.MaxValue : end,
+                    1, // sameSense
+                    _modelService.Precision,
+                    _modelService.RadianFactor,
+                    out var trimmedHandle);
+
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to trim directrix wire for #{ifcCurve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                return new Wire(trimmedHandle);
+            }
+            finally
+            {
+                wire.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Builds a directrix wire by first constructing the trimmed curve geometry
+        /// via CurveFactory, then wrapping the result as an edge and wire.
+        /// Used for unbounded curves that can't be directly built into a wire.
+        /// </summary>
+        private IXWire BuildDirectrixFromCurveFactory(IIfcCurve ifcCurve, double start, double end)
+        {
+            double? sp = double.IsNaN(start) ? null : start;
+            double? ep = double.IsNaN(end) ? null : end;
+            var builtCurve = _modelService.CurveFactory.BuildDirectrix(ifcCurve, sp, ep);
+
+            if (builtCurve.Is3d)
+            {
+                var curve3d = (Curve)builtCurve;
+                try
+                {
+                    var startPt = curve3d.GetPoint(curve3d.FirstParameter);
+                    var endPt = curve3d.GetPoint(curve3d.LastParameter);
+
+                    int r = XbimGeometryNativeApi.xbim_edge_build_from_curve_handle(
+                        ContextHandle,
+                        curve3d.Handle,
+                        startPt.X, startPt.Y, startPt.Z,
+                        endPt.X, endPt.Y, endPt.Z,
+                        1, _modelService.Precision,
+                        out var edgeHandle);
+
+                    if (r != 0)
+                        throw new InvalidOperationException(
+                            $"Failed to build edge from directrix curve #{ifcCurve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                    return WrapEdgeAsWire(edgeHandle, $"directrix #{ifcCurve.EntityLabel}");
+                }
+                finally
+                {
+                    curve3d.Dispose();
+                }
+            }
+            else
+            {
+                var curve2d = (Curve2d)builtCurve;
+                NativeCurve2dHandle curveHandle = null;
+                try
+                {
+                    curveHandle = curve2d.DetachHandle();
+                    using var curveArray = new NativeHandleArray(new SafeHandle[] { curveHandle });
+                    int r = XbimGeometryNativeApi.xbim_wire_build_from_2d_curves(
+                        ContextHandle,
+                        curveArray.Ptrs, 1,
+                        _modelService.Precision,
+                        _modelService.MinimumGap,
+                        out var wireHandle);
+
+                    if (r != 0)
+                        throw new InvalidOperationException(
+                            $"Failed to build wire from 2D directrix curve #{ifcCurve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                    return new Wire(wireHandle);
+                }
+                finally
+                {
+                    curveHandle?.Dispose();
+                }
             }
         }
 

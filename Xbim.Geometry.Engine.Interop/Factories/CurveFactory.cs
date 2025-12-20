@@ -60,7 +60,45 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXCurve BuildDirectrix(IIfcCurve curve, double? startParam, double? endParam)
         {
-            return Build(curve);
+            if ((int)curve.Dim != 3)
+                throw new InvalidOperationException(
+                    "Directrix must be a 3D curve.");
+
+            var builtCurve = (Curve)BuildCurve3d(curve);
+
+            // If no trimming requested, return the full curve
+            if (!startParam.HasValue && !endParam.HasValue)
+                return builtCurve;
+
+            // Resolve missing params to the curve's natural parameter range
+            double u1 = startParam ?? builtCurve.FirstParameter;
+            double u2 = endParam ?? builtCurve.LastParameter;
+
+            // Skip trimming if the params span the full range
+            if (Math.Abs(u1 - builtCurve.FirstParameter) < _modelService.Precision &&
+                Math.Abs(u2 - builtCurve.LastParameter) < _modelService.Precision)
+                return builtCurve;
+
+            // Trim the curve
+            try
+            {
+                int result = XbimGeometryNativeApi.xbim_curve_build_trimmed_3d(
+                    ContextHandle,
+                    builtCurve.Handle,
+                    u1, u2,
+                    1, // sense agreement
+                    out var trimmedHandle);
+
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to trim directrix curve #{curve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                return new Curve(trimmedHandle, builtCurve.CurveType);
+            }
+            finally
+            {
+                builtCurve.Dispose();
+            }
         }
 
         #region Helpers
