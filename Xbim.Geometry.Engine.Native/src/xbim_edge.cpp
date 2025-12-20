@@ -1,17 +1,13 @@
 /*
  * xbim_edge.cpp
  *
- * Implements edge construction and query functions via the flat C API.
- * Ports NEdgeFactory methods from the C++/CLI engine:
- *   - Build straight edge from two 3D points
- *   - Build edge from a curve handle with parameter bounds
- *   - Build circular arc edge from center, normal, radius, and angle range
- *   - Query edge length
+ * Implements edge construction and query functions.
  */
 
 #include "xbim_edge.h"
 #include "xbim_shape.h"
 #include "xbim_curve.h"
+#include "xbim_curve2d.h"
 #include "xbim_context.h"
 #include "xbim_error.h"
 #include "xbim_logging.h"
@@ -25,7 +21,9 @@
 #include <TopoDS_Edge.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
+#include <BRepBuilderAPI_MakeEdge2d.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
+#include <BRepLib.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
 #include <Geom_Circle.hxx>
@@ -33,7 +31,84 @@
 #include <GC_MakeArcOfCircle.hxx>
 #include <TopExp.hxx>
 #include <TopoDS_Vertex.hxx>
+#include <Geom_Line.hxx>
+#include <Geom2d_Line.hxx>
+#include <GeomAdaptor_Curve.hxx>
+#include <Extrema_ExtPC.hxx>
+#include <BRep_Builder.hxx>
 #include <Standard_Failure.hxx>
+
+#pragma region Helpers
+
+/*
+ * Locate a point on a curve, returning the parameter and distance.
+ * Unwraps trimmed curves to work on the basis curve.
+ * Checks endpoints first, then uses Extrema_ExtPC for interior points.
+ */
+static bool locate_vertex_on_curve(
+    const Handle(Geom_Curve)& geomCurve,
+    const gp_Pnt& P,
+    double maxTolerance,
+    double& parameter,
+    double& actualDistance)
+{
+    /* Unwrap trimmed curves to get the basis curve */
+    Handle(Geom_Curve) basisCurve = geomCurve;
+    Handle(Geom_TrimmedCurve) trimmed = Handle(Geom_TrimmedCurve)::DownCast(basisCurve);
+    while (!trimmed.IsNull())
+    {
+        basisCurve = trimmed->BasisCurve();
+        trimmed = Handle(Geom_TrimmedCurve)::DownCast(basisCurve);
+    }
+
+    double Eps2 = maxTolerance * maxTolerance;
+    GeomAdaptor_Curve GAC(basisCurve);
+
+    gp_Pnt P1 = GAC.Value(GAC.FirstParameter());
+    gp_Pnt P2 = GAC.Value(GAC.LastParameter());
+    double D1 = P1.SquareDistance(P);
+    double D2 = P2.SquareDistance(P);
+
+    if ((D1 < D2) && (D1 <= Eps2))
+    {
+        parameter = GAC.FirstParameter();
+        actualDistance = sqrt(D1);
+        return true;
+    }
+    else if ((D2 < D1) && (D2 <= Eps2))
+    {
+        parameter = GAC.LastParameter();
+        actualDistance = sqrt(D2);
+        return true;
+    }
+
+    Extrema_ExtPC extrema(P, GAC);
+    if (extrema.IsDone())
+    {
+        Standard_Integer index = 0, n = extrema.NbExt();
+        double Dist2 = RealLast();
+
+        for (Standard_Integer i = 1; i <= n; i++)
+        {
+            double dist2min = extrema.SquareDistance(i);
+            if (dist2min < Dist2)
+            {
+                index = i;
+                Dist2 = dist2min;
+            }
+        }
+
+        if (index != 0 && Dist2 <= Eps2)
+        {
+            parameter = extrema.Point(index).Parameter();
+            actualDistance = sqrt(Dist2);
+            return true;
+        }
+    }
+    return false;
+}
+
+#pragma endregion
 
 #pragma region Edge Construction
 
@@ -291,28 +366,71 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve_handle(
         gp_Pnt pStart(startX, startY, startZ);
         gp_Pnt pEnd(endX, endY, endZ);
 
-        BRepBuilderAPI_MakeEdge edgeMaker;
+        TopoDS_Edge edge;
 
         /* If start and end are coincident, build a closed edge (seam) */
         if (pStart.Distance(pEnd) < tolerance)
         {
-            edgeMaker = BRepBuilderAPI_MakeEdge(curve);
+            BRepBuilderAPI_MakeEdge edgeMaker(curve);
+            if (!edgeMaker.IsDone())
+            {
+                xbim_set_error("xbim_edge_build_from_curve_handle: closed edge construction failed");
+                xbim_log_warning(ctx, "BRepBuilderAPI_MakeEdge failed for closed curve-handle edge");
+                return XBIM_NULL_SHAPE;
+            }
+            edge = edgeMaker.Edge();
         }
         else
         {
+            /* Build vertices from points */
             BRepBuilderAPI_MakeVertex mv1(pStart);
             BRepBuilderAPI_MakeVertex mv2(pEnd);
-            edgeMaker = BRepBuilderAPI_MakeEdge(curve, mv1.Vertex(), mv2.Vertex());
+            TopoDS_Vertex startVertex = mv1.Vertex();
+            TopoDS_Vertex endVertex = mv2.Vertex();
+
+            /* Project vertices onto the curve to get exact parameters */
+            double paramStart, paramEnd;
+            double distStart, distEnd;
+
+            if (!locate_vertex_on_curve(curve, pStart, tolerance, paramStart, distStart))
+            {
+                xbim_set_error("xbim_edge_build_from_curve_handle: start vertex not on curve within tolerance");
+                xbim_log_warning(ctx, "Start vertex is not located on the curve within the required tolerance");
+                return XBIM_INVALID_ARG;
+            }
+            if (!locate_vertex_on_curve(curve, pEnd, tolerance, paramEnd, distEnd))
+            {
+                xbim_set_error("xbim_edge_build_from_curve_handle: end vertex not on curve within tolerance");
+                xbim_log_warning(ctx, "End vertex is not located on the curve within the required tolerance");
+                return XBIM_INVALID_ARG;
+            }
+
+            /* Widen vertex tolerances if the point-to-curve distance exceeds them */
+            BRep_Builder builder;
+            double startVertexTol = BRep_Tool::Tolerance(startVertex);
+            double endVertexTol = BRep_Tool::Tolerance(endVertex);
+            if (distStart > startVertexTol)
+                builder.UpdateVertex(startVertex, distStart);
+            if (distEnd > endVertexTol)
+                builder.UpdateVertex(endVertex, distEnd);
+
+            BRepBuilderAPI_MakeEdge edgeMaker(curve, startVertex, endVertex, paramStart, paramEnd);
+            if (!edgeMaker.IsDone())
+            {
+                xbim_set_error("xbim_edge_build_from_curve_handle: edge construction failed");
+                xbim_log_warning(ctx, "BRepBuilderAPI_MakeEdge failed for curve-handle edge");
+                return XBIM_NULL_SHAPE;
+            }
+            edge = edgeMaker.Edge();
+
+            if (!BRepLib::BuildCurve3d(edge))
+            {
+                xbim_set_error("xbim_edge_build_from_curve_handle: failed to build 3D curve for edge");
+                xbim_log_warning(ctx, "BRepLib::BuildCurve3d failed");
+                return XBIM_ERROR;
+            }
         }
 
-        if (!edgeMaker.IsDone())
-        {
-            xbim_set_error("xbim_edge_build_from_curve_handle: edge construction failed");
-            xbim_log_warning(ctx, "BRepBuilderAPI_MakeEdge failed for curve-handle edge");
-            return XBIM_NULL_SHAPE;
-        }
-
-        TopoDS_Edge edge = edgeMaker.Edge();
         if (edge.IsNull())
         {
             xbim_set_error("xbim_edge_build_from_curve_handle: resulting edge is null");
@@ -332,6 +450,255 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve_handle(
     {
         xbim_log_occt_failure(ctx, e, "xbim_edge_build_from_curve_handle");
         xbim_set_error("xbim_edge_build_from_curve_handle: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve2d_handle(
+    XbimContextHandle  ctx,
+    XbimCurve2dHandle  curve2dHandle,
+    double             startX, double startY,
+    double             endX,   double endY,
+    int                sameSense,
+    double             tolerance,
+    XbimShapeHandle*   outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_edge_build_from_curve2d_handle: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!curve2dHandle)
+    {
+        xbim_set_error("xbim_edge_build_from_curve2d_handle: curve2dHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        Handle(Geom2d_Curve) curve = curve2dHandle->curve;
+        if (curve.IsNull())
+        {
+            xbim_set_error("xbim_edge_build_from_curve2d_handle: curve is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        if (!sameSense)
+        {
+            curve = Handle(Geom2d_Curve)::DownCast(curve->Copy());
+            curve->Reverse();
+        }
+
+        gp_Pnt2d pStart(startX, startY);
+        gp_Pnt2d pEnd(endX, endY);
+
+        TopoDS_Edge edge;
+        bool isClosed = pStart.Distance(pEnd) < tolerance;
+
+        if (isClosed)
+        {
+            BRepBuilderAPI_MakeEdge2d edgeMaker(curve);
+            if (!edgeMaker.IsDone())
+            {
+                xbim_set_error("xbim_edge_build_from_curve2d_handle: edge construction failed (closed)");
+                xbim_log_warning(ctx, "BRepBuilderAPI_MakeEdge2d failed for closed curve2d edge");
+                return XBIM_NULL_SHAPE;
+            }
+            edge = edgeMaker.Edge();
+        }
+        else
+        {
+            BRepBuilderAPI_MakeEdge2d edgeMaker(curve, pStart, pEnd);
+            if (!edgeMaker.IsDone())
+            {
+                xbim_set_error("xbim_edge_build_from_curve2d_handle: edge construction failed (open)");
+                xbim_log_warning(ctx, "BRepBuilderAPI_MakeEdge2d failed for curve2d-handle edge");
+                return XBIM_NULL_SHAPE;
+            }
+            edge = edgeMaker.Edge();
+        }
+
+        if (edge.IsNull())
+        {
+            xbim_set_error("xbim_edge_build_from_curve2d_handle: resulting edge is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        /* Build the 3D curve representation required by downstream BRep operations */
+        if (!BRepLib::BuildCurve3d(edge))
+        {
+            xbim_set_error("xbim_edge_build_from_curve2d_handle: failed to build 3D curve for 2D edge");
+            xbim_log_warning(ctx, "BRepLib::BuildCurve3d failed for 2D edge");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_shape_create_from(edge);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_edge_build_from_curve2d_handle: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_edge_build_from_curve2d_handle");
+        xbim_set_error("xbim_edge_build_from_curve2d_handle: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_from_curve_handle(
+    XbimContextHandle ctx,
+    XbimCurveHandle   curveHandle,
+    XbimShapeHandle*  outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_edge_from_curve_handle: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!curveHandle)
+    {
+        xbim_set_error("xbim_edge_from_curve_handle: curveHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        Handle(Geom_Curve) curve = curveHandle->curve;
+        if (curve.IsNull())
+        {
+            xbim_set_error("xbim_edge_from_curve_handle: curve is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        /* Unbounded lines cannot be passed directly to MakeEdge;
+           use the parametric range [FirstParameter, LastParameter] which
+           for trimmed curves gives the correct bounds. For truly infinite
+           lines this will fail — callers should trim first. */
+        Handle(Geom_Line) line = Handle(Geom_Line)::DownCast(curve);
+        if (!line.IsNull())
+        {
+            xbim_set_error("xbim_edge_from_curve_handle: unbounded Geom_Line cannot be converted to an edge; trim it first");
+            return XBIM_INVALID_ARG;
+        }
+
+        BRepBuilderAPI_MakeEdge edgeMaker(curve);
+        if (!edgeMaker.IsDone())
+        {
+            xbim_set_error("xbim_edge_from_curve_handle: edge construction failed");
+            xbim_log_warning(ctx, "BRepBuilderAPI_MakeEdge failed for curve handle");
+            return XBIM_NULL_SHAPE;
+        }
+
+        TopoDS_Edge edge = edgeMaker.Edge();
+        if (edge.IsNull())
+        {
+            xbim_set_error("xbim_edge_from_curve_handle: resulting edge is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        *outHandle = xbim_shape_create_from(edge);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_edge_from_curve_handle: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_edge_from_curve_handle");
+        xbim_set_error("xbim_edge_from_curve_handle: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_from_curve2d_handle(
+    XbimContextHandle  ctx,
+    XbimCurve2dHandle  curve2dHandle,
+    XbimShapeHandle*   outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_edge_from_curve2d_handle: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!curve2dHandle)
+    {
+        xbim_set_error("xbim_edge_from_curve2d_handle: curve2dHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        Handle(Geom2d_Curve) curve = curve2dHandle->curve;
+        if (curve.IsNull())
+        {
+            xbim_set_error("xbim_edge_from_curve2d_handle: curve is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        Handle(Geom2d_Line) line = Handle(Geom2d_Line)::DownCast(curve);
+        if (!line.IsNull())
+        {
+            xbim_set_error("xbim_edge_from_curve2d_handle: unbounded Geom2d_Line cannot be converted to an edge; trim it first");
+            return XBIM_INVALID_ARG;
+        }
+
+        BRepBuilderAPI_MakeEdge2d edgeMaker(curve);
+        if (!edgeMaker.IsDone())
+        {
+            xbim_set_error("xbim_edge_from_curve2d_handle: edge construction failed");
+            xbim_log_warning(ctx, "BRepBuilderAPI_MakeEdge2d failed for curve2d handle");
+            return XBIM_NULL_SHAPE;
+        }
+
+        TopoDS_Edge edge = edgeMaker.Edge();
+        if (edge.IsNull())
+        {
+            xbim_set_error("xbim_edge_from_curve2d_handle: resulting edge is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        if (!BRepLib::BuildCurve3d(edge))
+        {
+            xbim_set_error("xbim_edge_from_curve2d_handle: failed to build 3D curve for 2D edge");
+            xbim_log_warning(ctx, "BRepLib::BuildCurve3d failed for 2D edge");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_shape_create_from(edge);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_edge_from_curve2d_handle: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_edge_from_curve2d_handle");
+        xbim_set_error("xbim_edge_from_curve2d_handle: OCCT exception");
         return XBIM_ERROR;
     }
 }

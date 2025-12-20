@@ -1,13 +1,7 @@
 /*
  * xbim_face.cpp
  *
- * Implements face construction and query functions via the flat C API.
- * Ports NFaceFactory methods from the C++/CLI engine:
- *   - Build face from a surface (no bounds)
- *   - Build planar face from a closed wire
- *   - Build advanced face with outer wire, inner wires, surface, and orientation
- *   - Query face area
- *   - Query face normal at parametric centre
+ * Implements face construction and query functions.
  */
 
 #include "xbim_face.h"

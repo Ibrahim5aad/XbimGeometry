@@ -53,8 +53,27 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXEdge Build(IXCurve curve)
         {
-            throw new NotImplementedException(
-                "Building an edge from an IXCurve requires native curve-to-edge API support.");
+            int result;
+            NativeShapeHandle shapeHandle;
+
+            if (curve.Is3d)
+            {
+                var nativeCurve = (Curve)curve;
+                result = XbimGeometryNativeApi.xbim_edge_from_curve_handle(
+                    ContextHandle, nativeCurve.Handle, out shapeHandle);
+            }
+            else
+            {
+                var nativeCurve2d = (Curve2d)curve;
+                result = XbimGeometryNativeApi.xbim_edge_from_curve2d_handle(
+                    ContextHandle, nativeCurve2d.Handle, out shapeHandle);
+            }
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build edge from curve: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new Edge(shapeHandle);
         }
     }
 }
