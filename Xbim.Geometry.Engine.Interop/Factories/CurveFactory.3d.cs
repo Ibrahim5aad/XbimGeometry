@@ -99,6 +99,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 ContextHandle,
                 ox, oy, oz,
                 zx, zy, zz,
+                xx, xy, xz,
                 ifcCircle.Radius,
                 out var nativeCurveHandle);
 

@@ -358,17 +358,36 @@ public class SweptSolidTests : IDisposable
     // ── Swept disk solid tests ───────────────────────────────────────
 
     [Fact]
-    public void SweptDiskSolid_ThrowsNotImplemented_PendingTopoInfrastructure()
+    public void SweptDiskSolid_StraightLine_ProducesCylindricalShape()
     {
-        // SweptDiskSolid requires WireFactory/CurveFactory (TOPO-002/TOPO-006)
-        // to build the directrix wire. Until those are implemented, this should
-        // throw NotImplementedException with a clear message.
-        var ifcSolid = IfcMoq.SweptDiskSolid(radius: 10, innerRadius: 5);
+        // Sweep a disk of radius 10 along a straight line of length 100
+        // IFC parametric length = param * magnitude, so magnitude=1, trim 0→100 = 100 units
+        var line = IfcMoq.IfcLine(0, 0, 0, 1, 0, 0, 1);
+        var trimmedLine = IfcMoq.IfcTrimmedCurve3d(line, 0, 100);
+        var ifcSolid = IfcMoq.SweptDiskSolid(radius: 10, directrix: trimmedLine);
 
-        var act = () => _solidFactory.Build(ifcSolid);
+        var shape = _solidFactory.Build(ifcSolid) as IXSolid;
 
-        act.Should().Throw<NotImplementedException>()
-            .WithMessage("*WireFactory*");
+        shape.Should().NotBeNull();
+        // Volume = π * R² * L = π * 100 * 100
+        shape.Volume.Should().BeApproximately(Math.PI * 100 * 100, 10);
+        SaveBrep(shape, "swept_disk_straight");
+    }
+
+    [Fact]
+    public void SweptDiskSolid_WithInnerRadius_ProducesHollowPipe()
+    {
+        // Sweep a hollow disk (outer=10, inner=5) along a straight line of length 100
+        var line = IfcMoq.IfcLine(0, 0, 0, 1, 0, 0, 1);
+        var trimmedLine = IfcMoq.IfcTrimmedCurve3d(line, 0, 100);
+        var ifcSolid = IfcMoq.SweptDiskSolid(radius: 10, innerRadius: 5, directrix: trimmedLine);
+
+        var shape = _solidFactory.Build(ifcSolid) as IXSolid;
+
+        shape.Should().NotBeNull();
+        double expectedVol = Math.PI * 100 * (100 - 25); // π * L * (R² - r²)
+        shape.Volume.Should().BeApproximately(expectedVol, 50);
+        SaveBrep(shape, "swept_disk_hollow");
     }
 
     // ── Dispose tests ────────────────────────────────────────────────

@@ -12,6 +12,7 @@ using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Common;
 using Xbim.Common.Geometry;
 using Xbim.Ifc4.Interfaces;
+using Xbim.Ifc4.MeasureResource;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
 {
@@ -152,36 +153,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private IXWire BuildFromIndexedPolyCurve(IIfcIndexedPolyCurve ifcIndexed)
         {
-            // Extract all points from the coordinate list
-            List<double> allPointsXYZ;
-
-            if (ifcIndexed.Points is IIfcCartesianPointList3D pl3D)
-            {
-                var coords = pl3D.CoordList;
-                allPointsXYZ = new List<double>(coords.Count * 3);
-                foreach (var pt in coords)
-                {
-                    allPointsXYZ.Add(pt[0]);
-                    allPointsXYZ.Add(pt[1]);
-                    allPointsXYZ.Add(pt.Count > 2 ? pt[2] : 0.0);
-                }
-            }
-            else if (ifcIndexed.Points is IIfcCartesianPointList2D pl2D)
-            {
-                var coords = pl2D.CoordList;
-                allPointsXYZ = new List<double>(coords.Count * 3);
-                foreach (var pt in coords)
-                {
-                    allPointsXYZ.Add(pt[0]);
-                    allPointsXYZ.Add(pt[1]);
-                    allPointsXYZ.Add(0.0);
-                }
-            }
-            else
-            {
-                throw new NotSupportedException(
-                    $"Unsupported point list type in IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}.");
-            }
+            List<double> allPointsXYZ = ExtractPointCoordinates(ifcIndexed);
 
             // If no segments specified, build a polyline through all points in order
             if (ifcIndexed.Segments == null || !ifcIndexed.Segments.Any())
@@ -209,10 +181,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             {
                 foreach (var segment in ifcIndexed.Segments)
                 {
-                    // Each segment is a list of 1-based point indices
-                    var indices = ((System.Collections.IEnumerable)segment)
-                        .Cast<long>()
-                        .ToArray();
+                    var valueList = (System.Collections.IList)segment.Value;
+                    var indices = new long[valueList.Count];
+                    for (int i = 0; i < valueList.Count; i++)
+                        indices[i] = (IfcPositiveInteger)valueList[i]!;
 
                     if (indices.Length == 3)
                     {
@@ -298,8 +270,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private IXWire BuildFromCompositeCurve(IIfcCompositeCurve ifcComposite)
         {
-            var segmentWires = new List<Wire>();
-            var allEdgeHandles = new List<NativeShapeHandle>();
+            var segmentCurves = new List<Curve>();
             try
             {
                 foreach (var segment in ifcComposite.Segments)
@@ -307,44 +278,31 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     var parentCurve = segment.ParentCurve;
                     if (parentCurve == null) continue;
 
-                    // Build each segment as a wire
-                    var segWire = (Wire)Build(parentCurve);
-                    segmentWires.Add(segWire);
-
-                    // Extract edges from the segment wire
-                    var segEdges = segWire.GetSubShapeHandles(XShapeType.Edge);
+                    var segCurve = (Curve)_modelService.CurveFactory.Build(parentCurve);
 
                     if (!segment.SameSense)
                     {
-                        // Reverse edge order and reverse each edge orientation
-                        var reversedEdges = new List<NativeShapeHandle>();
-                        for (int i = segEdges.Length - 1; i >= 0; i--)
-                        {
-                            int rr = XbimGeometryNativeApi.xbim_shape_reversed(
-                                segEdges[i], out var reversedEdge);
-                            if (rr != 0)
-                                throw new InvalidOperationException(
-                                    $"Failed to reverse edge in composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
-                            reversedEdges.Add(reversedEdge);
-                            segEdges[i].Dispose();
-                        }
-                        allEdgeHandles.AddRange(reversedEdges);
+                        int reverseResult = XbimGeometryNativeApi.xbim_curve_reverse(segCurve.Handle);
+                        if (reverseResult != 0)
+                            throw new InvalidOperationException(
+                                $"Failed to reverse composite curve segment #{segment.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
                     }
-                    else
-                    {
-                        allEdgeHandles.AddRange(segEdges);
-                    }
+
+                    segmentCurves.Add(segCurve);
                 }
 
-                if (allEdgeHandles.Count == 0)
+                if (segmentCurves.Count == 0)
                     throw new InvalidOperationException(
                         $"IIfcCompositeCurve #{ifcComposite.EntityLabel} has no valid segments.");
 
-                // Build combined wire from all edges
-                using var nativeEdges = new NativeHandleArray(allEdgeHandles.ToArray());
-                int buildResult = XbimGeometryNativeApi.xbim_wire_build_from_edges(
+                // Build wire from curves with shared vertex connectivity
+                using var nativeCurves = new NativeHandleArray(
+                    segmentCurves.Select(c => c.Handle).ToArray());
+                int buildResult = XbimGeometryNativeApi.xbim_wire_build_from_curves(
                     ContextHandle,
-                    nativeEdges.Ptrs, nativeEdges.Length,
+                    nativeCurves.Ptrs, nativeCurves.Length,
+                    _modelService.Precision,
+                    _modelService.MinimumGap,
                     out var wireHandle);
 
                 if (buildResult != 0)
@@ -355,10 +313,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
             finally
             {
-                foreach (var h in allEdgeHandles)
-                    h.Dispose();
-                foreach (var w in segmentWires)
-                    w.Dispose();
+                foreach (var c in segmentCurves)
+                    c.Dispose();
             }
         }
 
@@ -645,8 +601,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         /// <summary>
         /// Builds a wire from a curve with optional parametric trimming, suitable for
-        /// use as a sweep directrix. Handles the polyline trim (0:1) workaround for
-        /// authoring tools that incorrectly set trim values.
+        /// use as a sweep directrix.
         /// </summary>
         internal IXWire BuildDirectrixWire(IIfcCurve ifcCurve, double? startParam, double? endParam)
         {
@@ -666,10 +621,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
             }
 
-            // Composite and indexed poly curves need per-segment trimming (WIRE-010)
-            if (ifcCurve is IIfcCompositeCurve || ifcCurve is IIfcIndexedPolyCurve)
-                throw new NotImplementedException(
-                    $"Directrix trimming for {ifcCurve.ExpressType.ExpressName} #{ifcCurve.EntityLabel} is not yet implemented (WIRE-010).");
+            // Composite and indexed poly curves need IFC-to-arclength parameterization mapping
+            if (ifcCurve is IIfcCompositeCurve ifcCompositeDirectrix)
+                return BuildDirectrixCompositeCurve(ifcCompositeDirectrix, start, end);
+
+            if (ifcCurve is IIfcIndexedPolyCurve ifcIndexedDirectrix)
+                return BuildDirectrixIndexedPolyCurve(ifcIndexedDirectrix, start, end);
 
             // Unbounded curves (IIfcLine) can't be built into a wire directly.
             // Build the trimmed curve via CurveFactory, then wrap as wire.
@@ -772,6 +729,513 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     curveHandle?.Dispose();
                 }
             }
+        }
+
+        /// <summary>
+        /// Builds a directrix wire from a composite curve with IFC-to-arclength parameterization
+        /// mapping for trimming. Each segment's parameterized length depends on its type:
+        /// IIfcLine=1, IIfcTrimmedCurve=Trim2-Trim1, IIfcPolyline=Points.Count-1,
+        /// IIfcIndexedPolyCurve=sum of sub-segment params (arcs=angular span, lines=1).
+        /// </summary>
+        private IXWire BuildDirectrixCompositeCurve(IIfcCompositeCurve ifcComposite, double startParam, double endParam)
+        {
+            double startPar = double.IsNaN(startParam) ? 0.0 : startParam;
+            double endPar = double.IsNaN(endParam) ? double.PositiveInfinity : endParam;
+
+            double occStart = 0.0;
+            double occEnd = 0.0;
+            double totCurveLen = 0.0;
+            double firstParameterizedLength = 0.0;
+            int segIndex = 0;
+
+            var segmentCurves = new List<Curve>();
+            try
+            {
+                foreach (var segment in ifcComposite.Segments)
+                {
+                    // Skip remaining segments if both params are consumed
+                    if (startPar <= 0 && endPar <= 0)
+                        continue;
+
+                    // Reject reparameterised segments with non-unit param length
+                    if (segment is IIfcReparametrisedCompositeCurveSegment reparam &&
+                        (double)reparam.ParamLength != 1.0)
+                    {
+                        throw new NotSupportedException(
+                            $"IIfcReparametrisedCompositeCurveSegment #{segment.EntityLabel} with ParamLength != 1 is not supported.");
+                    }
+
+                    var parentCurve = segment.ParentCurve;
+                    if (parentCurve == null) continue;
+
+                    // Determine this segment's parameterized length based on its type
+                    double segParamLength;
+                    if (parentCurve is IIfcPolyline polyline)
+                        segParamLength = polyline.Points.Count - 1;
+                    else if (parentCurve is IIfcIndexedPolyCurve indexedPoly)
+                        segParamLength = GetIndexedPolyCurveParameterizedLength(indexedPoly);
+                    else
+                        segParamLength = GetSegmentParameterizedLength(segment);
+
+                    if (segIndex == 0)
+                        firstParameterizedLength = segParamLength;
+
+                    // Build the segment curve and apply SameSense reversal
+                    var segCurve = (Curve)_modelService.CurveFactory.Build(parentCurve);
+
+                    if (!segment.SameSense)
+                    {
+                        int reverseResult = XbimGeometryNativeApi.xbim_curve_reverse(segCurve.Handle);
+                        if (reverseResult != 0)
+                            throw new InvalidOperationException(
+                                $"Failed to reverse composite directrix segment #{segment.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+                    }
+
+                    segmentCurves.Add(segCurve);
+                    double geoLength = segCurve.Length;
+                    totCurveLen += geoLength;
+
+                    // Map IFC parameterization to arc-length offsets
+                    if (startPar > 0)
+                    {
+                        double ratio = Math.Min(startPar / segParamLength, 1.0);
+                        startPar -= ratio * segParamLength;
+                        occStart += ratio * geoLength;
+                    }
+
+                    if (endPar > 0)
+                    {
+                        // Special case: startParam=0, endParam=1 and fits within first segment
+                        // means "entire curve" in some authoring tools
+                        if (endPar <= firstParameterizedLength &&
+                            !double.IsNaN(endParam) && Math.Abs(endParam - 1.0) < 1e-10 &&
+                            !double.IsNaN(startParam) && Math.Abs(startParam) < 1e-10)
+                        {
+                            occEnd += geoLength;
+                        }
+                        else
+                        {
+                            double ratio = Math.Min(endPar / segParamLength, 1.0);
+                            endPar -= ratio * segParamLength;
+                            occEnd += ratio * geoLength;
+                        }
+                    }
+
+                    segIndex++;
+                }
+
+                if (segmentCurves.Count == 0)
+                    throw new InvalidOperationException(
+                        $"IIfcCompositeCurve #{ifcComposite.EntityLabel} has no valid segments for directrix.");
+
+                // Build wire from curves with shared vertex connectivity
+                using var nativeCurves = new NativeHandleArray(
+                    segmentCurves.Select(c => c.Handle).ToArray());
+                int buildResult = XbimGeometryNativeApi.xbim_wire_build_from_curves(
+                    ContextHandle,
+                    nativeCurves.Ptrs, nativeCurves.Length,
+                    _modelService.Precision,
+                    _modelService.MinimumGap,
+                    out var wireHandle);
+
+                if (buildResult != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build directrix wire from composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                var wire = new Wire(wireHandle);
+
+                // If no trimming needed (offsets span the entire curve), return as-is
+                if (Math.Abs(occStart) < _modelService.Precision &&
+                    Math.Abs(occEnd - totCurveLen) < _modelService.Precision)
+                    return wire;
+
+                // Trim by arc-length
+                try
+                {
+                    int trimResult = XbimGeometryNativeApi.xbim_wire_build_trimmed_by_length(
+                        ContextHandle,
+                        wire.Handle,
+                        occStart, occEnd,
+                        _modelService.Precision,
+                        out var trimmedHandle);
+
+                    if (trimResult != 0)
+                        throw new InvalidOperationException(
+                            $"Failed to trim composite directrix #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                    return new Wire(trimmedHandle);
+                }
+                finally
+                {
+                    wire.Dispose();
+                }
+            }
+            finally
+            {
+                foreach (var c in segmentCurves)
+                    c.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Builds a directrix wire from an indexed poly curve with IFC-to-arclength
+        /// parameterization mapping for trimming.
+        /// </summary>
+        private IXWire BuildDirectrixIndexedPolyCurve(IIfcIndexedPolyCurve ifcIndexed, double startParam, double endParam)
+        {
+            // Build the full wire
+            var wire = (Wire)BuildFromIndexedPolyCurve(ifcIndexed);
+
+            // If no trimming, return as-is
+            if (double.IsNaN(startParam) && double.IsNaN(endParam))
+                return wire;
+
+            double startPar = double.IsNaN(startParam) ? 0.0 : startParam;
+            double endPar = double.IsNaN(endParam) ? double.PositiveInfinity : endParam;
+
+            double totalGeoLength = wire.Length;
+            double occStart = 0;
+            double occEnd = 0;
+
+            if (ifcIndexed.Segments != null && ifcIndexed.Segments.Any())
+            {
+                // Extract point coordinates for per-segment geometric length computation
+                List<double> allPointsXYZ = ExtractPointCoordinates(ifcIndexed);
+
+                // Walk segments, consuming startPar/endPar per-segment like legacy code
+                foreach (var segment in ifcIndexed.Segments)
+                {
+                    if (startPar <= 0 && endPar <= 0)
+                        continue;
+
+                    var valueList = (System.Collections.IList)segment.Value;
+                    var indices = new long[valueList.Count];
+                    for (int k = 0; k < valueList.Count; k++)
+                        indices[k] = (IfcPositiveInteger)valueList[k]!;
+
+                    double segParamLength;
+                    double segGeoLength;
+
+                    if (indices.Length == 3)
+                    {
+                        // Arc segment — parameterized length is angular span, geo length is radius * span
+                        int i0 = (int)(indices[0] - 1);
+                        int i1 = (int)(indices[1] - 1);
+                        int i2 = (int)(indices[2] - 1);
+
+                        double arcSpan = ComputeArcAngularSpan(
+                            allPointsXYZ[i0 * 3], allPointsXYZ[i0 * 3 + 1], allPointsXYZ[i0 * 3 + 2],
+                            allPointsXYZ[i1 * 3], allPointsXYZ[i1 * 3 + 1], allPointsXYZ[i1 * 3 + 2],
+                            allPointsXYZ[i2 * 3], allPointsXYZ[i2 * 3 + 1], allPointsXYZ[i2 * 3 + 2],
+                            out double radius);
+
+                        if (arcSpan > 0)
+                        {
+                            segParamLength = arcSpan;
+                            segGeoLength = radius * arcSpan;
+                        }
+                        else
+                        {
+                            // Collinear fallback — treat as line
+                            segParamLength = 1;
+                            double dx = allPointsXYZ[i2 * 3] - allPointsXYZ[i0 * 3];
+                            double dy = allPointsXYZ[i2 * 3 + 1] - allPointsXYZ[i0 * 3 + 1];
+                            double dz = allPointsXYZ[i2 * 3 + 2] - allPointsXYZ[i0 * 3 + 2];
+                            segGeoLength = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+                        }
+                    }
+                    else
+                    {
+                        // Line segment(s) — parameterized length is number of sub-segments
+                        segGeoLength = 0;
+                        for (int p = 0; p < indices.Length - 1; p++)
+                        {
+                            int ip1 = (int)(indices[p] - 1);
+                            int ip2 = (int)(indices[p + 1] - 1);
+                            double dx = allPointsXYZ[ip2 * 3] - allPointsXYZ[ip1 * 3];
+                            double dy = allPointsXYZ[ip2 * 3 + 1] - allPointsXYZ[ip1 * 3 + 1];
+                            double dz = allPointsXYZ[ip2 * 3 + 2] - allPointsXYZ[ip1 * 3 + 2];
+                            segGeoLength += Math.Sqrt(dx * dx + dy * dy + dz * dz);
+                        }
+                        segParamLength = Math.Max(indices.Length - 1, 1);
+                    }
+
+                    if (startPar > 0)
+                    {
+                        double ratio = Math.Min(startPar / segParamLength, 1.0);
+                        startPar -= ratio * segParamLength;
+                        occStart += ratio * segGeoLength;
+                    }
+
+                    if (endPar > 0)
+                    {
+                        double ratio = Math.Min(endPar / segParamLength, 1.0);
+                        endPar -= ratio * segParamLength;
+                        occEnd += ratio * segGeoLength;
+                    }
+                }
+            }
+            else
+            {
+                // No explicit segments — params are arc-length offsets directly
+                occStart = startPar;
+                occEnd = endPar;
+            }
+
+            // Clamp
+            occStart = Math.Max(0, Math.Min(occStart, totalGeoLength));
+            occEnd = Math.Max(occStart, Math.Min(occEnd, totalGeoLength));
+
+            // If mapped range covers the entire wire, return as-is
+            if (Math.Abs(occStart) < _modelService.Precision &&
+                Math.Abs(occEnd - totalGeoLength) < _modelService.Precision)
+                return wire;
+
+            try
+            {
+                int trimResult = XbimGeometryNativeApi.xbim_wire_build_trimmed_by_length(
+                    ContextHandle,
+                    wire.Handle,
+                    occStart, occEnd,
+                    _modelService.Precision,
+                    out var trimmedHandle);
+
+                if (trimResult != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to trim indexed poly curve directrix #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                return new Wire(trimmedHandle);
+            }
+            finally
+            {
+                wire.Dispose();
+            }
+        }
+
+        #endregion
+
+        #region Parameterization Helpers
+
+        private static List<double> ExtractPointCoordinates(IIfcIndexedPolyCurve ifcIndexed)
+        {
+            if (ifcIndexed.Points is IIfcCartesianPointList3D pts3D)
+            {
+                var coords = pts3D.CoordList;
+                var result = new List<double>(coords.Count * 3);
+                foreach (var pt in coords)
+                {
+                    result.Add(pt[0]);
+                    result.Add(pt[1]);
+                    result.Add(pt.Count > 2 ? pt[2] : 0.0);
+                }
+                return result;
+            }
+
+            if (ifcIndexed.Points is IIfcCartesianPointList2D pts2D)
+            {
+                var coords = pts2D.CoordList;
+                var result = new List<double>(coords.Count * 3);
+                foreach (var pt in coords)
+                {
+                    result.Add(pt[0]);
+                    result.Add(pt[1]);
+                    result.Add(0.0);
+                }
+                return result;
+            }
+
+            throw new NotSupportedException(
+                $"Unsupported point list type in IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}.");
+        }
+
+        /// <summary>
+        /// Returns the IFC parameterized length of a composite curve segment based on its
+        /// parent curve type. Lines return 1, trimmed curves return the parametric span
+        /// (Trim2-Trim1), all others return 1.
+        /// </summary>
+        private double GetSegmentParameterizedLength(IIfcCompositeCurveSegment segment)
+        {
+            var parent = segment.ParentCurve;
+
+            if (parent is IIfcLine)
+                return 1.0;
+
+            if (parent is IIfcTrimmedCurve tc)
+            {
+                try
+                {
+                    double valTrim1 = 0.0;
+                    double valTrim2 = 1.0;
+
+                    foreach (var trim in tc.Trim1)
+                    {
+                        if (trim is Xbim.Ifc4.MeasureResource.IfcParameterValue pv)
+                        {
+                            valTrim1 = (double)pv.Value;
+                            break;
+                        }
+                    }
+                    foreach (var trim in tc.Trim2)
+                    {
+                        if (trim is Xbim.Ifc4.MeasureResource.IfcParameterValue pv)
+                        {
+                            valTrim2 = (double)pv.Value;
+                            break;
+                        }
+                    }
+
+                    double result = valTrim2 - valTrim1;
+
+                    // For conics, params are periodic — take absolute value
+                    if (result < 0 && tc.BasisCurve is IIfcConic)
+                        result = Math.Abs(result);
+
+                    return result > 0 ? result : 1.0;
+                }
+                catch
+                {
+                    return 1.0;
+                }
+            }
+
+            return 1.0;
+        }
+
+        /// <summary>
+        /// Computes the IFC parameterized length of an indexed poly curve by walking its
+        /// segments. Arc segments contribute their angular span in radians; line segments
+        /// contribute 1 per line. If no segments are defined, returns Points.Count-1.
+        /// </summary>
+        private double GetIndexedPolyCurveParameterizedLength(IIfcIndexedPolyCurve ifcIndexed)
+        {
+            if (ifcIndexed.Segments == null || !ifcIndexed.Segments.Any())
+            {
+                // No explicit segments — polyline through all points
+                if (ifcIndexed.Points is IIfcCartesianPointList3D pl3D)
+                    return Math.Max(pl3D.CoordList.Count - 1, 1);
+                if (ifcIndexed.Points is IIfcCartesianPointList2D pl2D)
+                    return Math.Max(pl2D.CoordList.Count - 1, 1);
+                return 1.0;
+            }
+
+            List<double> allPointsXYZ;
+            try
+            {
+                allPointsXYZ = ExtractPointCoordinates(ifcIndexed);
+            }
+            catch (NotSupportedException)
+            {
+                return 1.0;
+            }
+
+            double paramLength = 0.0;
+
+            foreach (var segment in ifcIndexed.Segments)
+            {
+                var valueList = (System.Collections.IList)segment.Value;
+                var indices = new long[valueList.Count];
+                for (int k = 0; k < valueList.Count; k++)
+                    indices[k] = (IfcPositiveInteger)valueList[k]!;
+
+                if (indices.Length == 3)
+                {
+                    // Arc segment — compute angular span
+                    int i0 = (int)(indices[0] - 1);
+                    int i1 = (int)(indices[1] - 1);
+                    int i2 = (int)(indices[2] - 1);
+
+                    double startX = allPointsXYZ[i0 * 3], startY = allPointsXYZ[i0 * 3 + 1], startZ = allPointsXYZ[i0 * 3 + 2];
+                    double midX = allPointsXYZ[i1 * 3], midY = allPointsXYZ[i1 * 3 + 1], midZ = allPointsXYZ[i1 * 3 + 2];
+                    double endX = allPointsXYZ[i2 * 3], endY = allPointsXYZ[i2 * 3 + 1], endZ = allPointsXYZ[i2 * 3 + 2];
+
+                    double arcSpan = ComputeArcAngularSpan(startX, startY, startZ, midX, midY, midZ, endX, endY, endZ, out _);
+                    if (arcSpan > 0)
+                        paramLength += arcSpan;
+                    else
+                        paramLength += 1.0; // Collinear fallback — treat as line
+                }
+                else
+                {
+                    // Line segment(s) — +1 per line
+                    paramLength += Math.Max(indices.Length - 1, 1);
+                }
+            }
+
+            return paramLength > 0 ? paramLength : 1.0;
+        }
+
+        /// <summary>
+        /// Computes the angular span of a circular arc through three points, in radians.
+        /// Returns 0 if the points are collinear.
+        /// </summary>
+        private static double ComputeArcAngularSpan(
+            double p1X, double p1Y, double p1Z,
+            double p2X, double p2Y, double p2Z,
+            double p3X, double p3Y, double p3Z,
+            out double arcRadius)
+        {
+            arcRadius = 0.0;
+
+            // Vectors from mid to start and mid to end
+            double v1X = p1X - p2X, v1Y = p1Y - p2Y, v1Z = p1Z - p2Z;
+            double v2X = p3X - p2X, v2Y = p3Y - p2Y, v2Z = p3Z - p2Z;
+
+            // Cross product to check collinearity
+            double crossX = v1Y * v2Z - v1Z * v2Y;
+            double crossY = v1Z * v2X - v1X * v2Z;
+            double crossZ = v1X * v2Y - v1Y * v2X;
+            double crossMag = Math.Sqrt(crossX * crossX + crossY * crossY + crossZ * crossZ);
+
+            if (crossMag < 1e-10)
+                return 0.0; // Collinear
+
+            // Compute circle center using circumcircle formula
+            double ax = p1X, ay = p1Y, az = p1Z;
+            double bx = p2X, by = p2Y, bz = p2Z;
+            double cx = p3X, cy = p3Y, cz = p3Z;
+
+            // Use 2D projection onto the plane of the three points
+            // Direction vectors in the arc plane
+            double abX = bx - ax, abY = by - ay, abZ = bz - az;
+            double acX = cx - ax, acY = cy - ay, acZ = cz - az;
+
+            double abLen2 = abX * abX + abY * abY + abZ * abZ;
+            double acLen2 = acX * acX + acY * acY + acZ * acZ;
+            double abDotAc = abX * acX + abY * acY + abZ * acZ;
+
+            double denom = 2.0 * (abLen2 * acLen2 - abDotAc * abDotAc);
+            if (Math.Abs(denom) < 1e-20)
+                return 0.0;
+
+            double s = acLen2 * (abLen2 - abDotAc) / denom;
+            double t = abLen2 * (acLen2 - abDotAc) / denom;
+
+            double centerX = ax + s * abX + t * acX;
+            double centerY = ay + s * abY + t * acY;
+            double centerZ = az + s * abZ + t * acZ;
+
+            // Radius
+            double rX = p1X - centerX, rY = p1Y - centerY, rZ = p1Z - centerZ;
+            double radius = Math.Sqrt(rX * rX + rY * rY + rZ * rZ);
+            if (radius < 1e-10)
+                return 0.0;
+
+            arcRadius = radius;
+
+            // Vectors from center to start and end points
+            double csX = p1X - centerX, csY = p1Y - centerY, csZ = p1Z - centerZ;
+            double ceX = p3X - centerX, ceY = p3Y - centerY, ceZ = p3Z - centerZ;
+
+            double csLen = Math.Sqrt(csX * csX + csY * csY + csZ * csZ);
+            double ceLen = Math.Sqrt(ceX * ceX + ceY * ceY + ceZ * ceZ);
+
+            if (csLen < 1e-10 || ceLen < 1e-10)
+                return 0.0;
+
+            double dot = (csX * ceX + csY * ceY + csZ * ceZ) / (csLen * ceLen);
+            dot = Math.Max(-1.0, Math.Min(1.0, dot));
+
+            return Math.Acos(dot);
         }
 
         #endregion

@@ -727,6 +727,15 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeShapeHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_build_from_curves(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] curveHandles,
+            int numCurves,
+            double tolerance,
+            double gapSize,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_wire_build_polyline(
             NativeContextHandle ctx,
             [MarshalAs(UnmanagedType.LPArray)] double[] pointsXYZ,
@@ -779,6 +788,15 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeShapeHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_build_trimmed_by_length(
+            NativeContextHandle ctx,
+            NativeShapeHandle wireHandle,
+            double arcStart,
+            double arcEnd,
+            double tolerance,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_wire_build_trimmed_by_points(
             NativeContextHandle ctx,
             NativeShapeHandle wireHandle,
@@ -790,6 +808,14 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             int sameSense,
             double tolerance,
             double radianFactor,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_fillet(
+            NativeContextHandle ctx,
+            NativeShapeHandle wireHandle,
+            double filletRadius,
+            double tolerance,
             out NativeShapeHandle outHandle);
 
         #endregion
@@ -966,6 +992,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeContextHandle ctx,
             double centerX, double centerY, double centerZ,
             double normalX, double normalY, double normalZ,
+            double xDirX, double xDirY, double xDirZ,
             double radius,
             out NativeCurveHandle outHandle);
 

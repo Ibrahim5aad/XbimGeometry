@@ -122,6 +122,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_circle_3d(
     XbimContextHandle ctx,
     double centerX, double centerY, double centerZ,
     double normalX, double normalY, double normalZ,
+    double xDirX,   double xDirY,   double xDirZ,
     double radius,
     XbimCurveHandle* outHandle)
 {
@@ -144,7 +145,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_circle_3d(
     {
         gp_Pnt center(centerX, centerY, centerZ);
         gp_Dir normal(normalX, normalY, normalZ);
-        gp_Ax2 ax2(center, normal);
+        gp_Dir xDir(xDirX, xDirY, xDirZ);
+        gp_Ax2 ax2(center, normal, xDir);
 
         Handle(Geom_Circle) circle = new Geom_Circle(ax2, radius);
 

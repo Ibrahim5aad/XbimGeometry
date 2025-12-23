@@ -1853,6 +1853,33 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_edges(
     XbimShapeHandle*         outHandle);
 
 /*
+ * Build a wire from a sequence of 3D curve handles with proper vertex connectivity.
+ * Ports NWireFactory::BuildWire(TColGeom_SequenceOfBoundedCurve) from the legacy
+ * C++/CLI engine.  Creates edges with shared vertices, tolerance adjustment, and
+ * periodic/non-periodic curve transition handling (line geometry is rebuilt to
+ * match arc endpoints).
+ *
+ * Curves should already have SameSense applied (reversed via xbim_curve_reverse
+ * where SameSense=false) before calling this function.
+ *
+ *   ctx           – a valid context handle (used for logging; may be NULL)
+ *   curveHandles  – array of XbimCurveHandle (Geom_Curve) in wire order
+ *   numCurves     – number of elements in curveHandles (must be > 0)
+ *   tolerance     – minimum vertex tolerance (typically model precision)
+ *   gapSize       – maximum allowed gap between adjacent segment endpoints
+ *   outHandle     – receives the new wire shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_curves(
+    XbimContextHandle         ctx,
+    const XbimCurveHandle*    curveHandles,
+    int                       numCurves,
+    double                    tolerance,
+    double                    gapSize,
+    XbimShapeHandle*          outHandle);
+
+/*
  * Build a 3D polyline wire from an array of point coordinates.
  * Points that are within tolerance of the previous vertex are merged.
  * If the first and last points are within tolerance, the wire is marked closed.
@@ -1960,6 +1987,30 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed(
     XbimShapeHandle*  outHandle);
 
 /*
+ * Trim a wire by arc-length positions.
+ *
+ * Walks edges sequentially, accumulating geometric lengths.  Trims the
+ * first edge at arcStart and the last edge at arcEnd; edges fully inside
+ * the range are taken whole; edges outside are skipped.
+ *
+ *   ctx       – a valid context handle (used for logging; may be NULL)
+ *   wireHandle – the basis wire to trim
+ *   arcStart  – start position in arc-length units from wire start
+ *   arcEnd    – end position in arc-length units from wire start
+ *   tolerance – geometric tolerance for edge construction
+ *   outHandle – receives the trimmed wire
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed_by_length(
+    XbimContextHandle ctx,
+    XbimShapeHandle   wireHandle,
+    double            arcStart,
+    double            arcEnd,
+    double            tolerance,
+    XbimShapeHandle*  outHandle);
+
+/*
  * Trim a wire with optional Cartesian point projection.
  *
  * If preferCartesian is true, projects p1 and p2 onto the wire to obtain
@@ -1995,6 +2046,31 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed_by_points(
     int               sameSense,
     double            tolerance,
     double            radianFactor,
+    XbimShapeHandle*  outHandle);
+
+/*
+ * Fillet a wire by inserting circular arcs at each interior vertex.
+ * Ports NWireFactory::Fillet from the C++/CLI engine.
+ *
+ * Processes consecutive edge pairs, applying BRepFilletAPI_MakeFillet2d
+ * at each shared vertex. If a vertex cannot be filleted (e.g. edges are
+ * collinear or too short), that vertex is skipped and the original edges
+ * are preserved. If the wire is closed, the first/last vertex is also
+ * filleted.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   wireHandle       – a shape handle containing a TopoDS_Wire to fillet
+ *   filletRadius     – radius of the fillet arcs (must be > 0)
+ *   tolerance        – model precision tolerance for closed-wire detection
+ *   outHandle        – receives the new filleted wire shape handle
+ *
+ * Returns XBIM_OK on success, XBIM_ERROR on failure.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_fillet(
+    XbimContextHandle ctx,
+    XbimShapeHandle   wireHandle,
+    double            filletRadius,
+    double            tolerance,
     XbimShapeHandle*  outHandle);
 
 #pragma endregion
@@ -2331,11 +2407,12 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_line_3d(
     XbimCurveHandle* outHandle);
 
 /*
- * Build a 3D circle curve from center, axis normal, and radius.
+ * Build a 3D circle curve from center, axis placement, and radius.
  *
  *   ctx            – a valid context handle (used for logging; may be NULL)
  *   centerX/Y/Z    – center point of the circle
  *   normalX/Y/Z    – axis normal direction (defines the plane of the circle)
+ *   xDirX/Y/Z      – reference direction (X axis of placement; defines parameter 0)
  *   radius          – circle radius (must be positive)
  *   outHandle      – receives the new curve handle
  *
@@ -2345,6 +2422,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_circle_3d(
     XbimContextHandle ctx,
     double centerX, double centerY, double centerZ,
     double normalX, double normalY, double normalZ,
+    double xDirX,   double xDirY,   double xDirZ,
     double radius,
     XbimCurveHandle* outHandle);
 

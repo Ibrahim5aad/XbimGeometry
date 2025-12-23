@@ -383,11 +383,51 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Swept disk solid #{sweptDisk.EntityLabel} has inner radius >= outer radius.");
 
-            // Build the directrix wire from the Directrix curve
-            // The directrix is an IIfcCurve — we need to build a wire from it.
-            // This requires WireFactory which delegates to native wire building.
-            throw new NotImplementedException(
-                $"SweptDiskSolid #{sweptDisk.EntityLabel} requires WireFactory/CurveFactory support (TOPO-002/TOPO-006).");
+            // Build the directrix wire, applying optional parametric trimming
+            var wireFactory = (WireFactory)_modelService.WireFactory;
+            double? startParam = sweptDisk.StartParam.HasValue ? (double)sweptDisk.StartParam.Value : null;
+            double? endParam = sweptDisk.EndParam.HasValue ? (double)sweptDisk.EndParam.Value : null;
+            using var directrixWire = (Wire)wireFactory.BuildDirectrixWire(sweptDisk.Directrix, startParam, endParam);
+
+            double innerRadius = sweptDisk.InnerRadius ?? 0;
+
+            // For polygonal swept disks, fillet the directrix wire at vertices
+            using var filletedWire = FilletIfPolygonal(sweptDisk, directrixWire);
+            var sweepWire = filletedWire ?? directrixWire;
+
+            int result = XbimGeometryNativeApi.xbim_solid_build_swept_disk(
+                _modelService.ContextHandle,
+                sweepWire.Handle,
+                sweptDisk.Radius,
+                innerRadius,
+                out NativeShapeHandle solidHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build swept disk solid #{sweptDisk.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return NativeShapeWrapper.WrapSolid(solidHandle);
+        }
+
+        private Wire FilletIfPolygonal(IIfcSweptDiskSolid sweptDisk, Wire directrixWire)
+        {
+            if (sweptDisk is not IIfcSweptDiskSolidPolygonal polygonal ||
+                !polygonal.FilletRadius.HasValue || polygonal.FilletRadius.Value <= 0)
+                return null;
+
+            int filletResult = XbimGeometryNativeApi.xbim_wire_fillet(
+                _modelService.ContextHandle,
+                directrixWire.Handle,
+                polygonal.FilletRadius.Value,
+                _modelService.Precision,
+                out NativeShapeHandle filletedHandle);
+
+            if (filletResult == 0)
+                return new Wire(filletedHandle);
+
+            _logger.LogWarning("Failed to fillet directrix for SweptDiskSolidPolygonal #{EntityLabel}: {Error}",
+                polygonal.EntityLabel, XbimGeometryNativeApi.GetLastError());
+            return null;
         }
 
         private IXShape BuildFixedReferenceSweptAreaSolid(IIfcFixedReferenceSweptAreaSolid fixedRefSwept)

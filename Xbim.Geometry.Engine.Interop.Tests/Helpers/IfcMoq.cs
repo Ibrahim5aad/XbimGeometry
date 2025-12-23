@@ -1342,7 +1342,90 @@ internal static class IfcMoq
         return moq.Object;
     }
 
+    // ── Segment index mock for IIfcIndexedPolyCurve segments ─────
+
+    /// <summary>
+    /// A mock segment index that can be enumerated as long values.
+    /// Used by IIfcIndexedPolyCurve.Segments to represent IfcArcIndex (3 indices)
+    /// or IfcLineIndex (2+ indices).
+    /// </summary>
+    private class SegmentIndexMock : List<long>, IIfcSegmentIndexSelect
+    {
+        private readonly List<IfcPositiveInteger> _posInts;
+        public SegmentIndexMock(params long[] indices) : base(indices)
+        {
+            _posInts = indices.Select(i => new IfcPositiveInteger(i)).ToList();
+        }
+        void IPersist.Parse(int propIndex, IPropertyValue value, int[] nested) { }
+        Type IExpressValueType.UnderlyingSystemType => typeof(List<IfcPositiveInteger>);
+        object IExpressValueType.Value => _posInts;
+    }
+
     // ── Composite Curve mocks ────────────────────────────────────
+
+    /// <summary>
+    /// Creates a composite curve segment wrapping the given parent curve.
+    /// </summary>
+    public static IIfcCompositeCurveSegment CompositeCurveSegment(
+        IIfcCurve parentCurve, bool sameSense = true, int entityLabel = 1)
+    {
+        var segMoq = MakeMoq<IIfcCompositeCurveSegment>();
+        segMoq.SetupGet(s => s.ParentCurve).Returns(parentCurve);
+        segMoq.SetupGet(s => s.SameSense).Returns(sameSense);
+        segMoq.SetupGet(s => s.EntityLabel).Returns(entityLabel);
+        return segMoq.Object;
+    }
+
+    /// <summary>
+    /// Creates a composite curve from pre-built segments.
+    /// </summary>
+    public static IIfcCompositeCurve CompositeCurve(
+        params IIfcCompositeCurveSegment[] segments)
+    {
+        var ccMoq = MakeMoq<IIfcCompositeCurve>();
+        ccMoq.SetupGet(c => c.EntityLabel).Returns(1);
+        var cc = ccMoq.Object;
+        foreach (var seg in segments)
+            cc.Segments.Add(seg);
+        return cc;
+    }
+
+    /// <summary>
+    /// Creates a polyline from 3D points.
+    /// </summary>
+    public static IIfcPolyline Polyline3d(params (double x, double y, double z)[] points)
+    {
+        var polyMoq = MakeMoq<IIfcPolyline>();
+        polyMoq.SetupGet(p => p.EntityLabel).Returns(1);
+        var poly = polyMoq.Object;
+        foreach (var (x, y, z) in points)
+            poly.Points.Add(CartesianPoint3d(x, y, z));
+        return poly;
+    }
+
+    /// <summary>
+    /// Creates an IIfcIndexedPolyCurve with a 3D point list and explicit segments.
+    /// Use 3-element arrays for arc indices, 2+-element arrays for line indices.
+    /// </summary>
+    public static IIfcIndexedPolyCurve IndexedPolyCurve3d(
+        (double x, double y, double z)[] points,
+        long[][]? segments = null)
+    {
+        var pointList = CartesianPointList3D(points);
+        var moq = MakeMoq<IIfcIndexedPolyCurve>();
+        moq.SetupGet(c => c.Points).Returns(pointList);
+        moq.SetupGet(c => c.EntityLabel).Returns(1);
+
+        if (segments != null && segments.Length > 0)
+        {
+            var segList = new ItemListMoq<IIfcSegmentIndexSelect>();
+            foreach (var seg in segments)
+                segList.Add(new SegmentIndexMock(seg));
+            moq.SetupGet(c => c.Segments).Returns(segList);
+        }
+
+        return moq.Object;
+    }
 
     /// <summary>
     /// Creates a polyline-based composite curve containing a single segment.

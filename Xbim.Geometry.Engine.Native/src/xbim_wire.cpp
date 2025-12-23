@@ -11,6 +11,7 @@
 
 #include "xbim_wire.h"
 #include "xbim_shape.h"
+#include "xbim_curve.h"
 #include "xbim_context.h"
 #include "xbim_error.h"
 #include "xbim_curve2d.h"
@@ -47,6 +48,9 @@
 #include <Geom_Line.hxx>
 #include <GeomLib_Tool.hxx>
 #include <GeomAbs_CurveType.hxx>
+#include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepFilletAPI_MakeFillet2d.hxx>
+#include <TopTools_Array1OfShape.hxx>
 
 
 #pragma region Wire Construction
@@ -132,6 +136,259 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_edges(
     {
         xbim_log_occt_failure(ctx, e, "xbim_wire_build_from_edges");
         xbim_set_error("xbim_wire_build_from_edges: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+/*
+ * Adjusts a shared vertex tolerance so it covers both the existing point
+ * and the incoming gap.  Returns true if tolerance was changed.
+ * Port of NWireFactory::AdjustVertexTolerance.
+ */
+static bool adjust_vertex_tolerance(
+    const TopoDS_Vertex& vertex,
+    const gp_Pnt& existingPt,
+    const gp_Pnt& incomingPt,
+    double gap)
+{
+    if (gap <= 0)
+        return false;
+
+    BRep_Builder b;
+    double currentTol = BRep_Tool::Tolerance(vertex);
+    double requiredTol = gap + currentTol;
+    if (requiredTol > currentTol)
+    {
+        b.UpdateVertex(vertex, requiredTol);
+        return true;
+    }
+    return false;
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_curves(
+    XbimContextHandle         ctx,
+    const XbimCurveHandle*    curveHandles,
+    int                       numCurves,
+    double                    tolerance,
+    double                    gapSize,
+    XbimShapeHandle*          outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_wire_build_from_curves: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!curveHandles || numCurves <= 0)
+    {
+        xbim_set_error("xbim_wire_build_from_curves: curveHandles is NULL or numCurves <= 0");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        ShapeFix_Edge toleranceFixer;
+        TopTools_SequenceOfShape edges;
+        BRep_Builder builder;
+        TopoDS_Wire wire;
+        TopoDS_Vertex theFirstVertex;
+        gp_Pnt theFirstPoint;
+        bool isClosed = false;
+        bool lastSegmentIsPeriodic = false;
+        Handle(Geom_Curve) lastBasisCurve;
+
+        for (int idx = 0; idx < numCurves; ++idx)
+        {
+            if (!curveHandles[idx])
+            {
+                xbim_log_warning(ctx, "xbim_wire_build_from_curves: curve handle at index %d is NULL, skipping", idx);
+                continue;
+            }
+
+            Handle(Geom_Curve) segment = curveHandles[idx]->curve;
+            if (segment.IsNull())
+            {
+                xbim_log_warning(ctx, "xbim_wire_build_from_curves: curve at index %d is null, skipping", idx);
+                continue;
+            }
+
+            Standard_Real cf = segment->FirstParameter();
+            Standard_Real cl = segment->LastParameter();
+
+            /* Determine if basis curve is periodic (circle, ellipse, etc.) */
+            bool currentSegmentIsPeriodic = false;
+            Handle(Geom_Curve) basisCurve;
+            Handle(Geom_TrimmedCurve) trimmedCurve = Handle(Geom_TrimmedCurve)::DownCast(segment);
+            while (!trimmedCurve.IsNull())
+            {
+                basisCurve = trimmedCurve->BasisCurve();
+                trimmedCurve = Handle(Geom_TrimmedCurve)::DownCast(basisCurve);
+            }
+            if (!basisCurve.IsNull())
+                currentSegmentIsPeriodic = basisCurve->IsPeriodic();
+            else
+                currentSegmentIsPeriodic = segment->IsPeriodic();
+
+            TopoDS_Edge anEdge;
+
+            if (edges.Length() == 0)
+            {
+                /* First edge — create directly */
+                BRepBuilderAPI_MakeEdge edgeMaker(segment, cf, cl);
+                if (!edgeMaker.IsDone())
+                {
+                    xbim_log_warning(ctx, "xbim_wire_build_from_curves: failed to rebuild first edge");
+                    continue;
+                }
+                anEdge = edgeMaker.Edge();
+                theFirstVertex = TopExp::FirstVertex(anEdge);
+                theFirstPoint = BRep_Tool::Pnt(theFirstVertex);
+            }
+            else
+            {
+                /* Subsequent edges — connect to the previous edge's last vertex */
+                gp_Pnt lastEdgeEndPoint = BRep_Tool::Pnt(TopExp::LastVertex(TopoDS::Edge(edges.Last())));
+
+                gp_Pnt segStartPoint = segment->Value(cf);
+                gp_Pnt segEndPoint = segment->Value(cl);
+
+                double gap = segStartPoint.Distance(lastEdgeEndPoint);
+
+                if (gap > gapSize)
+                {
+                    xbim_log_warning(ctx,
+                        "xbim_wire_build_from_curves: gap %.6g at edge %d exceeds gapSize %.6g, wire may be discontinuous",
+                        gap, idx, gapSize);
+                }
+
+                /* Periodic/non-periodic transition handling:
+                 * When a periodic curve (arc) meets a non-periodic one (line),
+                 * rebuild the line geometry to match the arc's endpoint exactly. */
+                if (currentSegmentIsPeriodic && !lastSegmentIsPeriodic)
+                {
+                    Handle(Geom_Line) line = Handle(Geom_Line)::DownCast(lastBasisCurve);
+                    if (!line.IsNull())
+                    {
+                        gp_Pnt lastSegStartPoint = BRep_Tool::Pnt(TopExp::FirstVertex(TopoDS::Edge(edges.Last())));
+                        gp_Vec dir(lastSegStartPoint, segStartPoint);
+                        double dirMag = dir.Magnitude();
+                        if (dirMag > Precision::Confusion())
+                        {
+                            gp_Lin newLine(lastSegStartPoint, dir);
+                            Handle(Geom_Line) hLine = new Geom_Line(newLine);
+                            Handle(Geom_TrimmedCurve) newSegment = new Geom_TrimmedCurve(hLine, 0, dirMag);
+                            builder.UpdateVertex(TopExp::LastVertex(TopoDS::Edge(edges.Last())), segStartPoint, tolerance);
+                            BRepBuilderAPI_MakeEdge edgeMaker(newSegment,
+                                TopExp::FirstVertex(TopoDS::Edge(edges.Last())),
+                                TopExp::LastVertex(TopoDS::Edge(edges.Last())));
+                            if (edgeMaker.IsDone())
+                            {
+                                auto newEdge = edgeMaker.Edge();
+                                edges.Remove(edges.Size());
+                                edges.Append(newEdge);
+                                lastEdgeEndPoint = segStartPoint;
+                                gap = 0;
+                            }
+                        }
+                    }
+                }
+                if (lastSegmentIsPeriodic && !currentSegmentIsPeriodic)
+                {
+                    Handle(Geom_Line) line = Handle(Geom_Line)::DownCast(basisCurve);
+                    if (!line.IsNull())
+                    {
+                        segStartPoint = lastEdgeEndPoint;
+                        gp_Vec dir(segStartPoint, segEndPoint);
+                        double dirMag = dir.Magnitude();
+                        if (dirMag > Precision::Confusion())
+                        {
+                            gp_Lin newLine(segStartPoint, dir);
+                            Handle(Geom_Line) hLine = new Geom_Line(newLine);
+                            segment = new Geom_TrimmedCurve(hLine, 0, dirMag);
+                            cf = 0;
+                            cl = dirMag;
+                            gap = 0;
+                        }
+                    }
+                }
+
+                adjust_vertex_tolerance(TopExp::LastVertex(TopoDS::Edge(edges.Last())),
+                    lastEdgeEndPoint, segStartPoint, gap);
+
+                /* Check for wire closure */
+                TopoDS_Vertex segEndVertex;
+                if (idx == numCurves - 1 && theFirstPoint.Distance(segEndPoint) < gapSize)
+                {
+                    isClosed = true;
+                    double closingGap = segEndPoint.Distance(theFirstPoint);
+                    adjust_vertex_tolerance(TopExp::FirstVertex(TopoDS::Edge(edges.First())),
+                        theFirstPoint, segEndPoint, closingGap);
+                }
+                else
+                {
+                    builder.MakeVertex(segEndVertex, segEndPoint, tolerance);
+                }
+
+                /* Build edge with shared vertices */
+                BRepBuilderAPI_MakeEdge edgeMaker(segment,
+                    TopExp::LastVertex(TopoDS::Edge(edges.Last())),
+                    isClosed ? TopExp::FirstVertex(TopoDS::Edge(edges.First())) : segEndVertex,
+                    cf, cl);
+
+                if (!edgeMaker.IsDone())
+                {
+                    xbim_log_warning(ctx, "xbim_wire_build_from_curves: failed to rebuild edge %d (error %d)",
+                        idx, edgeMaker.Error());
+                    continue;
+                }
+                anEdge = edgeMaker.Edge();
+            }
+
+            edges.Append(anEdge);
+            lastBasisCurve = basisCurve;
+            lastSegmentIsPeriodic = currentSegmentIsPeriodic;
+        }
+
+        if (edges.Length() == 0)
+        {
+            xbim_set_error("xbim_wire_build_from_curves: no valid edges produced");
+            return XBIM_NULL_SHAPE;
+        }
+
+        /* Assemble wire from edges with vertex tolerance fix */
+        builder.MakeWire(wire);
+        for (int i = 1; i <= edges.Length(); ++i)
+        {
+            toleranceFixer.FixVertexTolerance(TopoDS::Edge(edges(i)));
+            builder.Add(wire, TopoDS::Edge(edges(i)));
+        }
+        if (isClosed)
+            wire.Closed(true);
+
+        if (wire.IsNull())
+        {
+            xbim_set_error("xbim_wire_build_from_curves: resulting wire is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        *outHandle = xbim_shape_create_from(wire);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_wire_build_from_curves: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_wire_build_from_curves");
+        xbim_set_error("xbim_wire_build_from_curves: OCCT exception");
         return XBIM_ERROR;
     }
 }
@@ -961,6 +1218,167 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed(
 
 
 /*
+ * Trim a wire by arc-length positions.
+ *
+ * Walks edges via BRepTools_WireExplorer, accumulates geometric
+ * arc-lengths via GCPnts_AbscissaPoint::Length.  For the edge
+ * containing arcStart, trims the curve from the start offset.
+ * For the edge containing arcEnd, trims to the end offset.
+ * Edges fully inside the range are taken whole; edges outside
+ * are skipped.  Builds the result wire from collected edges.
+ *
+ *   ctx       – a valid context handle (used for logging; may be NULL)
+ *   wireHandle – the basis wire to trim
+ *   arcStart  – start position in arc-length units from wire start
+ *   arcEnd    – end position in arc-length units from wire start
+ *   tolerance – geometric tolerance for edge construction
+ *   outHandle – receives the trimmed wire
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed_by_length(
+    XbimContextHandle ctx,
+    XbimShapeHandle   wireHandle,
+    double            arcStart,
+    double            arcEnd,
+    double            tolerance,
+    XbimShapeHandle*  outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_wire_build_trimmed_by_length: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!wireHandle)
+    {
+        xbim_set_error("xbim_wire_build_trimmed_by_length: wireHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    if (arcEnd <= arcStart)
+    {
+        xbim_set_error("xbim_wire_build_trimmed_by_length: arcEnd must be greater than arcStart");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        const TopoDS_Shape& shape = wireHandle->shape;
+        if (shape.IsNull() || shape.ShapeType() != TopAbs_WIRE)
+        {
+            xbim_set_error("xbim_wire_build_trimmed_by_length: handle is not a wire");
+            return XBIM_INVALID_ARG;
+        }
+
+        const TopoDS_Wire& wire = TopoDS::Wire(shape);
+        BRepBuilderAPI_MakeWire wm;
+        double accumulated = 0.0;
+
+        for (BRepTools_WireExplorer exp(wire); exp.More(); exp.Next())
+        {
+            const TopoDS_Edge& edge = exp.Current();
+            Standard_Real fEdge, lEdge;
+            Handle(Geom_Curve) curve = BRep_Tool::Curve(edge, fEdge, lEdge);
+
+            if (curve.IsNull())
+                continue;
+
+            BRepAdaptor_Curve adaptor(edge);
+            double edgeLen = GCPnts_AbscissaPoint::Length(adaptor, fEdge, lEdge);
+            double edgeStart = accumulated;
+            double edgeEnd = accumulated + edgeLen;
+
+            /* Skip edges entirely before the trim start */
+            if (edgeEnd <= arcStart + Precision::Confusion())
+            {
+                accumulated = edgeEnd;
+                continue;
+            }
+
+            /* Stop if we've passed the trim end */
+            if (edgeStart >= arcEnd - Precision::Confusion())
+                break;
+
+            /* Determine trim parameters within this edge */
+            double trimFrac1 = 0.0; /* fraction from edge start */
+            double trimFrac2 = 1.0; /* fraction to edge end */
+
+            bool needTrimStart = (arcStart > edgeStart + Precision::Confusion());
+            bool needTrimEnd   = (arcEnd < edgeEnd - Precision::Confusion());
+
+            if (needTrimStart)
+                trimFrac1 = (arcStart - edgeStart) / edgeLen;
+            if (needTrimEnd)
+                trimFrac2 = (arcEnd - edgeStart) / edgeLen;
+
+            if (!needTrimStart && !needTrimEnd)
+            {
+                /* Take the whole edge */
+                wm.Add(edge);
+            }
+            else
+            {
+                /* Map fractions to curve parameters */
+                Standard_Real paramRange = lEdge - fEdge;
+                Standard_Real p1 = fEdge + trimFrac1 * paramRange;
+                Standard_Real p2 = fEdge + trimFrac2 * paramRange;
+
+                /* For better accuracy on non-linear curves, use
+                 * GCPnts_AbscissaPoint to find exact parameters */
+                if (needTrimStart)
+                {
+                    double targetLen = arcStart - edgeStart;
+                    GCPnts_AbscissaPoint finder(adaptor, targetLen, fEdge);
+                    if (finder.IsDone())
+                        p1 = finder.Parameter();
+                }
+                if (needTrimEnd)
+                {
+                    double targetLen = arcEnd - edgeStart;
+                    GCPnts_AbscissaPoint finder(adaptor, targetLen, fEdge);
+                    if (finder.IsDone())
+                        p2 = finder.Parameter();
+                }
+
+                if (std::abs(p2 - p1) > Precision::Confusion())
+                {
+                    Handle(Geom_TrimmedCurve) trimmed = new Geom_TrimmedCurve(curve, p1, p2);
+                    BRepBuilderAPI_MakeEdge edgeMaker(trimmed);
+                    if (edgeMaker.IsDone())
+                        wm.Add(edgeMaker.Edge());
+                }
+            }
+
+            accumulated = edgeEnd;
+
+            /* If we've covered the trim end, stop */
+            if (arcEnd <= edgeEnd + Precision::Confusion())
+                break;
+        }
+
+        if (!wm.IsDone())
+        {
+            xbim_set_error("xbim_wire_build_trimmed_by_length: no edges after trimming");
+            return XBIM_NULL_SHAPE;
+        }
+
+        *outHandle = xbim_shape_create_from(wm.Wire());
+        return *outHandle ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_wire_build_trimmed_by_length");
+        xbim_set_error("xbim_wire_build_trimmed_by_length: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+/*
  * Trim a wire using optional Cartesian point projection.
  *
  * If preferCartesian is true and the points are valid, projects them onto
@@ -1028,6 +1446,145 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed_by_points(
     {
         xbim_log_occt_failure(ctx, e, "xbim_wire_build_trimmed_by_points");
         xbim_set_error("xbim_wire_build_trimmed_by_points: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_fillet(
+    XbimContextHandle ctx,
+    XbimShapeHandle   wireHandle,
+    double            filletRadius,
+    double            tolerance,
+    XbimShapeHandle*  outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_wire_fillet: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!wireHandle)
+    {
+        xbim_set_error("xbim_wire_fillet: wireHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (filletRadius <= 0)
+    {
+        xbim_set_error("xbim_wire_fillet: filletRadius must be positive");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        const TopoDS_Shape& shape = wireHandle->shape;
+        if (shape.IsNull() || shape.ShapeType() != TopAbs_WIRE)
+        {
+            xbim_set_error("xbim_wire_fillet: handle is not a wire");
+            return XBIM_INVALID_ARG;
+        }
+
+        const TopoDS_Wire& wire = TopoDS::Wire(shape);
+        Standard_Integer nbEdges = wire.NbChildren();
+        if (nbEdges < 2)
+        {
+            // Nothing to fillet — return a copy of the original wire
+            *outHandle = xbim_shape_create_from(wire);
+            return XBIM_OK;
+        }
+
+        // Collect all edges and vertices
+        TopTools_Array1OfShape edges(1, nbEdges);
+        TopTools_Array1OfShape vertices(1, nbEdges);
+        // Filleted result: each pair can produce up to 3 edges (trimmed + fillet + trimmed)
+        TopTools_Array1OfShape filleted(1, nbEdges * 2);
+        Standard_Integer nb = 0;
+        for (BRepTools_WireExplorer edgeExp(wire); edgeExp.More(); edgeExp.Next())
+        {
+            nb++;
+            edges(nb) = TopoDS::Edge(edgeExp.Current());
+            vertices(nb) = TopoDS::Vertex(edgeExp.CurrentVertex());
+        }
+
+        // Fillet each consecutive edge pair
+        int totalEdges = 1;
+        for (int i = 1; i < nbEdges; i++)
+        {
+            BRepBuilderAPI_MakeWire filletWireMaker;
+            filletWireMaker.Add(TopoDS::Edge(edges(i)));
+            filletWireMaker.Add(TopoDS::Edge(edges(i + 1)));
+            BRepBuilderAPI_MakeFace faceMaker(filletWireMaker.Wire());
+            BRepFilletAPI_MakeFillet2d filleter(faceMaker.Face());
+            filleter.AddFillet(TopoDS::Vertex(vertices(i + 1)), filletRadius);
+            filleter.Build();
+            if (filleter.IsDone() && filleter.NbFillet() > 0)
+            {
+                const TopTools_SequenceOfShape& fillets = filleter.FilletEdges();
+                filleted(2 * i - 1) = filleter.DescendantEdge(TopoDS::Edge(edges(i)));
+                edges(i) = filleted(2 * i - 1);
+                filleted(2 * i) = fillets(1);
+                filleted(2 * i + 1) = filleter.DescendantEdge(TopoDS::Edge(edges(i + 1)));
+                edges(i + 1) = filleted(2 * i + 1);
+                totalEdges += 2;
+            }
+            else
+            {
+                xbim_log_warning(ctx, "xbim_wire_fillet: failed to fillet edge pair, skipping");
+                filleted(2 * i - 1) = edges(i);
+                filleted(2 * i) = edges(i + 1);
+                totalEdges++;
+            }
+        }
+
+        // If closed, also fillet the first/last vertex
+        if (wire.Closed() && nbEdges > 1)
+        {
+            BRepBuilderAPI_MakeWire filletWireMaker;
+            filletWireMaker.Add(TopoDS::Edge(edges(1)));
+            filletWireMaker.Add(TopoDS::Edge(edges(nbEdges)));
+            BRepBuilderAPI_MakeFace faceMaker(filletWireMaker.Wire());
+            BRepFilletAPI_MakeFillet2d filleter(faceMaker.Face());
+            filleter.AddFillet(TopoDS::Vertex(vertices(1)), filletRadius);
+            filleter.Build();
+            if (filleter.IsDone() && filleter.NbFillet() > 0)
+            {
+                const TopTools_SequenceOfShape& fillets = filleter.FilletEdges();
+                filleted(2 * nbEdges - 1) = filleter.DescendantEdge(TopoDS::Edge(edges(nbEdges)));
+                filleted(2 * nbEdges) = fillets(1);
+                filleted(1) = filleter.DescendantEdge(TopoDS::Edge(edges(1)));
+                totalEdges++;
+            }
+            else
+            {
+                xbim_log_warning(ctx, "xbim_wire_fillet: failed to close fillet at first/last vertex");
+            }
+        }
+
+        // Build the final wire from filleted edges
+        BRepBuilderAPI_MakeWire wireMaker;
+        for (int i = 1; i <= totalEdges; i++)
+        {
+            if (!TopoDS::Edge(filleted(i)).IsNull())
+                wireMaker.Add(TopoDS::Edge(filleted(i)));
+        }
+
+        if (!wireMaker.IsDone())
+        {
+            xbim_set_error("xbim_wire_fillet: failed to build filleted wire");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_shape_create_from(wireMaker.Wire());
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_wire_fillet");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_wire_fillet: OCCT exception");
         return XBIM_ERROR;
     }
 }

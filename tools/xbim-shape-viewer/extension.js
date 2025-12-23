@@ -111,6 +111,20 @@ async function debugEval(expression) {
     return null;
 }
 
+// Tries expression on the variable directly, then via V5Shape.Inner fallback
+async function evalWriteShape(name, method, filePath) {
+    // 1. Try directly: works for IXShape / Shape
+    await debugEval(`${name}.${method}("${filePath}")`);
+    if (fs.existsSync(filePath)) return true;
+
+    // 2. V5 shape (V5Solid, V5Shell, etc.): access Inner which is a Shape
+    outputChannel.appendLine(`[xbim] Direct call failed, trying V5 .Inner fallback...`);
+    await debugEval(`((Xbim.Geometry.Engine.Interop.Shapes.V5.V5Shape)${name}).Inner.${method}("${filePath}")`);
+    if (fs.existsSync(filePath)) return true;
+
+    return false;
+}
+
 // ── WebView Panel ───────────────────────────────────────────────────────────
 
 async function createViewerPanel(context, variableName, stlBase64) {
@@ -181,13 +195,13 @@ function activate(context) {
                 { location: vscode.ProgressLocation.Notification, title: `Rendering "${name}"...` },
                 async () => {
                     const stlPath = path.join(require('os').tmpdir(), `xbim_${name}_${Date.now()}.stl`).replace(/\\/g, '/');
-                    await debugEval(`${name}.WriteStl("${stlPath}")`);
-
+                    const ok = await evalWriteShape(name, 'WriteStl', stlPath);
 
                     outputChannel.appendLine(`[xbim] STL: ${stlPath}`);
 
-                    if (!fs.existsSync(stlPath)) {
-                        vscode.window.showErrorMessage(`STL file not found: ${stlPath}`);
+                    if (!ok) {
+                        vscode.window.showErrorMessage(`STL file not created. Check "xbim Shape Viewer" output.`);
+                        outputChannel.show(true);
                         return;
                     }
 
@@ -209,7 +223,13 @@ function activate(context) {
             }
             vscode.window.withProgress(
                 { location: vscode.ProgressLocation.Notification, title: `Opening OCCT viewer for "${name}"...` },
-                async () => { await debugEval(`${DEBUGVIZ}.Show(${name})`); }
+                async () => {
+                    const result = await debugEval(`${DEBUGVIZ}.Show(${name})`);
+                    if (!result) {
+                        outputChannel.appendLine(`[xbim] Direct Show failed, trying V5 .Inner fallback...`);
+                        await debugEval(`${DEBUGVIZ}.Show(((Xbim.Geometry.Engine.Interop.Shapes.V5.V5Shape)${name}).Inner)`);
+                    }
+                }
             );
         })
     );
@@ -231,9 +251,9 @@ function activate(context) {
             if (!uri) return; // cancelled
 
             const savePath = uri.fsPath.replace(/\\/g, '/');
-            await debugEval(`${name}.WriteBrep("${savePath}")`);
+            const ok = await evalWriteShape(name, 'WriteBrep', savePath);
 
-            if (!fs.existsSync(uri.fsPath)) {
+            if (!ok) {
                 vscode.window.showErrorMessage(`BREP file was not created. Check "xbim Shape Viewer" output for details.`);
                 outputChannel.show(true);
                 return;
