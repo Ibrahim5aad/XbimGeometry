@@ -513,13 +513,16 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXCurve BuildSpiral(IfcSpiral spiral, double startParam, double endParam)
         {
-            var handle = BuildSpiralInternal(spiral, startParam, endParam);
-            if (handle == null)
-                throw new InvalidOperationException("Failed to build spiral");
+            var handle = BuildSpiralInternal(spiral, startParam, endParam) ??
+                         throw new InvalidOperationException("Failed to build spiral");
+
+            if (XbimGeometryNativeApi.xbim_curve2d_align_to_origin(handle) != 0)
+                throw new InvalidOperationException(
+                    $"Failed to align spiral to origin: {XbimGeometryNativeApi.GetLastError()}");
             return new Curve2d(handle, GetSpiralCurveType(spiral));
         }
 
-        private XCurveType GetSpiralCurveType(IfcSpiral spiral)
+        private static XCurveType GetSpiralCurveType(IfcSpiral spiral)
         {
             return spiral switch
             {
