@@ -1,9 +1,7 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
-using Xbim.Ifc4;
-using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4x3;
 using Xbim.Ifc4x3.GeometricModelResource;
 using Xbim.Ifc4x3.GeometryResource;
@@ -13,24 +11,18 @@ using Xbim.IO.Memory;
 using Xunit;
 using ILoggerFactory = Microsoft.Extensions.Logging.ILoggerFactory;
 
-
-
 namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
 {
     public class IfcSectionedSurfaceTests
     {
         private readonly IXbimGeometryServicesFactory _factory;
         private readonly ILoggerFactory _loggerFactory;
-        private const double Tolerance = 1e-5;
-
 
         public IfcSectionedSurfaceTests(IXbimGeometryServicesFactory factory, ILoggerFactory loggerFactory)
         {
             _factory = factory;
             _loggerFactory = loggerFactory;
         }
-
-
 
         [Fact]
         public void CanBuildIfcSectionedSurface()
@@ -41,33 +33,73 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
             var surface = BuildIfcSectionedSurface(model);
             var modelSvc = _factory.CreateModelGeometryService(model, _loggerFactory);
 
-            using (var stream = File.Create("0000000000000000000000000000.ifc"))
-            {
-                model.SaveAsStep21(stream);
-            }
-
-
             // Act
-            var xSurface = modelSvc.SurfaceFactory.Build(surface);
+            var xSurface = modelSvc.SurfaceFactory.Build(surface) as IXSectionedSurface;
 
             // Assert
-            xSurface.Should().NotBeNull();
+            xSurface.BrepString().Should().NotBeNull();
         }
 
-
-
-        private static IfcSectionedSurface CreateIfcSectionedSurfaceWithOpenProfiles(
-            IfcCurve directrix,
-            List<IfcOpenCrossProfileDef> crossSections,
-            List<IfcAxis2PlacementLinear> sectionPositions,
-            MemoryModel model)
+        /// <summary>
+        /// Builds a road-like IfcSectionedSurface: a straight directrix along Z
+        /// with varying open cross-section profiles placed at regular stations.
+        /// </summary>
+        public static IfcSectionedSurface BuildIfcSectionedSurface(MemoryModel model)
         {
-            if (crossSections.Count != sectionPositions.Count)
+            // Directrix: line along Z axis
+            var directrix = model.Instances.New<IfcLine>(l =>
             {
-                throw new ArgumentException("Cross-sections count must match section positions count.");
+                l.Pnt = model.Instances.New<IfcCartesianPoint>(p => { p.X = 0; p.Y = 0; p.Z = 0; });
+                l.Dir = model.Instances.New<IfcVector>(v =>
+                {
+                    v.Orientation = model.Instances.New<IfcDirection>(d => { d.X = 0; d.Y = 0; d.Z = 1; });
+                    v.Magnitude = 1;
+                });
+            });
+
+            // Cross sections — varying profiles with tagged points for non-uniform alignment
+            var crossSections = new List<IfcOpenCrossProfileDef>
+            {
+                // Station 0: 4-point profile (3 segments)
+                CreateOpenProfile(model, new[] { 2.0, 3.0, 2.0 }, new[] { 0.5, 0.0, -0.5 },
+                    new[] { "P1", "P2", "P3", "P4" }),
+
+                // Station 10: 3-point profile (2 segments) — missing P3 tag
+                CreateOpenProfile(model, new[] { 3.5, 3.5 }, new[] { 0.5, -0.5 },
+                    new[] { "P1", "P2", "P4" }),
+
+                // Station 20: 3-point profile (2 segments) — missing P3 tag
+                CreateOpenProfile(model, new[] { 3.5, 3.5 }, new[] { 0.5, -0.5 },
+                    new[] { "P1", "P2", "P4" }),
+
+                // Station 40: 4-point profile with zero-width middle segment
+                CreateOpenProfile(model, new[] { 3.5, 0.0, 3.5 }, new[] { 0.5, 0.0, -0.5 },
+                    new[] { "P1", "P2", "P3", "P4" }),
+
+                // Station 50: standard 4-point profile
+                CreateOpenProfile(model, new[] { 2.0, 4.0, 2.0 }, new[] { 0.5, 0.0, -0.5 },
+                    new[] { "P1", "P2", "P3", "P4" }),
+
+                // Station 60: narrower 4-point profile
+                CreateOpenProfile(model, new[] { 2.0, 2.0, 2.0 }, new[] { 0.5, 0.0, -0.5 },
+                    new[] { "P1", "P2", "P3", "P4" }),
+
+                // Station 70: standard 4-point profile
+                CreateOpenProfile(model, new[] { 2.0, 3.0, 2.0 }, new[] { 0.5, 0.0, -0.5 },
+                    new[] { "P1", "P2", "P3", "P4" }),
+            };
+
+            // Section positions along the directrix.
+            // BasisCurve = directrix, DistanceAlong = arc length (IfcLengthMeasure).
+            // Axis = (0,1,0) (up), RefDirection = (1,0,0) (lateral).
+            double[] stations = { 0, 10, 20, 40, 50, 60, 70 };
+            var sectionPositions = new List<IfcAxis2PlacementLinear>();
+            foreach (double station in stations)
+            {
+                sectionPositions.Add(CreateSectionPosition(model, directrix, station));
             }
 
-            // Create the IfcSectionedSurface instance
+            // Assemble the IfcSectionedSurface
             var sectionedSurface = model.Instances.New<IfcSectionedSurface>(surface =>
             {
                 surface.Directrix = directrix;
@@ -78,235 +110,47 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
             return sectionedSurface;
         }
 
-        private static IfcOpenCrossProfileDef CreateOpenCrossProfileWithWidthsAndSlopes(
-                 MemoryModel model,
-                 List<double> widths,
-                 List<double> slopes,
-                 bool horizontalWidths,
-                 IfcCartesianPoint? offsetPoint = null,
-                 List<string>? tags = null)
+        private static IfcOpenCrossProfileDef CreateOpenProfile(
+            MemoryModel model, double[] widths, double[] slopes, string[] tags)
         {
-            if (widths.Count != slopes.Count)
-            {
-                throw new ArgumentException("Widths and slopes must have the same number of elements.");
-            }
-
-            var openProfile = model.Instances.New<IfcOpenCrossProfileDef>(profile =>
+            return model.Instances.New<IfcOpenCrossProfileDef>(profile =>
             {
                 profile.ProfileName = "OpenCrossProfile";
-                profile.ProfileType = Ifc4x3.ProfileResource.IfcProfileTypeEnum.CURVE;
-                profile.HorizontalWidths = horizontalWidths;
+                profile.ProfileType = IfcProfileTypeEnum.CURVE;
+                profile.HorizontalWidths = true;
 
-                foreach (var width in widths)
-                {
-                    profile.Widths.Add(new IfcNonNegativeLengthMeasure(width));
-                }
-
-                foreach (var slope in slopes)
-                {
-                    profile.Slopes.Add(new IfcPlaneAngleMeasure(slope));
-                }
-
-                if (tags != null)
-                {
-                    foreach (var tag in tags)
-                    {
-                        profile.Tags.Add(new IfcLabel(tag));
-                    }
-                }
-                if (offsetPoint != null)
-                {
-                    profile.OffsetPoint = offsetPoint;
-                }
-            });
-
-            return openProfile;
-        }
-
-        private static IfcCartesianPoint CreateOffsetPoint(MemoryModel model, double x, double y)
-        {
-            return model.Instances.New<IfcCartesianPoint>(p =>
-            {
-                p.X = x;
-                p.Y = y;
+                foreach (double w in widths)
+                    profile.Widths.Add(new IfcNonNegativeLengthMeasure(w));
+                foreach (double s in slopes)
+                    profile.Slopes.Add(new IfcPlaneAngleMeasure(s));
+                foreach (string t in tags)
+                    profile.Tags.Add(new IfcLabel(t));
             });
         }
 
-        private static IfcLine CreateDirectrix(MemoryModel model)
+        private static IfcAxis2PlacementLinear CreateSectionPosition(
+            MemoryModel model, IfcCurve directrix, double distanceAlong)
         {
-            var start = model.Instances.New<IfcCartesianPoint>(p => { p.X = 0; p.Y = 0; p.Z = 0; });
-            var direction = model.Instances.New<IfcVector>(d =>
+            return model.Instances.New<IfcAxis2PlacementLinear>(placement =>
             {
-
-                d.Orientation = model.Instances.New<IfcDirection>(d => { d.X = 0; d.Y = 0; d.Z = 1; });
-                d.Magnitude = 1;
-            });
-
-            var line = model.Instances.New<IfcLine>(l =>
-            {
-                l.Pnt = start;
-                l.Dir = direction;
-            });
-
-            return line;
-        }
-
-
-        private static IfcAxis2PlacementLinear CreateSectionPosition
-                (double radius, double semiCircleEndAngle, IfcCurveMeasureSelect distanceAlong, MemoryModel model)
-
-        {
-            var pointByDistanceExpression = model.Instances.New<IfcAxis2PlacementLinear>(placement =>
-            {
-                placement.Location = CreatePointByDistanceExpression(radius, semiCircleEndAngle, distanceAlong, model);
-                placement.RefDirection = model.Instances.New<IfcDirection>(refDir =>
+                placement.Location = model.Instances.New<IfcPointByDistanceExpression>(pt =>
                 {
-                    refDir.X = 1;
-                    refDir.Y = 0;
-                    refDir.Z = 0;
-                });
-                placement.Axis = model.Instances.New<IfcDirection>(dir =>
-                {
-                    dir.X = 0;
-                    dir.Y = 1;
-                    dir.Z = 0;
+                    pt.DistanceAlong = new IfcLengthMeasure(distanceAlong);
+                    pt.BasisCurve = directrix;
                 });
 
-            });
-            return pointByDistanceExpression;
-        }
-
-        private static IfcPointByDistanceExpression CreatePointByDistanceExpression
-                  (double radius, double semiCircleEndAngle, IfcCurveMeasureSelect distanceAlong, MemoryModel model)
-        {
-            var pointByDistanceExpression = model.Instances.New<IfcPointByDistanceExpression>(point =>
-            {
-                point.DistanceAlong = distanceAlong;
-                point.BasisCurve = model.Instances.New<IfcTrimmedCurve>(curve =>
+                // RefDirection = lateral (X)
+                placement.RefDirection = model.Instances.New<IfcDirection>(d =>
                 {
-                    curve.BasisCurve = model.Instances.New<IfcCircle>(circle =>
-                    {
-                        circle.Radius = radius;
-                        circle.Position = model.Instances.New<IfcAxis2Placement3D>(placement =>
-                        {
+                    d.X = 1; d.Y = 0; d.Z = 0;
+                });
 
-                            placement.Axis = model.Instances.New<IfcDirection>(dir =>
-                            {
-                                dir.X = 0;
-                                dir.Y = 0;
-                                dir.Z = 1;
-                            });
-                            placement.RefDirection = model.Instances.New<IfcDirection>(refDir =>
-                            {
-                                refDir.X = 0;
-                                refDir.Y = 1;
-                                refDir.Z = 0;
-                            });
-                            placement.Location = model.Instances.New<IfcCartesianPoint>(p =>
-                            {
-                                p.X = 0;
-                                p.Y = 0;
-                                p.Z = 0;
-                            });
-                        });
-                    });
-                    curve.MasterRepresentation = Ifc4x3.GeometryResource.IfcTrimmingPreference.PARAMETER;
-                    curve.SenseAgreement = true;
-                    curve.Trim1.Add(new IfcParameterValue(0));
-                    curve.Trim2.Add(new IfcParameterValue(semiCircleEndAngle));
+                // Axis = surface normal (Z up) so Y_local = Z×X = (0,1,0) carries slopes vertically
+                placement.Axis = model.Instances.New<IfcDirection>(d =>
+                {
+                    d.X = 0; d.Y = 0; d.Z = 1;
                 });
             });
-            return pointByDistanceExpression;
         }
-
-        public static IfcSectionedSurface BuildIfcSectionedSurface(MemoryModel model)
-        {
-            var crossSections = new List<IfcOpenCrossProfileDef>();
-            var random = new Random();
-
-            for (var i = 0; i < 5; i++)
-            {
-
-                if (i == 0)
-                {
-                    var widths = new List<double> { 2, 3, 2 };
-                    var slopes = new List<double> { 0.5, 0, -0.5 };
-
-                    var openCrossProfile = CreateOpenCrossProfileWithWidthsAndSlopes(
-                        model,
-                        widths,
-                        slopes,
-                        horizontalWidths: true,
-                        tags: new List<string> { "P1", "P2", "P3", "P4" });
-                    crossSections.Add(openCrossProfile);
-
-                    widths = new List<double> { 3.5, 3.5 };
-                    slopes = new List<double> { 0.5, -0.5 };
-
-                    openCrossProfile = CreateOpenCrossProfileWithWidthsAndSlopes(
-                        model,
-                        widths,
-                        slopes,
-                        horizontalWidths: true,
-                        tags: new List<string> { "P1", "P2", "P4" });
-                    crossSections.Add(openCrossProfile);
-
-                    openCrossProfile = CreateOpenCrossProfileWithWidthsAndSlopes(
-                        model,
-                        widths,
-                        slopes,
-                        horizontalWidths: true,
-                        tags: new List<string> { "P1", "P2", "P4" });
-                    crossSections.Add(openCrossProfile);
-                }
-                else if (i == 1)
-                {
-                    var widths = new List<double> { 3.5, 0, 3.5 };
-                    var slopes = new List<double> { 0.5, 0, -0.5 };
-
-                    var openCrossProfile = CreateOpenCrossProfileWithWidthsAndSlopes(
-                        model,
-                        widths,
-                        slopes,
-                        horizontalWidths: true,
-                        tags: new List<string> { "P1", "P2", "P3", "P4" });
-                    crossSections.Add(openCrossProfile);
-                }
-                else
-                {
-                    var widths = new List<double> { 2.0, i < 3 ? 3 + random.Next(2) : 1 + random.Next(2), 2 };
-                    var slopes = new List<double> { 0.5, 0, -0.5 };
-
-                    var openCrossProfile = CreateOpenCrossProfileWithWidthsAndSlopes(
-                        model,
-                        widths,
-                        slopes,
-                        horizontalWidths: true,
-                        tags: new List<string> { "P1", "P2", "P3", "P4" });
-                    crossSections.Add(openCrossProfile);
-
-                }
-
-
-            }
-
-            var sectionPositions = new List<IfcAxis2PlacementLinear>
-            {
-                CreateSectionPosition(100 , 90, new IfcLengthMeasure(0.0), model),
-                CreateSectionPosition(100 , 90, new IfcLengthMeasure(10.0), model),
-                CreateSectionPosition(100 , 180, new IfcLengthMeasure(20.0), model),
-                CreateSectionPosition(100 , 180, new IfcLengthMeasure(40.0), model),
-                CreateSectionPosition(100 , 180, new IfcLengthMeasure(50.0), model),
-                CreateSectionPosition(100 , 180, new IfcLengthMeasure(60.0), model),
-                CreateSectionPosition(100 , 180, new IfcLengthMeasure(70.0), model),
-            };
-
-            var directrix = CreateDirectrix(model);
-
-            return CreateIfcSectionedSurfaceWithOpenProfiles(directrix, crossSections, sectionPositions, model);
-
-        }
-
     }
-
 }

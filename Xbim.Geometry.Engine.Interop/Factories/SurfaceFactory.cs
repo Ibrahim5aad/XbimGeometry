@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
@@ -7,12 +9,17 @@ using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Ifc4.Interfaces;
+using Xbim.Ifc4x3.GeometricConstraintResource;
+using Xbim.Ifc4x3.GeometricModelResource;
+using Xbim.Ifc4x3.GeometryResource;
+using Xbim.Ifc4x3.ProfileResource;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
 {
     /// <summary>
     /// Builds surface geometry from IFC surface entities. Handles planes,
-    /// cylindrical surfaces, spherical surfaces, and B-spline surfaces.
+    /// cylindrical surfaces, spherical surfaces, B-spline surfaces,
+    /// and sectioned surfaces.
     /// </summary>
     internal class SurfaceFactory : IXSurfaceFactory
     {
@@ -43,6 +50,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (surface is IIfcBSplineSurfaceWithKnots ifcBSpline)
                 return BuildBSplineSurface(ifcBSpline);
+
+            if (surface is IfcSectionedSurface ifcSectioned)
+                return BuildSectionedSurface(ifcSectioned);
 
             throw new NotSupportedException(
                 $"Surface type {surface.ExpressType.ExpressName} #{surface.EntityLabel} is not yet supported.");
@@ -228,6 +238,234 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 : XSurfaceType.IfcBSplineSurfaceWithKnots;
 
             return new Surface(NativeSurfaceHandle, surfaceType);
+        }
+
+        #endregion
+
+        #region Sectioned Surface
+
+        private SectionedSurface BuildSectionedSurface(IfcSectionedSurface ifcSurface)
+        {
+            int sectionCount = ifcSurface.CrossSections.Count;
+            if (ifcSurface.CrossSectionPositions.Count != sectionCount)
+                throw new InvalidOperationException(
+                    $"IfcSectionedSurface #{ifcSurface.EntityLabel}: " +
+                    "number of cross-section positions doesn't match the number of cross-sections.");
+
+            // Build directrix curve
+            var directrix = _modelService.CurveFactory.Build(ifcSurface.Directrix);
+
+            // Build section polyline points and locations
+            var geoFactory = (GeometryFactory)_modelService.GeometryFactory;
+            var locationHandles = new XLocation[sectionCount];
+            var allPoints = new List<List<TaggedPoint>>(sectionCount);
+
+            for (int i = 0; i < sectionCount; i++)
+            {
+                if (!(ifcSurface.CrossSections[i] is IfcOpenCrossProfileDef section))
+                    throw new InvalidOperationException(
+                        $"IfcSectionedSurface #{ifcSurface.EntityLabel}: " +
+                        $"cross-section [{i}] must be IfcOpenCrossProfileDef.");
+
+                if (section.ProfileType != Xbim.Ifc4x3.ProfileResource.IfcProfileTypeEnum.CURVE)
+                    throw new InvalidOperationException(
+                        $"IfcOpenCrossProfileDef #{section.EntityLabel}: " +
+                        "ProfileType must be CURVE.");
+
+                // Build location from linear placement
+                var linearPlacement = ifcSurface.CrossSectionPositions[i];
+                locationHandles[i] = (XLocation)geoFactory.BuildLocation(linearPlacement);
+
+                // Extract widths, slopes, tags
+                int segCount = section.Widths.Count;
+                var widths = new double[segCount];
+                var slopes = new double[segCount];
+
+                for (int j = 0; j < segCount; j++)
+                {
+                    widths[j] = (double)section.Widths[j].Value;
+                    slopes[j] = (double)section.Slopes[j].Value;
+                }
+
+                int tagCount = section.Tags.Count > 0 ? section.Tags.Count : segCount + 1;
+                var tags = new string[tagCount];
+                if (section.Tags.Count > 0)
+                {
+                    for (int j = 0; j < section.Tags.Count; j++)
+                        tags[j] = section.Tags[j].Value?.ToString() ?? (j + 1).ToString();
+                }
+                else
+                {
+                    for (int j = 0; j < segCount + 1; j++)
+                        tags[j] = (j + 1).ToString();
+                }
+
+                allPoints.Add(BuildPolylinePoints(widths, slopes, tags, section.HorizontalWidths));
+            }
+
+            // Align non-uniform profiles by inserting duplicate points for missing tags
+            EnsureUniform(allPoints);
+
+            int numPointsPerSection = allPoints[0].Count;
+
+            // Flatten points for native call
+            var flatPoints = new double[sectionCount * numPointsPerSection * 3];
+            for (int s = 0; s < sectionCount; s++)
+            {
+                for (int p = 0; p < numPointsPerSection; p++)
+                {
+                    int idx = (s * numPointsPerSection + p) * 3;
+                    flatPoints[idx] = allPoints[s][p].X;
+                    flatPoints[idx + 1] = allPoints[s][p].Y;
+                    flatPoints[idx + 2] = 0.0;
+                }
+            }
+
+            var safeHandles = new SafeHandle[sectionCount];
+            for (int i = 0; i < sectionCount; i++)
+                safeHandles[i] = locationHandles[i].Handle;
+
+            using var nativeHandles = new NativeHandleArray(safeHandles);
+
+            int result = XbimGeometryNativeApi.xbim_surface_build_sectioned(
+                ContextHandle,
+                flatPoints,
+                sectionCount,
+                numPointsPerSection,
+                nativeHandles.Ptrs,
+                out var shapeHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build sectioned surface #{ifcSurface.EntityLabel}: " +
+                    XbimGeometryNativeApi.GetLastError());
+
+            return new SectionedSurface(shapeHandle, directrix);
+        }
+
+        /// <summary>
+        /// Converts widths and slopes into a sequence of tagged 2D polyline points.
+        /// Starting from origin (0,0), each segment advances by its width/slope.
+        /// </summary>
+        private static List<TaggedPoint> BuildPolylinePoints(
+            double[] widths, double[] slopes, string[] tags, bool horizontalWidths)
+        {
+            var points = new List<TaggedPoint>(widths.Length + 1);
+            double cx = 0, cy = 0;
+            points.Add(new TaggedPoint(cx, cy, tags[0]));
+
+            for (int i = 0; i < widths.Length; i++)
+            {
+                double w = widths[i];
+                double s = slopes[i];
+                double dx, dy;
+
+                if (horizontalWidths)
+                {
+                    dx = w;
+                    dy = w * Math.Tan(s);
+                }
+                else
+                {
+                    dx = w * Math.Cos(s);
+                    dy = w * Math.Sin(s);
+                }
+
+                cx += dx;
+                cy += dy;
+                points.Add(new TaggedPoint(cx, cy, tags[i + 1]));
+            }
+
+            return points;
+        }
+
+        /// <summary>
+        /// Ensures all sections have the same number of points by inserting duplicate
+        /// points where tags are missing (non-uniform cross-section alignment).
+        /// </summary>
+        private static void EnsureUniform(List<List<TaggedPoint>> allPoints)
+        {
+            // Check if already uniform
+            int maxSize = 0;
+            foreach (var pts in allPoints)
+                maxSize = Math.Max(maxSize, pts.Count);
+
+            bool uniform = true;
+            foreach (var pts in allPoints)
+            {
+                if (pts.Count != maxSize)
+                {
+                    uniform = false;
+                    break;
+                }
+            }
+
+            if (uniform) return;
+
+            // Align by inserting duplicate points for missing tags
+            for (int i = 0; i < allPoints.Count - 1; i++)
+            {
+                var current = allPoints[i];
+                var next = allPoints[i + 1];
+
+                while (current.Count < maxSize && next.Count != current.Count)
+                {
+                    bool inserted = false;
+                    for (int j = 1; j < next.Count; j++)
+                    {
+                        if (!ContainsTag(current, next[j].Tag))
+                        {
+                            current.Insert(j, new TaggedPoint(current[j - 1].X, current[j - 1].Y, next[j].Tag));
+                            inserted = true;
+                            break;
+                        }
+                    }
+                    if (!inserted) break;
+                }
+
+                if (i > 0)
+                {
+                    var prev = allPoints[i - 1];
+                    while (current.Count < maxSize && prev.Count != current.Count)
+                    {
+                        bool inserted = false;
+                        for (int j = 1; j < prev.Count; j++)
+                        {
+                            if (!ContainsTag(current, prev[j].Tag))
+                            {
+                                current.Insert(j, new TaggedPoint(current[j - 1].X, current[j - 1].Y, prev[j].Tag));
+                                inserted = true;
+                                break;
+                            }
+                        }
+                        if (!inserted) break;
+                    }
+                }
+            }
+        }
+
+        private static bool ContainsTag(List<TaggedPoint> points, string tag)
+        {
+            for (int i = 0; i < points.Count; i++)
+            {
+                if (points[i].Tag == tag)
+                    return true;
+            }
+            return false;
+        }
+
+        private struct TaggedPoint
+        {
+            public double X;
+            public double Y;
+            public string Tag;
+
+            public TaggedPoint(double x, double y, string tag)
+            {
+                X = x;
+                Y = y;
+                Tag = tag;
+            }
         }
 
         #endregion

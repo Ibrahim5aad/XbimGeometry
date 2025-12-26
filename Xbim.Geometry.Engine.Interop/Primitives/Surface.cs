@@ -22,6 +22,18 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         public bool IsUPeriodic => false; // TODO: query from native when available
 
         public bool IsVPeriodic => false; // TODO: query from native when available
+
+        public string BrepString() =>
+            throw new NotSupportedException(
+                $"BRep export is not supported for elementary surface type {_surfaceType}.");
+
+        public void WriteBrep(string filePath) =>
+            throw new NotSupportedException(
+                $"BRep export is not supported for elementary surface type {_surfaceType}.");
+
+        public void WriteStl(string filePath) =>
+            throw new NotSupportedException(
+                $"STL export is not supported for elementary surface type {_surfaceType}.");
     }
 
     /// <summary>

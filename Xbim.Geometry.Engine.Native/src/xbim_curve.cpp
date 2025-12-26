@@ -624,6 +624,74 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_length(
 }
 
 
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_parameter_at_length(
+    XbimCurveHandle handle,
+    double          arcLength,
+    double          tolerance,
+    double*         outParameter)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_curve_parameter_at_length: null handle");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!outParameter)
+    {
+        xbim_set_error("xbim_curve_parameter_at_length: null output parameter");
+        return XBIM_INVALID_ARG;
+    }
+
+    const Handle(Geom_Curve)& c = handle->curve;
+    if (c.IsNull())
+    {
+        xbim_set_error("xbim_curve_parameter_at_length: curve is null");
+        return XBIM_ERROR;
+    }
+
+    try
+    {
+        GeomAdaptor_Curve adaptor(c);
+        Standard_Real firstParam = c->FirstParameter();
+        Standard_Real lastParam  = c->LastParameter();
+
+        // For unbounded curves (e.g. Geom_Line where FirstParameter = -inf),
+        // the IFC convention is that arc length is measured from the curve's
+        // defining origin, which corresponds to parameter 0.
+        Standard_Real startParam = firstParam;
+        if (Precision::IsNegativeInfinite(firstParam) ||
+            Precision::IsPositiveInfinite(lastParam))
+        {
+            startParam = 0.0;
+        }
+
+        if (std::abs(arcLength) < tolerance)
+        {
+            *outParameter = startParam;
+            return XBIM_OK;
+        }
+
+        GCPnts_AbscissaPoint abscissa(adaptor, arcLength, startParam, tolerance);
+        if (!abscissa.IsDone())
+        {
+            xbim_set_error("xbim_curve_parameter_at_length: "
+                           "GCPnts_AbscissaPoint failed to converge");
+            return XBIM_ERROR;
+        }
+
+        *outParameter = abscissa.Parameter();
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_curve_parameter_at_length: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_value(
     XbimCurveHandle handle,
     double          u,

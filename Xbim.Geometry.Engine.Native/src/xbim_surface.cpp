@@ -14,6 +14,8 @@
 #include "xbim_context.h"
 #include "xbim_error.h"
 #include "xbim_logging.h"
+#include "xbim_shape.h"
+#include "xbim_location.h"
 
 #include <gp_Pnt.hxx>
 #include <gp_Dir.hxx>
@@ -29,6 +31,15 @@
 #include <TColStd_Array1OfInteger.hxx>
 #include <TColStd_Array2OfReal.hxx>
 #include <Standard_Failure.hxx>
+
+#include <BRepBuilderAPI_MakePolygon.hxx>
+#include <BRepBuilderAPI_Sewing.hxx>
+#include <BRepFill.hxx>
+#include <TopExp_Explorer.hxx>
+#include <TopoDS.hxx>
+#include <TopoDS_Edge.hxx>
+#include <TopoDS_Face.hxx>
+#include <TopoDS_Wire.hxx>
 
 #pragma region Surface Helpers
 
@@ -315,6 +326,113 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_bspline(
     {
         xbim_log_occt_failure(ctx, e, "xbim_surface_build_bspline");
         xbim_set_error("xbim_surface_build_bspline: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_sectioned(
+    XbimContextHandle          ctx,
+    const double*              pointsXYZ,
+    int                        numSections,
+    int                        numPointsPerSection,
+    const XbimLocationHandle*  locations,
+    XbimShapeHandle*           outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_surface_build_sectioned: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!pointsXYZ || numSections < 2 || numPointsPerSection < 2)
+    {
+        xbim_set_error("xbim_surface_build_sectioned: invalid points or section count");
+        return XBIM_INVALID_ARG;
+    }
+    if (!locations)
+    {
+        xbim_set_error("xbim_surface_build_sectioned: locations is NULL");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        // For each consecutive pair of point indices (tags), create a longitudinal
+        // wire connecting that point across all sections, then build ruled surface
+        // strips between adjacent wires.
+        BRepBuilderAPI_Sewing outerSewing;
+
+        for (int t = 0; t < numPointsPerSection - 1; ++t)
+        {
+            // Build longitudinal wire for point index t
+            BRepBuilderAPI_MakePolygon poly1;
+            // Build longitudinal wire for point index t+1
+            BRepBuilderAPI_MakePolygon poly2;
+
+            for (int s = 0; s < numSections; ++s)
+            {
+                const auto& loc = locations[s]->location;
+                const gp_Trsf& trsf = loc.Transformation();
+
+                int idx1 = (s * numPointsPerSection + t) * 3;
+                gp_Pnt p1(pointsXYZ[idx1], pointsXYZ[idx1 + 1], pointsXYZ[idx1 + 2]);
+                p1.Transform(trsf);
+                poly1.Add(p1);
+
+                int idx2 = (s * numPointsPerSection + (t + 1)) * 3;
+                gp_Pnt p2(pointsXYZ[idx2], pointsXYZ[idx2 + 1], pointsXYZ[idx2 + 2]);
+                p2.Transform(trsf);
+                poly2.Add(p2);
+            }
+
+            if (!poly1.IsDone() || !poly2.IsDone())
+            {
+                xbim_set_error("xbim_surface_build_sectioned: failed to build longitudinal wire");
+                return XBIM_ERROR;
+            }
+
+            TopoDS_Wire wire1 = poly1.Wire();
+            TopoDS_Wire wire2 = poly2.Wire();
+
+            // Create ruled surfaces between matching edges of the two wires
+            std::vector<TopoDS_Edge> edges1, edges2;
+            for (TopExp_Explorer exp(wire1, TopAbs_EDGE); exp.More(); exp.Next())
+                edges1.push_back(TopoDS::Edge(exp.Current()));
+            for (TopExp_Explorer exp(wire2, TopAbs_EDGE); exp.More(); exp.Next())
+                edges2.push_back(TopoDS::Edge(exp.Current()));
+
+            BRepBuilderAPI_Sewing stripSewing;
+            size_t edgeCount = std::min(edges1.size(), edges2.size());
+            for (size_t e = 0; e < edgeCount; ++e)
+            {
+                TopoDS_Shape ruled = BRepFill::Face(edges1[e], edges2[e]);
+                stripSewing.Add(ruled);
+            }
+            stripSewing.Perform();
+
+            outerSewing.Add(stripSewing.SewedShape());
+        }
+
+        outerSewing.Perform();
+        TopoDS_Shape result = outerSewing.SewedShape();
+
+        *outHandle = xbim_shape_create_from(result);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_surface_build_sectioned: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_surface_build_sectioned");
+        xbim_set_error("xbim_surface_build_sectioned: OCCT exception");
         return XBIM_ERROR;
     }
 }

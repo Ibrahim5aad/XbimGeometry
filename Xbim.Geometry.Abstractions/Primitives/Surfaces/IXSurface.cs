@@ -5,5 +5,8 @@
         XSurfaceType SurfaceType { get; }
         bool IsUPeriodic { get; }
         bool IsVPeriodic { get; }
+        string BrepString();
+        void WriteBrep(string filePath);
+        void WriteStl(string filePath);
     }
 }

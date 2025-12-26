@@ -2584,6 +2584,23 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_length(
     double*         outLength);
 
 /*
+ * Find the curve parameter corresponding to a given arc length measured from
+ * the curve's first parameter.  Uses GCPnts_AbscissaPoint internally.
+ *
+ *   handle       – a valid curve handle
+ *   arcLength    – target arc length from curve start
+ *   tolerance    – computation tolerance (e.g. model precision)
+ *   outParameter – receives the curve parameter at the requested arc length
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_parameter_at_length(
+    XbimCurveHandle handle,
+    double          arcLength,
+    double          tolerance,
+    double*         outParameter);
+
+/*
  * Evaluate a point on the curve at parameter u.
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_value(
@@ -2794,6 +2811,32 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_bspline(
     int               vDegree,
     const double*     weights,
     XbimSurfaceHandle* outHandle);
+
+/*
+ * Build a sectioned surface from cross-section polyline points and locations.
+ *
+ * Each cross-section is a polyline in local 2D space (z=0). The points are
+ * transformed by the corresponding location to 3D world space. Ruled surface
+ * strips are created between longitudinal wires connecting same-indexed points
+ * across all sections, then sewn into a single compound shape.
+ *
+ *   ctx                  – a valid context handle
+ *   pointsXYZ            – flat array of 3D points [numSections * numPointsPerSection * 3]
+ *                          row-major: section 0 points, section 1 points, ...
+ *   numSections          – number of cross-sections (must be >= 2)
+ *   numPointsPerSection  – number of points per cross-section (must be >= 2)
+ *   locations            – array of numSections location handles for positioning
+ *   outHandle            – receives the new shape handle (sewn surface compound)
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_sectioned(
+    XbimContextHandle          ctx,
+    const double*              pointsXYZ,
+    int                        numSections,
+    int                        numPointsPerSection,
+    const XbimLocationHandle*  locations,
+    XbimShapeHandle*           outHandle);
 
 /*
  * Destroy a surface handle and free its resources.

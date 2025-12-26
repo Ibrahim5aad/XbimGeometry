@@ -70,7 +70,15 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (distanceAlong is IIfcLengthMeasure lengthMeasure)
             {
-                len = lengthMeasure.Value;
+                // IfcLengthMeasure is an arc length — convert to the curve parameter
+                // using GCPnts_AbscissaPoint on the native side.
+                int paramResult = XbimGeometryNativeApi.xbim_curve_parameter_at_length(
+                    curveHandle, lengthMeasure.Value, _modelService.Precision, out len);
+                if (paramResult != 0)
+                    throw new InvalidOperationException(
+                        $"IfcPointByDistanceExpression #{pointExpr.EntityLabel}: " +
+                        $"failed to convert arc length {lengthMeasure.Value} to parameter: " +
+                        XbimGeometryNativeApi.GetLastError());
             }
             else if (distanceAlong is Xbim.Ifc4x3.MeasureResource.IfcParameterValue parameterValue)
             {

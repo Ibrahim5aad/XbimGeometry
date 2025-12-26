@@ -1061,6 +1061,13 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out double outLength);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_parameter_at_length(
+            NativeCurveHandle handle,
+            double arcLength,
+            double tolerance,
+            out double outParameter);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_curve_value(
             NativeCurveHandle handle,
             double u,
@@ -1247,6 +1254,15 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             int vDegree,
             [MarshalAs(UnmanagedType.LPArray)] double[]? weights,
             out NativeSurfaceHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_surface_build_sectioned(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] double[] pointsXYZ,
+            int numSections,
+            int numPointsPerSection,
+            [In] IntPtr[] locations,
+            out NativeShapeHandle outHandle);
 
         #endregion
 
