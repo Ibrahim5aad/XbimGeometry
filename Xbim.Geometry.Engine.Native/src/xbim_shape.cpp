@@ -117,7 +117,7 @@ XBIM_EXPORT int XBIM_CALL xbim_shape_is_null(XbimShapeHandle handle)
 {
     if (!handle)
         return XBIM_TRUE;
-    return handle->shape.IsNull() ? XBIM_TRUE : XBIM_FALSE;
+    return handle->shape.IsNull() || handle->shape.NbChildren() == 0 ? XBIM_TRUE : XBIM_FALSE;
 }
 
 XBIM_EXPORT int XBIM_CALL xbim_shape_is_valid(XbimShapeHandle handle)
