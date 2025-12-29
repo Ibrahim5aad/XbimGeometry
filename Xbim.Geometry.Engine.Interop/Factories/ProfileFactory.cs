@@ -1121,10 +1121,41 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         }
 
         /// <summary>
-        /// Builds a 2D curve via CurveFactory and adds the detached handle to the list.
+        /// Builds 2D curves from an IFC curve and adds the detached handles to the list.
+        /// Multi-point polylines are expanded into separate line segments to preserve
+        /// individual edge topology in the profile wire.
         /// </summary>
         private void BuildCurves2dFromCurve(IIfcCurve curve, List<NativeCurve2dHandle> curves)
         {
+            // Multi-point polylines must produce separate line edges, not a single
+            // composite BSpline. The pipe sweep (BRepOffsetAPI_MakePipeShell) creates
+            // one face per profile edge per spine segment; merging edges into a BSpline
+            // changes the face topology and breaks corner transitions.
+            if (curve is IIfcPolyline polyline && polyline.Points.Count > 2)
+            {
+                for (int i = 0; i < polyline.Points.Count - 1; i++)
+                {
+                    var p1 = polyline.Points[i];
+                    var p2 = polyline.Points[i + 1];
+                    double sx = p1.Coordinates[0], sy = p1.Coordinates[1];
+                    double ex = p2.Coordinates[0], ey = p2.Coordinates[1];
+
+                    double dist = Math.Sqrt((ex - sx) * (ex - sx) + (ey - sy) * (ey - sy));
+                    if (dist < _modelService.Precision) continue;
+
+                    int result = XbimGeometryNativeApi.xbim_curve2d_build_line(
+                        ContextHandle, sx, sy, ex, ey, out var lineHandle);
+
+                    if (result != 0)
+                        throw new InvalidOperationException(
+                            $"Failed to build line segment for polyline #{curve.EntityLabel}: " +
+                            XbimGeometryNativeApi.GetLastError());
+
+                    curves.Add(lineHandle);
+                }
+                return;
+            }
+
             var curveFactory = (CurveFactory)_modelService.CurveFactory;
             var builtCurve = (Curve2d)curveFactory.BuildCurve2d(curve);
             curves.Add(builtCurve.DetachHandle());

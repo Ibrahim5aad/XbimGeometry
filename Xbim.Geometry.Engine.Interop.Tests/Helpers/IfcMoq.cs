@@ -1094,7 +1094,14 @@ internal static class IfcMoq
             double px, double py, double pz,
             params (IIfcEdgeCurve edge, bool forward)[] edges)
         {
-            var plane = IfcPlane(px, py, pz, nx, ny, nz);
+            // Choose a ref direction that is not parallel to the normal
+            double rx = 0, ry = 0, rz = 1;
+            if (Math.Abs(nz) > 0.9)
+                (rx, ry, rz) = (1, 0, 0);
+            else if (Math.Abs(nx) > 0.9)
+                (rx, ry, rz) = (0, 1, 0);
+
+            var plane = IfcPlane(px, py, pz, nx, ny, nz, rx, ry, rz);
             var orientedEdges = edges.Select(e => OrientedEdge(e.edge, e.forward)).ToArray();
             var loop = EdgeLoop(orientedEdges);
             var outerBound = AdvancedFaceOuterBound(loop);

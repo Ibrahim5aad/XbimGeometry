@@ -54,6 +54,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (surface is IfcSectionedSurface ifcSectioned)
                 return BuildSectionedSurface(ifcSectioned);
 
+            if (surface is IIfcSurfaceOfRevolution ifcRevolution)
+                return BuildSurfaceOfRevolution(ifcRevolution);
+
+            if (surface is IIfcSurfaceOfLinearExtrusion ifcExtrusion)
+                return BuildSurfaceOfLinearExtrusion(ifcExtrusion);
+
             throw new NotSupportedException(
                 $"Surface type {surface.ExpressType.ExpressName} #{surface.EntityLabel} is not yet supported.");
         }
@@ -64,6 +70,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 ContextHandle,
                 origin.X, origin.Y, origin.Z,
                 normal.X, normal.Y, normal.Z,
+                0, 0, 0, // auto-compute refDir
                 out var NativeSurfaceHandle,
                 out double refX, out double refY, out double refZ);
 
@@ -88,6 +95,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 ContextHandle,
                 ox, oy, oz,
                 zx, zy, zz,
+                xx, xy, xz,
                 out var NativeSurfaceHandle,
                 out _, out _, out _);
 
@@ -151,6 +159,111 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     $"Failed to build spherical surface #{ifcSphere.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new Surface(NativeSurfaceHandle, XSurfaceType.IfcSphericalSurface);
+        }
+
+        #endregion
+
+        #region Surface of Revolution
+
+        private Surface BuildSurfaceOfRevolution(IIfcSurfaceOfRevolution ifcRevolution)
+        {
+            if (ifcRevolution.SweptCurve.ProfileType != Ifc4.Interfaces.IfcProfileTypeEnum.CURVE)
+                throw new InvalidOperationException(
+                    $"SurfaceOfRevolution #{ifcRevolution.EntityLabel}: only profiles of type CURVE are valid.");
+
+            if (ifcRevolution.SweptCurve is not IIfcArbitraryOpenProfileDef openProfile)
+                throw new NotSupportedException(
+                    $"SurfaceOfRevolution #{ifcRevolution.EntityLabel}: SweptCurve must be an ArbitraryOpenProfileDef, " +
+                    $"got {ifcRevolution.SweptCurve.ExpressType.ExpressName}.");
+
+            // Build the generatrix curve from the profile's curve property
+            var curveFactory = (CurveFactory)_modelService.CurveFactory;
+            using var curve = (Curve)curveFactory.Build(openProfile.Curve);
+
+           
+            // Extract revolution axis
+            var axisPoint = GeometryFactory.BuildPoint3d(ifcRevolution.AxisPosition.Location);
+            double axisDirX = 0, axisDirY = 0, axisDirZ = 1;
+            if (ifcRevolution.AxisPosition.Axis != null)
+            {
+                if (!GeometryFactory.BuildDirection3d(ifcRevolution.AxisPosition.Axis,
+                        out axisDirX, out axisDirY, out axisDirZ))
+                    throw new InvalidOperationException(
+                        $"SurfaceOfRevolution #{ifcRevolution.EntityLabel}: axis direction is incorrectly defined.");
+            }
+
+            int result = XbimGeometryNativeApi.xbim_surface_build_revolution(
+                ContextHandle,
+                curve.Handle,
+                axisPoint.X, axisPoint.Y, axisPoint.Z,
+                axisDirX, axisDirY, axisDirZ,
+                out var NativeSurfaceHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build SurfaceOfRevolution #{ifcRevolution.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new Surface(NativeSurfaceHandle, XSurfaceType.IfcSurfaceOfRevolution);
+           
+        }
+
+        #endregion
+
+        #region Surface of Linear Extrusion
+
+        private Surface BuildSurfaceOfLinearExtrusion(IIfcSurfaceOfLinearExtrusion ifcExtrusion)
+        {
+            if (ifcExtrusion.SweptCurve.ProfileType != Ifc4.Interfaces.IfcProfileTypeEnum.CURVE)
+                throw new InvalidOperationException(
+                    $"SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: only profiles of type CURVE are valid.");
+
+            if (ifcExtrusion.SweptCurve is not IIfcArbitraryOpenProfileDef openProfile)
+                throw new NotSupportedException(
+                    $"SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: SweptCurve must be an ArbitraryOpenProfileDef, " +
+                    $"got {ifcExtrusion.SweptCurve.ExpressType.ExpressName}.");
+
+            // Build the generatrix curve from the profile's curve property
+            var curveFactory = (CurveFactory)_modelService.CurveFactory;
+            using var curve = (Curve)curveFactory.Build(openProfile.Curve);
+
+           
+            // Extract extrusion direction
+            if (!GeometryFactory.BuildDirection3d(ifcExtrusion.ExtrudedDirection,
+                    out double dirX, out double dirY, out double dirZ))
+                throw new InvalidOperationException(
+                    $"SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: extrusion direction is incorrectly defined.");
+
+            // Extract position transform if present
+            int hasPosition = 0;
+            double posOX = 0, posOY = 0, posOZ = 0;
+            double posZX = 0, posZY = 0, posZZ = 1;
+            double posXX = 1, posXY = 0, posXZ = 0;
+
+            if (ifcExtrusion.Position != null)
+            {
+                GeometryFactory.BuildAxis2Placement3d(ifcExtrusion.Position,
+                    out posOX, out posOY, out posOZ,
+                    out posZX, out posZY, out posZZ,
+                    out posXX, out posXY, out posXZ);
+                hasPosition = 1;
+            }
+
+            int result = XbimGeometryNativeApi.xbim_surface_build_linear_extrusion(
+                ContextHandle,
+                curve.Handle,
+                dirX, dirY, dirZ,
+                posOX, posOY, posOZ,
+                posZX, posZY, posZZ,
+                posXX, posXY, posXZ,
+                hasPosition,
+                out var nativeSurfaceHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new Surface(nativeSurfaceHandle, XSurfaceType.IfcSurfaceOfLinearExtrusion);
+            
         }
 
         #endregion

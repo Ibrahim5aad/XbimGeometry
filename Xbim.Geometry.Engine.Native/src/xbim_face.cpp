@@ -759,6 +759,80 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_get_surface(
     }
 }
 
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_normal_at_point(
+    XbimShapeHandle faceHandle,
+    double          pointX,
+    double          pointY,
+    double          pointZ,
+    double          precision,
+    double          tolerance,
+    double*         outNormalX,
+    double*         outNormalY,
+    double*         outNormalZ)
+{
+    xbim_clear_error();
+
+    if (!outNormalX || !outNormalY || !outNormalZ)
+    {
+        xbim_set_error("xbim_face_normal_at_point: output pointer is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outNormalX = 0.0;
+    *outNormalY = 0.0;
+    *outNormalZ = 0.0;
+
+    if (!faceHandle)
+    {
+        xbim_set_error("xbim_face_normal_at_point: faceHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        const TopoDS_Shape& shape = faceHandle->shape;
+        if (shape.IsNull() || shape.ShapeType() != TopAbs_FACE)
+        {
+            xbim_set_error("xbim_face_normal_at_point: handle is not a face");
+            return XBIM_INVALID_ARG;
+        }
+
+        const TopoDS_Face& face = TopoDS::Face(shape);
+        Handle(Geom_Surface) surf = BRep_Tool::Surface(face);
+        if (surf.IsNull())
+        {
+            xbim_set_error("xbim_face_normal_at_point: face has no surface");
+            return XBIM_NULL_SHAPE;
+        }
+
+        ShapeAnalysis_Surface sas(surf);
+        gp_Pnt2d uv = sas.ValueOfUV(gp_Pnt(pointX, pointY, pointZ), precision);
+
+        GeomLProp_SLProps props(surf, uv.X(), uv.Y(), 1, tolerance);
+        if (!props.IsNormalDefined())
+        {
+            xbim_set_error("xbim_face_normal_at_point: normal is undefined at the given point");
+            return XBIM_ERROR;
+        }
+
+        gp_Dir normal = props.Normal();
+
+        // Respect face orientation — if reversed, flip the normal
+        if (face.Orientation() == TopAbs_REVERSED)
+            normal.Reverse();
+
+        *outNormalX = normal.X();
+        *outNormalY = normal.Y();
+        *outNormalZ = normal.Z();
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_face_normal_at_point: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
 #pragma endregion
 
 #pragma region Face Modification

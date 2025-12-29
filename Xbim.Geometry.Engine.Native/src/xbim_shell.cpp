@@ -15,20 +15,27 @@
 #include "xbim_error.h"
 #include "xbim_logging.h"
 
+
 #include <TopoDS.hxx>
 #include <TopoDS_Shell.hxx>
 #include <TopoDS_Solid.hxx>
+#include <TopoDS_Compound.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
 #include <BRep_Builder.hxx>
+#include <BRep_Tool.hxx>
 #include <BRepBuilderAPI_MakeSolid.hxx>
 #include <BRepCheck_Shell.hxx>
+#include <BRepClass3d_SolidClassifier.hxx>
 #include <BRepOffsetAPI_Sewing.hxx>
+#include <Precision.hxx>
 #include <ShapeFix_Shape.hxx>
 #include <ShapeFix_Shell.hxx>
 #include <ShapeFix_Solid.hxx>
+#include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopAbs_ShapeEnum.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
 #include <Standard_Failure.hxx>
 
 #pragma region Shell Construction
@@ -320,6 +327,37 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_make_solid(
         xbim_set_error("xbim_shell_make_solid: OCCT exception");
         return XBIM_ERROR;
     }
+}
+
+
+/*
+ * Helper: converts a single shell to a solid with orientation checking.
+ * Returns true if successful, populating outSolid.
+ */
+static bool shell_to_solid(
+    XbimContextHandle ctx,
+    const TopoDS_Shell& shell,
+    double tolerance,
+    TopoDS_Solid& outSolid)
+{
+    if (shell.IsNull() || shell.NbChildren() == 0)
+        return false;
+
+    BRep_Builder b;
+    TopoDS_Solid solid;
+    b.MakeSolid(solid);
+    b.Add(solid, shell);
+
+    if (BRep_Tool::IsClosed(shell))
+    {
+        BRepClass3d_SolidClassifier classifier(solid);
+        classifier.PerformInfinitePoint(Precision::Confusion());
+        if (classifier.State() == TopAbs_IN)
+            solid.Reverse();
+    }
+
+    outSolid = solid;
+    return true;
 }
 
 

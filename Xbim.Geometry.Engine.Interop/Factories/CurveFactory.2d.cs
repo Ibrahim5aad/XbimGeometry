@@ -7,6 +7,7 @@ using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
+using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.GeometryResource;
 using Xbim.Ifc4.Interfaces;
 
@@ -103,11 +104,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private Circle2d BuildCircle2d(IIfcCircle ifcCircle)
         {
             if (ifcCircle.Radius <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryFactoryException(
                     $"IIfcCircle #{ifcCircle.EntityLabel} has invalid radius {ifcCircle.Radius}. Radius must be greater than zero.");
 
             if (ifcCircle.Position is not IIfcAxis2Placement2D axis2d)
-                throw new InvalidOperationException(
+                throw new XbimGeometryFactoryException(
                     $"IIfcCircle #{ifcCircle.EntityLabel} (Dim=2) has no valid 2D placement.");
 
             double cx = axis2d.Location.Coordinates[0];
@@ -152,7 +153,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private Ellipse2d BuildEllipse2d(IIfcEllipse ifcEllipse)
         {
             if (ifcEllipse.Position is not IIfcAxis2Placement2D axis2d)
-                throw new InvalidOperationException(
+                throw new XbimGeometryFactoryException(
                     $"IIfcEllipse #{ifcEllipse.EntityLabel} (Dim=2) has no valid 2D placement.");
 
             double cx = axis2d.Location.Coordinates[0];

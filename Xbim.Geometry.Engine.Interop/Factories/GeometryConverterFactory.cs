@@ -23,8 +23,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// <inheritdoc/>
         public IXbimGeometryEngine CreateGeometryEngineV5(IModel model, ILoggerFactory loggerFactory)
         {
-            throw new PlatformNotSupportedException(
-                "V5 geometry engine is not available. Use V6 or CreateModelGeometryService instead.");
+            var service = new ModelGeometryService(model, loggerFactory);
+            return new GeometryEngine(service, loggerFactory);
         }
 
         /// <inheritdoc/>
@@ -37,14 +37,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// <inheritdoc/>
         public IXbimGeometryEngine CreateGeometryEngine(XGeometryEngineVersion version, IModel model, ILoggerFactory loggerFactory)
         {
-            return version switch
-            {
-                XGeometryEngineVersion.V5 => CreateGeometryEngineV6(model, loggerFactory), // default to V6 for V5 is not supported
-                XGeometryEngineVersion.V6 => CreateGeometryEngineV6(model, loggerFactory),
-                _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported geometry engine version.")
-            };
+            return CreateGeometryEngineV6(model, loggerFactory);
         }
-
+        
         /// <inheritdoc/>
         public IXModelGeometryService GetUnderlyingModelGeometryService(IXbimGeometryEngine geometryEngine)
         {

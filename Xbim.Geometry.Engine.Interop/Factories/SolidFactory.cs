@@ -439,9 +439,83 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private IXShape BuildSurfaceCurveSweptAreaSolid(IIfcSurfaceCurveSweptAreaSolid surfaceCurveSwept)
         {
-            // This requires WireFactory (for directrix) and SurfaceFactory (for reference surface)
-            throw new NotImplementedException(
-                $"SurfaceCurveSweptAreaSolid #{surfaceCurveSwept.EntityLabel} requires WireFactory and SurfaceFactory support (TOPO-002/TOPO-006).");
+            // Composite profiles: build a solid per sub-profile, combine into compound
+            if (surfaceCurveSwept.SweptArea is IIfcCompositeProfileDef compositeProfile)
+            {
+                var solidHandles = new List<NativeShapeHandle>();
+                try
+                {
+                    foreach (var profileDef in compositeProfile.Profiles)
+                        solidHandles.Add(BuildSurfaceCurveSweptAreaSolidCore(surfaceCurveSwept, profileDef));
+
+                    using var nativeHandles = new NativeHandleArray(solidHandles.ToArray());
+
+                    int result = XbimGeometryNativeApi.xbim_compound_make(
+                        ContextHandle,
+                        nativeHandles.Ptrs,
+                        nativeHandles.Length,
+                        out var compoundHandle);
+
+                    if (result != 0)
+                        throw new InvalidOperationException(
+                            $"Failed to build compound for SurfaceCurveSweptAreaSolid #{surfaceCurveSwept.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                    return NativeShapeWrapper.WrapShape(compoundHandle);
+                }
+                finally
+                {
+                    foreach (var h in solidHandles)
+                        h.Dispose();
+                }
+            }
+
+            var solidResult = BuildSurfaceCurveSweptAreaSolidCore(surfaceCurveSwept, surfaceCurveSwept.SweptArea);
+            return NativeShapeWrapper.WrapSolid(solidResult);
+        }
+
+        private NativeShapeHandle BuildSurfaceCurveSweptAreaSolidCore(
+            IIfcSurfaceCurveSweptAreaSolid surfaceCurveSwept, IIfcProfileDef profileDef)
+        {
+            if (profileDef.ProfileType != IfcProfileTypeEnum.AREA)
+                throw new InvalidOperationException(
+                    $"SurfaceCurveSweptAreaSolid #{surfaceCurveSwept.EntityLabel}: profile must be AREA type.");
+
+            // Build the swept area profile face
+            using var profileFace = (Face)_modelService.ProfileFactory.BuildFace(profileDef);
+
+            // Build the reference surface 
+            var refSurface = (Surface)_modelService.SurfaceFactory.Build(surfaceCurveSwept.ReferenceSurface);
+            bool isPlanar = refSurface.SurfaceType == XSurfaceType.IfcPlane;
+
+            // Build the directrix wire with optional parametric trimming
+            var wireFactory = (WireFactory)_modelService.WireFactory;
+            double? startParam = surfaceCurveSwept.StartParam.HasValue ? (double)surfaceCurveSwept.StartParam.Value : null;
+            double? endParam = surfaceCurveSwept.EndParam.HasValue ? (double)surfaceCurveSwept.EndParam.Value : null;
+            using var directrixWire = (Wire)wireFactory.BuildDirectrixWire(surfaceCurveSwept.Directrix, startParam, endParam);
+
+            // Build optional position location (NullHandle = identity)
+            var locationHandle = NativeLocationHandle.NullHandle;
+            if (surfaceCurveSwept.Position != null)
+            {
+                locationHandle = ((GeometryFactory)_modelService.GeometryFactory)
+                    .BuildLocationFromAxis3D(surfaceCurveSwept.Position).Handle;
+            }
+
+            int result = XbimGeometryNativeApi.xbim_solid_build_surface_curve_swept(
+                ContextHandle,
+                profileFace.Handle,
+                directrixWire.Handle,
+                refSurface.Handle,
+                isPlanar ? 1 : 0,
+                _modelService.Precision,
+                locationHandle,
+                out var solidHandle);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to build SurfaceCurveSweptAreaSolid #{surfaceCurveSwept.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return solidHandle;
         }
 
         #endregion
@@ -519,7 +593,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         private NativeShapeHandle BuildClosedShellAsSolid(IIfcConnectedFaceSet faceSet)
         {
-            double tolerance = _modelService.Precision;
+            double tolerance = _modelService.MinimumGap;
             var faceHandles = new List<NativeShapeHandle>();
 
             try
@@ -753,20 +827,83 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         /// <summary>
         /// Builds a solid from an IIfcClosedShell whose faces are IIfcAdvancedFace entities.
-        /// Each face has an associated surface geometry and edge loops with parametric edge curves.
-        /// Edge curves and vertices are deduplicated by IFC entity label to ensure shared topology.
         /// </summary>
         private NativeShapeHandle BuildAdvancedShellAsSolid(IIfcClosedShell closedShell)
         {
-            double tolerance = _modelService.Precision;
-            var faceHandles = new List<NativeShapeHandle>();
-
-            // Deduplication caches keyed by IFC entity label
-            var edgeCurveCache = new Dictionary<int, NativeShapeHandle>();
+            double tolerance = _modelService.MinimumGap;
             var curveCache = new Dictionary<int, NativeCurveHandle>();
+
+            int result = XbimGeometryNativeApi.xbim_advanced_brep_create(
+                ContextHandle, tolerance, out var builder);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to create advanced BRep builder: {XbimGeometryNativeApi.GetLastError()}");
 
             try
             {
+                // Pass 1: Register all edge curves and vertices
+                var registeredEdges = new HashSet<int>();
+                var registeredVertices = new HashSet<int>();
+
+                var edgeCurves = closedShell.CfsFaces
+                    .OfType<IIfcAdvancedFace>()
+                    .SelectMany(f => f.Bounds)
+                    .Where(b => b.Bound is IIfcEdgeLoop)
+                    .SelectMany(b => ((IIfcEdgeLoop)b.Bound).EdgeList)
+                    .Select(oe => oe.EdgeElement)
+                    .OfType<IIfcEdgeCurve>();
+
+                foreach (var edgeCurve in edgeCurves)
+                {
+                    int edgeLabel = edgeCurve.EntityLabel;
+
+                    // Register edge curve geometry (deduplicated)
+                    if (registeredEdges.Add(edgeLabel))
+                    {
+                        var curveHandle = BuildCurveForEdge(edgeCurve.EdgeGeometry, curveCache);
+                        if (curveHandle != null && !curveHandle.IsInvalid)
+                        {
+                            if (!edgeCurve.SameSense)
+                            {
+                                int rev = XbimGeometryNativeApi.xbim_curve_reverse(curveHandle);
+                                if (rev != 0)
+                                    _logger.LogWarning("Failed to reverse edge curve #{Label}: {Error}",
+                                        edgeLabel, XbimGeometryNativeApi.GetLastError());
+                            }
+
+                            XbimGeometryNativeApi.xbim_advanced_brep_add_edge_curve(
+                                builder, edgeLabel, curveHandle);
+                        }
+                    }
+
+                    // Register start vertex
+                    if (edgeCurve.EdgeStart is IIfcVertexPoint startVP &&
+                        startVP.VertexGeometry is IIfcCartesianPoint startPt)
+                    {
+                        int svLabel = startVP.EntityLabel;
+                        if (registeredVertices.Add(svLabel))
+                        {
+                            XbimGeometryNativeApi.xbim_advanced_brep_add_vertex(
+                                builder, svLabel, startPt.X, startPt.Y, startPt.Z);
+                        }
+                    }
+
+                    // Register end vertex
+                    if (edgeCurve.EdgeEnd is IIfcVertexPoint endVP &&
+                        endVP.VertexGeometry is IIfcCartesianPoint endPt)
+                    {
+                        int evLabel = endVP.EntityLabel;
+                        if (registeredVertices.Add(evLabel))
+                        {
+                            XbimGeometryNativeApi.xbim_advanced_brep_add_vertex(
+                                builder, evLabel, endPt.X, endPt.Y, endPt.Z);
+                        }
+                    }
+                }
+
+                // Pass 2: Define faces with their bounds and oriented edges
+                int faceCount = 0;
                 foreach (var ifcFace in closedShell.CfsFaces)
                 {
                     if (ifcFace is not IIfcAdvancedFace advancedFace)
@@ -776,19 +913,74 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         continue;
                     }
 
-                    var faceHandle = BuildAdvancedFace(advancedFace, edgeCurveCache, curveCache, tolerance);
-                    if (faceHandle != null && !faceHandle.IsInvalid)
-                        faceHandles.Add(faceHandle);
+                    // Build the face surface
+                    var surfaceHandle = BuildSurfaceForAdvancedFace(advancedFace.FaceSurface);
+                    if (surfaceHandle == null || surfaceHandle.IsInvalid)
+                    {
+                        _logger.LogWarning("Failed to build surface for AdvancedFace #{Label}, skipping.",
+                            advancedFace.EntityLabel);
+                        surfaceHandle?.Dispose();
+                        continue;
+                    }
+
+                    result = XbimGeometryNativeApi.xbim_advanced_brep_begin_face(
+                        builder, surfaceHandle, advancedFace.SameSense ? 1 : 0);
+                    surfaceHandle.Dispose();
+
+                    if (result != 0)
+                    {
+                        _logger.LogWarning("Failed to begin face #{Label}: {Error}",
+                            advancedFace.EntityLabel, XbimGeometryNativeApi.GetLastError());
+                        continue;
+                    }
+
+                    int numberOfBounds = advancedFace.Bounds.Count;
+                    foreach (var bound in advancedFace.Bounds)
+                    {
+                        if (bound.Bound is not IIfcEdgeLoop edgeLoop)
+                        {
+                            _logger.LogWarning(
+                                "AdvancedFace #{FaceLabel} bound #{BoundLabel} is not an IIfcEdgeLoop, skipping.",
+                                advancedFace.EntityLabel, bound.EntityLabel);
+                            continue;
+                        }
+
+                        bool isOuter = numberOfBounds == 1 || bound is IIfcFaceOuterBound;
+
+                        XbimGeometryNativeApi.xbim_advanced_brep_begin_bound(
+                            builder, isOuter ? 1 : 0, bound.Orientation ? 1 : 0);
+
+                        foreach (var orientedEdge in edgeLoop.EdgeList)
+                        {
+                            if (orientedEdge.EdgeElement is not IIfcEdgeCurve edgeCurve)
+                                continue;
+
+                            var startVP = edgeCurve.EdgeStart as IIfcVertexPoint;
+                            var endVP = edgeCurve.EdgeEnd as IIfcVertexPoint;
+                            if (startVP == null || endVP == null)
+                                continue;
+
+                            XbimGeometryNativeApi.xbim_advanced_brep_add_bound_edge(
+                                builder,
+                                edgeCurve.EntityLabel,
+                                startVP.EntityLabel,
+                                endVP.EntityLabel,
+                                orientedEdge.Orientation ? 1 : 0);
+                        }
+
+                        XbimGeometryNativeApi.xbim_advanced_brep_end_bound(builder);
+                    }
+
+                    XbimGeometryNativeApi.xbim_advanced_brep_end_face(builder);
+                    faceCount++;
                 }
 
-                if (faceHandles.Count < 4)
+                if (faceCount < 4)
                     throw new InvalidOperationException(
-                        $"Advanced BRep closed shell requires at least 4 faces but only {faceHandles.Count} were built.");
+                        $"Advanced BRep closed shell requires at least 4 faces but only {faceCount} were built.");
 
-                using var nativeFaces = new NativeHandleArray(faceHandles.ToArray());
-
-                int result = XbimGeometryNativeApi.xbim_shell_build_closed_shell(
-                    ContextHandle, nativeFaces.Ptrs, nativeFaces.Length, tolerance, out var solidHandle);
+                // Build the complete BRep topology natively
+                result = XbimGeometryNativeApi.xbim_advanced_brep_build(builder, out var solidHandle);
 
                 if (result != 0)
                     throw new InvalidOperationException(
@@ -798,111 +990,34 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
             finally
             {
-                foreach (var h in faceHandles)
-                    h.Dispose();
-                foreach (var h in edgeCurveCache.Values)
-                    h.Dispose();
+                builder.Dispose();
                 foreach (var h in curveCache.Values)
                     h.Dispose();
             }
         }
 
         /// <summary>
-        /// Builds a single advanced face from an IIfcAdvancedFace: constructs the underlying
-        /// surface, iterates edge loops to build boundary wires, and assembles the face.
+        /// Builds a curve handle from an IFC curve entity for edge curve registration.
         /// </summary>
-        private NativeShapeHandle? BuildAdvancedFace(
-            IIfcAdvancedFace advancedFace,
-            Dictionary<int, NativeShapeHandle> edgeCurveCache,
-            Dictionary<int, NativeCurveHandle> curveCache,
-            double tolerance)
+        private NativeCurveHandle? BuildCurveForEdge(IIfcCurve ifcCurve, Dictionary<int, NativeCurveHandle> curveCache)
         {
-            NativeSurfaceHandle? surfaceHandle = null;
-            NativeShapeHandle? outerWireHandle = null;
-            var innerWireHandles = new List<NativeShapeHandle>();
+            int curveLabel = ifcCurve.EntityLabel;
+            if (curveCache.TryGetValue(curveLabel, out var cached))
+                return NativeCurveHandle.Borrowed(cached);
 
             try
             {
-                // Build the face surface
-                var faceSurface = advancedFace.FaceSurface;
-                surfaceHandle = BuildSurfaceForAdvancedFace(faceSurface);
-                if (surfaceHandle == null || surfaceHandle.IsInvalid)
-                {
-                    _logger.LogWarning("Failed to build surface for AdvancedFace #{Label}, skipping.",
-                        advancedFace.EntityLabel);
-                    return null;
-                }
-
-                // Build boundary wires from edge loops
-                int numberOfBounds = advancedFace.Bounds.Count;
-                foreach (var bound in advancedFace.Bounds)
-                {
-                    if (bound.Bound is not IIfcEdgeLoop edgeLoop)
-                    {
-                        _logger.LogWarning(
-                            "AdvancedFace #{FaceLabel} bound #{BoundLabel} is not an IIfcEdgeLoop, skipping.",
-                            advancedFace.EntityLabel, bound.EntityLabel);
-                        continue;
-                    }
-
-                    var wireHandle = BuildWireFromEdgeLoop(edgeLoop, bound.Orientation,
-                        edgeCurveCache, curveCache, tolerance);
-                    if (wireHandle == null || wireHandle.IsInvalid)
-                        continue;
-
-                    bool isOuter = numberOfBounds == 1 || bound is IIfcFaceOuterBound;
-                    if (isOuter && outerWireHandle == null)
-                    {
-                        outerWireHandle = wireHandle;
-                    }
-                    else
-                    {
-                        innerWireHandles.Add(wireHandle);
-                    }
-                }
-
-                // If no explicit outer bound, use the first wire
-                if (outerWireHandle == null && innerWireHandles.Count > 0)
-                {
-                    outerWireHandle = innerWireHandles[0];
-                    innerWireHandles.RemoveAt(0);
-                }
-
-                if (outerWireHandle == null)
-                {
-                    _logger.LogWarning("No valid boundary wires for AdvancedFace #{Label}.",
-                        advancedFace.EntityLabel);
-                    return null;
-                }
-
-                // Build the face using the surface-handle variant
-                using var nativeInnerWires = new NativeHandleArray(innerWireHandles.ToArray());
-
-                int result = XbimGeometryNativeApi.xbim_face_build_advanced_with_surface(
-                    ContextHandle,
-                    surfaceHandle,
-                    outerWireHandle,
-                    nativeInnerWires.Ptrs,
-                    nativeInnerWires.Length,
-                    tolerance,
-                    advancedFace.SameSense ? 1 : 0,
-                    out var faceHandle);
-
-                if (result != 0)
-                {
-                    _logger.LogWarning("Failed to build AdvancedFace #{Label}: {Error}",
-                        advancedFace.EntityLabel, XbimGeometryNativeApi.GetLastError());
-                    return null;
-                }
-
-                return faceHandle;
+                var curveFactory = (CurveFactory)_modelService.CurveFactory;
+                var curve = (Curve)curveFactory.Build(ifcCurve);
+                var curveHandle = curve.DetachHandle();
+                curveCache[curveLabel] = curveHandle;
+                return curveHandle;
             }
-            finally
+            catch (Exception ex)
             {
-                surfaceHandle?.Dispose();
-                outerWireHandle?.Dispose();
-                foreach (var h in innerWireHandles)
-                    h.Dispose();
+                _logger.LogWarning("Cannot build curve #{Label} ({Type}): {Error}",
+                    ifcCurve.EntityLabel, ifcCurve.ExpressType.ExpressName, ex.Message);
+                return null;
             }
         }
 
@@ -915,172 +1030,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             {
                 var surfaceFactory = (SurfaceFactory)_modelService.SurfaceFactory;
                 var surface = (Surface)surfaceFactory.Build(ifcSurface);
-                // Transfer ownership — detach from the managed Surface wrapper
                 return surface.DetachHandle();
             }
             catch (Exception ex)
             {
                 _logger.LogWarning("Cannot build surface #{Label} ({Type}): {Error}",
                     ifcSurface.EntityLabel, ifcSurface.ExpressType.ExpressName, ex.Message);
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Builds a wire from an IIfcEdgeLoop by constructing each oriented edge curve
-        /// and assembling them into a wire.
-        /// </summary>
-        private NativeShapeHandle? BuildWireFromEdgeLoop(
-            IIfcEdgeLoop edgeLoop,
-            bool boundOrientation,
-            Dictionary<int, NativeShapeHandle> edgeCurveCache,
-            Dictionary<int, NativeCurveHandle> curveCache,
-            double tolerance)
-        {
-            var edgeHandles = new List<NativeShapeHandle>();
-            var ownedReversedHandles = new List<NativeShapeHandle>();
-
-            try
-            {
-                foreach (var orientedEdge in edgeLoop.EdgeList)
-                {
-                    var edgeCurve = orientedEdge.EdgeElement as IIfcEdgeCurve;
-                    if (edgeCurve == null)
-                    {
-                        _logger.LogWarning("Edge #{Label} is not an IIfcEdgeCurve, skipping.",
-                            orientedEdge.EdgeElement.EntityLabel);
-                        continue;
-                    }
-
-                    // Build or reuse the edge curve
-                    NativeShapeHandle edgeHandle;
-                    int edgeLabel = edgeCurve.EntityLabel;
-
-                    if (edgeCurveCache.TryGetValue(edgeLabel, out var cachedEdge))
-                    {
-                        edgeHandle = cachedEdge;
-                    }
-                    else
-                    {
-                        edgeHandle = BuildEdgeCurve(edgeCurve, curveCache, tolerance);
-                        if (edgeHandle == null || edgeHandle.IsInvalid)
-                            continue;
-                        edgeCurveCache[edgeLabel] = edgeHandle;
-                    }
-
-                    // Apply oriented edge orientation: if false, the edge must be
-                    // traversed in reverse direction to form the correct wire loop
-                    if (!orientedEdge.Orientation)
-                    {
-                        int revResult = XbimGeometryNativeApi.xbim_shape_reversed(
-                            edgeHandle, out var reversedHandle);
-                        if (revResult != 0 || reversedHandle == null || reversedHandle.IsInvalid)
-                        {
-                            _logger.LogWarning("Failed to reverse edge #{Label}.", edgeLabel);
-                            continue;
-                        }
-                        ownedReversedHandles.Add(reversedHandle);
-                        edgeHandle = reversedHandle;
-                    }
-
-                    edgeHandles.Add(edgeHandle);
-                }
-
-                if (edgeHandles.Count == 0)
-                    return null;
-
-                using var nativeEdges = new NativeHandleArray(edgeHandles.ToArray());
-
-                int result = XbimGeometryNativeApi.xbim_wire_build_from_edges(
-                    ContextHandle, nativeEdges.Ptrs, nativeEdges.Length, out var wireHandle);
-
-                if (result != 0)
-                {
-                    _logger.LogWarning("Failed to build wire from edge loop #{Label}: {Error}",
-                        edgeLoop.EntityLabel, XbimGeometryNativeApi.GetLastError());
-                    return null;
-                }
-
-                return wireHandle;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("Error building wire from edge loop #{Label}: {Error}",
-                    edgeLoop.EntityLabel, ex.Message);
-                return null;
-            }
-            finally
-            {
-                foreach (var h in ownedReversedHandles)
-                    h.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Builds an edge from an IIfcEdgeCurve using the underlying 3D curve geometry
-        /// and the start/end vertex positions.
-        /// </summary>
-        private NativeShapeHandle? BuildEdgeCurve(
-            IIfcEdgeCurve edgeCurve,
-            Dictionary<int, NativeCurveHandle> curveCache,
-            double tolerance)
-        {
-            try
-            {
-                // Build the 3D curve (with deduplication)
-                var ifcCurve = edgeCurve.EdgeGeometry;
-                int curveLabel = ifcCurve.EntityLabel;
-
-                NativeCurveHandle curveHandle;
-                if (curveCache.TryGetValue(curveLabel, out var cached))
-                {
-                    curveHandle = cached;
-                }
-                else
-                {
-                    var curveFactory = (CurveFactory)_modelService.CurveFactory;
-                    var curve = (Curve)curveFactory.Build(ifcCurve);
-                    curveHandle = curve.DetachHandle();
-                    curveCache[curveLabel] = curveHandle;
-                }
-
-                // Extract start and end vertex positions
-                var startVertex = edgeCurve.EdgeStart as IIfcVertexPoint;
-                var endVertex = edgeCurve.EdgeEnd as IIfcVertexPoint;
-
-                if (startVertex?.VertexGeometry is not IIfcCartesianPoint startPt ||
-                    endVertex?.VertexGeometry is not IIfcCartesianPoint endPt)
-                {
-                    _logger.LogWarning("EdgeCurve #{Label} has non-point vertices, skipping.",
-                        edgeCurve.EntityLabel);
-                    return null;
-                }
-
-                double sx = startPt.X, sy = startPt.Y, sz = startPt.Z;
-                double ex = endPt.X, ey = endPt.Y, ez = endPt.Z;
-
-                int result = XbimGeometryNativeApi.xbim_edge_build_from_curve_handle(
-                    ContextHandle,
-                    curveHandle,
-                    sx, sy, sz,
-                    ex, ey, ez,
-                    edgeCurve.SameSense ? 1 : 0,
-                    tolerance,
-                    out var edgeHandle);
-
-                if (result != 0)
-                {
-                    _logger.LogWarning("Failed to build edge curve #{Label}: {Error}",
-                        edgeCurve.EntityLabel, XbimGeometryNativeApi.GetLastError());
-                    return null;
-                }
-
-                return edgeHandle;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("Error building edge curve #{Label}: {Error}",
-                    edgeCurve.EntityLabel, ex.Message);
                 return null;
             }
         }

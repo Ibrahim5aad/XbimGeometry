@@ -86,13 +86,13 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     break;
                 default:
                     firstHandle.Dispose();
-                    secondHandle.Dispose();
+                    secondHandle?.Dispose();
                     throw new NotSupportedException(
                         $"Boolean operator {boolResult.Operator} is not supported.");
             }
 
             firstHandle.Dispose();
-            secondHandle.Dispose();
+            secondHandle?.Dispose();
 
             if (hasWarnings != 0)
                 _logger.LogDebug("Boolean {Operator} #{Label} issued warnings.",
@@ -144,8 +144,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             if (shape is Shape Shape)
             {
-                // Transfer ownership: we take the handle out and the Shape wrapper
-                // should not dispose it. We use the handle directly.
                 return Shape.DetachHandle();
             }
 

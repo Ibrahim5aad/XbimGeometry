@@ -39,6 +39,7 @@ typedef struct XbimLocation_*       XbimLocationHandle;
 typedef struct XbimCurve_*          XbimCurveHandle;
 typedef struct XbimCurve2d_*        XbimCurve2dHandle;
 typedef struct XbimSurface_*        XbimSurfaceHandle;
+typedef struct XbimAdvancedBrepBuilder_* XbimAdvancedBrepBuilderHandle;
 
 #pragma endregion
 
@@ -758,6 +759,34 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_sectioned_spine(
     int                      numSections,
     double                   precision,
     XbimShapeHandle*         outHandle);
+
+/*
+ * Build a surface-curve swept area solid.
+ * Sweeps a planar profile face along a directrix wire that lies on an
+ * arbitrary reference surface. The profile is repositioned to the start
+ * of the directrix using the surface normal, then swept with
+ * BRepOffsetAPI_MakePipeShell in surface-reference mode.
+ *
+ *   ctx                       – a valid context handle (used for logging; may be NULL)
+ *   faceHandle                – swept area profile (must be a planar TopoDS_Face)
+ *   directrixHandle           – directrix wire (TopoDS_Wire)
+ *   surfaceHandle             – reference surface (Geom_Surface, may be non-planar)
+ *   isPlanarReferenceSurface  – non-zero if the reference surface is a plane
+ *   precision                 – model precision tolerance (> 0)
+ *   locationHandle            – optional location transform (may be NULL for identity)
+ *   outHandle                 – receives the new solid shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_surface_curve_swept(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     faceHandle,
+    XbimShapeHandle     directrixHandle,
+    XbimSurfaceHandle   surfaceHandle,
+    int                 isPlanarReferenceSurface,
+    double              precision,
+    XbimLocationHandle  locationHandle,
+    XbimShapeHandle*    outHandle);
 
 #pragma endregion
 
@@ -2766,13 +2795,15 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_offset_3d(
 #pragma region Surface Operations
 
 /*
- * Build an infinite plane surface from an origin point and normal direction.
+ * Build an infinite plane surface from an origin point, normal direction,
+ * and optional reference direction (X-axis).
  *
  *   ctx            – a valid context handle (used for logging; may be NULL)
  *   originX/Y/Z    – a point on the plane
  *   normalX/Y/Z    – plane normal direction (must be non-zero)
+ *   refDirX/Y/Z    – reference direction (X-axis); if zero-length, OCCT auto-computes
  *   outHandle      – receives the new surface handle
- *   outRefDirX/Y/Z – receives the OCCT-computed reference direction (X-axis)
+ *   outRefDirX/Y/Z – receives the actual reference direction (X-axis) used
  *
  * Returns XBIM_OK on success.
  */
@@ -2780,6 +2811,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_plane(
     XbimContextHandle ctx,
     double originX, double originY, double originZ,
     double normalX, double normalY, double normalZ,
+    double refDirX,  double refDirY,  double refDirZ,
     XbimSurfaceHandle* outHandle,
     double* outRefDirX, double* outRefDirY, double* outRefDirZ);
 
@@ -2889,6 +2921,47 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_sectioned(
     int                        numPointsPerSection,
     const XbimLocationHandle*  locations,
     XbimShapeHandle*           outHandle);
+
+/*
+ * Build a surface of revolution by revolving a generatrix curve around an axis.
+ *
+ *   ctx          – a valid context handle (used for logging; may be NULL)
+ *   curveHandle  – the generatrix curve to revolve
+ *   axisOrigin   – point on the revolution axis (X, Y, Z)
+ *   axisDir      – direction of the revolution axis (X, Y, Z)
+ *   outHandle    – receives the new surface handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_revolution(
+    XbimContextHandle  ctx,
+    XbimCurveHandle    curveHandle,
+    double axisOriginX, double axisOriginY, double axisOriginZ,
+    double axisDirX,    double axisDirY,    double axisDirZ,
+    XbimSurfaceHandle* outHandle);
+
+/*
+ * Build a surface of linear extrusion by sweeping a curve along a direction.
+ *
+ *   ctx          – a valid context handle (used for logging; may be NULL)
+ *   curveHandle  – the generatrix curve to sweep
+ *   dir          – extrusion direction (X, Y, Z); will be normalised
+ *   posO/posZ/posX – IIfcSweptSurface.Position (origin, Z-axis, X-axis)
+ *   hasPosition  – nonzero if the position parameters are valid and should
+ *                  be applied as a transform on the resulting surface
+ *   outHandle    – receives the new surface handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_linear_extrusion(
+    XbimContextHandle  ctx,
+    XbimCurveHandle    curveHandle,
+    double dirX,    double dirY,    double dirZ,
+    double posOX,   double posOY,   double posOZ,
+    double posZX,   double posZY,   double posZZ,
+    double posXX,   double posXY,   double posXZ,
+    int    hasPosition,
+    XbimSurfaceHandle* outHandle);
 
 /*
  * Destroy a surface handle and free its resources.
@@ -3729,6 +3802,97 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_2d_curves(
     double              tolerance,
     double              gapSize,
     XbimShapeHandle*    outWire);
+
+#pragma endregion
+
+#pragma region Advanced BRep Builder
+
+/*
+ * Create an advanced BRep builder that accumulates IFC face data and builds
+ * the full shell topology natively with proper vertex/edge sharing.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_create(
+    XbimContextHandle ctx,
+    double tolerance,
+    XbimAdvancedBrepBuilderHandle* outBuilder);
+
+/*
+ * Destroy an advanced BRep builder, releasing all internal state.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_destroy(
+    XbimAdvancedBrepBuilderHandle builder);
+
+/*
+ * Pre-register a vertex by IFC entity label and coordinates.
+ * Vertices with the same label are shared across edges.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_add_vertex(
+    XbimAdvancedBrepBuilderHandle builder,
+    int vertexLabel,
+    double x, double y, double z);
+
+/*
+ * Register an edge curve geometry by IFC entity label.
+ * The curve is used when building edges during the build phase.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_add_edge_curve(
+    XbimAdvancedBrepBuilderHandle builder,
+    int edgeLabel,
+    XbimCurveHandle curveHandle);
+
+/*
+ * Begin a new face with the given surface and sameSense flag.
+ * Must be followed by bound/edge calls and ended with end_face.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_begin_face(
+    XbimAdvancedBrepBuilderHandle builder,
+    XbimSurfaceHandle surfaceHandle,
+    int sameSense);
+
+/*
+ * Begin a new bound (wire loop) within the current face.
+ * isOuter: nonzero if this is the outer bound.
+ * orientation: nonzero if the bound has positive orientation.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_begin_bound(
+    XbimAdvancedBrepBuilderHandle builder,
+    int isOuter,
+    int orientation);
+
+/*
+ * Add an oriented edge to the current bound.
+ * edgeLabel matches a previously registered edge curve.
+ * startVertexLabel/endVertexLabel match registered vertices.
+ * sameSense: nonzero if the edge traversal matches its curve direction.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_add_bound_edge(
+    XbimAdvancedBrepBuilderHandle builder,
+    int edgeLabel,
+    int startVertexLabel,
+    int endVertexLabel,
+    int sameSense);
+
+/*
+ * End the current bound (wire loop).
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_end_bound(
+    XbimAdvancedBrepBuilderHandle builder);
+
+/*
+ * End the current face.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_end_face(
+    XbimAdvancedBrepBuilderHandle builder);
+
+/*
+ * Build the advanced BRep shell from all accumulated data and return
+ * it as a solid shape. Performs vertex/edge deduplication, wire
+ * construction, face building, shell assembly and shell-to-solid
+ * conversion with orientation checking.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_build(
+    XbimAdvancedBrepBuilderHandle builder,
+    XbimShapeHandle* outHandle);
 
 #pragma endregion
 

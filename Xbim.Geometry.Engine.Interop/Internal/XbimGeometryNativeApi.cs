@@ -318,6 +318,17 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double precision,
             out NativeShapeHandle outHandle);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_solid_build_surface_curve_swept(
+            NativeContextHandle ctx,
+            NativeShapeHandle faceHandle,
+            NativeShapeHandle directrixHandle,
+            NativeSurfaceHandle surfaceHandle,
+            int isPlanarReferenceSurface,
+            double precision,
+            NativeLocationHandle locationHandle,
+            out NativeShapeHandle outHandle);
+
         #endregion
 
         #region Profiles
@@ -1243,6 +1254,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeContextHandle ctx,
             double originX, double originY, double originZ,
             double normalX, double normalY, double normalZ,
+            double refDirX, double refDirY, double refDirZ,
             out NativeSurfaceHandle outHandle,
             out double outRefDirX, out double outRefDirY, out double outRefDirZ);
 
@@ -1289,6 +1301,25 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             int numPointsPerSection,
             [In] IntPtr[] locations,
             out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_surface_build_revolution(
+            NativeContextHandle ctx,
+            NativeCurveHandle curveHandle,
+            double axisOriginX, double axisOriginY, double axisOriginZ,
+            double axisDirX, double axisDirY, double axisDirZ,
+            out NativeSurfaceHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_surface_build_linear_extrusion(
+            NativeContextHandle ctx,
+            NativeCurveHandle curveHandle,
+            double dirX, double dirY, double dirZ,
+            double posOX, double posOY, double posOZ,
+            double posZX, double posZY, double posZZ,
+            double posXX, double posXY, double posXZ,
+            int hasPosition,
+            out NativeSurfaceHandle outHandle);
 
         #endregion
 
@@ -1590,6 +1621,61 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double tolerance,
             double gapSize,
             out NativeShapeHandle outWire);
+
+        #endregion
+
+        #region Advanced BRep Builder
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_advanced_brep_create(
+            NativeContextHandle ctx,
+            double tolerance,
+            out NativeAdvancedBrepBuilderHandle outBuilder);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_advanced_brep_add_vertex(
+            NativeAdvancedBrepBuilderHandle builder,
+            int vertexLabel,
+            double x, double y, double z);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_advanced_brep_add_edge_curve(
+            NativeAdvancedBrepBuilderHandle builder,
+            int edgeLabel,
+            NativeCurveHandle curveHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_advanced_brep_begin_face(
+            NativeAdvancedBrepBuilderHandle builder,
+            NativeSurfaceHandle surfaceHandle,
+            int sameSense);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_advanced_brep_begin_bound(
+            NativeAdvancedBrepBuilderHandle builder,
+            int isOuter,
+            int orientation);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_advanced_brep_add_bound_edge(
+            NativeAdvancedBrepBuilderHandle builder,
+            int edgeLabel,
+            int startVertexLabel,
+            int endVertexLabel,
+            int sameSense);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_advanced_brep_end_bound(
+            NativeAdvancedBrepBuilderHandle builder);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_advanced_brep_end_face(
+            NativeAdvancedBrepBuilderHandle builder);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_advanced_brep_build(
+            NativeAdvancedBrepBuilderHandle builder,
+            out NativeShapeHandle outHandle);
 
         #endregion
     }

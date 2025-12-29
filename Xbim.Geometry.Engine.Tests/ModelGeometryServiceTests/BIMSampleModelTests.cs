@@ -111,7 +111,6 @@ namespace Xbim.Geometry.Engine.Tests
             var ifc = _modelSvc.Model.Instances[158] as IIfcSurfaceCurveSweptAreaSolid;
             var occ = _modelSvc.SolidFactory.Build(ifc) as IXSolid;
             occ.Should().NotBeNull();
-            var brep = occ.BrepString();
             occ.Shells.Count().Should().Be(1);
             occ.Shells[0].Faces.Count().Should().Be(26);
             occ.Volume.Should().BeApproximately(870231920, 1);

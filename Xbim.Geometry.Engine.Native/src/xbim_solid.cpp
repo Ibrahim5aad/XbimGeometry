@@ -23,6 +23,7 @@
 
 #include "xbim_solid.h"
 #include "xbim_shape.h"
+#include "xbim_surface.h"
 #include "xbim_location.h"
 #include "xbim_context.h"
 #include "xbim_error.h"
@@ -1404,6 +1405,201 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_fixed_reference_swept(
         xbim_log_occt_failure(ctx, e, "xbim_solid_build_fixed_reference_swept");
         const char* msg = e.GetMessageString();
         xbim_set_error(msg ? msg : "xbim_solid_build_fixed_reference_swept: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── Surface-curve swept area solid (BRepOffsetAPI_MakePipeShell with arbitrary ref surface) */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_surface_curve_swept(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     faceHandle,
+    XbimShapeHandle     directrixHandle,
+    XbimSurfaceHandle   surfaceHandle,
+    int                 isPlanarReferenceSurface,
+    double              precision,
+    XbimLocationHandle  locationHandle,
+    XbimShapeHandle*    outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_solid_build_surface_curve_swept: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!faceHandle)
+    {
+        xbim_set_error("xbim_solid_build_surface_curve_swept: faceHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    if (!directrixHandle)
+    {
+        xbim_set_error("xbim_solid_build_surface_curve_swept: directrixHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    if (!surfaceHandle)
+    {
+        xbim_set_error("xbim_solid_build_surface_curve_swept: surfaceHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        const TopoDS_Shape& faceShape = faceHandle->shape;
+        const TopoDS_Shape& directrixShape = directrixHandle->shape;
+        const Handle(Geom_Surface)& refSurface = surfaceHandle->surface;
+
+        if (faceShape.IsNull() || faceShape.ShapeType() != TopAbs_FACE)
+        {
+            xbim_set_error("xbim_solid_build_surface_curve_swept: faceHandle must be a valid face");
+            return XBIM_INVALID_ARG;
+        }
+
+        if (directrixShape.IsNull() || directrixShape.ShapeType() != TopAbs_WIRE)
+        {
+            xbim_set_error("xbim_solid_build_surface_curve_swept: directrixHandle must be a valid wire");
+            return XBIM_INVALID_ARG;
+        }
+
+        if (refSurface.IsNull())
+        {
+            xbim_set_error("xbim_solid_build_surface_curve_swept: surfaceHandle contains a null surface");
+            return XBIM_INVALID_ARG;
+        }
+
+        TopoDS_Face sweptArea = TopoDS::Face(faceShape);
+        TopoDS_Wire directrixWire = TopoDS::Wire(directrixShape);
+        double prec = (precision > 0.0) ? precision : ctx->precision;
+
+        /* Analyse directrix wire continuity */
+        BRepAdaptor_CompCurve cc(directrixWire, Standard_True);
+        BRepBuilderAPI_TransitionMode transitionMode =
+            (cc.Continuity() == GeomAbs_C0) ? BRepBuilderAPI_RightCorner : BRepBuilderAPI_Transformed;
+
+        /* Place the directrix on the reference surface */
+        BRepBuilderAPI_MakeFace faceMaker(refSurface, directrixWire);
+        if (!faceMaker.IsDone())
+        {
+            xbim_set_error("xbim_solid_build_surface_curve_swept: directrix could not be projected onto reference surface");
+            return XBIM_ERROR;
+        }
+
+        /* The swept area must be planar */
+        Handle(Geom_Plane) sweptAreaPlane = Handle(Geom_Plane)::DownCast(BRep_Tool::Surface(sweptArea));
+        if (sweptAreaPlane.IsNull())
+        {
+            xbim_set_error("xbim_solid_build_surface_curve_swept: swept area must be a planar face");
+            return XBIM_INVALID_ARG;
+        }
+
+        gp_Dir sweptAreaZDir = sweptAreaPlane->Axis().Direction();
+        gp_Vec sweptAreaXDir = sweptAreaPlane->Position().XDirection();
+
+        /* Get directrix start point and tangent */
+        gp_Pnt directrixWireStart;
+        gp_Vec tangentAtDirectrixStart;
+        cc.D1(cc.FirstParameter(), directrixWireStart, tangentAtDirectrixStart);
+
+        /* Compute reference surface normal at the directrix start */
+        ShapeAnalysis_Surface surfaceAnalyser(refSurface);
+        gp_Pnt2d uv = surfaceAnalyser.ValueOfUV(directrixWireStart, prec);
+        GeomLProp_SLProps props(refSurface, uv.X(), uv.Y(), 1, prec);
+
+        if (!props.IsNormalDefined())
+        {
+            xbim_set_error("xbim_solid_build_surface_curve_swept: could not compute reference surface normal at directrix start");
+            return XBIM_ERROR;
+        }
+
+        gp_Vec normalAtDirectrixStart = props.Normal();
+        tangentAtDirectrixStart.Normalize();
+        normalAtDirectrixStart.Normalize();
+
+        /* Transform the swept area to the directrix start position */
+        gp_Ax3 toAx3(directrixWireStart, tangentAtDirectrixStart, normalAtDirectrixStart);
+        gp_Ax3 fromAx3(gp::Origin(), sweptAreaZDir, sweptAreaXDir);
+        gp_Trsf sweptAreaTransform;
+        sweptAreaTransform.SetTransformation(toAx3, fromAx3);
+
+        TopoDS_Face sweptAreaRepositioned = TopoDS::Face(BRepBuilderAPI_Transform(sweptArea, sweptAreaTransform));
+        TopoDS_Wire sweptAreaBound = ShapeAnalysis::OuterWire(sweptAreaRepositioned);
+
+        /* If reference surface is non-planar, add parameter curves to edges */
+        TopoDS_Face referenceFace = faceMaker.Face();
+        if (!isPlanarReferenceSurface)
+        {
+            ShapeFix_Edge sfe;
+            for (TopExp_Explorer exp(directrixWire, TopAbs_EDGE); exp.More(); exp.Next())
+                sfe.FixAddPCurve(TopoDS::Edge(exp.Current()), referenceFace, false, prec);
+        }
+
+        /* Build pipe shell sweep */
+        BRepOffsetAPI_MakePipeShell pipeMaker(directrixWire);
+        pipeMaker.SetTransitionMode(transitionMode);
+        pipeMaker.SetMode(referenceFace);
+
+        TopoDS_Edge firstEdge;
+        double uOnEdge;
+        cc.Edge(cc.FirstParameter(), firstEdge, uOnEdge);
+        pipeMaker.Add(sweptAreaBound, TopExp::FirstVertex(firstEdge), Standard_False, Standard_False);
+
+        pipeMaker.Build();
+        if (!pipeMaker.IsDone())
+        {
+            const char* detail = "unknown error";
+            if (pipeMaker.ErrorOnSurface())
+                detail = "error on surface";
+            else
+            {
+                BRepBuilderAPI_PipeError status = pipeMaker.GetStatus();
+                switch (status)
+                {
+                case BRepBuilderAPI_PipeNotDone:
+                    detail = "pipe not done"; break;
+                case BRepBuilderAPI_PlaneNotIntersectGuide:
+                    detail = "plane not intersect guide"; break;
+                case BRepBuilderAPI_ImpossibleContact:
+                    detail = "impossible contact"; break;
+                default:
+                    break;
+                }
+            }
+            xbim_set_error("xbim_solid_build_surface_curve_swept: could not build swept pipe");
+            xbim_log_error(ctx, "SurfaceCurveSweptAreaSolid pipe failed: %s", detail);
+            return XBIM_ERROR;
+        }
+
+        if (!pipeMaker.MakeSolid())
+        {
+            xbim_set_error("xbim_solid_build_surface_curve_swept: could not make swept pipe a solid");
+            return XBIM_ERROR;
+        }
+
+        TopoDS_Solid solid = TopoDS::Solid(pipeMaker.Shape());
+
+        /* Apply optional location transform */
+        if (locationHandle && !locationHandle->location.IsIdentity())
+            solid.Move(locationHandle->location);
+
+        *outHandle = xbim_shape_create_from(solid);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_solid_build_surface_curve_swept: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_solid_build_surface_curve_swept");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_solid_build_surface_curve_swept: OCCT exception");
         return XBIM_ERROR;
     }
 }

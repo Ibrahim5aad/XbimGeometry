@@ -58,14 +58,6 @@ public class GeometryConverterFactoryTests : IDisposable
     }
 
     [Fact]
-    public void CreateGeometryEngineV5_ThrowsPlatformNotSupported()
-    {
-        var act = () => _factory.CreateGeometryEngineV5(_model, _loggerFactory);
-
-        act.Should().Throw<PlatformNotSupportedException>();
-    }
-
-    [Fact]
     public void CreateGeometryEngine_V6_ReturnsV6Engine()
     {
         var engine = _factory.CreateGeometryEngine(XGeometryEngineVersion.V6, _model, _loggerFactory);
@@ -85,26 +77,6 @@ public class GeometryConverterFactoryTests : IDisposable
         engine.Should().BeOfType<GeometryEngine>();
     }
 
-    [Fact]
-    public void CreateGeometryEngine_InvalidVersion_ThrowsArgumentOutOfRange()
-    {
-        var act = () => _factory.CreateGeometryEngine((XGeometryEngineVersion)99, _model, _loggerFactory);
-
-        act.Should().Throw<ArgumentOutOfRangeException>();
-    }
-
-    [Fact]
-    public void GetUnderlyingModelGeometryService_ExtractsServiceFromV6Engine()
-    {
-        var engine = _factory.CreateGeometryEngineV6(_model, _loggerFactory);
-        _disposables.Add((IDisposable)engine);
-
-        var service = _factory.GetUnderlyingModelGeometryService(engine);
-
-        service.Should().NotBeNull();
-        service.Should().BeOfType<ModelGeometryService>();
-        service.Should().BeSameAs(engine.ModelGeometryService);
-    }
 
     [Fact]
     public void V6Engine_DelegatesFactoryProperties_ToUnderlyingService()

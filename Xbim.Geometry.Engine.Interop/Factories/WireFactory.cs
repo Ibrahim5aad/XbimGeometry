@@ -608,17 +608,16 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             double start = startParam ?? double.NaN;
             double end = endParam ?? double.NaN;
 
-            // Workaround: some authoring tools set polyline trim to (0, 1) meaning "entire line"
+            // Workaround: some authoring tools set polyline trim to (0, 1) meaning "entire line".
+            // IFC polyline parameterization is arc-length based, so endParam=1 would trim to
+            // just 1 model unit — always an authoring error for any real directrix.
             if (ifcCurve is IIfcPolyline &&
                 !double.IsNaN(start) && Math.Abs(start) < _modelService.Precision &&
                 !double.IsNaN(end) && Math.Abs(end - 1.0) < _modelService.Precision)
             {
-                var modelFactors = _modelService.Model.ModelFactors as XbimModelFactors;
-                if (modelFactors != null && modelFactors.ApplyWorkAround("#PolylineTrimLengthOneForEntireLine"))
-                {
-                    _logger.LogDebug("Polyline trim (0:1) does not comply with schema, expanding to entire length");
-                    end = double.NaN;
-                }
+                _logger.LogDebug("Polyline trim (0:1) does not comply with schema, expanding to entire length");
+                start = double.NaN;
+                end = double.NaN;
             }
 
             // Composite and indexed poly curves need IFC-to-arclength parameterization mapping

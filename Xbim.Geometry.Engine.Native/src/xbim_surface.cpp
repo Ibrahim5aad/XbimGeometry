@@ -11,6 +11,7 @@
  */
 
 #include "xbim_surface.h"
+#include "xbim_curve.h"
 #include "xbim_context.h"
 #include "xbim_error.h"
 #include "xbim_logging.h"
@@ -26,6 +27,8 @@
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_SphericalSurface.hxx>
 #include <Geom_BSplineSurface.hxx>
+#include <Geom_SurfaceOfLinearExtrusion.hxx>
+#include <Geom_SurfaceOfRevolution.hxx>
 #include <TColgp_Array2OfPnt.hxx>
 #include <TColStd_Array1OfReal.hxx>
 #include <TColStd_Array1OfInteger.hxx>
@@ -74,6 +77,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_plane(
     XbimContextHandle ctx,
     double originX, double originY, double originZ,
     double normalX, double normalY, double normalZ,
+    double refDirX,  double refDirY,  double refDirZ,
     XbimSurfaceHandle* outHandle,
     double* outRefDirX, double* outRefDirY, double* outRefDirZ)
 {
@@ -91,7 +95,19 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_plane(
         gp_Pnt origin(originX, originY, originZ);
         gp_Dir normal(normalX, normalY, normalZ);
 
-        Handle(Geom_Plane) plane = new Geom_Plane(origin, normal);
+        /* Use reference direction if provided, otherwise let OCCT auto-compute */
+        double refMag = refDirX * refDirX + refDirY * refDirY + refDirZ * refDirZ;
+        Handle(Geom_Plane) plane;
+        if (refMag > 1e-14)
+        {
+            gp_Dir refDir(refDirX, refDirY, refDirZ);
+            gp_Ax3 ax3(origin, normal, refDir);
+            plane = new Geom_Plane(ax3);
+        }
+        else
+        {
+            plane = new Geom_Plane(origin, normal);
+        }
 
         /* Output the reference direction (X-axis) that OCCT computed */
         if (outRefDirX && outRefDirY && outRefDirZ)
@@ -433,6 +449,132 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_sectioned(
     {
         xbim_log_occt_failure(ctx, e, "xbim_surface_build_sectioned");
         xbim_set_error("xbim_surface_build_sectioned: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_revolution(
+    XbimContextHandle ctx,
+    XbimCurveHandle   curveHandle,
+    double axisOriginX, double axisOriginY, double axisOriginZ,
+    double axisDirX,    double axisDirY,    double axisDirZ,
+    XbimSurfaceHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_surface_build_revolution: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!curveHandle || curveHandle->curve.IsNull())
+    {
+        xbim_set_error("xbim_surface_build_revolution: curveHandle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        gp_Pnt origin(axisOriginX, axisOriginY, axisOriginZ);
+        gp_Dir dir(axisDirX, axisDirY, axisDirZ);
+        gp_Ax1 axis(origin, dir);
+
+        Handle(Geom_SurfaceOfRevolution) revSurface =
+            new Geom_SurfaceOfRevolution(curveHandle->curve, axis);
+
+        if (revSurface.IsNull())
+        {
+            xbim_set_error("xbim_surface_build_revolution: failed to create surface");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_surface_create_from(revSurface);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_surface_build_revolution: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_surface_build_revolution");
+        xbim_set_error("xbim_surface_build_revolution: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_linear_extrusion(
+    XbimContextHandle ctx,
+    XbimCurveHandle   curveHandle,
+    double dirX,    double dirY,    double dirZ,
+    double posOX,   double posOY,   double posOZ,
+    double posZX,   double posZY,   double posZZ,
+    double posXX,   double posXY,   double posXZ,
+    int    hasPosition,
+    XbimSurfaceHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_surface_build_linear_extrusion: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!curveHandle || curveHandle->curve.IsNull())
+    {
+        xbim_set_error("xbim_surface_build_linear_extrusion: curveHandle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        gp_Dir extDir(dirX, dirY, dirZ);
+
+        Handle(Geom_SurfaceOfLinearExtrusion) surface =
+            new Geom_SurfaceOfLinearExtrusion(curveHandle->curve, extDir);
+
+        if (surface.IsNull())
+        {
+            xbim_set_error("xbim_surface_build_linear_extrusion: failed to create surface");
+            return XBIM_ERROR;
+        }
+
+        /* Apply the IIfcSweptSurface.Position transform if present.
+         * SetTransformation(ax3) maps FROM global INTO the local frame;
+         * we invert to get from local to global (place geometry at position). */
+        if (hasPosition)
+        {
+            gp_Ax3 targetFrame(
+                gp_Pnt(posOX, posOY, posOZ),
+                gp_Dir(posZX, posZY, posZZ),
+                gp_Dir(posXX, posXY, posXZ));
+            gp_Trsf trsf;
+            trsf.SetTransformation(targetFrame);
+            trsf.Invert();
+            surface->Transform(trsf);
+        }
+
+        *outHandle = xbim_surface_create_from(surface);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_surface_build_linear_extrusion: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_surface_build_linear_extrusion");
+        xbim_set_error("xbim_surface_build_linear_extrusion: OCCT exception");
         return XBIM_ERROR;
     }
 }
