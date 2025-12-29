@@ -81,9 +81,9 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
                 double py = cy == 0 ? _minY : _maxY;
                 double pz = cz == 0 ? _minZ : _maxZ;
 
-                xs[i] = m.M11 * px + m.M12 * py + m.M13 * pz + m.OffsetX;
-                ys[i] = m.M21 * px + m.M22 * py + m.M23 * pz + m.OffsetY;
-                zs[i] = m.M31 * px + m.M32 * py + m.M33 * pz + m.OffsetZ;
+                xs[i] = m.ScaleX * (m.M11 * px + m.M12 * py + m.M13 * pz) + m.OffsetX;
+                ys[i] = m.ScaleY * (m.M21 * px + m.M22 * py + m.M23 * pz) + m.OffsetY;
+                zs[i] = m.ScaleZ * (m.M31 * px + m.M32 * py + m.M33 * pz) + m.OffsetZ;
                 i++;
             }
 
