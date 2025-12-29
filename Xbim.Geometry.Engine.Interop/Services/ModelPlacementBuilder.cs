@@ -110,13 +110,17 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
                 if (localPlacement != null)
                 {
-                    if (localPlacement.EntityLabel == rootId)
-                    {
-                        stepLocation = new XLocation();
-                    }
-                    else if (localPlacement.RelativePlacement is IIfcAxis2Placement3D axis3D)
+                    if (localPlacement.RelativePlacement is IIfcAxis2Placement3D axis3D)
                     {
                         stepLocation = _geometryFactory.BuildLocationFromAxis3D(axis3D);
+
+                        if (localPlacement.EntityLabel == rootId)
+                        {
+                            // Keep orientation, strip translation
+                            var adjusted = (XLocation)stepLocation.Translated(0, 0, 0);
+                            stepLocation.Dispose();
+                            stepLocation = adjusted;
+                        }
                     }
                     else
                     {
@@ -170,9 +174,13 @@ namespace Xbim.Geometry.Engine.Interop.Services
             if (accumulated == null)
                 return stepLocation;
 
-            var composed = (XLocation)stepLocation.Multiplied(accumulated);
-            accumulated.Dispose();
-            stepLocation.Dispose();
+            var composed = (XLocation)accumulated.Multiplied(stepLocation);
+
+            // Multiplied may return 'this' when the argument is identity; only dispose if distinct.
+            if (!ReferenceEquals(composed, accumulated))
+                accumulated.Dispose();
+            if (!ReferenceEquals(composed, stepLocation))
+                stepLocation.Dispose();
             return composed;
         }
 

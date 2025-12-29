@@ -7,14 +7,14 @@ using Xbim.Geometry.Engine.Interop.Internal;
 namespace Xbim.Geometry.Engine.Interop.Primitives
 {
     /// <summary>
-    /// Pure C# implementation of <see cref="IXLocation"/> backed by a native location handle.
-    /// The matrix components are extracted from the native handle at construction time
-    /// so that property access doesn't require P/Invoke round-trips.
+    /// Wraps a native OCCT location handle and exposes the transform as an IXLocation.
+    /// The matrix components are read from the native handle at construction time;
+    /// all derived operations (compose, invert, translate, scale) delegate to native
+    /// OCCT so the handle and managed fields are always consistent.
     /// </summary>
     internal class XLocation : NativeOwner<NativeLocationHandle>, IXLocation
     {
-        // Rotation/scale matrix (3x3) - row-major layout matching XbimMatrix3D convention.
-        // Row 0 (M11,M12,M13) = X axis, Row 1 (M21,M22,M23) = Y axis, Row 2 (M31,M32,M33) = Z axis.
+        // Rotation/scale matrix (3x3) - IXMatrix convention (rows = local axis directions).
         private readonly double _m11, _m12, _m13;
         private readonly double _m21, _m22, _m23;
         private readonly double _m31, _m32, _m33;
@@ -22,33 +22,27 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         private readonly double _scale;
 
         /// <summary>
-        /// Creates an XLocation from a native location handle.
-        /// Takes ownership of the handle.
+        /// Creates an XLocation from a native location handle, reading the transform
+        /// components from native via P/Invoke. Takes ownership of the handle.
         /// </summary>
         internal XLocation(NativeLocationHandle handle) : base(handle)
         {
-            // Extract the transform components from the native handle.
-            // We need a native API to do this. For now, store the handle
-            // and use identity defaults. The actual matrix extraction will
-            // be done via P/Invoke when the native API provides xbim_location_get_transform.
-            //
-            // Since the location handle is created from axis2 placement or composition,
-            // and we control the inputs, we can reconstruct the matrix from how we built it.
-            // However, for proper extraction we'd need a native getter.
-            //
-            // For this feature, XLocation primarily serves as a handle wrapper that
-            // other factories use to pass to xbim_shape_moved. The matrix properties
-            // are used for serialization/inspection but not critical for the geometry pipeline.
-            _m11 = 1; _m12 = 0; _m13 = 0;
-            _m21 = 0; _m22 = 1; _m23 = 0;
-            _m31 = 0; _m32 = 0; _m33 = 1;
-            _offsetX = 0; _offsetY = 0; _offsetZ = 0;
-            _scale = 1.0;
+            int result = XbimGeometryNativeApi.xbim_location_get_transform(handle,
+                out _m11, out _m12, out _m13,
+                out _m21, out _m22, out _m23,
+                out _m31, out _m32, out _m33,
+                out _offsetX, out _offsetY, out _offsetZ,
+                out _scale);
+
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Failed to read location transform: {XbimGeometryNativeApi.GetLastError()}");
         }
 
         /// <summary>
         /// Creates an XLocation with explicit matrix components.
-        /// Takes ownership of the handle.
+        /// Use this when the matrix is already known from the creation inputs
+        /// (e.g. BuildLocationFromAxis3D) to avoid an extra P/Invoke round-trip.
         /// </summary>
         internal XLocation(
             NativeLocationHandle handle,
@@ -121,7 +115,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
 
         public IXMatrix Multiply(IXMatrix matrix)
         {
-            // 4x4 matrix multiplication (row-major layout matching XLocation.h Values order)
+            // 4x4 matrix multiplication (row-major layout matching legacy XLocation.h Values order)
             return new XMatrix(
                 _m11 * matrix.M11 + _m12 * matrix.M21 + _m13 * matrix.M31,
                 _m11 * matrix.M12 + _m12 * matrix.M22 + _m13 * matrix.M32,
@@ -210,73 +204,49 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             if (other == null)
                 throw new ArgumentException("Location must be an XLocation from the native interop layer.", nameof(location));
 
+            // Native compose: result = other * this (OCCT column-vector convention)
+            // Semantics: "apply this first, then other"
             int result = XbimGeometryNativeApi.xbim_location_compose(other.Handle, Handle, out var composed);
             if (result != 0)
                 throw new InvalidOperationException($"Failed to compose locations: {XbimGeometryNativeApi.GetLastError()}");
 
-            // Compose the matrix components: result = other * this
-            return new XLocation(composed,
-                other._m11 * _m11 + other._m12 * _m21 + other._m13 * _m31,
-                other._m11 * _m12 + other._m12 * _m22 + other._m13 * _m32,
-                other._m11 * _m13 + other._m12 * _m23 + other._m13 * _m33,
-                other._m21 * _m11 + other._m22 * _m21 + other._m23 * _m31,
-                other._m21 * _m12 + other._m22 * _m22 + other._m23 * _m32,
-                other._m21 * _m13 + other._m22 * _m23 + other._m23 * _m33,
-                other._m31 * _m11 + other._m32 * _m21 + other._m33 * _m31,
-                other._m31 * _m12 + other._m32 * _m22 + other._m33 * _m32,
-                other._m31 * _m13 + other._m32 * _m23 + other._m33 * _m33,
-                other._m11 * _offsetX + other._m12 * _offsetY + other._m13 * _offsetZ + other._offsetX,
-                other._m21 * _offsetX + other._m22 * _offsetY + other._m23 * _offsetZ + other._offsetY,
-                other._m31 * _offsetX + other._m32 * _offsetY + other._m33 * _offsetZ + other._offsetZ,
-                other._scale * _scale);
+            // Read the matrix from the composed native handle — single source of truth
+            return new XLocation(composed);
         }
 
         public IXLocation Inverted()
         {
-            // For a rigid transform, inverse rotation = transpose, inverse translation = -R^T * t
-            double im11 = _m11, im12 = _m21, im13 = _m31;
-            double im21 = _m12, im22 = _m22, im23 = _m32;
-            double im31 = _m13, im32 = _m23, im33 = _m33;
-            double iox = -(im11 * _offsetX + im12 * _offsetY + im13 * _offsetZ);
-            double ioy = -(im21 * _offsetX + im22 * _offsetY + im23 * _offsetZ);
-            double ioz = -(im31 * _offsetX + im32 * _offsetY + im33 * _offsetZ);
-            double iScale = Math.Abs(_scale) > 1e-15 ? 1.0 / _scale : 1.0;
-
-            // Create a new native handle from the inverted transform
-            // The simplest approach is to create from axis2 with the inverted basis vectors
-            int result = XbimGeometryNativeApi.xbim_location_create_identity(out var invHandle);
+            int result = XbimGeometryNativeApi.xbim_location_invert(Handle, out var inverted);
             if (result != 0)
-                throw new InvalidOperationException("Failed to create inverted location.");
+                throw new InvalidOperationException(
+                    $"Failed to invert location: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new XLocation(invHandle, im11, im12, im13, im21, im22, im23, im31, im32, im33, iox, ioy, ioz, iScale);
+            return new XLocation(inverted);
         }
 
         public IXLocation ScaledBy(double scaleFactor)
         {
-            int result = XbimGeometryNativeApi.xbim_location_create_identity(out var scaledHandle);
+            int result = XbimGeometryNativeApi.xbim_location_scaled(Handle, scaleFactor, out var scaled);
             if (result != 0)
-                throw new InvalidOperationException("Failed to create scaled location.");
+                throw new InvalidOperationException(
+                    $"Failed to scale location: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new XLocation(scaledHandle, _m11, _m12, _m13, _m21, _m22, _m23, _m31, _m32, _m33,
-                _offsetX, _offsetY, _offsetZ, scaleFactor);
+            return new XLocation(scaled);
         }
 
         public void SetTranslation(double x, double y, double z)
         {
-            // IXLocation defines this as a mutating method, but our struct is readonly.
-            // This is a design inconsistency in the abstractions; for now we follow the interface
-            // but note that the underlying native handle isn't updated.
             throw new NotSupportedException("XLocation is immutable. Use Translated() instead.");
         }
 
         public IXLocation Translated(double x, double y, double z)
         {
-            int result = XbimGeometryNativeApi.xbim_location_create_identity(out var translatedHandle);
+            int result = XbimGeometryNativeApi.xbim_location_translated(Handle, x, y, z, out var translated);
             if (result != 0)
-                throw new InvalidOperationException("Failed to create translated location.");
+                throw new InvalidOperationException(
+                    $"Failed to translate location: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new XLocation(translatedHandle, _m11, _m12, _m13, _m21, _m22, _m23, _m31, _m32, _m33,
-                x, y, z, _scale);
+            return new XLocation(translated);
         }
 
         #endregion

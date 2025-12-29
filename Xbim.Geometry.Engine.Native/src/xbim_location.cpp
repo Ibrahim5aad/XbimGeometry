@@ -169,6 +169,194 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_location_destroy(XbimLocationHandle handle
     return XBIM_OK;
 }
 
+XBIM_EXPORT XbimResult XBIM_CALL xbim_location_get_transform(
+    XbimLocationHandle handle,
+    double* outM11, double* outM12, double* outM13,
+    double* outM21, double* outM22, double* outM23,
+    double* outM31, double* outM32, double* outM33,
+    double* outOffsetX, double* outOffsetY, double* outOffsetZ,
+    double* outScale)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_location_get_transform: handle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        if (handle->location.IsIdentity())
+        {
+            if (outM11) *outM11 = 1; if (outM12) *outM12 = 0; if (outM13) *outM13 = 0;
+            if (outM21) *outM21 = 0; if (outM22) *outM22 = 1; if (outM23) *outM23 = 0;
+            if (outM31) *outM31 = 0; if (outM32) *outM32 = 0; if (outM33) *outM33 = 1;
+            if (outOffsetX) *outOffsetX = 0; if (outOffsetY) *outOffsetY = 0; if (outOffsetZ) *outOffsetZ = 0;
+            if (outScale) *outScale = 1.0;
+        }
+        else
+        {
+            const gp_Trsf& trsf = handle->location.Transformation();
+            // IXMatrix convention: rows = local axis directions (transposed from OCCT)
+            // M_ij = trsf.Value(j, i), i.e. IXMatrix row = OCCT column
+            if (outM11) *outM11 = trsf.Value(1,1); if (outM12) *outM12 = trsf.Value(2,1); if (outM13) *outM13 = trsf.Value(3,1);
+            if (outM21) *outM21 = trsf.Value(1,2); if (outM22) *outM22 = trsf.Value(2,2); if (outM23) *outM23 = trsf.Value(3,2);
+            if (outM31) *outM31 = trsf.Value(1,3); if (outM32) *outM32 = trsf.Value(2,3); if (outM33) *outM33 = trsf.Value(3,3);
+            if (outOffsetX) *outOffsetX = trsf.TranslationPart().X();
+            if (outOffsetY) *outOffsetY = trsf.TranslationPart().Y();
+            if (outOffsetZ) *outOffsetZ = trsf.TranslationPart().Z();
+            if (outScale) *outScale = trsf.ScaleFactor();
+        }
+
+        return XBIM_OK;
+    }
+    catch (Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_location_get_transform: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_location_invert(
+    XbimLocationHandle  handle,
+    XbimLocationHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_location_invert: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+
+    *outHandle = nullptr;
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_location_invert: handle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        if (handle->location.IsIdentity())
+        {
+            *outHandle = xbim_location_create_internal(TopLoc_Location());
+        }
+        else
+        {
+            gp_Trsf inverted = handle->location.Transformation().Inverted();
+            *outHandle = xbim_location_create_internal(TopLoc_Location(inverted));
+        }
+
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_location_invert: allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_location_invert: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_location_translated(
+    XbimLocationHandle  handle,
+    double tx, double ty, double tz,
+    XbimLocationHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_location_translated: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+
+    *outHandle = nullptr;
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_location_translated: handle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        gp_Trsf copy = handle->location.IsIdentity()
+            ? gp_Trsf()
+            : handle->location.Transformation();
+        copy.SetTranslationPart(gp_Vec(tx, ty, tz));
+        *outHandle = xbim_location_create_internal(TopLoc_Location(copy));
+
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_location_translated: allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_location_translated: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_location_scaled(
+    XbimLocationHandle  handle,
+    double scaleFactor,
+    XbimLocationHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_location_scaled: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+
+    *outHandle = nullptr;
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_location_scaled: handle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        gp_Trsf copy = handle->location.IsIdentity()
+            ? gp_Trsf()
+            : handle->location.Transformation();
+        copy.SetScaleFactor(scaleFactor);
+        *outHandle = xbim_location_create_internal(TopLoc_Location(copy));
+
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_location_scaled: allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_location_scaled: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
 XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_get_location(
     XbimShapeHandle     shapeHandle,
     XbimLocationHandle* outHandle,

@@ -977,9 +977,39 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
             else
             {
-                // No explicit segments — params are arc-length offsets directly
-                occStart = startPar;
-                occEnd = endPar;
+                // No explicit segments — polyline through all points in order.
+                // Each sub-segment has parametric length 1 (total = nPoints - 1).
+                // Map from parametric space to arc-length.
+                List<double> allPointsXYZ = ExtractPointCoordinates(ifcIndexed);
+                int numPoints = allPointsXYZ.Count / 3;
+
+                for (int i = 0; i < numPoints - 1; i++)
+                {
+                    if (startPar <= 0 && endPar <= 0)
+                        break;
+
+                    int ip1 = i;
+                    int ip2 = i + 1;
+                    double dx = allPointsXYZ[ip2 * 3] - allPointsXYZ[ip1 * 3];
+                    double dy = allPointsXYZ[ip2 * 3 + 1] - allPointsXYZ[ip1 * 3 + 1];
+                    double dz = allPointsXYZ[ip2 * 3 + 2] - allPointsXYZ[ip1 * 3 + 2];
+                    double segGeoLength = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+                    const double segParamLength = 1.0;
+
+                    if (startPar > 0)
+                    {
+                        double ratio = Math.Min(startPar / segParamLength, 1.0);
+                        startPar -= ratio * segParamLength;
+                        occStart += ratio * segGeoLength;
+                    }
+
+                    if (endPar > 0)
+                    {
+                        double ratio = Math.Min(endPar / segParamLength, 1.0);
+                        endPar -= ratio * segParamLength;
+                        occEnd += ratio * segGeoLength;
+                    }
+                }
             }
 
             // Clamp

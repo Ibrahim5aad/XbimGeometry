@@ -144,6 +144,32 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeLocationHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_location_get_transform(
+            NativeLocationHandle handle,
+            out double outM11, out double outM12, out double outM13,
+            out double outM21, out double outM22, out double outM23,
+            out double outM31, out double outM32, out double outM33,
+            out double outOffsetX, out double outOffsetY, out double outOffsetZ,
+            out double outScale);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_location_invert(
+            NativeLocationHandle handle,
+            out NativeLocationHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_location_translated(
+            NativeLocationHandle handle,
+            double tx, double ty, double tz,
+            out NativeLocationHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_location_scaled(
+            NativeLocationHandle handle,
+            double scaleFactor,
+            out NativeLocationHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_shape_get_location(
             NativeShapeHandle shapeHandle,
             out NativeLocationHandle outHandle,

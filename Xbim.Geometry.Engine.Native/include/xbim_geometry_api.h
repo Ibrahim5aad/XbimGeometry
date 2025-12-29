@@ -348,6 +348,58 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_location_compose(
 XBIM_EXPORT XbimResult XBIM_CALL xbim_location_destroy(XbimLocationHandle handle);
 
 /*
+ * Extract the 3x3 rotation matrix, translation, and scale from a location.
+ * Matrix values follow the IXMatrix convention (rows = local axis directions):
+ *   M11=Value(1,1), M12=Value(2,1), M13=Value(3,1)   // X axis in global
+ *   M21=Value(1,2), M22=Value(2,2), M23=Value(3,2)   // Y axis in global
+ *   M31=Value(1,3), M32=Value(2,3), M33=Value(3,3)   // Z axis in global
+ * All output pointers are optional (NULL = skip).
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if handle is NULL.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_location_get_transform(
+    XbimLocationHandle handle,
+    double* outM11, double* outM12, double* outM13,
+    double* outM21, double* outM22, double* outM23,
+    double* outM31, double* outM32, double* outM33,
+    double* outOffsetX, double* outOffsetY, double* outOffsetZ,
+    double* outScale);
+
+/*
+ * Create the inverse of a location transform.
+ * The original handle is not modified; a new handle is allocated.
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if handle is NULL;
+ * XBIM_INVALID_ARG if outHandle is NULL.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_location_invert(
+    XbimLocationHandle  handle,
+    XbimLocationHandle* outHandle);
+
+/*
+ * Create a copy of a location with a replaced translation component.
+ * The rotation is preserved; only the translation changes.
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if handle is NULL;
+ * XBIM_INVALID_ARG if outHandle is NULL.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_location_translated(
+    XbimLocationHandle  handle,
+    double tx, double ty, double tz,
+    XbimLocationHandle* outHandle);
+
+/*
+ * Create a copy of a location with a replaced scale factor.
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if handle is NULL;
+ * XBIM_INVALID_ARG if outHandle is NULL.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_location_scaled(
+    XbimLocationHandle  handle,
+    double scaleFactor,
+    XbimLocationHandle* outHandle);
+
+/*
  * Extract the location (transform) from a shape.
  * Returns the location handle and the 3x3 rotation matrix, translation
  * vector, and scale factor. Matrix components follow gp_Trsf::Value(row, col)
