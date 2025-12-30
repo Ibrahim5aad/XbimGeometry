@@ -222,48 +222,68 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     $"SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: SweptCurve must be an ArbitraryOpenProfileDef, " +
                     $"got {ifcExtrusion.SweptCurve.ExpressType.ExpressName}.");
 
-            // Build the generatrix curve from the profile's curve property
+            // Try the Revit arc-centre workaround first: early Revit exporters
+            // double-transform the centre of trimmed circular arcs.
+            var model = _modelService.Model;
             var curveFactory = (CurveFactory)_modelService.CurveFactory;
-            using var curve = (Curve)curveFactory.Build(openProfile.Curve);
-
-           
-            // Extract extrusion direction
-            if (!GeometryFactory.BuildDirection3d(ifcExtrusion.ExtrudedDirection,
-                    out double dirX, out double dirY, out double dirZ))
-                throw new InvalidOperationException(
-                    $"SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: extrusion direction is incorrectly defined.");
-
-            // Extract position transform if present
-            int hasPosition = 0;
-            double posOX = 0, posOY = 0, posOZ = 0;
-            double posZX = 0, posZY = 0, posZZ = 1;
-            double posXX = 1, posXY = 0, posXZ = 0;
-
-            if (ifcExtrusion.Position != null)
+            Curve curve;
+            if (ModelWorkArounds.TryFixArcCentreSweptCurve(model, ifcExtrusion,
+                    c => curveFactory.Build(c), out var fixedCurve))
             {
-                GeometryFactory.BuildAxis2Placement3d(ifcExtrusion.Position,
-                    out posOX, out posOY, out posOZ,
-                    out posZX, out posZY, out posZZ,
-                    out posXX, out posXY, out posXZ);
-                hasPosition = 1;
+                curve = (Curve)fixedCurve;
+            }
+            else
+            {
+                curve = (Curve)curveFactory.Build(openProfile.Curve);
             }
 
-            int result = XbimGeometryNativeApi.xbim_surface_build_linear_extrusion(
-                ContextHandle,
-                curve.Handle,
-                dirX, dirY, dirZ,
-                posOX, posOY, posOZ,
-                posZX, posZY, posZZ,
-                posXX, posXY, posXZ,
-                hasPosition,
-                out var nativeSurfaceHandle);
+            using (curve)
+            {
+                // Extract extrusion direction
+                // NOTE: FixRevitSweptSurfaceExtrusionInFeet is intentionally omitted here.
+                // The old code multiplied direction × depth × OneFoot, but
+                // Geom_SurfaceOfLinearExtrusion normalises direction to a unit gp_Dir,
+                // making the magnitude irrelevant for surface construction.
+                if (!GeometryFactory.BuildDirection3d(ifcExtrusion.ExtrudedDirection,
+                        out double dirX, out double dirY, out double dirZ))
+                    throw new InvalidOperationException(
+                        $"SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: extrusion direction is incorrectly defined.");
 
-            if (result != 0)
-                throw new InvalidOperationException(
-                    $"Failed to build SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+                // Determine whether to apply the IFC Position transform.
+                // For Revit ≤ 20.0.0.500 with BSpline swept curves, the control points
+                // already include the placement — applying Position would double-displace.
+                bool skipPosition = ModelWorkArounds.ShouldApplyBsplineWorkaround(model, ifcExtrusion);
 
-            return new Surface(nativeSurfaceHandle, XSurfaceType.IfcSurfaceOfLinearExtrusion);
-            
+                int hasPosition = 0;
+                double posOX = 0, posOY = 0, posOZ = 0;
+                double posZX = 0, posZY = 0, posZZ = 1;
+                double posXX = 1, posXY = 0, posXZ = 0;
+
+                if (!skipPosition && ifcExtrusion.Position != null)
+                {
+                    GeometryFactory.BuildAxis2Placement3d(ifcExtrusion.Position,
+                        out posOX, out posOY, out posOZ,
+                        out posZX, out posZY, out posZZ,
+                        out posXX, out posXY, out posXZ);
+                    hasPosition = 1;
+                }
+
+                int result = XbimGeometryNativeApi.xbim_surface_build_linear_extrusion(
+                    ContextHandle,
+                    curve.Handle,
+                    dirX, dirY, dirZ,
+                    posOX, posOY, posOZ,
+                    posZX, posZY, posZZ,
+                    posXX, posXY, posXZ,
+                    hasPosition,
+                    out var nativeSurfaceHandle);
+
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                return new Surface(nativeSurfaceHandle, XSurfaceType.IfcSurfaceOfLinearExtrusion);
+            }
         }
 
         #endregion

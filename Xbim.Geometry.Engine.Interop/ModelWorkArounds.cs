@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using Xbim.Common;
 using Xbim.Common.Geometry;
+using Xbim.Geometry.Abstractions;
 using Xbim.Ifc4.Interfaces;
 using Microsoft.Extensions.Logging;
 
@@ -13,12 +14,12 @@ namespace Xbim.Geometry.Engine.Interop
     /// </summary>
     public static class ModelWorkArounds
     {
-        //this bug exists in ifc files exported by Revit up to releases 20.1 
-        const string RevitIncorrectBsplineSweptCurve = "#RevitIncorrectBsplineSweptCurve";
+        //this bug exists in ifc files exported by Revit up to releases 20.1
+        internal const string RevitIncorrectBsplineSweptCurve = "#RevitIncorrectBsplineSweptCurve";
         //this bug exists in all current Revit exported Ifc files
-        const string RevitIncorrectArcCentreSweptCurve = "#RevitIncorrectArcCentreSweptCurve";
+        internal const string RevitIncorrectArcCentreSweptCurve = "#RevitIncorrectArcCentreSweptCurve";
         //this bug exists in all current Revit exported Ifc files
-        const string RevitSweptSurfaceExtrusionInFeet = "#RevitSweptSurfaceExtrusionInFeet";
+        internal const string RevitSweptSurfaceExtrusionInFeet = "#RevitSweptSurfaceExtrusionInFeet";
         const string PolylineTrimLengthOneForEntireLine = "#PolylineTrimLengthOneForEntireLine";
 
         // Incorrect precision specified in Archicad models,
@@ -126,14 +127,7 @@ namespace Xbim.Geometry.Engine.Interop
                 {
                     if (Version.TryParse(version, out Version modelVersion))
                     {
-                        //uncomment this code when it is fixed in the exporter
-                        ////SurfaceOfLinearExtrusion bug found in version 20.1.0 and earlier
-                        //var revitIncorrectArcCentreSweptCurveVersion = new Version(20, 1, 0, 0);
-                        //if (modelVersion <= revitIncorrectArcCentreSweptCurveVersion)
-                        //{
-                        //    modelFactors.AddWorkAround(RevitIncorrectArcCentreSweptCurve);
-                        //}
-                        //SurfaceOfLinearExtrusion bug found in version 20.0.0 and earlier
+                        
                         var revitIncorrectBsplineSweptCurveVersion = new Version(20, 0, 0, 500);
                         if (modelVersion <= revitIncorrectBsplineSweptCurveVersion)
                         {
@@ -236,5 +230,113 @@ namespace Xbim.Geometry.Engine.Interop
             }
             return true;
         }
+
+        #region Swept Surface Workaround Application
+
+        /// <summary>
+        /// Checks whether the BSpline swept-curve workaround should be applied to
+        /// this surface of linear extrusion. When true, the surface Position must be
+        /// skipped because the BSpline control points already include the placement.
+        /// Applies to Revit exports version 20.0.0.500 and earlier.
+        /// </summary>
+        internal static bool ShouldApplyBsplineWorkaround(IModel model, IIfcSurfaceOfLinearExtrusion ifcExtrusion)
+        {
+            if (ifcExtrusion.SweptCurve is not IIfcArbitraryOpenProfileDef pDef)
+                return false;
+
+            // Check if the profile curve is a BSpline (directly or wrapped in a TrimmedCurve)
+            IIfcBSplineCurveWithKnots bspline;
+            if (pDef.Curve is IIfcTrimmedCurve tc)
+                bspline = tc.BasisCurve as IIfcBSplineCurveWithKnots;
+            else
+                bspline = pDef.Curve as IIfcBSplineCurveWithKnots;
+
+            if (bspline == null)
+                return false;
+
+            if (ifcExtrusion.Position == null)
+                return false;
+
+            var modelFactors = model.ModelFactors as XbimModelFactors;
+            return modelFactors?.ApplyWorkAround(RevitIncorrectBsplineSweptCurve) == true;
+        }
+
+        /// <summary>
+        /// Fixes a bug in early Revit exporters where the arc centre in an
+        /// IfcArbitraryOpenProfileDef (TrimmedCurve of a Circle) is transformed twice.
+        /// Recalculates the correct centre from the trim points and radius, temporarily
+        /// updates the model, invokes the curve builder, then rolls back.
+        /// </summary>
+        /// <param name="model">The IFC model (must support transactions).</param>
+        /// <param name="ifcExtrusion">The surface of linear extrusion entity.</param>
+        /// <param name="buildCurve">Delegate that builds a curve from an IFC curve definition.</param>
+        /// <param name="fixedCurve">The curve built from the corrected geometry, if the fix was applied.</param>
+        /// <returns>True if the workaround was applied; false if conditions were not met.</returns>
+        internal static bool TryFixArcCentreSweptCurve(
+            IModel model,
+            IIfcSurfaceOfLinearExtrusion ifcExtrusion,
+            Func<IIfcCurve, IXCurve> buildCurve,
+            out IXCurve fixedCurve)
+        {
+            fixedCurve = null;
+
+            var modelFactors = model.ModelFactors as XbimModelFactors;
+            if (modelFactors?.ApplyWorkAround(RevitIncorrectArcCentreSweptCurve) != true)
+                return false;
+
+            if (ifcExtrusion.Position == null)
+                return false;
+
+            if (ifcExtrusion.SweptCurve is not IIfcArbitraryOpenProfileDef openProfile)
+                return false;
+
+            if (openProfile.Curve is not IIfcTrimmedCurve tc)
+                return false;
+
+            if (tc.BasisCurve is not IIfcCircle circle)
+                return false;
+
+            var trim1 = tc.Trim1.OfType<IIfcCartesianPoint>().FirstOrDefault();
+            var trim2 = tc.Trim2.OfType<IIfcCartesianPoint>().FirstOrDefault();
+            if (trim1 == null || trim2 == null)
+                return false;
+
+            // Recalculate the correct arc centre from the two trim points and the radius
+            double p1X = trim1.X, p1Y = trim1.Y;
+            double p2X = trim2.X, p2Y = trim2.Y;
+            double radius = circle.Radius;
+            double rSq = radius * radius;
+
+            double q = Math.Sqrt((p2X - p1X) * (p2X - p1X) + (p2Y - p1Y) * (p2Y - p1Y));
+            double midX = (p1X + p2X) / 2.0;
+            double midY = (p1Y + p2Y) / 2.0;
+            double halfQ = q / 2.0;
+            double centreX = midX - Math.Sqrt(rSq - halfQ * halfQ) * (p1Y - p2Y) / q;
+            double centreY = midY - Math.Sqrt(rSq - halfQ * halfQ) * (p2X - p1X) / q;
+
+            // Temporarily update the circle's position via a transaction, build the curve,
+            // then roll back to restore the original IFC data
+            var placement = circle.Position as IIfcPlacement;
+            if (placement?.Location == null)
+                return false;
+
+            var txn = model.BeginTransaction("Fix arc centre");
+            try
+            {
+                placement.Location.Coordinates[0] = centreX;
+                placement.Location.Coordinates[1] = centreY;
+                placement.Location.Coordinates[2] = 0;
+
+                fixedCurve = buildCurve(openProfile.Curve);
+            }
+            finally
+            {
+                txn.RollBack();
+            }
+
+            return fixedCurve != null;
+        }
+
+        #endregion
     }
 }

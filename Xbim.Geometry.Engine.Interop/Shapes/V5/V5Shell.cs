@@ -95,7 +95,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes.V5
         public IXbimFaceSet Section(IXbimFace toSection, double tolerance, ILogger logger = null)
             => throw new NotSupportedException("Use V6 BooleanFactory for section operations.");
 
-        public void SaveAsBrep(string fileName) => ((Shape)Inner).WriteBrep(fileName);
+        public void SaveAsBrep(string fileName) => Inner.WriteBrep(fileName);
 
         public string ToBRep => Inner.BrepString();
 
