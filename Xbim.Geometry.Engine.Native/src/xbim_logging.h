@@ -2,10 +2,8 @@
  * xbim_logging.h
  *
  * Internal logging helpers for the native geometry library.
- * Ports the NLoggingService pattern from the C++/CLI engine into
- * context-bound logging through the callback supplied by managed code.
+ * Context-bound logging through the callback supplied by managed code.
  *
- * Not part of the public C API - used by native implementation code only.
  */
 
 #ifndef XBIM_LOGGING_H

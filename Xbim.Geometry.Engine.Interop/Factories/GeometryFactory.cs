@@ -53,7 +53,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             out double axisX, out double axisY, out double axisZ)
         {
             // Build the basis curve
-            using var curve = (Curve)_modelService.CurveFactory.Build(pointExpr.BasisCurve);
+            using var curve = (XbimCurve)_modelService.CurveFactory.Build(pointExpr.BasisCurve);
             var curveHandle = curve.Handle;
 
             // Get curve length for parameter normalization
@@ -967,7 +967,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         public bool IsFacingAwayFrom(IXFace face, IXDirection direction)
         {
             if (direction.IsNull) return false;
-            var nativeFace = (Face)face;
+            var nativeFace = (XbimFace)face;
             return XbimGeometryNativeApi.xbim_face_is_facing_away(
                 nativeFace.Handle,
                 direction.X, direction.Y, direction.Z) != 0;
@@ -993,7 +993,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXDirection NormalAt(IXFace face, IXPoint position, double tolerance)
         {
-            var nativeFace = (Shapes.Face)face;
+            var nativeFace = (Shapes.XbimFace)face;
             int result = XbimGeometryNativeApi.xbim_face_normal_at_point(
                 nativeFace.Handle,
                 position.X, position.Y, position.Z,

@@ -23,8 +23,8 @@ namespace Xbim.Geometry.Engine.Interop.Services
         public byte[] ToArray(IXShape shape, bool withTriangles = false, bool withNormals = false)
         {
             if (shape == null) throw new ArgumentNullException(nameof(shape));
-            var Shape = shape as Shape
-                ?? throw new ArgumentException("Shape must be a Shape instance.", nameof(shape));
+            var Shape = shape as XbimShape
+                ?? throw new ArgumentException("Shape must be a XbimShape instance.", nameof(shape));
 
             int result = XbimGeometryNativeApi.xbim_shape_to_binary(
                 Shape.Handle,
@@ -80,7 +80,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         /// <summary>
         /// Converts a shape to its OCCT BRep ASCII string representation.
         /// </summary>
-        internal static string ToBrep(Shape shape)
+        internal static string ToBrep(XbimShape shape)
         {
             int result = XbimGeometryNativeApi.xbim_shape_to_brep_string(
                 shape.Handle,

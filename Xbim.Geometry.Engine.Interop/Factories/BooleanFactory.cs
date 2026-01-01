@@ -142,9 +142,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private static NativeShapeHandle ExtractHandle(IXShape shape, IIfcBooleanOperand operand)
         {
-            if (shape is Shape Shape)
+            if (shape is XbimShape xbimShape)
             {
-                return Shape.DetachHandle();
+                return xbimShape.DetachHandle();
             }
 
             throw new InvalidOperationException(

@@ -49,7 +49,6 @@
  * For non-planar surfaces, we need to add 2D parametric curves (pcurves) to
  * the wire edges so that OCCT can properly trim the surface. Returns true if
  * the resulting face area is positive (CCW orientation).
- * Ports NFaceFactory::AddParameterisedCurves.
  */
 static bool add_parametric_curves(Handle(Geom_Surface)& surface,
                                   const TopoDS_Wire& wire,

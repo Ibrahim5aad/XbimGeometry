@@ -9,6 +9,7 @@ using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4.MeasureResource;
 
@@ -216,8 +217,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     $"Extruded area solid #{extrudedSolid.EntityLabel} has invalid extrusion direction.");
 
             // Build the swept profile face
-            var profileFace = (Face)_modelService.ProfileFactory.BuildFace(extrudedSolid.SweptArea);
-            
+            var profileFace = (XbimFace)_modelService.ProfileFactory.BuildFace(extrudedSolid.SweptArea);
+
             // Build optional position location (NullHandle = identity)
             var locationHandle = NativeLocationHandle.NullHandle;
             if (extrudedSolid.Position != null)
@@ -253,8 +254,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     $"Extruded area solid tapered #{extrudedTapered.EntityLabel} has invalid extrusion direction.");
 
             // Build start and end profile faces
-            var startFace = (Face)_modelService.ProfileFactory.BuildFace(extrudedTapered.SweptArea);
-            var endFace = (Face)_modelService.ProfileFactory.BuildFace(extrudedTapered.EndSweptArea);
+            var startFace = (XbimFace)_modelService.ProfileFactory.BuildFace(extrudedTapered.SweptArea);
+            var endFace = (XbimFace)_modelService.ProfileFactory.BuildFace(extrudedTapered.EndSweptArea);
 
             // Build optional position location (NullHandle = identity)
             var locationHandle = NativeLocationHandle.NullHandle;
@@ -288,7 +289,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     $"Revolved area solid #{revolvedSolid.EntityLabel} has angle <= 0.");
 
             // Build the swept profile face
-            var profileFace = (Face)_modelService.ProfileFactory.BuildFace(revolvedSolid.SweptArea);
+            var profileFace = (XbimFace)_modelService.ProfileFactory.BuildFace(revolvedSolid.SweptArea);
 
             // Extract axis: origin + direction from the Axis placement
             var axisPoint = GeometryFactory.BuildPoint3d(revolvedSolid.Axis.Location);
@@ -333,8 +334,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     $"Revolved area solid tapered #{revolvedTapered.EntityLabel} has angle <= 0.");
 
             // Build start and end profile faces
-            var startFace = (Face)_modelService.ProfileFactory.BuildFace(revolvedTapered.SweptArea);
-            var endFace = (Face)_modelService.ProfileFactory.BuildFace(revolvedTapered.EndSweptArea);
+            var startFace = (XbimFace)_modelService.ProfileFactory.BuildFace(revolvedTapered.SweptArea);
+            var endFace = (XbimFace)_modelService.ProfileFactory.BuildFace(revolvedTapered.EndSweptArea);
 
             // Extract axis
             var axisPoint = GeometryFactory.BuildPoint3d(revolvedTapered.Axis.Location);
@@ -387,7 +388,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var wireFactory = (WireFactory)_modelService.WireFactory;
             double? startParam = sweptDisk.StartParam.HasValue ? (double)sweptDisk.StartParam.Value : null;
             double? endParam = sweptDisk.EndParam.HasValue ? (double)sweptDisk.EndParam.Value : null;
-            using var directrixWire = (Wire)wireFactory.BuildDirectrixWire(sweptDisk.Directrix, startParam, endParam);
+            using var directrixWire = (XbimWire)wireFactory.BuildDirectrixWire(sweptDisk.Directrix, startParam, endParam);
 
             double innerRadius = sweptDisk.InnerRadius ?? 0;
 
@@ -409,7 +410,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             return NativeShapeWrapper.WrapSolid(solidHandle);
         }
 
-        private Wire FilletIfPolygonal(IIfcSweptDiskSolid sweptDisk, Wire directrixWire)
+        private XbimWire FilletIfPolygonal(IIfcSweptDiskSolid sweptDisk, XbimWire directrixWire)
         {
             if (sweptDisk is not IIfcSweptDiskSolidPolygonal polygonal ||
                 !polygonal.FilletRadius.HasValue || polygonal.FilletRadius.Value <= 0)
@@ -423,7 +424,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out NativeShapeHandle filletedHandle);
 
             if (filletResult == 0)
-                return new Wire(filletedHandle);
+                return new XbimWire(filletedHandle);
 
             _logger.LogWarning("Failed to fillet directrix for SweptDiskSolidPolygonal #{EntityLabel}: {Error}",
                 polygonal.EntityLabel, XbimGeometryNativeApi.GetLastError());
@@ -481,7 +482,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     $"SurfaceCurveSweptAreaSolid #{surfaceCurveSwept.EntityLabel}: profile must be AREA type.");
 
             // Build the swept area profile face
-            using var profileFace = (Face)_modelService.ProfileFactory.BuildFace(profileDef);
+            using var profileFace = (XbimFace)_modelService.ProfileFactory.BuildFace(profileDef);
 
             // Build the reference surface 
             var refSurface = (Surface)_modelService.SurfaceFactory.Build(surfaceCurveSwept.ReferenceSurface);
@@ -491,7 +492,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var wireFactory = (WireFactory)_modelService.WireFactory;
             double? startParam = surfaceCurveSwept.StartParam.HasValue ? (double)surfaceCurveSwept.StartParam.Value : null;
             double? endParam = surfaceCurveSwept.EndParam.HasValue ? (double)surfaceCurveSwept.EndParam.Value : null;
-            using var directrixWire = (Wire)wireFactory.BuildDirectrixWire(surfaceCurveSwept.Directrix, startParam, endParam);
+            using var directrixWire = (XbimWire)wireFactory.BuildDirectrixWire(surfaceCurveSwept.Directrix, startParam, endParam);
 
             // Build optional position location (NullHandle = identity)
             var locationHandle = NativeLocationHandle.NullHandle;
@@ -512,7 +513,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var solidHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryFactoryException(
                     $"Failed to build SurfaceCurveSweptAreaSolid #{surfaceCurveSwept.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return solidHandle;
@@ -1008,7 +1009,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             try
             {
                 var curveFactory = (CurveFactory)_modelService.CurveFactory;
-                var curve = (Curve)curveFactory.Build(ifcCurve);
+                var curve = (XbimCurve)curveFactory.Build(ifcCurve);
                 var curveHandle = curve.DetachHandle();
                 curveCache[curveLabel] = curveHandle;
                 return curveHandle;
@@ -1677,7 +1678,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     $"IfcSectionedSpine #{ifcSectionedSpine.EntityLabel}: cross-section count ({crossSections.Count}) does not match position count ({positions.Count}).");
 
             // Build the spine wire from the composite curve
-            var spineWire = (Wire)_modelService.WireFactory.Build(ifcSectionedSpine.SpineCurve);
+            var spineWire = (XbimWire)_modelService.WireFactory.Build(ifcSectionedSpine.SpineCurve);
 
             var geometryFactory = (GeometryFactory)_modelService.GeometryFactory;
             var movedFaceHandles = new List<NativeShapeHandle>();
@@ -1687,7 +1688,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 // Build each cross-section face and move it to its placement position
                 for (int i = 0; i < crossSections.Count; i++)
                 {
-                    var face = (Face)_modelService.ProfileFactory.BuildFace(crossSections[i]);
+                    var face = (XbimFace)_modelService.ProfileFactory.BuildFace(crossSections[i]);
                     var location = geometryFactory.BuildLocationFromAxis3D(positions[i]);
 
                     int moveResult = XbimGeometryNativeApi.xbim_shape_moved(

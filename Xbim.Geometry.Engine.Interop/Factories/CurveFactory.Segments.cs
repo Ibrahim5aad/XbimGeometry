@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
@@ -16,7 +16,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
     {
         #region Gradient Curve
 
-        private Curve BuildGradientCurve(IfcGradientCurve ifcGradient)
+        private XbimCurve BuildGradientCurve(IfcGradientCurve ifcGradient)
         {
             // Step 1: Build the horizontal projection (BaseCurve) as a 2D composite curve
             var horizontalHandle = BuildBaseCurve2d(ifcGradient);
@@ -86,7 +86,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"IfcGradientCurve #{ifcGradient.EntityLabel}: failed to build gradient curve: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new GradientCurve(curveHandle, ContextHandle, _modelService.Precision);
+                return new XbimGradientCurve(curveHandle, ContextHandle, _modelService.Precision);
             }
             finally
             {
@@ -307,7 +307,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             IfcCurveSegment segment, IIfcCurve parentCurve,
             double startParam, double endParam, double length)
         {
-            using var curve2d = (Curve2d)BuildCurve2d(parentCurve);
+            using var curve2d = (XbimCurve2d)BuildCurve2d(parentCurve);
 
             if (parentCurve is IIfcEllipse)
             {
@@ -360,7 +360,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         #region Segmented Reference Curve
 
-        private Curve BuildSegmentedReferenceCurve(IfcSegmentedReferenceCurve ifcSegRef)
+        private XbimCurve BuildSegmentedReferenceCurve(IfcSegmentedReferenceCurve ifcSegRef)
         {
             // Step 1: Build the base gradient curve (via cache to avoid redundant construction)
             if (ifcSegRef.BaseCurve is not IfcGradientCurve ifcGradient)
@@ -432,7 +432,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"IfcSegmentedReferenceCurve #{ifcSegRef.EntityLabel}: failed to build: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new Curve(outHandle, XCurveType.IfcSegmentedReferenceCurve);
+                return new XbimCurve(outHandle, XCurveType.IfcSegmentedReferenceCurve);
             }
             finally
             {
@@ -519,7 +519,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (XbimGeometryNativeApi.xbim_curve2d_align_to_origin(handle) != 0)
                 throw new InvalidOperationException(
                     $"Failed to align spiral to origin: {XbimGeometryNativeApi.GetLastError()}");
-            return new Curve2d(handle, GetSpiralCurveType(spiral));
+            return new XbimCurve2d(handle, GetSpiralCurveType(spiral));
         }
 
         private static XCurveType GetSpiralCurveType(IfcSpiral spiral)
@@ -627,7 +627,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (alignResult != 0)
                 throw new InvalidOperationException(
                     $"Failed to align polynomial curve to origin: {XbimGeometryNativeApi.GetLastError()}");
-            return new Curve2d(handle, XCurveType.IfcPolynomialCurve);
+            return new XbimCurve2d(handle, XCurveType.IfcPolynomialCurve);
         }
 
         private NativeCurve2dHandle? BuildPolynomialCurve(

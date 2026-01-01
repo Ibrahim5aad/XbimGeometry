@@ -1,12 +1,8 @@
 /*
  * xbim_shell.cpp
  *
- * Implements shell construction and repair operations via the flat C API:
- *   - Build a shell from an array of face shapes
- *   - Sew/fix a shell using ShapeFix_Shell with orientation checking
- *   - Convert a closed shell into a solid
+ * Implements shell construction and repair operations
  *
- * Ports NShellFactory methods from the C++/CLI engine.
  */
 
 #include "xbim_shell.h"

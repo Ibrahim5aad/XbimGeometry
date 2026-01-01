@@ -35,7 +35,7 @@ public class ShapeTraversalTests : IDisposable
     [Fact]
     public void Solid_Shells_BlockHasOneShell()
     {
-        using var block = (Solid)_solidFactory.Build(
+        using var block = (XbimSolid)_solidFactory.Build(
             IfcMoq.Block(10, 20, 30));
 
         var shells = block.Shells;
@@ -48,7 +48,7 @@ public class ShapeTraversalTests : IDisposable
     [Fact]
     public void Solid_AllFaces_BlockHasSixFaces()
     {
-        using var block = (Solid)_solidFactory.Build(
+        using var block = (XbimSolid)_solidFactory.Build(
             IfcMoq.Block(10, 20, 30));
 
         var faces = block.AllFaces().ToArray();
@@ -61,7 +61,7 @@ public class ShapeTraversalTests : IDisposable
     public void Solid_AllFaces_CylinderHasThreeFaces()
     {
         // A cylinder has 3 faces: top cap, bottom cap, lateral
-        using var cyl = (Solid)_solidFactory.Build(
+        using var cyl = (XbimSolid)_solidFactory.Build(
             IfcMoq.Cylinder(5, 10));
 
         var faces = cyl.AllFaces().ToArray();
@@ -73,7 +73,7 @@ public class ShapeTraversalTests : IDisposable
     [Fact]
     public void Shell_Faces_BlockShellHasSixFaces()
     {
-        using var block = (Solid)_solidFactory.Build(
+        using var block = (XbimSolid)_solidFactory.Build(
             IfcMoq.Block(10, 20, 30));
 
         var shells = block.Shells;
@@ -92,7 +92,7 @@ public class ShapeTraversalTests : IDisposable
     {
         double[] pts = { 0, 0, 0, 10, 0, 0, 10, 10, 0, 0, 10, 0 };
         XbimGeometryNativeApi.xbim_wire_build_polygon(Ctx, pts, 4, 1, out var wireHandle);
-        using var wire = new Wire(wireHandle);
+        using var wire = new XbimWire(wireHandle);
 
         var edges = wire.EdgeLoop;
         edges.Should().HaveCount(4);
@@ -110,7 +110,7 @@ public class ShapeTraversalTests : IDisposable
         XbimGeometryNativeApi.xbim_face_build_from_wire(Ctx, wireHandle, out var faceHandle);
         wireHandle.Dispose();
 
-        using var face = new Face(faceHandle);
+        using var face = new XbimFace(faceHandle);
         var outer = face.OuterBound;
         outer.Should().NotBeNull();
         outer.ShapeType.Should().Be(XShapeType.Wire);
@@ -126,7 +126,7 @@ public class ShapeTraversalTests : IDisposable
         XbimGeometryNativeApi.xbim_face_build_from_wire(Ctx, wireHandle, out var faceHandle);
         wireHandle.Dispose();
 
-        using var face = new Face(faceHandle);
+        using var face = new XbimFace(faceHandle);
         face.InnerBounds.Should().BeEmpty();
     }
 
@@ -151,7 +151,7 @@ public class ShapeTraversalTests : IDisposable
         outerWire.Dispose();
         innerWire.Dispose();
 
-        using var face = new Face(faceHandle);
+        using var face = new XbimFace(faceHandle);
         face.InnerBounds.Should().HaveCount(1);
         face.InnerBounds[0].ShapeType.Should().Be(XShapeType.Wire);
     }
@@ -162,7 +162,7 @@ public class ShapeTraversalTests : IDisposable
     public void CountSubshapes_BlockEdges_Is12()
     {
         // A box/block has 12 edges
-        using var block = (Solid)_solidFactory.Build(
+        using var block = (XbimSolid)_solidFactory.Build(
             IfcMoq.Block(10, 20, 30));
 
         XbimGeometryNativeApi.xbim_shape_count_subshapes(
@@ -174,7 +174,7 @@ public class ShapeTraversalTests : IDisposable
     public void CountSubshapes_BlockVertices_Is8()
     {
         // A box/block has 8 vertices
-        using var block = (Solid)_solidFactory.Build(
+        using var block = (XbimSolid)_solidFactory.Build(
             IfcMoq.Block(10, 20, 30));
 
         XbimGeometryNativeApi.xbim_shape_count_subshapes(

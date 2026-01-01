@@ -129,8 +129,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_context_destroy(XbimContextHandle handle);
 
 /*
  * Replace the logging callback on an existing context.
- * Pass NULL to disable logging. This matches the NLoggingService::SetLogger
- * pattern from the original C++/CLI engine.
+ * Pass NULL to disable logging.
  *
  * Returns XBIM_INVALID_HANDLE if handle is NULL.
  */
@@ -682,7 +681,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_revolved_tapered(
 
 /*
  * Build a swept disk solid by sweeping a circular cross-section along a wire directrix.
- * Ports NSolidFactory::BuildSweptDiskSolid from the C++/CLI engine.
  *
  * The directrix is a wire (shape handle of type Wire). A circle of the given
  * radius is swept along the wire using BRepOffsetAPI_MakePipeShell.
@@ -1711,7 +1709,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_wire(
 /*
  * Build an advanced face with a surface, outer wire, optional inner wires,
  * and orientation control.
- * Ports NFaceFactory::BuildFace(surface, outerLoop, innerLoops, tolerance, sameSense).
  *
  * The outer wire is oriented counter-clockwise (CCW) automatically.
  * Inner wires are oriented clockwise (CW) to define holes.
@@ -1935,8 +1932,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_edges(
 
 /*
  * Build a wire from a sequence of 3D curve handles with proper vertex connectivity.
- * Ports NWireFactory::BuildWire(TColGeom_SequenceOfBoundedCurve) from the legacy
- * C++/CLI engine.  Creates edges with shared vertices, tolerance adjustment, and
+ * Creates edges with shared vertices, tolerance adjustment, and
  * periodic/non-periodic curve transition handling (line geometry is rebuilt to
  * match arc endpoints).
  *
@@ -1964,7 +1960,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_curves(
  * Build a 3D polyline wire from an array of point coordinates.
  * Points that are within tolerance of the previous vertex are merged.
  * If the first and last points are within tolerance, the wire is marked closed.
- * Ports NWireFactory::BuildPolyline3d with duplicate-point removal.
  *
  *   ctx         – a valid context handle (used for logging; may be NULL)
  *   pointsXYZ   – flat array of [x0,y0,z0, x1,y1,z1, ...] coordinates
@@ -2131,7 +2126,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed_by_points(
 
 /*
  * Fillet a wire by inserting circular arcs at each interior vertex.
- * Ports NWireFactory::Fillet from the C++/CLI engine.
  *
  * Processes consecutive edge pairs, applying BRepFilletAPI_MakeFillet2d
  * at each shared vertex. If a vertex cannot be filleted (e.g. edges are

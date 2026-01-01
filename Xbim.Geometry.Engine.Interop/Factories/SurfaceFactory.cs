@@ -178,7 +178,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             // Build the generatrix curve from the profile's curve property
             var curveFactory = (CurveFactory)_modelService.CurveFactory;
-            using var curve = (Curve)curveFactory.Build(openProfile.Curve);
+            using var curve = (XbimCurve)curveFactory.Build(openProfile.Curve);
 
            
             // Extract revolution axis
@@ -226,15 +226,15 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             // double-transform the centre of trimmed circular arcs.
             var model = _modelService.Model;
             var curveFactory = (CurveFactory)_modelService.CurveFactory;
-            Curve curve;
+            XbimCurve curve;
             if (ModelWorkArounds.TryFixArcCentreSweptCurve(model, ifcExtrusion,
-                    c => curveFactory.Build(c), out var fixedCurve))
+                    c => curveFactory.Build3d(c), out var fixedCurve) && fixedCurve is XbimCurve fc)
             {
-                curve = (Curve)fixedCurve;
+                curve = fc;
             }
             else
             {
-                curve = (Curve)curveFactory.Build(openProfile.Curve);
+                curve = curveFactory.Build3d(openProfile.Curve);
             }
 
             using (curve)

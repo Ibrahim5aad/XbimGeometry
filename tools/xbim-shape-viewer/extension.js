@@ -111,18 +111,15 @@ async function debugEval(expression) {
     return null;
 }
 
-// Tries expression on the variable directly, then via V5Shape.Inner fallback
 async function evalWriteShape(name, method, filePath) {
-    // 1. Try directly: works for IXShape / Shape
+    // Try directly first (works when variable is typed as Shape/Solid/etc.)
     await debugEval(`${name}.${method}("${filePath}")`);
     if (fs.existsSync(filePath)) return true;
 
-    // 2. V5 shape (V5Solid, V5Shell, etc.): access Inner which is a Shape
-    outputChannel.appendLine(`[xbim] Direct call failed, trying V5 .Inner fallback...`);
-    await debugEval(`((Xbim.Geometry.Engine.Interop.Shapes.V5.V5Shape)${name}).Inner.${method}("${filePath}")`);
-    if (fs.existsSync(filePath)) return true;
-
-    return false;
+    // Debugger may see the variable as IXbimGeometryObject — cast to Shape
+    outputChannel.appendLine(`[xbim] Direct call failed, casting to XbimShape...`);
+    await debugEval(`((Xbim.Geometry.Engine.Interop.Shapes.XbimShape)${name}).${method}("${filePath}")`);
+    return fs.existsSync(filePath);
 }
 
 // ── WebView Panel ───────────────────────────────────────────────────────────
@@ -226,8 +223,8 @@ function activate(context) {
                 async () => {
                     const result = await debugEval(`${DEBUGVIZ}.Show(${name})`);
                     if (!result) {
-                        outputChannel.appendLine(`[xbim] Direct Show failed, trying V5 .Inner fallback...`);
-                        await debugEval(`${DEBUGVIZ}.Show(((Xbim.Geometry.Engine.Interop.Shapes.V5.V5Shape)${name}).Inner)`);
+                        outputChannel.appendLine(`[xbim] Direct Show failed, casting to XbimShape...`);
+                        await debugEval(`${DEBUGVIZ}.Show((Xbim.Geometry.Engine.Interop.Shapes.XbimShape)${name})`);
                     }
                 }
             );

@@ -1,14 +1,7 @@
 /*
  * xbim_mesh.cpp
  *
- * Implements WexBim mesh creation via the flat C API.
- * Ports NWexBimMeshFactory, NWexBimMesh, NFaceMeshIterator, PackedNormal,
- * and PointInspector from the C++/CLI engine.
- *
- * Exported functions:
- *   - xbim_mesh_create_wexbim: triangulate a shape and serialize to WexBim format
- *   - xbim_mesh_get_bounding_box: extract bounding box from mesh data
- *   - xbim_buffer_free: free a native-allocated byte buffer
+ * Implements WexBim mesh creation 
  */
 
 #include "xbim_mesh.h"

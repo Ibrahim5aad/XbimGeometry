@@ -1,29 +1,8 @@
 /*
  * xbim_profile.cpp
  *
- * Implements parametric profile construction via the flat C API.
- * Ports the NWireFactory and NProfileFactory profile methods from the
- * C++/CLI engine:
- *   - Rectangle profile (wire -> face)
- *   - Circle profile (wire -> face)
- *   - Ellipse profile (wire -> face)
- *   - Rounded rectangle profile (wire with fillets -> face)
- *   - I-shape structural profile
- *   - L-shape structural profile
- *   - T-shape structural profile
- *   - U-shape structural profile
- *   - Z-shape structural profile
- *   - C-shape structural profile
+ * Implements parametric profile construction 
  *
- * Each function builds a wire in the XY plane, creates a face from it,
- * then applies the requested axis2 placement transform.
- *
- * Arbitrary/composite/derived profiles:
- *   - Arbitrary closed profile (polyline -> face)
- *   - Arbitrary open profile (polyline -> wire)
- *   - Arbitrary profile with voids (outer face + inner wire holes)
- *   - Composite profile (merge multiple face shapes into compound)
- *   - Derived profile (apply 2D transform to parent face)
  */
 
 #include <cmath>

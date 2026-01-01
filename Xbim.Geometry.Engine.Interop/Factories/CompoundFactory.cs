@@ -39,7 +39,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to create empty compound: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Compound(outHandle);
+            return new XbimCompound(outHandle);
         }
 
         public IXCompound CreateFrom(IEnumerable<IXShape> shapes)
@@ -53,7 +53,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var handles = new NativeShapeHandle[shapeList.Count];
             for (int i = 0; i < shapeList.Count; i++)
             {
-                if (shapeList[i] is Shape ns)
+                if (shapeList[i] is XbimShape ns)
                     handles[i] = ns.Handle;
                 else
                     throw new ArgumentException(
@@ -68,7 +68,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to create compound from {shapeList.Count} shapes: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Compound(outHandle);
+            return new XbimCompound(outHandle);
         }
     }
 }

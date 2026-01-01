@@ -75,8 +75,8 @@ namespace Xbim.Geometry.Engine.Interop.Services
         public string Convert(IXShape shape)
         {
             if (shape == null) throw new ArgumentNullException(nameof(shape));
-            var native = shape as Shape
-                ?? throw new ArgumentException("Shape must be a Shape.", nameof(shape));
+            var native = shape as XbimShape
+                ?? throw new ArgumentException("Shape must be a XbimShape.", nameof(shape));
 
             int result = XbimGeometryNativeApi.xbim_shape_to_brep_string(
                 native.Handle, out var brepPtr, out int strLen);
@@ -100,8 +100,8 @@ namespace Xbim.Geometry.Engine.Interop.Services
             if (shape == null) throw new ArgumentNullException(nameof(shape));
             if (transformMatrix == null || transformMatrix.IsIdentity) return shape;
 
-            var native = shape as Shape
-                ?? throw new ArgumentException("Shape must be a Shape.", nameof(shape));
+            var native = shape as XbimShape
+                ?? throw new ArgumentException("Shape must be a XbimShape.", nameof(shape));
 
             int result = XbimGeometryNativeApi.xbim_shape_gtransform(
                 native.Handle,
@@ -201,8 +201,8 @@ namespace Xbim.Geometry.Engine.Interop.Services
             if (shape == null) throw new ArgumentNullException(nameof(shape));
             if (moveTo == null || moveTo.IsIdentity) return shape;
 
-            var native = shape as Shape
-                ?? throw new ArgumentException("Shape must be a Shape.", nameof(shape));
+            var native = shape as XbimShape
+                ?? throw new ArgumentException("Shape must be a XbimShape.", nameof(shape));
             var loc = moveTo as XLocation
                 ?? throw new ArgumentException("Location must be an XLocation.", nameof(moveTo));
 
@@ -221,8 +221,8 @@ namespace Xbim.Geometry.Engine.Interop.Services
             if (shape == null) throw new ArgumentNullException(nameof(shape));
             if (Math.Abs(scale - 1.0) < 1e-15) return shape;
 
-            var native = shape as Shape
-                ?? throw new ArgumentException("Shape must be a Shape.", nameof(shape));
+            var native = shape as XbimShape
+                ?? throw new ArgumentException("Shape must be a XbimShape.", nameof(shape));
 
             // Identity rotation + uniform scale via gp_GTrsf
             int result = XbimGeometryNativeApi.xbim_shape_gtransform(
@@ -244,7 +244,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         {
             if (face == null || direction == null || direction.IsNull) return false;
 
-            var native = face as Shape;
+            var native = face as XbimShape;
             if (native == null) return false;
 
             return XbimGeometryNativeApi.xbim_face_is_facing_away(
@@ -265,10 +265,10 @@ namespace Xbim.Geometry.Engine.Interop.Services
             var handles = new NativeShapeHandle[shapeList.Count];
             for (int i = 0; i < shapeList.Count; i++)
             {
-                if (shapeList[i] is Shape ns)
+                if (shapeList[i] is XbimShape ns)
                     handles[i] = ns.Handle;
                 else
-                    throw new ArgumentException("All shapes must be Shape instances.");
+                    throw new ArgumentException("All shapes must be XbimShape instances.");
             }
 
             using var nativeHandles = new NativeHandleArray(handles);
@@ -293,8 +293,8 @@ namespace Xbim.Geometry.Engine.Interop.Services
         {
             if (shape == null) throw new ArgumentNullException(nameof(shape));
 
-            var native = shape as Shape
-                ?? throw new ArgumentException("Shape must be a Shape.", nameof(shape));
+            var native = shape as XbimShape
+                ?? throw new ArgumentException("Shape must be a XbimShape.", nameof(shape));
 
             int result = XbimGeometryNativeApi.xbim_mesh_create_wexbim(
                 Context, native.Handle,
@@ -335,10 +335,10 @@ namespace Xbim.Geometry.Engine.Interop.Services
             if (body == null) throw new ArgumentNullException(nameof(body));
             if (tool == null) throw new ArgumentNullException(nameof(tool));
 
-            var nativeBody = body as Shape
-                ?? throw new ArgumentException("Body must be a Shape.");
-            var nativeTool = tool as Shape
-                ?? throw new ArgumentException("Tool must be a Shape.");
+            var nativeBody = body as XbimShape
+                ?? throw new ArgumentException("Body must be a XbimShape.");
+            var nativeTool = tool as XbimShape
+                ?? throw new ArgumentException("Tool must be a XbimShape.");
 
             int result = op(Context, nativeBody.Handle, nativeTool.Handle,
                 precision, out _, out var resultHandle);

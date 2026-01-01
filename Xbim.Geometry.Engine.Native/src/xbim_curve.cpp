@@ -1,13 +1,7 @@
 /*
  * xbim_curve.cpp
  *
- * Implements curve construction, query, and lifecycle functions via the flat C API.
- * Ports NCurveFactory methods from the C++/CLI engine:
- *   - Build 3D infinite line from origin and direction
- *   - Build 3D circle from axis placement and radius
- *   - Build 3D ellipse from axis placement and semi-axes
- *   - Build 3D B-spline curve from poles, knots, multiplicities, and degree
- *   - Destroy curve handle
+ * Implements curve construction, query, and lifecycle functions 
  */
 
 #include "xbim_curve.h"

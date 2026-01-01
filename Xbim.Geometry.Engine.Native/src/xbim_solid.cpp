@@ -2,7 +2,7 @@
  * xbim_solid.cpp
  *
  * Implements CSG solid primitive construction and sweep operations
- * via the flat C API. Ports the NSolidFactory methods from the C++/CLI engine:
+ * 
  *   - Block (box)
  *   - Sphere
  *   - Right circular cylinder

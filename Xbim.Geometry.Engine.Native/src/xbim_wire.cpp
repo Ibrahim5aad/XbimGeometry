@@ -1,12 +1,7 @@
 /*
  * xbim_wire.cpp
  *
- * Implements wire construction and query functions via the flat C API.
- * Ports NWireFactory methods from the C++/CLI engine:
- *   - Build wire from a sequence of edge shape handles
- *   - Build polyline wire from 3D point coordinates
- *   - Build closed polygon wire from 3D point coordinates
- *   - Query whether a wire is closed
+ * Implements wire construction and query functions 
  */
 
 #include "xbim_wire.h"

@@ -4,7 +4,6 @@ using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Factories;
 using Xbim.Geometry.Engine.Interop.Shapes;
-using Xbim.Geometry.Engine.Interop.Shapes.V5;
 using Xbim.Geometry.Engine.Interop.Tests.Helpers;
 using Xunit;
 
@@ -177,33 +176,30 @@ public class V5CompatibilityTests : IDisposable
 
     #endregion
 
-    #region V5Shape.Wrap dispatch
+    #region Shape is IXbimGeometryObject
 
     [Fact]
-    public void Wrap_Solid_ReturnsV5Solid()
+    public void Solid_IsIXbimSolid()
     {
         var block = IfcMoq.Block(10, 20, 30);
         var shape = _engine.Build(block);
 
-        var wrapped = V5Shape.Wrap(shape);
-
-        wrapped.Should().BeOfType<V5Solid>();
-        wrapped.GeometryType.Should().Be(XbimGeometryObjectType.XbimSolidType);
+        shape.Should().BeOfType<XbimSolid>();
+        shape.Should().BeAssignableTo<IXbimSolid>();
+        ((IXbimGeometryObject)shape).GeometryType.Should().Be(XbimGeometryObjectType.XbimSolidType);
     }
 
     [Fact]
-    public void Wrap_Face_ReturnsV5Face()
+    public void Face_IsIXbimFace()
     {
-        // Build a solid and extract the first face to wrap
         var block = IfcMoq.Block(10, 20, 30);
         var shape = _engine.Build(block);
         var faces = shape.AllFaces();
         var firstFace = faces.First();
 
-        var wrapped = V5Shape.Wrap(firstFace);
-
-        wrapped.Should().BeOfType<V5Face>();
-        wrapped.GeometryType.Should().Be(XbimGeometryObjectType.XbimFaceType);
+        firstFace.Should().BeOfType<XbimFace>();
+        firstFace.Should().BeAssignableTo<IXbimFace>();
+        ((IXbimGeometryObject)firstFace).GeometryType.Should().Be(XbimGeometryObjectType.XbimFaceType);
     }
 
     #endregion

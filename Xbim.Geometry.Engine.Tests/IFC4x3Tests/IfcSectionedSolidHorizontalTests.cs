@@ -36,7 +36,7 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
         private void SaveBrep(IXShape shape, string name)
         {
             #if DEBUG
-            if (shape is Shape ns)
+            if (shape is XbimShape ns)
             {
                 var path = Path.Combine(_brepOutputDir, $"{name}.brep");
                 ns.WriteBrep(path);

@@ -1,11 +1,7 @@
 /*
  * xbim_boolean.cpp
  *
- * Implements boolean operations (union, cut, intersect) via the flat C API.
- * Ports NBooleanFactory from the C++/CLI engine:
- *   - Union (BOPAlgo_FUSE)
- *   - Cut (BOPAlgo_CUT)
- *   - Intersect (BOPAlgo_COMMON)
+ * Implements boolean operations (union, cut, intersect)
  *
  * Includes self-intersection detection and automatic shape fixing,
  * topology trimming, and result simplification.

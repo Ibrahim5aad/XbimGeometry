@@ -44,18 +44,18 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public string Convert(IXShape shape)
         {
-            if (shape is Shape ns)
+            if (shape is XbimShape ns)
                 return ShapeBinarySerializer.ToBrep(ns);
 
-            throw new ArgumentException("Shape must be a Shape instance.", nameof(shape));
+            throw new ArgumentException("Shape must be a XbimShape instance.", nameof(shape));
         }
 
         public string Convert(IXbimGeometryObject shape)
         {
-            if (shape is Shape ns)
+            if (shape is XbimShape ns)
                 return ShapeBinarySerializer.ToBrep(ns);
 
-            throw new ArgumentException("Shape must be a Shape instance.", nameof(shape));
+            throw new ArgumentException("Shape must be a XbimShape instance.", nameof(shape));
         }
 
         #endregion
@@ -97,8 +97,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXShape UnifyDomain(IXShape toFix)
         {
-            if (toFix is not Shape ns)
-                throw new ArgumentException("Shape must be a Shape instance.", nameof(toFix));
+            if (toFix is not XbimShape ns)
+                throw new ArgumentException("Shape must be a XbimShape instance.", nameof(toFix));
 
             int result = XbimGeometryNativeApi.xbim_shape_unify_domain(ns.Handle, out var outHandle);
             if (result != 0)
@@ -113,8 +113,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IEnumerable<IXFace> FixFace(IXFace face)
         {
-            if (face is not Face nsFace)
-                throw new ArgumentException("Face must be a Face instance.", nameof(face));
+            if (face is not XbimFace nsFace)
+                throw new ArgumentException("Face must be a XbimFace instance.", nameof(face));
 
             int result = XbimGeometryNativeApi.xbim_face_fix(
                 nsFace.Handle, _modelService.Model.ModelFactors.Precision,
@@ -127,24 +127,24 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 return new[] { face };
             }
 
-            var fixedShape = new Shape(fixedHandle);
+            var fixedShape = new XbimShape(fixedHandle);
             var faceHandles = fixedShape.GetSubShapeHandles(Abstractions.XShapeType.Face);
             if (faceHandles.Length == 0)
                 return new[] { face };
 
-            return faceHandles.Select(h => new Face(h)).ToArray();
+            return faceHandles.Select(h => new XbimFace(h)).ToArray();
         }
 
         public IXFace Add(IXFace toFace, IXWire[] wires)
         {
-            if (toFace is not Face nsFace)
-                throw new ArgumentException("Face must be a Face instance.", nameof(toFace));
+            if (toFace is not XbimFace nsFace)
+                throw new ArgumentException("Face must be a XbimFace instance.", nameof(toFace));
 
             var wireHandles = new NativeShapeHandle[wires.Length];
             for (int i = 0; i < wires.Length; i++)
             {
-                if (wires[i] is not Shape ws)
-                    throw new ArgumentException($"Wire at index {i} must be a Shape instance.");
+                if (wires[i] is not XbimShape ws)
+                    throw new ArgumentException($"Wire at index {i} must be a XbimShape instance.");
                 wireHandles[i] = ws.Handle;
             }
 
@@ -156,7 +156,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to add wires to face: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Face(outHandle);
+            return new XbimFace(outHandle);
         }
 
         #endregion
@@ -165,8 +165,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXShape Transform(IXShape shape, XbimMatrix3D matrix)
         {
-            if (shape is not Shape ns)
-                throw new ArgumentException("Shape must be a Shape instance.", nameof(shape));
+            if (shape is not XbimShape ns)
+                throw new ArgumentException("Shape must be a XbimShape instance.", nameof(shape));
 
             // Build a location from the matrix (extracting rotation + translation)
             double ox = matrix.OffsetX, oy = matrix.OffsetY, oz = matrix.OffsetZ;
@@ -200,8 +200,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXShape Moved(IXShape shape, IXLocation moveTo)
         {
-            if (shape is not Shape ns)
-                throw new ArgumentException("Shape must be a Shape instance.", nameof(shape));
+            if (shape is not XbimShape ns)
+                throw new ArgumentException("Shape must be a XbimShape instance.", nameof(shape));
             if (moveTo is not XLocation loc)
                 throw new ArgumentException("Location must be an XLocation instance.", nameof(moveTo));
 
@@ -305,10 +305,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private IXShape PerformBoolean(IXShape body, IXShape tool, BooleanOp operation)
         {
-            if (body is not Shape nsBody)
-                throw new ArgumentException("Body must be a Shape instance.", nameof(body));
-            if (tool is not Shape nsTool)
-                throw new ArgumentException("Tool must be a Shape instance.", nameof(tool));
+            if (body is not XbimShape nsBody)
+                throw new ArgumentException("Body must be a XbimShape instance.", nameof(body));
+            if (tool is not XbimShape nsTool)
+                throw new ArgumentException("Tool must be a XbimShape instance.", nameof(tool));
 
             double fuzzyTolerance = _modelService.Model.ModelFactors.Precision;
 

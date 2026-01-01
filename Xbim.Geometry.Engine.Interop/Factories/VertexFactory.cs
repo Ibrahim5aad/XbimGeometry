@@ -36,7 +36,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build vertex at ({x}, {y}, {z}): {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Vertex(NativeShapeHandle);
+            return new XbimVertex(NativeShapeHandle);
         }
     }
 }

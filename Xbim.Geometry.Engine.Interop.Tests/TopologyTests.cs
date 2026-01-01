@@ -215,7 +215,7 @@ public class TopologyTests : IDisposable
             // Vertex point query via native handle
             using (start)
             {
-                var startShape = (Shape)start;
+                var startShape = (XbimShape)start;
                 XbimGeometryNativeApi.xbim_vertex_point(startShape.Handle, out var x, out var y, out var z).Should().Be(0);
                 x.Should().BeApproximately(10, 1e-10);
                 y.Should().BeApproximately(20, 1e-10);
@@ -226,7 +226,7 @@ public class TopologyTests : IDisposable
             end.Should().NotBeNull();
             using (end)
             {
-                var endShape = (Shape)end;
+                var endShape = (XbimShape)end;
                 XbimGeometryNativeApi.xbim_vertex_point(endShape.Handle, out var x, out var y, out var z).Should().Be(0);
                 x.Should().BeApproximately(40, 1e-10);
                 y.Should().BeApproximately(50, 1e-10);
@@ -722,7 +722,7 @@ public class TopologyTests : IDisposable
         double radius = 10;
         XbimGeometryNativeApi.xbim_curve_build_circle_3d(
             Ctx, 0, 0, 0, 0, 0, 1, 1, 0, 0, radius, out var curveHandle).Should().Be(0);
-        var curve = new Primitives.Curve(curveHandle, XCurveType.IfcCircle);
+        var curve = new Primitives.XbimCurve(curveHandle, XCurveType.IfcCircle);
         using (curve)
         {
             curve.Length.Should().BeApproximately(2 * Math.PI * radius, 1e-3);
@@ -735,7 +735,7 @@ public class TopologyTests : IDisposable
         double radius = 5;
         XbimGeometryNativeApi.xbim_curve_build_circle_3d(
             Ctx, 0, 0, 0, 0, 0, 1, 1, 0, 0, radius, out var curveHandle).Should().Be(0);
-        var curve = new Primitives.Curve(curveHandle, XCurveType.IfcCircle);
+        var curve = new Primitives.XbimCurve(curveHandle, XCurveType.IfcCircle);
         using (curve)
         {
             var pt = curve.GetPoint(curve.FirstParameter);
@@ -751,7 +751,7 @@ public class TopologyTests : IDisposable
         double radius = 5;
         XbimGeometryNativeApi.xbim_curve_build_circle_3d(
             Ctx, 0, 0, 0, 0, 0, 1, 1, 0, 0, radius, out var curveHandle).Should().Be(0);
-        var curve = new Primitives.Curve(curveHandle, XCurveType.IfcCircle);
+        var curve = new Primitives.XbimCurve(curveHandle, XCurveType.IfcCircle);
         using (curve)
         {
             var pt = curve.GetFirstDerivative(curve.FirstParameter, out var dir);
@@ -766,7 +766,7 @@ public class TopologyTests : IDisposable
         double radius = 5;
         XbimGeometryNativeApi.xbim_curve_build_circle_3d(
             Ctx, 0, 0, 0, 0, 0, 1, 1, 0, 0, radius, out var curveHandle).Should().Be(0);
-        var curve = new Primitives.Curve(curveHandle, XCurveType.IfcCircle);
+        var curve = new Primitives.XbimCurve(curveHandle, XCurveType.IfcCircle);
         using (curve)
         {
             curve.GetSecondDerivative(curve.FirstParameter, out _, out var normal);

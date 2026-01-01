@@ -10,7 +10,6 @@ using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Shapes;
-using Xbim.Geometry.Engine.Interop.Shapes.V5;
 using Xbim.Ifc4;
 using Xbim.Ifc4.Interfaces;
 
@@ -181,8 +180,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXbimGeometryObject Create(IIfcGeometricRepresentationItem ifcRepresentation, ILogger logger)
         {
-            var shape = Build(ifcRepresentation);
-            return V5Shape.Wrap(shape);
+            return (IXbimGeometryObject)Build(ifcRepresentation);
         }
 
         public IXbimGeometryObject Create(IIfcGeometricRepresentationItem ifcRepresentation, IIfcAxis2Placement3D objectLocation, ILogger logger)
@@ -195,14 +193,14 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 using (location)
                 {
                     int moveResult = XbimGeometryNativeApi.xbim_shape_moved(
-                        ((Shape)shape).Handle, location.Handle, out var movedHandle);
+                        ((XbimShape)shape).Handle, location.Handle, out var movedHandle);
                     if (moveResult != 0)
                         throw new InvalidOperationException(
                             $"Failed to apply placement: {XbimGeometryNativeApi.GetLastError()}");
                     shape = Shapes.NativeShapeWrapper.WrapShape(movedHandle);
                 }
             }
-            return V5Shape.Wrap(shape);
+            return (IXbimGeometryObject)shape;
         }
 
         // --- CreateShapeGeometry ---
@@ -263,37 +261,37 @@ namespace Xbim.Geometry.Engine.Interop.Services
             => WrapBuildAsSolid((IIfcSolidModel)ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcBoundingBox ifcSolid, ILogger logger)
-            => V5Shape.WrapSolid((IXSolid)BuildBoundingBox(ifcSolid));
+            => (IXbimSolid)BuildBoundingBox(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcSurfaceCurveSweptAreaSolid ifcSolid, ILogger logger)
             => WrapBuildAsSolid((IIfcSolidModel)ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcHalfSpaceSolid ifcSolid, ILogger logger)
-            => V5Shape.WrapSolid((IXSolid)_service.SolidFactory.Build(ifcSolid));
+            => (IXbimSolid)_service.SolidFactory.Build(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcPolygonalBoundedHalfSpace ifcSolid, ILogger logger)
-            => V5Shape.WrapSolid((IXSolid)_service.SolidFactory.Build((IIfcHalfSpaceSolid)ifcSolid));
+            => (IXbimSolid)_service.SolidFactory.Build((IIfcHalfSpaceSolid)ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcBoxedHalfSpace ifcSolid, ILogger logger)
-            => V5Shape.WrapSolid((IXSolid)_service.SolidFactory.Build((IIfcHalfSpaceSolid)ifcSolid));
+            => (IXbimSolid)_service.SolidFactory.Build((IIfcHalfSpaceSolid)ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcCsgPrimitive3D ifcSolid, ILogger logger)
-            => V5Shape.WrapSolid(_service.SolidFactory.Build(ifcSolid));
+            => (IXbimSolid)_service.SolidFactory.Build(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcSphere ifcSolid, ILogger logger)
-            => V5Shape.WrapSolid(_service.SolidFactory.Build((IIfcCsgPrimitive3D)ifcSolid));
+            => (IXbimSolid)_service.SolidFactory.Build((IIfcCsgPrimitive3D)ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcBlock ifcSolid, ILogger logger)
-            => V5Shape.WrapSolid(_service.SolidFactory.Build((IIfcCsgPrimitive3D)ifcSolid));
+            => (IXbimSolid)_service.SolidFactory.Build((IIfcCsgPrimitive3D)ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcRightCircularCylinder ifcSolid, ILogger logger)
-            => V5Shape.WrapSolid(_service.SolidFactory.Build((IIfcCsgPrimitive3D)ifcSolid));
+            => (IXbimSolid)_service.SolidFactory.Build((IIfcCsgPrimitive3D)ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcRightCircularCone ifcSolid, ILogger logger)
-            => V5Shape.WrapSolid(_service.SolidFactory.Build((IIfcCsgPrimitive3D)ifcSolid));
+            => (IXbimSolid)_service.SolidFactory.Build((IIfcCsgPrimitive3D)ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcRectangularPyramid ifcSolid, ILogger logger)
-            => V5Shape.WrapSolid(_service.SolidFactory.Build((IIfcCsgPrimitive3D)ifcSolid));
+            => (IXbimSolid)_service.SolidFactory.Build((IIfcCsgPrimitive3D)ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcSweptDiskSolidPolygonal ifcSolid, ILogger logger)
             => WrapBuildAsSolid((IIfcSolidModel)ifcSolid);
@@ -337,7 +335,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         // --- CreateSolidSet overloads ---
 
         public IXbimSolidSet CreateSolidSet()
-            => new V5SolidSet();
+            => new XbimSolidSet();
 
         public IXbimSolidSet CreateSolidSet(IIfcBooleanClippingResult ifcSolid, ILogger logger)
         {
@@ -373,7 +371,6 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXbimSolidSet CreateSolidSet(IIfcClosedShell ifcSolid, ILogger logger)
         {
-            // Build the shell as a shell-based surface model, then extract solids
             var shape = Build((IIfcGeometricRepresentationItem)ifcSolid);
             return WrapShapeAsSolidSet(shape);
         }
@@ -401,7 +398,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         public IXbimFace CreateFace(IIfcProfileDef profileDef, ILogger logger)
         {
             var face = _service.ProfileFactory.BuildFace(profileDef);
-            return V5Shape.WrapFace(face);
+            return (IXbimFace)face;
         }
 
         public IXbimFace CreateFace(IIfcCompositeCurve cCurve, ILogger logger)
@@ -418,7 +415,6 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXbimFace CreateFace(IIfcPolyLoop loop, ILogger logger)
         {
-            // Extract points from the polyloop and build a wire, then make a face
             var points = new System.Collections.Generic.List<IXPoint>();
             foreach (var pt in loop.Polygon)
             {
@@ -439,20 +435,16 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXbimFace CreateFace(IXbimWire wire, ILogger logger)
         {
-            if (wire is V5Wire v5Wire)
+            if (wire is XbimWire wireShape)
             {
-                var innerWire = v5Wire.Inner as Wire;
-                if (innerWire != null)
-                {
-                    int result = XbimGeometryNativeApi.xbim_face_build_from_wire(
-                        _service.ContextHandle, innerWire.Handle, out var faceHandle);
-                    if (result != 0)
-                        throw new InvalidOperationException(
-                            $"Failed to build face from wire: {XbimGeometryNativeApi.GetLastError()}");
-                    return V5Shape.WrapFace(Shapes.NativeShapeWrapper.WrapFace(faceHandle));
-                }
+                int result = XbimGeometryNativeApi.xbim_face_build_from_wire(
+                    _service.ContextHandle, wireShape.Handle, out var faceHandle);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to build face from wire: {XbimGeometryNativeApi.GetLastError()}");
+                return (IXbimFace)Shapes.NativeShapeWrapper.WrapFace(faceHandle);
             }
-            throw new InvalidOperationException("Wire must be a V5Wire from this geometry engine.");
+            throw new InvalidOperationException("Wire must be a XbimWire from this geometry engine.");
         }
 
         // --- CreateSurfaceModel overloads ---
@@ -484,7 +476,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         // --- Empty set creation ---
 
         public IXbimGeometryObjectSet CreateGeometryObjectSet()
-            => new V5GeometryObjectSet();
+            => new XbimGeometryObjectSet();
 
         // --- Shell creation ---
 
@@ -502,7 +494,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         public IXbimWire CreateWire(IIfcCurve curve, ILogger logger)
         {
             var wire = _service.WireFactory.Build(curve);
-            return new V5Wire((Wire)wire);
+            return (IXbimWire)wire;
         }
 
         public IXbimWire CreateWire(IIfcCompositeCurveSegment compCurveSeg, ILogger logger)
@@ -574,7 +566,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
             if (result != 0)
                 throw new InvalidOperationException(
                     $"Failed to create vertex: {XbimGeometryNativeApi.GetLastError()}");
-            return new V5Vertex(new Vertex(handle));
+            return new XbimVertex(handle);
         }
 
         // --- Transforms ---
@@ -591,89 +583,87 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXbimGeometryObject Transformed(IXbimGeometryObject geometry, IIfcCartesianTransformationOperator cartesianTransform)
         {
-            var v5 = geometry as V5Shape;
-            if (v5 == null)
+            var shape = geometry as XbimShape;
+            if (shape == null)
                 throw new InvalidOperationException("Geometry must originate from this geometry engine.");
 
             var gf = (GeometryFactory)_service.GeometryFactory;
             var matrix = gf.BuildTransform(cartesianTransform);
 
-            // Convert IXMatrix to XbimMatrix3D to apply via V5Shape.Transform
             var m = new XbimMatrix3D(
                 matrix.M11, matrix.M12, matrix.M13, 0,
                 matrix.M21, matrix.M22, matrix.M23, 0,
                 matrix.M31, matrix.M32, matrix.M33, 0,
                 matrix.OffsetX, matrix.OffsetY, matrix.OffsetZ, 1);
 
-            return v5.Transform(m);
+            return shape.Transform(m);
         }
 
         public IXbimGeometryObject Moved(IXbimGeometryObject geometryObject, IIfcPlacement placement)
         {
-            var v5 = geometryObject as V5Shape;
-            if (v5 == null)
+            var shape = geometryObject as XbimShape;
+            if (shape == null)
                 throw new InvalidOperationException("Geometry must originate from this geometry engine.");
 
             var gf = (GeometryFactory)_service.GeometryFactory;
             var loc = gf.BuildLocation(placement);
-            return MoveShape(v5, (XLocation)loc);
+            return MoveShape(shape, (XLocation)loc);
         }
 
         public IXbimGeometryObject Moved(IXbimGeometryObject geometryObject, IIfcAxis2Placement3D placement)
         {
-            var v5 = geometryObject as V5Shape;
-            if (v5 == null)
+            var shape = geometryObject as XbimShape;
+            if (shape == null)
                 throw new InvalidOperationException("Geometry must originate from this geometry engine.");
 
             var gf = (GeometryFactory)_service.GeometryFactory;
             var loc = gf.BuildLocationFromAxis3D(placement);
-            return MoveShape(v5, loc);
+            return MoveShape(shape, loc);
         }
 
         public IXbimGeometryObject Moved(IXbimGeometryObject geometryObject, IIfcAxis2Placement2D placement)
         {
-            var v5 = geometryObject as V5Shape;
-            if (v5 == null)
+            var shape = geometryObject as XbimShape;
+            if (shape == null)
                 throw new InvalidOperationException("Geometry must originate from this geometry engine.");
 
             var gf = (GeometryFactory)_service.GeometryFactory;
             var loc = gf.BuildLocationFromAxis2D(placement);
-            return MoveShape(v5, loc);
+            return MoveShape(shape, loc);
         }
 
         public IXbimGeometryObject Moved(IXbimGeometryObject geometryObject, IIfcObjectPlacement objectPlacement, ILogger logger)
         {
-            var v5 = geometryObject as V5Shape;
-            if (v5 == null)
+            var shape = geometryObject as XbimShape;
+            if (shape == null)
                 throw new InvalidOperationException("Geometry must originate from this geometry engine.");
 
             var gf = (GeometryFactory)_service.GeometryFactory;
             var loc = gf.ToLocation(objectPlacement);
-            return MoveShape(v5, loc);
+            return MoveShape(shape, loc);
         }
 
         // --- BRep I/O ---
 
         public IXbimGeometryObject FromBrep(string brepStr)
         {
-            var shape = Services.ShapeBinarySerializer.FromBrep(brepStr);
-            return V5Shape.Wrap(shape);
+            return (IXbimGeometryObject)Services.ShapeBinarySerializer.FromBrep(brepStr);
         }
 
         public string ToBrep(IXbimGeometryObject geometryObject)
         {
-            var v5 = geometryObject as V5Shape;
-            if (v5 == null)
+            var shape = geometryObject as XbimShape;
+            if (shape == null)
                 throw new InvalidOperationException("Geometry must originate from this geometry engine.");
-            return v5.Inner.BrepString();
+            return shape.BrepString();
         }
 
         public void WriteBrep(string filename, IXbimGeometryObject geomObj)
         {
-            var v5 = geomObj as V5Shape;
-            if (v5 == null)
+            var shape = geomObj as XbimShape;
+            if (shape == null)
                 throw new InvalidOperationException("Geometry must originate from this geometry engine.");
-            ((Shape)v5.Inner).WriteBrep(filename);
+            shape.WriteBrep(filename);
         }
 
         public IXbimGeometryObject ReadBrep(string filename)
@@ -706,16 +696,16 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         #endregion
 
-        #region V5 Helpers
+        #region Helpers
 
         /// <summary>
-        /// Extracts the underlying V6 shape from a V5 geometry object.
+        /// Extracts the underlying V6 shape from a geometry object.
         /// For sets, builds a compound shape from all constituent objects.
         /// </summary>
         private IXShape ExtractV6Shape(IXbimGeometryObject geometryObject)
         {
-            if (geometryObject is V5Shape v5)
-                return v5.Inner;
+            if (geometryObject is XbimShape shape)
+                return shape;
 
             // For sets, build a compound from all elements
             if (geometryObject.IsSet && geometryObject is IEnumerable<IXbimGeometryObject> set)
@@ -723,8 +713,8 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 var shapeHandles = new List<NativeShapeHandle>();
                 foreach (var item in set)
                 {
-                    if (item is V5Shape v5Item)
-                        shapeHandles.Add(((Shape)v5Item.Inner).Handle);
+                    if (item is XbimShape s)
+                        shapeHandles.Add(s.Handle);
                 }
 
                 if (shapeHandles.Count == 0)
@@ -751,7 +741,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         }
 
         /// <summary>
-        /// Builds a solid model via V6 factory and wraps as V5 solid.
+        /// Builds a solid model via V6 factory and returns as IXbimSolid.
         /// </summary>
         private IXbimSolid WrapBuildAsSolid(IIfcSolidModel solidModel)
         {
@@ -760,44 +750,42 @@ namespace Xbim.Geometry.Engine.Interop.Services
         }
 
         /// <summary>
-        /// Wraps a V6 shape result as a V5 solid.
-        /// If the result is already a solid, wraps directly.
+        /// Returns an IXShape result as IXbimSolid.
+        /// If the result is already a solid, casts directly.
         /// If it's a compound, extracts the first solid.
         /// </summary>
         private static IXbimSolid WrapShapeAsSolid(IXShape shape)
         {
-            if (shape is IXSolid solid)
-                return V5Shape.WrapSolid(solid);
+            if (shape is XbimSolid solid)
+                return solid;
 
             // For compound results, extract the first solid
-            var s = (Shape)shape;
+            var s = (XbimShape)shape;
             var solidHandles = s.GetSubShapeHandles(XShapeType.Solid);
             if (solidHandles.Length > 0)
-                return new V5Solid(new Solid(solidHandles[0]));
+                return new XbimSolid(solidHandles[0]);
 
             throw new InvalidOperationException("Build result is not a solid.");
         }
 
         /// <summary>
-        /// Wraps a V6 shape result as a V5 solid set.
-        /// Handles both single solids and compound shapes with multiple solids.
+        /// Returns an IXShape result as IXbimSolidSet.
         /// </summary>
         private static IXbimSolidSet WrapShapeAsSolidSet(IXShape shape)
         {
-            if (shape is IXSolid solid)
-                return new V5SolidSet(new[] { V5Shape.WrapSolid(solid) });
+            if (shape is XbimSolid solid)
+                return new XbimSolidSet(new IXbimSolid[] { solid });
 
-            var s = (Shape)shape;
-            return new V5SolidSet(s);
+            var s = (XbimShape)shape;
+            return new XbimSolidSet(s);
         }
 
         /// <summary>
-        /// Wraps a V6 shape result as a V5 geometry object set.
+        /// Wraps a V6 shape as an IXbimGeometryObjectSet.
         /// </summary>
         private static IXbimGeometryObjectSet WrapShapeAsGeometryObjectSet(IXShape shape)
         {
-            var wrapped = V5Shape.Wrap(shape);
-            return new V5GeometryObjectSet(new[] { wrapped });
+            return new XbimGeometryObjectSet(new IXbimGeometryObject[] { (IXbimGeometryObject)shape });
         }
 
         /// <summary>
@@ -805,9 +793,9 @@ namespace Xbim.Geometry.Engine.Interop.Services
         /// </summary>
         private IXbimFace WrapWireAsFace(IXWire wire)
         {
-            var wireShape = wire as Wire;
+            var wireShape = wire as XbimWire;
             if (wireShape == null)
-                throw new InvalidOperationException("Wire must be a Wire instance.");
+                throw new InvalidOperationException("Wire must be a XbimWire instance.");
 
             int result = XbimGeometryNativeApi.xbim_face_build_from_wire(
                 _service.ContextHandle, wireShape.Handle, out var faceHandle);
@@ -815,22 +803,22 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 throw new InvalidOperationException(
                     $"Failed to build face from wire: {XbimGeometryNativeApi.GetLastError()}");
 
-            return V5Shape.WrapFace(Shapes.NativeShapeWrapper.WrapFace(faceHandle));
+            return (IXbimFace)Shapes.NativeShapeWrapper.WrapFace(faceHandle);
         }
 
         /// <summary>
-        /// Moves a V5Shape using a native location handle, returning a new wrapped V5 shape.
+        /// Moves a shape using a native location handle, returning a new shape.
         /// </summary>
-        private static IXbimGeometryObject MoveShape(V5Shape v5, XLocation location)
+        private static IXbimGeometryObject MoveShape(XbimShape shape, XLocation location)
         {
             using (location)
             {
                 int moveResult = XbimGeometryNativeApi.xbim_shape_moved(
-                    v5.Inner.Handle, location.Handle, out var movedHandle);
+                    shape.Handle, location.Handle, out var movedHandle);
                 if (moveResult != 0)
                     throw new InvalidOperationException(
                         $"Failed to move shape: {XbimGeometryNativeApi.GetLastError()}");
-                return V5Shape.Wrap(Shapes.NativeShapeWrapper.WrapShape(movedHandle));
+                return (IXbimGeometryObject)Shapes.NativeShapeWrapper.WrapShape(movedHandle);
             }
         }
 

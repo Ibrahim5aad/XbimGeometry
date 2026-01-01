@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -17,7 +17,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
     {
         /// <summary>
         /// Routes an IFC curve entity to the appropriate 2D curve builder based on its type.
-        /// Returns a <see cref="Curve2d"/> wrapper with Is3d=false.
+        /// Returns a <see cref="XbimCurve2d"/> wrapper with Is3d=false.
         /// </summary>
         internal IXCurve BuildCurve2d(IIfcCurve curve)
         {
@@ -52,14 +52,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 $"2D curve type {curve.ExpressType.ExpressName} #{curve.EntityLabel} is not yet supported.");
         }
 
-        #region Line2d
+        #region XbimLine2d
 
         /// <summary>
         /// Builds an unbounded 2D line from an IFC line entity.
-        /// The line's direction magnitude is stored on the returned Line2d
+        /// The line's direction magnitude is stored on the returned XbimLine2d
         /// for use in trim parameter conversion.
         /// </summary>
-        private Line2d BuildLine2d(IIfcLine ifcLine)
+        private XbimLine2d BuildLine2d(IIfcLine ifcLine)
         {
             var coords = ifcLine.Pnt.Coordinates;
             double ox = coords[0];
@@ -87,7 +87,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build 2D line #{ifcLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Line2d(nativeHandle,
+            return new XbimLine2d(nativeHandle,
                 new XPoint(ox, oy),
                 new XVector(dx, dy),
                 ifcLine.Dir.Magnitude);
@@ -95,13 +95,13 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         #endregion
 
-        #region Circle2d
+        #region XbimCircle2d
 
         /// <summary>
         /// Builds a 2D circle from an IFC circle entity with center, radius, and
         /// reference direction extracted from a 2D axis placement.
         /// </summary>
-        private Circle2d BuildCircle2d(IIfcCircle ifcCircle)
+        private XbimCircle2d BuildCircle2d(IIfcCircle ifcCircle)
         {
             if (ifcCircle.Radius <= 0)
                 throw new XbimGeometryFactoryException(
@@ -138,19 +138,19 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var position = new XAxis2Placement2d(
                 new XPoint(cx, cy),
                 new XDirection(refDirX, refDirY));
-            return new Circle2d(nativeHandle, ifcCircle.Radius, position);
+            return new XbimCircle2d(nativeHandle, ifcCircle.Radius, position);
         }
 
         #endregion
 
-        #region Ellipse2d
+        #region XbimEllipse2d
 
         /// <summary>
         /// Builds a 2D ellipse from an IFC ellipse entity with center, semi-axes, and
         /// reference direction extracted from a 2D axis placement. The native function
         /// handles automatic semi-axis swapping when SemiAxis1 &lt; SemiAxis2.
         /// </summary>
-        private Ellipse2d BuildEllipse2d(IIfcEllipse ifcEllipse)
+        private XbimEllipse2d BuildEllipse2d(IIfcEllipse ifcEllipse)
         {
             if (ifcEllipse.Position is not IIfcAxis2Placement2D axis2d)
                 throw new XbimGeometryFactoryException(
@@ -183,7 +183,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var position = new XAxis2Placement2d(
                 new XPoint(cx, cy),
                 new XDirection(refDirX, refDirY));
-            return new Ellipse2d(nativeHandle, ifcEllipse.SemiAxis1, ifcEllipse.SemiAxis2, position);
+            return new XbimEllipse2d(nativeHandle, ifcEllipse.SemiAxis1, ifcEllipse.SemiAxis2, position);
         }
 
         #endregion
@@ -194,7 +194,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// Builds a 2D B-spline curve from an IFC B-spline entity. Extracts 2D control points,
         /// knots, multiplicities, degree, and optional weights (for rational B-splines).
         /// </summary>
-        private BSplineCurve2d BuildBSpline2d(IIfcBSplineCurveWithKnots ifcBSpline)
+        private XbimBSplineCurve2d BuildBSpline2d(IIfcBSplineCurveWithKnots ifcBSpline)
         {
             var controlPoints = ifcBSpline.ControlPointsList;
             int numPoles = controlPoints.Count;
@@ -247,13 +247,13 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 : XCurveType.IfcBSplineCurveWithKnots;
 
             bool isRational = ifcBSpline is IIfcRationalBSplineCurveWithKnots;
-            return new BSplineCurve2d(nativeHandle, curveType,
+            return new XbimBSplineCurve2d(nativeHandle, curveType,
                 XGeometricContinuity.GeomAbs_CN, false, isRational);
         }
 
         #endregion
 
-        #region TrimmedCurve2d
+        #region XbimTrimmedCurve2d
 
         /// <summary>
         /// Builds a 2D trimmed curve from an IFC trimmed curve entity.
@@ -262,7 +262,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// For circle basis curves, uses arc-of-circle construction; for ellipse, arc-of-ellipse;
         /// for other curves, generic parametric trimming.
         /// </summary>
-        private TrimmedCurve2d BuildTrimmedCurve2d(IIfcTrimmedCurve ifcTrimmed)
+        private XbimTrimmedCurve2d BuildTrimmedCurve2d(IIfcTrimmedCurve ifcTrimmed)
         {
             // Formal proposition: NoTrimOfBoundedCurves — stricter in 2D (throw, not warn)
             if (ifcTrimmed.BasisCurve is IIfcBoundedCurve)
@@ -270,8 +270,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Formal Proposition NoTrimOfBoundedCurves — " +
                     "already bounded curves shall not be trimmed.");
 
-            // Build the 2D basis curve — ownership transfers to TrimmedCurve2d on success
-            var basisCurve = (Curve2d)BuildCurve2d(ifcTrimmed.BasisCurve);
+            // Build the 2D basis curve — ownership transfers to XbimTrimmedCurve2d on success
+            var basisCurve = (XbimCurve2d)BuildCurve2d(ifcTrimmed.BasisCurve);
             try
             {
                 bool isConic = ifcTrimmed.BasisCurve is IIfcConic;
@@ -397,7 +397,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build 2D trimmed curve #{ifcTrimmed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new TrimmedCurve2d(trimHandle, basisCurve);
+                return new XbimTrimmedCurve2d(trimHandle, basisCurve);
             }
             catch
             {
@@ -415,7 +415,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// trimmed line segment. Multi-point polylines are built as individual trimmed line segments
         /// joined into a composite B-spline, with degenerate (zero-length) segments skipped.
         /// </summary>
-        private BoundedCurve2d BuildPolyline2d(IIfcPolyline ifcPolyline)
+        private XbimBoundedCurve2d BuildPolyline2d(IIfcPolyline ifcPolyline)
         {
             var ifcPoints = ifcPolyline.Points;
             int pointCount = ifcPoints.Count;
@@ -456,7 +456,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build 2D polyline line segment #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new BoundedCurve2d(lineHandle, XCurveType.IfcPolyline);
+                return new XbimBoundedCurve2d(lineHandle, XCurveType.IfcPolyline);
             }
 
             // 3+ points: build individual 2D lines, skip degenerate segments
@@ -495,7 +495,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 {
                     var singleHandle = segments[0];
                     segments.Clear();
-                    return new BoundedCurve2d(singleHandle, XCurveType.IfcPolyline);
+                    return new XbimBoundedCurve2d(singleHandle, XCurveType.IfcPolyline);
                 }
 
                 using var nativeSegments = new NativeHandleArray(
@@ -509,7 +509,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build 2D polyline #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new BoundedCurve2d(compositeHandle, XCurveType.IfcPolyline);
+                return new XbimBoundedCurve2d(compositeHandle, XCurveType.IfcPolyline);
             }
             finally
             {
@@ -527,9 +527,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// SameSense reversal, and joining all segments into a single composite B-spline.
         /// Skips consecutive duplicate segments (ArchiCAD bug workaround).
         /// </summary>
-        private BoundedCurve2d BuildCompositeCurve2d(IIfcCompositeCurve ifcComposite)
+        private XbimBoundedCurve2d BuildCompositeCurve2d(IIfcCompositeCurve ifcComposite)
         {
-            var segmentCurves = new List<Curve2d>();
+            var segmentCurves = new List<XbimCurve2d>();
 
             try
             {
@@ -560,7 +560,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         throw new InvalidOperationException(
                             "Composite curve is invalid, only curve segments that are bounded curves are permitted.");
 
-                    var segCurve = (Curve2d)BuildCurve2d(segment.ParentCurve);
+                    var segCurve = (XbimCurve2d)BuildCurve2d(segment.ParentCurve);
 
                     if (!segment.SameSense)
                     {
@@ -588,7 +588,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build 2D composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new BoundedCurve2d(compositeHandle, XCurveType.IfcCompositeCurve);
+                return new XbimBoundedCurve2d(compositeHandle, XCurveType.IfcCompositeCurve);
             }
             finally
             {
@@ -607,7 +607,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// LineIndex segments (consecutive point-to-point lines), and the no-segments case
         /// (sequential lines through all points). Joins segments into a single composite B-spline.
         /// </summary>
-        private BoundedCurve2d BuildIndexedPolyCurve2d(IIfcIndexedPolyCurve ifcIndexed)
+        private XbimBoundedCurve2d BuildIndexedPolyCurve2d(IIfcIndexedPolyCurve ifcIndexed)
         {
             var points = ExtractPoints2d(ifcIndexed);
             var segments = new List<NativeCurve2dHandle>();
@@ -698,7 +698,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 {
                     var singleHandle = segments[0];
                     segments.Clear(); // prevent dispose of the returned handle
-                    return new BoundedCurve2d(singleHandle, XCurveType.IfcIndexedPolyCurve);
+                    return new XbimBoundedCurve2d(singleHandle, XCurveType.IfcIndexedPolyCurve);
                 }
 
                 // Join all segments into a single B-spline
@@ -713,7 +713,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to join 2D IndexedPolyCurve segments #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new BoundedCurve2d(compositeHandle, XCurveType.IfcIndexedPolyCurve);
+                return new XbimBoundedCurve2d(compositeHandle, XCurveType.IfcIndexedPolyCurve);
             }
             finally
             {
@@ -750,9 +750,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// Builds a 2D offset curve from an IFC offset curve 2D entity.
         /// Offsets the basis curve by the specified distance in the 2D plane.
         /// </summary>
-        private Curve2d BuildOffsetCurve2d(IIfcOffsetCurve2D ifcOffset)
+        private XbimCurve2d BuildOffsetCurve2d(IIfcOffsetCurve2D ifcOffset)
         {
-            using var basisCurve = (Curve2d)BuildCurve2d(ifcOffset.BasisCurve);
+            using var basisCurve = (XbimCurve2d)BuildCurve2d(ifcOffset.BasisCurve);
 
             int result = XbimGeometryNativeApi.xbim_curve2d_build_offset(
                 ContextHandle, basisCurve.Handle,
@@ -763,7 +763,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build 2D offset curve #{ifcOffset.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Curve2d(offsetHandle, XCurveType.IfcOffsetCurve2D);
+            return new XbimCurve2d(offsetHandle, XCurveType.IfcOffsetCurve2D);
         }
 
         #endregion

@@ -56,7 +56,6 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
             _logger = loggerFactory.CreateLogger<ModelGeometryService>();
 
-            // Begin a logging scope with model metadata (matching C++/CLI pattern)
             var scope = new Dictionary<string, object?>
             {
                 ["OriginatingSystem"] = model.Header?.FileName?.OriginatingSystem,
@@ -151,7 +150,6 @@ namespace Xbim.Geometry.Engine.Interop.Services
             _precisionSquared = precision * precision;
             _minAreaM2 = Math.Pow(0.002, 2) * Math.Pow(oneMeter, 2); // 2mm x 2mm
 
-            // Determine minimum gap based on authoring tool (matching C++/CLI logic)
             var app = model.Instances.OfType<IIfcApplication>().FirstOrDefault();
             if (app != null && app.ApplicationIdentifier.ToString() == "Revit")
                 _minimumGap = (oneMillimeter * 25.4) / 32; // 1/32nd inch — Revit's min line length

@@ -1,13 +1,8 @@
 /*
  * xbim_surface.cpp
  *
- * Implements surface construction, query, and lifecycle functions via the flat C API.
- * Ports NSurfaceFactory methods from the C++/CLI engine:
- *   - Build plane from origin and normal (or axis-2 placement)
- *   - Build cylindrical surface from axis-2 placement and radius
- *   - Build spherical surface from axis-2 placement and radius
- *   - Build B-spline surface from control points grid, knots, and parameters
- *   - Destroy surface handle
+ * Implements surface construction, query, and lifecycle functions
+ * 
  */
 
 #include "xbim_surface.h"

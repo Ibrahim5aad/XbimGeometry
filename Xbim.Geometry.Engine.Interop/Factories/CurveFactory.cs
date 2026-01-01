@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
@@ -58,13 +58,18 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             return BuildCurve3d(curve);
         }
 
+        /// <summary>
+        /// Builds a 3D curve regardless of the IFC-declared dimensionality.
+        /// </summary>
+        public XbimCurve Build3d(IIfcCurve curve) => (XbimCurve)BuildCurve3d(curve);
+
         public IXCurve BuildDirectrix(IIfcCurve curve, double? startParam, double? endParam)
         {
             if ((int)curve.Dim != 3)
                 throw new InvalidOperationException(
                     "Directrix must be a 3D curve.");
 
-            var builtCurve = (Curve)BuildCurve3d(curve);
+            var builtCurve = (XbimCurve)BuildCurve3d(curve);
 
             // If no trimming requested, return the full curve
             if (!startParam.HasValue && !endParam.HasValue)
@@ -93,7 +98,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to trim directrix curve #{curve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new Curve(trimmedHandle, builtCurve.CurveType);
+                return new XbimCurve(trimmedHandle, builtCurve.CurveType);
             }
             finally
             {
@@ -125,21 +130,21 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// Returns a cached curve if available, otherwise builds it, stores the owning handle
         /// in the cache, and returns a borrowed (non-owning) wrapper to the caller.
         /// </summary>
-        private Curve GetOrBuildCached(int entityLabel, Func<Curve> builder)
+        private XbimCurve GetOrBuildCached(int entityLabel, Func<XbimCurve> builder)
         {
             lock (_cacheLock)
             {
                 if (_curveCache.TryGetValue(entityLabel, out var entry))
-                    return new Curve(NativeCurveHandle.Borrowed(entry.Handle), entry.CurveType);
+                    return new XbimCurve(NativeCurveHandle.Borrowed(entry.Handle), entry.CurveType);
 
                 var built = builder();
                 var curveType = built.CurveType;
                 var owningHandle = built.DetachHandle();
                 _curveCache[entityLabel] = (owningHandle, curveType);
                 if (curveType is XCurveType.IfcGradientCurve)
-                    return new GradientCurve(NativeCurveHandle.Borrowed(owningHandle), ContextHandle, _modelService.Precision);
+                    return new XbimGradientCurve(NativeCurveHandle.Borrowed(owningHandle), ContextHandle, _modelService.Precision);
                 else
-                    return new Curve(NativeCurveHandle.Borrowed(owningHandle), curveType);
+                    return new XbimCurve(NativeCurveHandle.Borrowed(owningHandle), curveType);
             }
         }
 

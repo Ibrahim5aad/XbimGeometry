@@ -17,7 +17,7 @@ using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Geometry.Engine.Interop.Internal;
-using Xbim.Geometry.Engine.Interop.Shapes.V5;
+using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
 using Xbim.ModelGeometry.Scene.Clustering;
@@ -1659,7 +1659,7 @@ namespace Xbim.ModelGeometry.Scene
         }
 
         /// <summary>
-        /// Extracts a single V6 shape from a V5 geometry object set.
+        /// Extracts a single V6 shape from a geometry object set.
         /// If the set has multiple items, combines them into a compound.
         /// </summary>
         private IXShape ExtractV6Shape(IXbimGeometryObjectSet geomSet)
@@ -1667,8 +1667,8 @@ namespace Xbim.ModelGeometry.Scene
             var shapes = new List<IXShape>();
             foreach (var item in geomSet)
             {
-                if (item is V5Shape v5)
-                    shapes.Add(v5.Inner);
+                if (item is IXShape s)
+                    shapes.Add(s);
             }
             if (shapes.Count == 0) return null;
             if (shapes.Count == 1) return shapes[0];
@@ -1677,24 +1677,23 @@ namespace Xbim.ModelGeometry.Scene
         }
 
         /// <summary>
-        /// Extracts V6 shapes from a V5 solid set.
+        /// Extracts V6 shapes from a solid set.
         /// </summary>
         private static IEnumerable<IXShape> ExtractV6Shapes(IXbimSolidSet solidSet)
         {
             foreach (var solid in solidSet)
             {
-                if (solid is V5Shape v5)
-                    yield return v5.Inner;
+                if (solid is IXShape s)
+                    yield return s;
             }
         }
 
         /// <summary>
-        /// Wraps a V6 shape result back into a V5 geometry object set.
+        /// Wraps a shape result into a geometry object set.
         /// </summary>
         private static IXbimGeometryObjectSet WrapAsGeometryObjectSet(IXShape shape)
         {
-            var wrapped = V5Shape.Wrap(shape);
-            return new V5GeometryObjectSet(new[] { wrapped });
+            return new XbimGeometryObjectSet(new[] { (IXbimGeometryObject)shape });
         }
 
         private bool ShouldTesselateShapeDirectly(ShapeContext shapeMeta, XbimTessellator xbimTessellator)

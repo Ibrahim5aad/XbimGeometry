@@ -2,8 +2,8 @@
  * xbim_logging.cpp
  *
  * Implements context-bound logging with printf-style formatting.
- * All log messages pass through the XbimLogCallback stored in the context,
- * matching the NLoggingService pattern from the C++/CLI engine.
+ * All log messages pass through the XbimLogCallback stored in the context.
+ * 
  */
 
 #include "xbim_logging.h"

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -59,7 +59,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build wire from {points.Length} points: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Wire(wireHandle);
+            return new XbimWire(wireHandle);
         }
 
         public IXWire Build(IIfcCurve ifcCurve)
@@ -105,7 +105,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 return BuildOpenProfileWire(openProfile);
 
             // All other profile types: build face, extract outer wire
-            var face = (Face)_modelService.ProfileFactory.BuildFace(ifcProfileDef);
+            var face = (XbimFace)_modelService.ProfileFactory.BuildFace(ifcProfileDef);
             try
             {
                 return face.OuterBound;
@@ -144,7 +144,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build wire from polyline #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Wire(wireHandle);
+            return new XbimWire(wireHandle);
         }
 
         #endregion
@@ -169,7 +169,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build indexed poly curve #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new Wire(wireHandle);
+                return new XbimWire(wireHandle);
             }
 
             // Build individual edges from segments.
@@ -255,7 +255,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build wire from edges in indexed poly curve #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new Wire(resultWireHandle);
+                return new XbimWire(resultWireHandle);
             }
             finally
             {
@@ -270,7 +270,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private IXWire BuildFromCompositeCurve(IIfcCompositeCurve ifcComposite)
         {
-            var segmentCurves = new List<Curve>();
+            var segmentCurves = new List<XbimCurve>();
             try
             {
                 foreach (var segment in ifcComposite.Segments)
@@ -278,7 +278,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     var parentCurve = segment.ParentCurve;
                     if (parentCurve == null) continue;
 
-                    var segCurve = (Curve)_modelService.CurveFactory.Build(parentCurve);
+                    var segCurve = (XbimCurve)_modelService.CurveFactory.Build(parentCurve);
 
                     if (!segment.SameSense)
                     {
@@ -309,7 +309,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build wire from composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new Wire(wireHandle);
+                return new XbimWire(wireHandle);
             }
             finally
             {
@@ -334,7 +334,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build wire from {curveDescription}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Wire(wireHandle);
+            return new XbimWire(wireHandle);
         }
 
         private IXWire BuildFromTrimmedCurve(IIfcTrimmedCurve ifcTrimmed)
@@ -343,7 +343,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (builtCurve.Is3d)
             {
-                var curve3d = (Curve)builtCurve;
+                var curve3d = (XbimCurve)builtCurve;
                 try
                 {
                     var startPt = curve3d.GetPoint(curve3d.FirstParameter);
@@ -370,7 +370,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
             else
             {
-                var curve2d = (Curve2d)builtCurve;
+                var curve2d = (XbimCurve2d)builtCurve;
                 NativeCurve2dHandle curveHandle = null;
                 try
                 {
@@ -387,7 +387,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         throw new InvalidOperationException(
                             $"Failed to build wire from 2D trimmed curve #{ifcTrimmed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                    return new Wire(wireHandle);
+                    return new XbimWire(wireHandle);
                 }
                 finally
                 {
@@ -398,25 +398,25 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private IXWire BuildFromLine(IIfcLine ifcLine)
         {
-            var edge = (Edge)_modelService.EdgeFactory.Build(ifcLine);
+            var edge = (XbimEdge)_modelService.EdgeFactory.Build(ifcLine);
             return WrapEdgeAsWire(edge.Handle, $"line #{ifcLine.EntityLabel}");
         }
 
         private IXWire BuildFromCircle(IIfcCircle ifcCircle)
         {
-            var edge = (Edge)_modelService.EdgeFactory.Build(ifcCircle);
+            var edge = (XbimEdge)_modelService.EdgeFactory.Build(ifcCircle);
             return WrapEdgeAsWire(edge.Handle, $"circle #{ifcCircle.EntityLabel}");
         }
 
         private IXWire BuildFromEllipse(IIfcEllipse ifcEllipse)
         {
-            var edge = (Edge)_modelService.EdgeFactory.Build(ifcEllipse);
+            var edge = (XbimEdge)_modelService.EdgeFactory.Build(ifcEllipse);
             return WrapEdgeAsWire(edge.Handle, $"ellipse #{ifcEllipse.EntityLabel}");
         }
 
         private IXWire BuildFromBSpline(IIfcBSplineCurveWithKnots ifcBSpline)
         {
-            var edge = (Edge)_modelService.EdgeFactory.Build(ifcBSpline);
+            var edge = (XbimEdge)_modelService.EdgeFactory.Build(ifcBSpline);
             return WrapEdgeAsWire(edge.Handle, $"B-spline #{ifcBSpline.EntityLabel}");
         }
 
@@ -426,7 +426,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (builtCurve.Is3d)
             {
-                var curve3d = (Curve)builtCurve;
+                var curve3d = (XbimCurve)builtCurve;
                 try
                 {
                     var startPt = curve3d.GetPoint(curve3d.FirstParameter);
@@ -453,7 +453,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
             else
             {
-                var curve2d = (Curve2d)builtCurve;
+                var curve2d = (XbimCurve2d)builtCurve;
                 NativeCurve2dHandle curveHandle = null;
                 try
                 {
@@ -470,7 +470,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         throw new InvalidOperationException(
                             $"Failed to build wire from 2D offset curve #{ifcCurve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                    return new Wire(wireHandle);
+                    return new XbimWire(wireHandle);
                 }
                 finally
                 {
@@ -506,7 +506,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var curveFactory = (CurveFactory)_modelService.CurveFactory;
 
             // Build center line as 2D curve
-            var centre = (Curve2d)curveFactory.BuildCurve2d(centerLine.Curve);
+            var centre = (XbimCurve2d)curveFactory.BuildCurve2d(centerLine.Curve);
             NativeCurve2dHandle aCurveHandle = null;
             NativeCurve2dHandle bCurveHandle = null;
             NativeCurve2dHandle lineAEndToBEnd = null;
@@ -583,7 +583,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build wire for IfcCenterLineProfileDef #{centerLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new Wire(wireHandle);
+                return new XbimWire(wireHandle);
             }
             finally
             {
@@ -633,7 +633,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 return BuildDirectrixFromCurveFactory(ifcCurve, start, end);
 
             // Build full wire from the bounded curve
-            var wire = (Wire)Build(ifcCurve);
+            var wire = (XbimWire)Build(ifcCurve);
 
             // If no trimming needed, return the wire as-is
             if (double.IsNaN(start) && double.IsNaN(end))
@@ -656,7 +656,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to trim directrix wire for #{ifcCurve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new Wire(trimmedHandle);
+                return new XbimWire(trimmedHandle);
             }
             finally
             {
@@ -677,7 +677,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (builtCurve.Is3d)
             {
-                var curve3d = (Curve)builtCurve;
+                var curve3d = (XbimCurve)builtCurve;
                 try
                 {
                     var startPt = curve3d.GetPoint(curve3d.FirstParameter);
@@ -704,7 +704,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
             else
             {
-                var curve2d = (Curve2d)builtCurve;
+                var curve2d = (XbimCurve2d)builtCurve;
                 NativeCurve2dHandle curveHandle = null;
                 try
                 {
@@ -721,7 +721,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         throw new InvalidOperationException(
                             $"Failed to build wire from 2D directrix curve #{ifcCurve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                    return new Wire(wireHandle);
+                    return new XbimWire(wireHandle);
                 }
                 finally
                 {
@@ -747,7 +747,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             double firstParameterizedLength = 0.0;
             int segIndex = 0;
 
-            var segmentCurves = new List<Curve>();
+            var segmentCurves = new List<XbimCurve>();
             try
             {
                 foreach (var segment in ifcComposite.Segments)
@@ -780,7 +780,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         firstParameterizedLength = segParamLength;
 
                     // Build the segment curve and apply SameSense reversal
-                    var segCurve = (Curve)_modelService.CurveFactory.Build(parentCurve);
+                    var segCurve = (XbimCurve)_modelService.CurveFactory.Build(parentCurve);
 
                     if (!segment.SameSense)
                     {
@@ -841,7 +841,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to build directrix wire from composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                var wire = new Wire(wireHandle);
+                var wire = new XbimWire(wireHandle);
 
                 // If no trimming needed (offsets span the entire curve), return as-is
                 if (Math.Abs(occStart) < _modelService.Precision &&
@@ -862,7 +862,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         throw new InvalidOperationException(
                             $"Failed to trim composite directrix #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                    return new Wire(trimmedHandle);
+                    return new XbimWire(trimmedHandle);
                 }
                 finally
                 {
@@ -883,7 +883,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXWire BuildDirectrixIndexedPolyCurve(IIfcIndexedPolyCurve ifcIndexed, double startParam, double endParam)
         {
             // Build the full wire
-            var wire = (Wire)BuildFromIndexedPolyCurve(ifcIndexed);
+            var wire = (XbimWire)BuildFromIndexedPolyCurve(ifcIndexed);
 
             // If no trimming, return as-is
             if (double.IsNaN(startParam) && double.IsNaN(endParam))
@@ -1033,7 +1033,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new InvalidOperationException(
                         $"Failed to trim indexed poly curve directrix #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new Wire(trimmedHandle);
+                return new XbimWire(trimmedHandle);
             }
             finally
             {

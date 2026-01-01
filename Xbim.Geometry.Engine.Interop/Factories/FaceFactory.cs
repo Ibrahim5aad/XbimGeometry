@@ -38,8 +38,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new ArgumentException("At least one wire is required.", nameof(wires));
 
             // The outer wire is the first, inner wires are the rest
-            var outerWire = wires[0] as Wire
-                ?? throw new ArgumentException("Expected Wire for outer boundary.");
+            var outerWire = wires[0] as XbimWire
+                ?? throw new ArgumentException("Expected XbimWire for outer boundary.");
 
             if (surface is Plane Plane)
             {
@@ -55,7 +55,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         throw new InvalidOperationException(
                             $"Failed to build planar face from wire: {XbimGeometryNativeApi.GetLastError()}");
 
-                    return new Face(faceHandle);
+                    return new XbimFace(faceHandle);
                 }
 
                 // With inner wires (voids), use the advanced face builder
@@ -69,9 +69,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 $"Cannot build face from surface type {surface.GetType().Name}.");
         }
 
-        private Face BuildAdvancedFace(Surface surface, IXWire[] wires)
+        private XbimFace BuildAdvancedFace(Surface surface, IXWire[] wires)
         {
-            var outerWire = (Wire)wires[0];
+            var outerWire = (XbimWire)wires[0];
 
             // Determine surface type code for the native API
             int surfaceType = GetSurfaceType(surface.SurfaceType);
@@ -91,7 +91,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             // Collect inner wire handles
             var innerWireSources = wires.Length > 1
-                ? wires.Skip(1).Cast<Wire>().Select(w => w.Handle).ToArray()
+                ? wires.Skip(1).Cast<XbimWire>().Select(w => w.Handle).ToArray()
                 : Array.Empty<NativeShapeHandle>();
             using var innerWireHandles = new NativeHandleArray(innerWireSources);
 
@@ -113,7 +113,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build advanced face: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Face(faceHandle);
+            return new XbimFace(faceHandle);
         }
 
         /// <summary>

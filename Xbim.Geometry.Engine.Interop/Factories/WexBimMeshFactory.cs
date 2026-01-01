@@ -57,8 +57,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         public byte[] CreateWexBimMesh(IXShape shape, double tolerance, double linearDeflection, double angularDeflection, double scale, out IXAxisAlignedBoundingBox bounds, out bool hasCurves)
         {
             if (shape == null) throw new ArgumentNullException(nameof(shape));
-            var Shape = shape as Shape
-                ?? throw new ArgumentException("Shape must be a Shape instance.", nameof(shape));
+            var Shape = shape as XbimShape
+                ?? throw new ArgumentException("Shape must be an XbimShape instance.", nameof(shape));
 
             int result = XbimGeometryNativeApi.xbim_mesh_create_wexbim(
                 _modelService.ContextHandle,

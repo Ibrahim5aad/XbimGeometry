@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
@@ -619,7 +619,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (indexedPolyCurve.Segments != null && indexedPolyCurve.Segments.Any())
             {
                 var curveFactory = (CurveFactory)_modelService.CurveFactory;
-                var builtCurve = (Curve2d)curveFactory.BuildCurve2d(indexedPolyCurve);
+                var builtCurve = (XbimCurve2d)curveFactory.BuildCurve2d(indexedPolyCurve);
                 var curves = new List<NativeCurve2dHandle> { builtCurve.DetachHandle() };
                 try
                 {
@@ -690,7 +690,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     return outerFace;
 
                 // Get the outer face handle
-                var outerShapeHandle = ((Face)outerFace).Handle;
+                var outerShapeHandle = ((XbimFace)outerFace).Handle;
 
                 using var nativeInnerHandles = new NativeHandleArray(innerShapeHandles.ToArray());
                 int result = XbimGeometryNativeApi.xbim_profile_build_with_voids(
@@ -744,7 +744,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 try
                 {
                     var face = BuildFaceFromCompositeCurve(compositeCurve, 0);
-                    return ((Face)face).Handle;
+                    return ((XbimFace)face).Handle;
                 }
                 catch (Exception ex)
                 {
@@ -758,7 +758,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 try
                 {
                     var face = BuildArbitraryFromIndexedPolyCurve(indexedPolyCurve, 0);
-                    return ((Face)face).Handle;
+                    return ((XbimFace)face).Handle;
                 }
                 catch (Exception ex)
                 {
@@ -783,12 +783,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"CompositeProfileDef #{compositeProfile.EntityLabel} has no profiles.");
 
-            var faceShapes = new List<Face>();
+            var faceShapes = new List<XbimFace>();
 
             try
             {
                 foreach (var profile in profiles)
-                    faceShapes.Add((Face)BuildFace(profile));
+                    faceShapes.Add((XbimFace)BuildFace(profile));
 
                 using var nativeHandles = new NativeHandleArray(
                     faceShapes.ConvertAll(f => f.Handle).ToArray());
@@ -804,9 +804,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         $"Failed to build CompositeProfileDef #{compositeProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 // Composite profiles produce a compound of faces, not a single face.
-                // We wrap directly as Face since the P/Invoke surface_area call
+                // We wrap directly as XbimFace since the P/Invoke surface_area call
                 // works on compounds (it sums all face areas via BRepGProp).
-                return new Face(compositeHandle);
+                return new XbimFace(compositeHandle);
             }
             finally
             {
@@ -822,7 +822,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"DerivedProfileDef #{derivedProfile.EntityLabel} has no ParentProfile.");
 
-            var parentFace = (Face)BuildFace(parentProfile);
+            var parentFace = (XbimFace)BuildFace(parentProfile);
 
             var op = derivedProfile.Operator;
             if (op == null)
@@ -866,7 +866,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"MirroredProfileDef #{mirroredProfile.EntityLabel} has no ParentProfile.");
 
-            var parentFace = (Face)BuildFace(parentProfile);
+            var parentFace = (XbimFace)BuildFace(parentProfile);
 
             try
             {
@@ -1157,7 +1157,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
 
             var curveFactory = (CurveFactory)_modelService.CurveFactory;
-            var builtCurve = (Curve2d)curveFactory.BuildCurve2d(curve);
+            var builtCurve = (XbimCurve2d)curveFactory.BuildCurve2d(curve);
             curves.Add(builtCurve.DetachHandle());
         }
 

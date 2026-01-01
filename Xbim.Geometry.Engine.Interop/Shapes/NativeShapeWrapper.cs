@@ -24,20 +24,20 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             if (result != 0)
             {
                 // Can't determine type - wrap as generic shape
-                return new Shape(handle);
+                return new XbimShape(handle);
             }
 
             var shapeType = (XShapeType)typeVal;
             return shapeType switch
             {
-                XShapeType.Solid => new Solid(handle),
-                XShapeType.Face => new Face(handle),
-                XShapeType.Shell => new Shell(handle),
-                XShapeType.Wire => new Wire(handle),
-                XShapeType.Edge => new Edge(handle),
-                XShapeType.Vertex => new Vertex(handle),
-                XShapeType.Compound => new Compound(handle),
-                _ => new Shape(handle),
+                XShapeType.Solid => new XbimSolid(handle),
+                XShapeType.Face => new XbimFace(handle),
+                XShapeType.Shell => new XbimShell(handle),
+                XShapeType.Wire => new XbimWire(handle),
+                XShapeType.Edge => new XbimEdge(handle),
+                XShapeType.Vertex => new XbimVertex(handle),
+                XShapeType.Compound => new XbimCompound(handle),
+                _ => new XbimShape(handle),
             };
         }
 
@@ -61,7 +61,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 throw new InvalidOperationException(
                     $"Expected a Solid shape but got {(XShapeType)typeVal}.");
 
-            return new Solid(handle);
+            return new XbimSolid(handle);
         }
 
         /// <summary>
@@ -78,7 +78,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 throw new InvalidOperationException(
                     $"Expected a Face shape but got {(XShapeType)typeVal}.");
 
-            return new Face(handle);
+            return new XbimFace(handle);
         }
     }
 }

@@ -1,17 +1,7 @@
 /*
  * xbim_curve2d.cpp
  *
- * Implements 2D curve construction, query, and lifecycle functions via the flat C API.
- * Ports NCurveFactory 2D methods from the legacy C++/CLI engine:
- *   - Build 2D line segment from two points
- *   - Build 2D circle from center, radius, and reference direction
- *   - Build 2D ellipse from center, semi-axes, and reference direction
- *   - Build trimmed 2D curve from basis curve and parameters
- *   - Build arc of circle from parameters or 3 points
- *   - Build arc of ellipse from parameters
- *   - Project 2D point onto curve to get parameter
- *   - Reverse curve direction
- *   - Destroy curve handle
+ * Implements 2D curve construction, query, and lifecycle functions
  */
 
 #include "xbim_curve2d.h"

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using Xbim.Geometry.Engine.Interop.Handles;
 
@@ -1420,7 +1420,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
 
         #endregion
 
-        #region Curve2d Construction
+        #region XbimCurve2d Construction
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_curve2d_build_line(

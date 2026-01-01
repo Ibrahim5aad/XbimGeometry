@@ -1,0 +1,77 @@
+using System;
+using Xbim.Common.Geometry;
+using Xbim.Geometry.Abstractions;
+using Xbim.Geometry.Engine.Interop.Handles;
+using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Engine.Interop.Primitives;
+
+namespace Xbim.Geometry.Engine.Interop.Shapes
+{
+    /// <summary>
+    /// Represents a vertex shape (TopoDS_Vertex), implementing both the V6 <see cref="IXVertex"/>
+    /// and the legacy <see cref="IXbimVertex"/> interfaces.
+    /// </summary>
+    internal class XbimVertex : XbimShape, IXVertex, IXbimVertex, IEquatable<IXbimVertex>
+    {
+        internal XbimVertex(NativeShapeHandle handle) : base(handle)
+        {
+        }
+
+        public override XbimGeometryObjectType GeometryType => XbimGeometryObjectType.XbimVertexType;
+
+        #region IXVertex
+
+        public double Tolerance
+        {
+            get
+            {
+                int result = XbimGeometryNativeApi.xbim_vertex_tolerance(Handle, out double tol);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to get vertex tolerance: {XbimGeometryNativeApi.GetLastError()}");
+                return tol;
+            }
+        }
+
+        public IXPoint VertexGeometry
+        {
+            get
+            {
+                int result = XbimGeometryNativeApi.xbim_vertex_point(
+                    Handle, out double x, out double y, out double z);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to get vertex point: {XbimGeometryNativeApi.GetLastError()}");
+                return new XPoint(x, y, z);
+            }
+        }
+
+        #endregion
+
+        #region IXbimVertex (explicit for clashing name)
+
+        XbimPoint3D IXbimVertex.VertexGeometry
+        {
+            get
+            {
+                int result = XbimGeometryNativeApi.xbim_vertex_point(
+                    Handle, out double x, out double y, out double z);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Failed to get vertex point: {XbimGeometryNativeApi.GetLastError()}");
+                return new XbimPoint3D(x, y, z);
+            }
+        }
+
+        public string ToBRep => BrepString();
+
+        public bool Equals(IXbimVertex other)
+        {
+            if (other is XbimShape os)
+                return IsEqual(os);
+            return false;
+        }
+
+        #endregion
+    }
+}

@@ -2,10 +2,7 @@
  * xbim_mesh.h
  *
  * Internal definitions for WexBim mesh creation.
- * Ports the NWexBimMesh, NFaceMeshIterator, PackedNormal, and PointInspector
- * classes from the C++/CLI engine into the standalone native library.
  *
- * Not part of the public C API - used by native implementation code only.
  */
 
 #ifndef XBIM_MESH_H

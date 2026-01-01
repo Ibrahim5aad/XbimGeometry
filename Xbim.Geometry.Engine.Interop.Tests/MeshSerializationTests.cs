@@ -141,7 +141,7 @@ public class MeshSerializationTests : IDisposable
         var solid = _solidFactory.Build(ifcBlock);
 
         // Serialize to BRep string
-        var brepStr = ((Shape)solid).BrepString();
+        var brepStr = ((XbimShape)solid).BrepString();
         brepStr.Should().NotBeNullOrEmpty("BRep string should be generated");
 
         // Deserialize from BRep string
@@ -160,7 +160,7 @@ public class MeshSerializationTests : IDisposable
         var solid = _solidFactory.Build(ifcCylinder);
         double originalVolume = solid.Volume;
 
-        var brepStr = ((Shape)solid).BrepString();
+        var brepStr = ((XbimShape)solid).BrepString();
         var restored = ShapeBinarySerializer.FromBrep(brepStr);
 
         ((IXSolid)restored).Volume.Should().BeApproximately(originalVolume, 0.1);
@@ -172,8 +172,8 @@ public class MeshSerializationTests : IDisposable
         var ifcSphere = IfcMoq.Sphere(radius: 5);
         var solid = _solidFactory.Build(ifcSphere);
 
-        var brepStr = ((Shape)solid).BrepString();
-        var restored = ShapeBinarySerializer.FromBrep(brepStr) as Shape;
+        var brepStr = ((XbimShape)solid).BrepString();
+        var restored = ShapeBinarySerializer.FromBrep(brepStr) as XbimShape;
 
         restored.Should().NotBeNull();
         restored!.IsValidShape().Should().BeTrue("deserialized sphere should be a valid shape");
@@ -235,7 +235,7 @@ public class MeshSerializationTests : IDisposable
         var solid = _solidFactory.Build(ifcBlock);
 
         var binary = _binarySerializer.ToArray(solid);
-        var restored = _binarySerializer.FromArray(binary) as Shape;
+        var restored = _binarySerializer.FromArray(binary) as XbimShape;
 
         restored.Should().NotBeNull();
         restored!.IsValidShape().Should().BeTrue("deserialized shape should be valid");
@@ -251,7 +251,7 @@ public class MeshSerializationTests : IDisposable
         var solid = _solidFactory.Build(ifcBlock);
 
         // BRep round-trip
-        var brepStr = ((Shape)solid).BrepString();
+        var brepStr = ((XbimShape)solid).BrepString();
         var fromBrep = ShapeBinarySerializer.FromBrep(brepStr);
 
         // Binary round-trip

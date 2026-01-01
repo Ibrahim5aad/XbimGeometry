@@ -4,7 +4,7 @@ using Xbim.Geometry.Abstractions;
 namespace Xbim.Geometry.Engine.Interop.Services
 {
     /// <summary>
-    /// Mesh tessellation parameters matching the C++/CLI MeshFactors implementation.
+    /// Mesh tessellation parameters.
     /// </summary>
     internal class MeshFactors : IXMeshFactors
     {

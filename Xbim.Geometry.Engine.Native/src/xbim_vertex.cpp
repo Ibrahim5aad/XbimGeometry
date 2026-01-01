@@ -1,10 +1,7 @@
 /*
  * xbim_vertex.cpp
  *
- * Implements vertex construction and query functions via the flat C API.
- * Ports NVertexFactory methods from the C++/CLI engine:
- *   - Build a vertex at a 3D point with a given tolerance
- *   - Query the 3D coordinates of a vertex
+ * Implements vertex construction and query functions
  */
 
 #include "xbim_vertex.h"

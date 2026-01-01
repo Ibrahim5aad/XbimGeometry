@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
@@ -42,7 +42,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build line edge: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Edge(NativeShapeHandle);
+            return new XbimEdge(NativeShapeHandle);
         }
 
         public IXEdge Build(IIfcCurve curve)
@@ -58,13 +58,13 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (curve.Is3d)
             {
-                var nativeCurve = (Curve)curve;
+                var nativeCurve = (XbimCurve)curve;
                 result = XbimGeometryNativeApi.xbim_edge_from_curve_handle(
                     ContextHandle, nativeCurve.Handle, out shapeHandle);
             }
             else
             {
-                var nativeCurve2d = (Curve2d)curve;
+                var nativeCurve2d = (XbimCurve2d)curve;
                 result = XbimGeometryNativeApi.xbim_edge_from_curve2d_handle(
                     ContextHandle, nativeCurve2d.Handle, out shapeHandle);
             }
@@ -73,7 +73,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"Failed to build edge from curve: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Edge(shapeHandle);
+            return new XbimEdge(shapeHandle);
         }
     }
 }
