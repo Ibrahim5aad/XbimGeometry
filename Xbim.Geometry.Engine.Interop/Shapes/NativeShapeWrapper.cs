@@ -49,7 +49,8 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         /// <summary>
         /// Wraps a native shape handle as an <see cref="IXSolid"/>.
-        /// Throws if the underlying shape is not a solid.
+        /// If the shape is a Compound, extracts the single solid from it.
+        /// Throws if the underlying shape is not a solid or a compound containing exactly one solid.
         /// </summary>
         internal static IXSolid WrapSolid(NativeShapeHandle handle)
         {
@@ -57,11 +58,41 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 throw new ArgumentException("Cannot wrap an invalid shape handle.", nameof(handle));
 
             int result = XbimGeometryNativeApi.xbim_shape_type(handle, out int typeVal);
-            if (result != 0 || (XShapeType)typeVal != XShapeType.Solid)
-                throw new InvalidOperationException(
-                    $"Expected a Solid shape but got {(XShapeType)typeVal}.");
+            if (result != 0)
+                throw new InvalidOperationException("Failed to determine shape type.");
 
-            return new XbimSolid(handle);
+            var shapeType = (XShapeType)typeVal;
+
+            if (shapeType == XShapeType.Solid)
+                return new XbimSolid(handle);
+
+            if (shapeType == XShapeType.Compound)
+            {
+                int countResult = XbimGeometryNativeApi.xbim_shape_count_subshapes(
+                    handle, (int)XShapeType.Solid, out int solidCount);
+                if (countResult != 0 || solidCount == 0)
+                    throw new InvalidOperationException(
+                        "Compound shape contains no solids.");
+
+                var ptrs = new IntPtr[solidCount];
+                int capacity = solidCount;
+                int getResult = XbimGeometryNativeApi.xbim_shape_get_subshapes(
+                    handle, (int)XShapeType.Solid, ptrs, ref capacity);
+                if (getResult != 0 || capacity == 0)
+                    throw new InvalidOperationException(
+                        "Failed to extract solids from compound shape.");
+
+                // Take the first solid; dispose any extras
+                var solidHandle = NativeShapeHandle.FromIntPtr(ptrs[0]);
+                for (int i = 1; i < capacity; i++)
+                    NativeShapeHandle.FromIntPtr(ptrs[i]).Dispose();
+
+                handle.Dispose();
+                return new XbimSolid(solidHandle);
+            }
+
+            throw new InvalidOperationException(
+                $"Expected a Solid shape but got {shapeType}.");
         }
 
         /// <summary>

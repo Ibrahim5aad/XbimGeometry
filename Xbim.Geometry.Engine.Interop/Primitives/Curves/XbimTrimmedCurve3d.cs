@@ -18,7 +18,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             : base(handle, XCurveType.IfcTrimmedCurve)
         {
             BasisCurve = basisCurve;
-            _basisOwned = basisCurve as IDisposable;
+            _basisOwned = basisCurve;
         }
 
         protected override void Dispose(bool disposing)

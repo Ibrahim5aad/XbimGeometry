@@ -63,7 +63,7 @@ public class TessellatedFaceSetTests : IDisposable
         var faceSet = IfcMoq.TriangulatedFaceSet(coords, triangles, closed: true);
 
         // Act
-        var shape = _solidFactory.Build((IIfcTessellatedItem)faceSet);
+        var shape = _solidFactory.Build(faceSet);
 
         // Assert
         shape.Should().NotBeNull();
@@ -105,7 +105,7 @@ public class TessellatedFaceSetTests : IDisposable
         var faceSet = IfcMoq.TriangulatedFaceSet(coords, triangles, closed: true);
 
         // Act
-        var shape = _solidFactory.Build((IIfcTessellatedItem)faceSet);
+        var shape = _solidFactory.Build(faceSet);
 
         // Assert: closed set should produce a solid with correct volume
         shape.Should().NotBeNull();
@@ -134,7 +134,7 @@ public class TessellatedFaceSetTests : IDisposable
         var faceSet = IfcMoq.TriangulatedFaceSet(coords, triangles, closed: false);
 
         // Act
-        var shape = _solidFactory.Build((IIfcTessellatedItem)faceSet);
+        var shape = _solidFactory.Build(faceSet);
 
         // Assert: open set should produce a shell (not a solid)
         shape.Should().NotBeNull();
@@ -165,7 +165,7 @@ public class TessellatedFaceSetTests : IDisposable
         var faceSet = IfcMoq.TriangulatedFaceSet(coords, triangles, closed: true);
 
         // Act
-        var shape = _solidFactory.Build((IIfcTessellatedItem)faceSet);
+        var shape = _solidFactory.Build(faceSet);
 
         // Assert: should succeed despite the degenerate triangle
         shape.Should().NotBeNull();
@@ -192,7 +192,7 @@ public class TessellatedFaceSetTests : IDisposable
         var faceSet = IfcMoq.TriangulatedFaceSet(coords, triangles, closed: null);
 
         // Act
-        var shape = _solidFactory.Build((IIfcTessellatedItem)faceSet);
+        var shape = _solidFactory.Build(faceSet);
 
         // Assert
         shape.Should().NotBeNull();
@@ -228,7 +228,7 @@ public class TessellatedFaceSetTests : IDisposable
         var faceSet = IfcMoq.PolygonalFaceSet(coords, faces, closed: true);
 
         // Act
-        var shape = _solidFactory.Build((IIfcTessellatedItem)faceSet);
+        var shape = _solidFactory.Build(faceSet);
 
         // Assert
         shape.Should().NotBeNull();
@@ -277,7 +277,7 @@ public class TessellatedFaceSetTests : IDisposable
         var faceSet = IfcMoq.PolygonalFaceSet(coords, faces, closed: true);
 
         // Act
-        var shape = _solidFactory.Build((IIfcTessellatedItem)faceSet);
+        var shape = _solidFactory.Build(faceSet);
 
         // Assert
         shape.Should().NotBeNull();
@@ -306,7 +306,7 @@ public class TessellatedFaceSetTests : IDisposable
         var faceSet = IfcMoq.PolygonalFaceSet(coords, faces, closed: false);
 
         // Act
-        var shape = _solidFactory.Build((IIfcTessellatedItem)faceSet);
+        var shape = _solidFactory.Build(faceSet);
 
         // Assert: open set should produce a shell
         shape.Should().NotBeNull();
@@ -341,7 +341,7 @@ public class TessellatedFaceSetTests : IDisposable
         var faceSet = IfcMoq.PolygonalFaceSet(coords, faces, closed: false);
 
         // Act
-        var shape = _solidFactory.Build((IIfcTessellatedItem)faceSet);
+        var shape = _solidFactory.Build(faceSet);
 
         // Assert
         shape.Should().NotBeNull();
@@ -363,7 +363,7 @@ public class TessellatedFaceSetTests : IDisposable
         var faceSet = moq.Object;
 
         // Act & Assert
-        var act = () => _solidFactory.Build((IIfcTessellatedItem)faceSet);
+        var act = () => _solidFactory.Build(faceSet);
         act.Should().Throw<InvalidOperationException>()
            .WithMessage("*missing Coordinates*");
     }

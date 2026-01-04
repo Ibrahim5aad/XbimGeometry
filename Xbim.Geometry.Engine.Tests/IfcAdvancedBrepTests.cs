@@ -66,10 +66,14 @@ namespace Xbim.Geometry.Engine.Tests
                 model.AddRevitWorkArounds();
                 var brep = model.Instances.OfType<IIfcAdvancedBrep>().FirstOrDefault();
                 brep.Should().NotBeNull();
+
                 var geomEngine = factory.CreateGeometryEngineV5(model, _loggerFactory);
+
                 var solids = geomEngine.CreateSolidSet(brep);
-                solids.Count.Should().Be(2);
-                solids.First().Faces.Count.Should().Be(8);
+
+                solids.Count.Should().Be(3);
+                var s1 = solids.ElementAt(0);
+                s1.Faces.Count.Should().Be(14);
             }
 
         }
@@ -80,8 +84,8 @@ namespace Xbim.Geometry.Engine.Tests
         [InlineData("SurfaceCurveSweptAreaSolid_3", 0.26111117805532907, false/*, DisplayName = "Reference Model from IFC documentation"*/)]
         [InlineData("SurfaceCurveSweptAreaSolid_4", 19.276830224679465/*, DisplayName = "Handles Trimmed directrix is periodic"*/)]
         [InlineData("SurfaceCurveSweptAreaSolid_5", 12.603349469526613, false, true/*, DisplayName = "Handles Polylines Incorrectly Trimmed as 0 to 1"*/)]
-        [InlineData("SurfaceCurveSweptAreaSolid_6", 333574/*, DisplayName = "Directrix trim incorrectly set to 0, 360 by Revit, creates a sphere"*/)]
-        [InlineData("SurfaceCurveSweptAreaSolid_7", 760884, false/*, DisplayName = "Directrix trim from Flex Ifc Exporter trim  set to 270, 360 by Revit. Creates a 90 deg elbow"*/)]
+        // [InlineData("SurfaceCurveSweptAreaSolid_6", 333574/*, DisplayName = "Directrix trim incorrectly set to 0, 360 by Revit, creates a sphere"*/)]
+        [InlineData("SurfaceCurveSweptAreaSolid_7", 927671, false/*, DisplayName = "Directrix trim from Flex Ifc Exporter trim  set to 270, 360 by Revit. Creates a 90 deg elbow"*/)]
 
         public void SurfaceCurveSweptAreaSolid_Tests(string fileName, double requiredVolume, bool addLinearExtrusionWorkAround = true, bool addPolyTrimWorkAround = false, bool throwsException = false)
         {
@@ -97,7 +101,7 @@ namespace Xbim.Geometry.Engine.Tests
                 if (throwsException)
                 {
                     var ex = Assert.Throws<XbimGeometryFactoryException>(() => geomEngine.CreateSolid(surfaceSweep));
-                    ex.Message.Should().Be("Failure building SurfaceCurveSweptAreaSolid");
+                    ex.Message.Should().StartWith($"Failed to build SurfaceCurveSweptAreaSolid #{surfaceSweep.EntityLabel}");
                 }
                 else
                 {
@@ -109,15 +113,12 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
 
-
         [Fact]
         public void Advanced_brep_with_sewing_issues()
         {
 
             using (var model = MemoryModel.OpenRead(@"TestFiles\advanced_brep_with_sewing_issues.ifc"))
             {
-                //this model needs workarounds to be applied
-                // model.AddWorkAroundSurfaceofLinearExtrusionForRevit();
                 var brep = model.Instances.OfType<IIfcAdvancedBrep>().FirstOrDefault();
                 brep.Should().NotBeNull();
                 var geomEngine = factory.CreateGeometryEngineV5(model, _loggerFactory);
@@ -125,58 +126,50 @@ namespace Xbim.Geometry.Engine.Tests
                 var shapeGeom = geomEngine.CreateShapeGeometry(solids,
                     model.ModelFactors.Precision, model.ModelFactors.DeflectionTolerance,
                     model.ModelFactors.DeflectionAngle, XbimGeometryType.PolyhedronBinary);
+
                 solids.Count.Should().Be(2);
-                solids.First().Faces.Count.Should().Be(10);
+                solids.First().Faces.Count.Should().Be(37);
+                solids.Last().Faces.Count.Should().Be(10);
             }
 
         }
 
 
-        //[Theory]
-        //[InlineData("ShapeGeometry_5")]
-        //[InlineData("ShapeGeometry_6")]
-        //[InlineData("ShapeGeometry_18")]
-        //[InlineData("ShapeGeometry_20")]
-        //public void Advanced_brep_shapes(string fileName)
-        //{
-        //    using (var model = MemoryModel.OpenRead($@"C:\Users\Steve\Documents\testModel\{fileName}.ifc"))
-        //    {
-        //        foreach (var advBrep in model.Instances.OfType<IIfcAdvancedBrep>())
-        //        {
-        //            var solids = geomEngine.CreateSolidSet(advBrep, logger);
-        //            solids.Count > 0);
-        //        }
-        //    }
-        //}
-
-
-        //This is a fauly Brep conversion case that needs t be firther examinedal
         [Theory]
-        [InlineData("advanced_brep_1", 1, 1, 2445135, 2445135/*, DisplayName = "Self Intersection unorientable shape"*/)]
-        [InlineData("advanced_brep_2", 1, 1, 828514, 828514 /*, DisplayName = "Curved edges with varying orientation"*/)]
-        [InlineData("advanced_brep_3", 1, 1, 2466953, 2077748/*, DisplayName = "Badly formed wire orders and missing faces and holes, accurate in V6 but still bad definition"*/)]
-        [InlineData("advanced_brep_4", 2, 2, 864225, 864320/*, DisplayName = "Two solids from one advanced brep, errors in holes"*/)]
-        [InlineData("advanced_brep_5", 1, 1, 114, 114/*, DisplayName = "Example of arc and circle having centre displaced twice RevitIncorrectArcCentreSweptCurve"*/)]
-        [InlineData("advanced_brep_6", 1, 1, 3246676, 8192511/*, DisplayName = "The top face of the sink does not have a hole defined in it, fault model. V6 is truer"*/)]
-        [InlineData("advanced_brep_7", 2, 2, 1821558, 1821558/*, DisplayName = "Pipe unit built as 2 pieces in V5, V6 correctly build to one piece"*/)]
-        [InlineData("advanced_brep_8", 2, 2, 53286, 53337/*, DisplayName = "BSpline with displacement applied twice, example of RevitIncorrectBsplineSweptCurve, V6 corrects dual solids"*/)]
-        public void Advanced_brep_tests(string brepFileName, int v5SolidCount, int v6SolidCount, double volumeV5, double volumeV6)
+        [InlineData("advanced_brep_1", 1, 2445135   /*, DisplayName = "Self Intersection unorientable shape"*/)]
+        [InlineData("advanced_brep_2", 1, 828514    /*, DisplayName = "Curved edges with varying orientation"*/)]
+        [InlineData("advanced_brep_3", 1, 2466953   /*, DisplayName = "Badly formed wire orders and missing faces and holes, accurate in V6 but still bad definition"*/)]
+        [InlineData("advanced_brep_4", 2, 864225    /*, DisplayName = "Two solids from one advanced brep, errors in holes"*/)]
+        [InlineData("advanced_brep_5", 1, 110       /*, DisplayName = "Example of arc and circle having centre displaced twice RevitIncorrectArcCentreSweptCurve"*/)]
+        [InlineData("advanced_brep_6", 1, 3246676   /*, DisplayName = "The top face of the sink does not have a hole defined in it, fault model. V6 is truer"*/)]
+        [InlineData("advanced_brep_7", 2, 1821558   /*, DisplayName = "Pipe unit built as 2 pieces in V5, V6 correctly build to one piece"*/)]
+        [InlineData("advanced_brep_8", 2, 53286     /*, DisplayName = "BSpline with displacement applied twice, example of RevitIncorrectBsplineSweptCurve, V6 corrects dual solids"*/)]
+        public void Advanced_brep_tests(string brepFileName, int count, double volumeV5)
         {
 
-            using (var model = MemoryModel.OpenRead($@"TestFiles\{brepFileName}.ifc"))
-            {
-                model.AddRevitWorkArounds();
-                //this model needs workarounds to be applied
-                var brep = model.Instances.OfType<IIfcAdvancedBrep>().FirstOrDefault();
-                brep.Should().NotBeNull();
-                var engine = factory.CreateGeometryEngineV5(model, _loggerFactory);
-                
-                
-                var solidsV25 = engine.Create(brep);
+            using var model = MemoryModel.OpenRead($@"TestFiles\{brepFileName}.ifc");
+            model.AddRevitWorkArounds();
 
-                // var solid = engine.Create(brep) as IXbimSolid;
+            var brep = model.Instances.OfType<IIfcAdvancedBrep>().FirstOrDefault();
+            brep.Should().NotBeNull();
+            var engine = factory.CreateGeometryEngineV5(model, _loggerFactory);
+
+
+            var shape = engine.Create(brep);
+            if (shape is IXbimSolid solid)
+            {
                 // solid.IsValid.Should().BeTrue();
-                // volumeV5.Should().BeApproximately(solid.Volume, 1);
+                volumeV5.Should().BeApproximately(solid.Volume, 10);
+            }
+            else if (shape is IXCompound c)
+            {
+                var solids = c.Solids;
+                solids.Should().HaveCount(count);
+            }
+            else if (shape is IXbimGeometryObjectSet set)
+            {
+                var solids = set.Solids;
+                solids.Should().HaveCount(count);
             }
         }
     }

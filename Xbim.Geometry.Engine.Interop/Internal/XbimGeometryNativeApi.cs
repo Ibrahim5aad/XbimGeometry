@@ -1678,6 +1678,20 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeShapeHandle outHandle);
 
         #endregion
+
+        #region Grid Operations
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_grid_create(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] uCurves, int uCount,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] vCurves, int vCount,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] wCurves, int wCount,
+            double precision,
+            double oneMillimeter,
+            out NativeShapeHandle outHandle);
+
+        #endregion
     }
 
     /// <summary>

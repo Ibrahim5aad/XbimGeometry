@@ -23,6 +23,7 @@
 #include <Geom_SphericalSurface.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <Geom_SurfaceOfLinearExtrusion.hxx>
+#include <Geom_TrimmedCurve.hxx>
 #include <Geom_SurfaceOfRevolution.hxx>
 #include <TColgp_Array2OfPnt.hxx>
 #include <TColStd_Array1OfReal.hxx>
@@ -533,8 +534,20 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_linear_extrusion(
     {
         gp_Dir extDir(dirX, dirY, dirZ);
 
+        /* Unwrap any Geom_TrimmedCurve layers to the full basis curve.
+         * The surface must cover the entire basis curve domain because
+         * consumers such as IfcSurfaceCurveSweptAreaSolid may define a
+         * directrix that extends beyond the original trim bounds. */
+        Handle(Geom_Curve) curve = curveHandle->curve;
+        Handle(Geom_TrimmedCurve) tc = Handle(Geom_TrimmedCurve)::DownCast(curve);
+        while (!tc.IsNull())
+        {
+            curve = tc->BasisCurve();
+            tc = Handle(Geom_TrimmedCurve)::DownCast(curve);
+        }
+
         Handle(Geom_SurfaceOfLinearExtrusion) surface =
-            new Geom_SurfaceOfLinearExtrusion(curveHandle->curve, extDir);
+            new Geom_SurfaceOfLinearExtrusion(curve, extDir);
 
         if (surface.IsNull())
         {

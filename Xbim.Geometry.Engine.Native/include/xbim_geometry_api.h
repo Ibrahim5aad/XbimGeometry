@@ -3890,6 +3890,42 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_build(
 
 #pragma endregion
 
+#pragma region Grid Operations
+
+/*
+ * Create a visual representation of an IFC grid by sweeping a small
+ * rectangular cross-section (75mm x 1mm) along each grid axis curve.
+ *
+ * The caller builds 2D curves from the IFC grid's U, V, and W axes
+ * and passes them as three arrays. The function computes curve
+ * intersections to determine the grid extent, trims unbounded lines
+ * to that extent, converts each curve to 3D, and sweeps a rectangular
+ * profile along each to produce a compound of solids.
+ *
+ *   ctx            - a valid context handle (used for logging; may be NULL)
+ *   uCurves        - array of 2D curve handles for U-axis curves
+ *   uCount         - number of U-axis curves
+ *   vCurves        - array of 2D curve handles for V-axis curves
+ *   vCount         - number of V-axis curves
+ *   wCurves        - array of 2D curve handles for W-axis curves
+ *   wCount         - number of W-axis curves
+ *   precision      - model precision tolerance
+ *   oneMillimeter  - length of one millimetre in model units
+ *   outHandle      - receives the compound shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_grid_create(
+    XbimContextHandle        ctx,
+    const XbimCurve2dHandle* uCurves, int uCount,
+    const XbimCurve2dHandle* vCurves, int vCount,
+    const XbimCurve2dHandle* wCurves, int wCount,
+    double                   precision,
+    double                   oneMillimeter,
+    XbimShapeHandle*         outHandle);
+
+#pragma endregion
+
 #ifdef __cplusplus
 }
 #endif

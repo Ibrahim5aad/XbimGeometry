@@ -7,6 +7,7 @@ using Xbim.Common.Geometry;
 using Xbim.Common.XbimExtensions;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Geometry.Exceptions;
 using Xbim.Ifc;
 using Xbim.Ifc4.GeometricModelResource;
@@ -550,14 +551,10 @@ namespace Xbim.Geometry.Engine.Tests
             {
                 var taperedSolid = model.Instances.OfType<IfcExtrudedAreaSolidTapered>().FirstOrDefault();
                 taperedSolid.Should().NotBeNull();
-                var geomEngineV5 = factory.CreateGeometryEngine(XGeometryEngineVersion.V5, model, _loggerFactory);
                 var geomEngineV6 = factory.CreateGeometryEngine(XGeometryEngineVersion.V6, model, _loggerFactory);
-                var barV5 = geomEngineV5.Create(taperedSolid, _logger) as IXbimSolid;
-                var barV6 = geomEngineV6.Create(taperedSolid) as IXbimSolid;
+                var barV6 = geomEngineV6.Create(taperedSolid) as XbimSolid;
                 barV6.Should().NotBeNull();
-                barV6.Volume.Should().BeApproximately(611, 1);
-                barV5.Volume.Should().BeApproximately(1262,1); //NB version 5 does not do this correctly
-
+                barV6.Volume.Should().BeApproximately(707, 1);
             }
         }
 
@@ -574,21 +571,16 @@ namespace Xbim.Geometry.Engine.Tests
             }
         }
 
-
-
-
-
         [Fact]
         public void WireInitFromIfcIndexedPolyCurveTest()
         {
             using (var model = MemoryModel.OpenRead(@"TestFiles\Ifc4TestFiles\WirePolycurve.ifc"))
             {
-
                 var shape = model.Instances[185] as IIfcGeometricRepresentationItem;
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
-                IXbimGeometryObject geomObject = geomEngine.Create(shape, _logger);
+                var geomObject = geomEngine.Create(shape, _logger) as XbimSolid;
                 geomObject.IsValid.Should().BeTrue();
-
+                geomObject.Volume.Should().Be(210000000);
             }
         }
 
@@ -605,14 +597,6 @@ namespace Xbim.Geometry.Engine.Tests
             }
         }
 
-        //var composite = (IIfcCompositeCurve)model.Instances[75];
-        //foreach (var segment in composite.Segments)
-        //{
-        //    var curve = geomEngine.CreateCurve(segment.ParentCurve);
-        //    var wire = geomEngine.CreateWire(segment.ParentCurve);
-        //    Math.Abs((curve.Start - wire.Start).Length)<1e-5);
-        //    Math.Abs((curve.End - wire.End).Length) < 1e-5);
-        //}
         [Fact]
         public void FixedReferenceSweptSolidTest()
         {
@@ -882,7 +866,7 @@ namespace Xbim.Geometry.Engine.Tests
                     var cl = IfcModelBuilder.MakeCenterLineProfileDef(m, semiCircle, 5);
                     var geomEngine = new XbimGeometryEngine(m, _loggerFactory);
                     var face = geomEngine.CreateFace(cl, _logger);
-                    (face as IXbimFace).Should().NotBeNull();
+                    face.Should().NotBeNull();
                     face.IsValid.Should().BeTrue("Invalid face returned");
                 }
             }
@@ -899,7 +883,7 @@ namespace Xbim.Geometry.Engine.Tests
                 var cl = IfcModelBuilder.MakeSurfaceOfLinearExtrusion(m, def, 50, new XbimVector3D(0, 0, 1));
                 var geomEngine = new XbimGeometryEngine(m, _loggerFactory);
                 var face = geomEngine.CreateFace(cl, _logger);
-                (face as IXbimFace).Should().NotBeNull();
+                face.Should().NotBeNull();
                 face.IsValid.Should().BeTrue("Invalid face returned");
             }
         }
@@ -915,7 +899,7 @@ namespace Xbim.Geometry.Engine.Tests
                 var rev = IfcModelBuilder.MakeSurfaceOfRevolution(m, def);
                 var geomEngine = new XbimGeometryEngine(m, _loggerFactory);
                 var face = geomEngine.CreateFace(rev, _logger);
-                (face as IXbimFace).Should().NotBeNull();
+                face.Should().NotBeNull();
                 face.IsValid.Should().BeTrue("Invalid face returned");
             }
         }

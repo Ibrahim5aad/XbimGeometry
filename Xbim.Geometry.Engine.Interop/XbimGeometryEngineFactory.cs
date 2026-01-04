@@ -18,7 +18,7 @@ namespace Xbim.Geometry.Engine.Interop
         /// <summary>
         /// Constructs a new <see cref="XbimGeometryEngineFactory"/>
         /// </summary>
-        public XbimGeometryEngineFactory() : 
+        public XbimGeometryEngineFactory() :
             this(InternalServiceProvider.GetRequiredService<Func<IXbimManagedGeometryEngine>>())
         {
             

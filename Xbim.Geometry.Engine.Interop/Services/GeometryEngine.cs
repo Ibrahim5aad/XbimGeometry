@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Microsoft.Extensions.Logging;
 using Xbim.Common;
 using Xbim.Common.Geometry;
@@ -249,64 +250,64 @@ namespace Xbim.Geometry.Engine.Interop.Services
         // --- CreateSolid overloads ---
 
         public IXbimSolid CreateSolid(IIfcSweptAreaSolid ifcSolid, ILogger logger)
-            => WrapBuildAsSolid((IIfcSolidModel)ifcSolid);
+            => BuildAsSolid(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcExtrudedAreaSolid ifcSolid, ILogger logger)
-            => WrapBuildAsSolid((IIfcSolidModel)ifcSolid);
+            => BuildAsSolid(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcRevolvedAreaSolid ifcSolid, ILogger logger)
-            => WrapBuildAsSolid((IIfcSolidModel)ifcSolid);
+            => BuildAsSolid(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcSweptDiskSolid ifcSolid, ILogger logger)
-            => WrapBuildAsSolid((IIfcSolidModel)ifcSolid);
+            => BuildAsSolid(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcBoundingBox ifcSolid, ILogger logger)
             => (IXbimSolid)BuildBoundingBox(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcSurfaceCurveSweptAreaSolid ifcSolid, ILogger logger)
-            => WrapBuildAsSolid((IIfcSolidModel)ifcSolid);
+            => BuildAsSolid(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcHalfSpaceSolid ifcSolid, ILogger logger)
             => (IXbimSolid)_service.SolidFactory.Build(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcPolygonalBoundedHalfSpace ifcSolid, ILogger logger)
-            => (IXbimSolid)_service.SolidFactory.Build((IIfcHalfSpaceSolid)ifcSolid);
+            => (IXbimSolid)_service.SolidFactory.Build(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcBoxedHalfSpace ifcSolid, ILogger logger)
-            => (IXbimSolid)_service.SolidFactory.Build((IIfcHalfSpaceSolid)ifcSolid);
+            => (IXbimSolid)_service.SolidFactory.Build(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcCsgPrimitive3D ifcSolid, ILogger logger)
             => (IXbimSolid)_service.SolidFactory.Build(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcSphere ifcSolid, ILogger logger)
-            => (IXbimSolid)_service.SolidFactory.Build((IIfcCsgPrimitive3D)ifcSolid);
+            => (IXbimSolid)_service.SolidFactory.Build(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcBlock ifcSolid, ILogger logger)
-            => (IXbimSolid)_service.SolidFactory.Build((IIfcCsgPrimitive3D)ifcSolid);
+            => (IXbimSolid)_service.SolidFactory.Build(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcRightCircularCylinder ifcSolid, ILogger logger)
-            => (IXbimSolid)_service.SolidFactory.Build((IIfcCsgPrimitive3D)ifcSolid);
+            => (IXbimSolid)_service.SolidFactory.Build(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcRightCircularCone ifcSolid, ILogger logger)
-            => (IXbimSolid)_service.SolidFactory.Build((IIfcCsgPrimitive3D)ifcSolid);
+            => (IXbimSolid)_service.SolidFactory.Build(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcRectangularPyramid ifcSolid, ILogger logger)
-            => (IXbimSolid)_service.SolidFactory.Build((IIfcCsgPrimitive3D)ifcSolid);
+            => (IXbimSolid)_service.SolidFactory.Build(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcSweptDiskSolidPolygonal ifcSolid, ILogger logger)
-            => WrapBuildAsSolid((IIfcSolidModel)ifcSolid);
+            => BuildAsSolid(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcRevolvedAreaSolidTapered ifcSolid, ILogger logger)
-            => WrapBuildAsSolid((IIfcSolidModel)ifcSolid);
+            => BuildAsSolid(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcFixedReferenceSweptAreaSolid ifcSolid, ILogger logger)
-            => WrapBuildAsSolid((IIfcSolidModel)ifcSolid);
+            => BuildAsSolid(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcAdvancedBrep ifcSolid, ILogger logger)
-            => WrapBuildAsSolid((IIfcSolidModel)ifcSolid);
+            => BuildAsSolid(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcAdvancedBrepWithVoids ifcSolid, ILogger logger)
-            => WrapBuildAsSolid((IIfcSolidModel)ifcSolid);
+            => BuildAsSolid(ifcSolid);
 
         public IXbimSolid CreateSolid(IIfcSectionedSpine ifcSolid, ILogger logger)
         {
@@ -316,7 +317,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXbimSolid CreateSolid(IIfcTriangulatedFaceSet shell, ILogger logger)
         {
-            var shape = _service.SolidFactory.Build((IIfcTessellatedItem)shell);
+            var shape = _service.SolidFactory.Build(shell);
             return WrapShapeAsSolid(shape);
         }
 
@@ -339,7 +340,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXbimSolidSet CreateSolidSet(IIfcBooleanClippingResult ifcSolid, ILogger logger)
         {
-            var shape = _service.BooleanFactory.Build((IIfcBooleanResult)ifcSolid);
+            var shape = _service.BooleanFactory.Build(ifcSolid);
             return WrapShapeAsSolidSet(shape);
         }
 
@@ -361,7 +362,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
             => WrapShapeAsSolidSet(_service.BooleanFactory.Build(boolOp));
 
         public IXbimSolidSet CreateSolidSet(IIfcManifoldSolidBrep ifcSolid, ILogger logger)
-            => WrapShapeAsSolidSet(_service.SolidFactory.Build((IIfcSolidModel)ifcSolid));
+            => WrapShapeAsSolidSet(_service.SolidFactory.Build(ifcSolid));
 
         public IXbimSolidSet CreateSolidSet(IIfcFacetedBrep ifcSolid, ILogger logger)
             => WrapShapeAsSolidSet(_service.SolidFactory.Build(ifcSolid));
@@ -376,16 +377,16 @@ namespace Xbim.Geometry.Engine.Interop.Services
         }
 
         public IXbimSolidSet CreateSolidSet(IIfcSweptAreaSolid ifcSolid, ILogger logger)
-            => WrapShapeAsSolidSet(_service.SolidFactory.Build((IIfcSolidModel)ifcSolid));
+            => WrapShapeAsSolidSet(_service.SolidFactory.Build(ifcSolid));
 
         public IXbimSolidSet CreateSolidSet(IIfcCsgSolid ifcSolid, ILogger logger)
-            => WrapShapeAsSolidSet(_service.SolidFactory.Build((IIfcSolidModel)ifcSolid));
+            => WrapShapeAsSolidSet(_service.SolidFactory.Build(ifcSolid));
 
         public IXbimSolidSet CreateSolidSet(IIfcTriangulatedFaceSet shell, ILogger logger)
-            => WrapShapeAsSolidSet(_service.SolidFactory.Build((IIfcTessellatedItem)shell));
+            => WrapShapeAsSolidSet(_service.SolidFactory.Build(shell));
 
         public IXbimSolidSet CreateSolidSet(IIfcPolygonalFaceSet shell, ILogger logger)
-            => WrapShapeAsSolidSet(_service.SolidFactory.Build((IIfcTessellatedItem)shell));
+            => WrapShapeAsSolidSet(_service.SolidFactory.Build(shell));
 
         public IXbimSolidSet CreateSolidSet(IIfcShellBasedSurfaceModel ifcSurface, ILogger logger)
             => WrapShapeAsSolidSet(_service.SolidFactory.Build(ifcSurface));
@@ -463,13 +464,13 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXbimGeometryObjectSet CreateSurfaceModel(IIfcTessellatedFaceSet shell, ILogger logger)
         {
-            var shape = _service.SolidFactory.Build((IIfcTessellatedItem)shell);
+            var shape = _service.SolidFactory.Build(shell);
             return WrapShapeAsGeometryObjectSet(shape);
         }
 
         public IXbimGeometryObjectSet CreateSurfaceModel(IIfcPolygonalFaceSet shell, ILogger logger)
         {
-            var shape = _service.SolidFactory.Build((IIfcTessellatedItem)shell);
+            var shape = _service.SolidFactory.Build(shell);
             return WrapShapeAsGeometryObjectSet(shape);
         }
 
@@ -503,7 +504,74 @@ namespace Xbim.Geometry.Engine.Interop.Services
         // --- Grid ---
 
         public IXbimSolidSet CreateGrid(IIfcGrid grid, ILogger logger)
-            => throw new NotSupportedException("CreateGrid not yet supported.");
+        {
+            double precision = grid.Model.ModelFactors.Precision;
+            double mm = Math.Max(grid.Model.ModelFactors.OneMilliMeter, precision * 10);
+
+            var curveFactory = (CurveFactory)_service.CurveFactory;
+
+            var uHandles = BuildGridAxisCurves(grid.UAxes, curveFactory, logger);
+            var vHandles = BuildGridAxisCurves(grid.VAxes, curveFactory, logger);
+            var wHandles = BuildGridAxisCurves(grid.WAxes, curveFactory, logger);
+
+            if (uHandles.Length == 0 && vHandles.Length == 0 && wHandles.Length == 0)
+                return new XbimSolidSet();
+
+            try
+            {
+                using var uArray = new NativeHandleArray(uHandles);
+                using var vArray = new NativeHandleArray(vHandles);
+                using var wArray = new NativeHandleArray(wHandles);
+
+                int result = XbimGeometryNativeApi.xbim_grid_create(
+                    _service.ContextHandle,
+                    uArray.Ptrs, uArray.Length,
+                    vArray.Ptrs, vArray.Length,
+                    wArray.Ptrs, wArray.Length,
+                    precision, mm,
+                    out var shapeHandle);
+
+                if (result != 0)
+                {
+                    logger?.LogWarning("CreateGrid failed: {Error}",
+                        XbimGeometryNativeApi.GetLastError());
+                    return new XbimSolidSet();
+                }
+
+                return new XbimSolidSet(new XbimShape(shapeHandle));
+            }
+            finally
+            {
+                foreach (var h in uHandles) h?.Dispose();
+                foreach (var h in vHandles) h?.Dispose();
+                foreach (var h in wHandles) h?.Dispose();
+            }
+        }
+
+        private static NativeCurve2dHandle[] BuildGridAxisCurves(
+            IEnumerable<IIfcGridAxis> axes, CurveFactory curveFactory, ILogger logger)
+        {
+            if (axes == null)
+                return Array.Empty<NativeCurve2dHandle>();
+
+            var handles = new List<NativeCurve2dHandle>();
+            foreach (var axis in axes)
+            {
+                if (axis.AxisCurve == null) continue;
+                try
+                {
+                    var curve2d = (XbimCurve2d)curveFactory.BuildCurve2d(axis.AxisCurve);
+                    handles.Add(curve2d.DetachHandle());
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogWarning(ex,
+                        "Failed to build 2D curve for grid axis {Tag}, skipping",
+                        axis.AxisTag?.Value ?? "(unnamed)");
+                }
+            }
+            return handles.ToArray();
+        }
 
         // --- Curve creation (not yet supported) ---
 
@@ -743,7 +811,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         /// <summary>
         /// Builds a solid model via V6 factory and returns as IXbimSolid.
         /// </summary>
-        private IXbimSolid WrapBuildAsSolid(IIfcSolidModel solidModel)
+        private IXbimSolid BuildAsSolid(IIfcSolidModel solidModel)
         {
             var shape = _service.SolidFactory.Build(solidModel);
             return WrapShapeAsSolid(shape);

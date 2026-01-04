@@ -37,7 +37,7 @@ namespace Xbim.Geometry.Engine.Tests
 
             var solidFactory = _modelSvc.SolidFactory;
             var blockMoq = IfcMoq.IfcBlockMoq();
-            var solid = solidFactory.Build(blockMoq) as IXSolid; //initialise the factory with the block
+            var solid = solidFactory.Build(blockMoq); //initialise the factory with the block
             Assert.Equal(XShapeType.Solid, solid.ShapeType);
             var shells = solid.Shells;
             shells.Should().HaveCount(1);
@@ -69,7 +69,7 @@ namespace Xbim.Geometry.Engine.Tests
             var solidFactory = _modelSvc.SolidFactory;
             var pyramidMoq = IfcMoq.IfcRectangularPyramidMoq();
 
-            var solid = solidFactory.Build(pyramidMoq) as IXSolid; //initialise the factory with the block
+            var solid = solidFactory.Build(pyramidMoq); //initialise the factory with the block
             Assert.Equal(XShapeType.Solid, solid.ShapeType);
             var shells = solid.Shells;
             shells.Count().Should().Be(1);
@@ -100,7 +100,7 @@ namespace Xbim.Geometry.Engine.Tests
             var rccMoq = IfcMoq.IfcRightCircularConeMoq();
 
             var solidFactory = _modelSvc.SolidFactory;
-            var solid = solidFactory.Build(rccMoq) as IXSolid; //initialise the factory with the block
+            var solid = solidFactory.Build(rccMoq); //initialise the factory with the block
             Assert.Equal(XShapeType.Solid, solid.ShapeType);
             var shells = solid.Shells;
             shells.Count().Should().Be(1);
@@ -156,7 +156,7 @@ namespace Xbim.Geometry.Engine.Tests
             var rccMoq = IfcMoq.IfcRightCircularCylinderMoq();
 
             var solidFactory = _modelSvc.SolidFactory;
-            var solid = solidFactory.Build(rccMoq) as IXSolid; //initialise the factory with the block
+            var solid = solidFactory.Build(rccMoq); //initialise the factory with the block
             Assert.Equal(XShapeType.Solid, solid.ShapeType);
             var shells = solid.Shells;
             shells.Count().Should().Be(1);
@@ -202,7 +202,7 @@ namespace Xbim.Geometry.Engine.Tests
             var sphereMoq = IfcMoq.IfcSphereMoq();
 
             var solidFactory = _modelSvc.SolidFactory;
-            var solid = solidFactory.Build(sphereMoq) as IXSolid; //initialise the factory with the block
+            var solid = solidFactory.Build(sphereMoq); //initialise the factory with the block
             Assert.Equal(XShapeType.Solid, solid.ShapeType);
             var shells = solid.Shells;
             shells.Should().HaveCount(1);

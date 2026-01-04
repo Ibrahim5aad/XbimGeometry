@@ -95,26 +95,43 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             }
         }
 
-        public IXbimGeometryObjectSet Cut(IXbimSolidSet toCut, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use BooleanFactory for boolean operations.");
-
         public IXbimGeometryObjectSet Cut(IXbimSolid toCut, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use BooleanFactory for boolean operations.");
+            => PerformBoolean(XbimGeometryNativeApi.xbim_boolean_cut, toCut, tolerance);
 
-        public IXbimGeometryObjectSet Union(IXbimSolidSet toCut, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use BooleanFactory for boolean operations.");
+        public IXbimGeometryObjectSet Cut(IXbimSolidSet toCut, double tolerance, ILogger logger = null)
+            => PerformBooleanChained(XbimGeometryNativeApi.xbim_boolean_cut, toCut, tolerance);
 
-        public IXbimGeometryObjectSet Union(IXbimSolid toCut, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use BooleanFactory for boolean operations.");
+        public IXbimGeometryObjectSet Union(IXbimSolid toUnion, double tolerance, ILogger logger = null)
+            => PerformBoolean(XbimGeometryNativeApi.xbim_boolean_union, toUnion, tolerance);
 
-        public IXbimGeometryObjectSet Intersection(IXbimSolidSet toCut, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use BooleanFactory for boolean operations.");
+        public IXbimGeometryObjectSet Union(IXbimSolidSet toUnion, double tolerance, ILogger logger = null)
+            => PerformBooleanChained(XbimGeometryNativeApi.xbim_boolean_union, toUnion, tolerance);
 
-        public IXbimGeometryObjectSet Intersection(IXbimSolid toCut, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use BooleanFactory for boolean operations.");
+        public IXbimGeometryObjectSet Intersection(IXbimSolid toIntersect, double tolerance, ILogger logger = null)
+            => PerformBoolean(XbimGeometryNativeApi.xbim_boolean_intersect, toIntersect, tolerance);
+
+        public IXbimGeometryObjectSet Intersection(IXbimSolidSet toIntersect, double tolerance, ILogger logger = null)
+            => PerformBooleanChained(XbimGeometryNativeApi.xbim_boolean_intersect, toIntersect, tolerance);
 
         public IXbimFaceSet Section(IXbimFace toSection, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use BooleanFactory for section operations.");
+        {
+            if (!IsValid || !toSection.IsValid)
+                return new XbimFaceSet(Array.Empty<IXbimFace>());
+
+            var faceHandle = ((XbimFace)toSection).Handle;
+            int result = XbimGeometryNativeApi.xbim_boolean_section(
+                NativeContextHandle.NullHandle,
+                Handle, faceHandle, tolerance,
+                out var resultHandle);
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Section operation failed: {XbimGeometryNativeApi.GetLastError()}");
+
+            var shape = (XbimShape)NativeShapeWrapper.WrapShape(resultHandle);
+            var faceHandles = shape.GetSubShapeHandles(XShapeType.Face);
+            var faces = faceHandles.Select(h => (IXbimFace)new XbimFace(h)).ToArray();
+            return new XbimFaceSet(faces);
+        }
 
         public void SaveAsBrep(string fileName) => WriteBrep(fileName);
 
@@ -125,6 +142,64 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             if (other is XbimShape os)
                 return IsEqual(os);
             return false;
+        }
+
+        #endregion
+
+        #region Boolean helpers
+
+        private delegate int BooleanOp(
+            NativeContextHandle ctx,
+            NativeShapeHandle body,
+            NativeShapeHandle tool,
+            double fuzzyTolerance,
+            out int outHasWarnings,
+            out NativeShapeHandle outHandle);
+
+        private IXbimGeometryObjectSet PerformBoolean(BooleanOp op, IXbimSolid tool, double tolerance)
+        {
+            var toolHandle = ((XbimShape)tool).Handle;
+            int result = op(
+                NativeContextHandle.NullHandle,
+                Handle, toolHandle, tolerance,
+                out _, out var resultHandle);
+            if (result != 0)
+                throw new InvalidOperationException(
+                    $"Boolean operation failed: {XbimGeometryNativeApi.GetLastError()}");
+
+            return BuildObjectSet(resultHandle);
+        }
+
+        private IXbimGeometryObjectSet PerformBooleanChained(BooleanOp op, IXbimSolidSet tools, double tolerance)
+        {
+            NativeShapeHandle bodyHandle = Handle;
+            foreach (var tool in tools)
+            {
+                var toolHandle = ((XbimShape)tool).Handle;
+                int result = op(
+                    NativeContextHandle.NullHandle,
+                    bodyHandle, toolHandle, tolerance,
+                    out _, out var resultHandle);
+                if (result != 0)
+                    throw new InvalidOperationException(
+                        $"Boolean operation failed: {XbimGeometryNativeApi.GetLastError()}");
+                bodyHandle = resultHandle;
+            }
+
+            return BuildObjectSet(bodyHandle);
+        }
+
+        private static XbimGeometryObjectSet BuildObjectSet(NativeShapeHandle resultHandle)
+        {
+            var shape = (XbimShape)NativeShapeWrapper.WrapShape(resultHandle);
+            var solidHandles = shape.GetSubShapeHandles(XShapeType.Solid);
+            if (solidHandles.Length > 0)
+            {
+                var items = solidHandles.Select(h => (IXbimGeometryObject)new XbimSolid(h));
+                return new XbimGeometryObjectSet(items);
+            }
+
+            return new XbimGeometryObjectSet(new[] { (IXbimGeometryObject)shape });
         }
 
         #endregion

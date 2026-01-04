@@ -123,7 +123,7 @@ namespace Xbim.Geometry.Engine.Tests
             occ.IsSolidsOnly.Should().BeTrue();
             var compositeProfile = (IIfcCompositeProfileDef)extrusion.SweptArea;
             occ.Solids.Count().Should().Be(compositeProfile.Profiles.Count);                                                               
-            occ.Solids.Sum(s => ((IXSolid)s).Volume).Should().BeApproximately(12399283891, 1);
+            occ.Solids.Sum(s => s.Volume).Should().BeApproximately(12399283891, 1);
            
             //check the old engine returns the same result
             var engineV5 = factory.CreateGeometryEngineV5(model, _loggerFactory);

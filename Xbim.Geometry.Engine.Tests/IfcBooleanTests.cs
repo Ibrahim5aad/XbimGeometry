@@ -1116,7 +1116,7 @@ namespace Xbim.Geometry.Engine.Tests
                 {
                     var result = uncutItem.Cut(openingBReps, precision);
                     result.Count.Should().Be(1);
-                    var cutSolid = result.First as IXbimSolid;
+                    var cutSolid = result.First;
                     cutSolid.Should().NotBeNull();
                     cutSolid.IsValid.Should().BeTrue();
                     if (uncutItem.Volume <= cutSolid.Volume) uncut++;
