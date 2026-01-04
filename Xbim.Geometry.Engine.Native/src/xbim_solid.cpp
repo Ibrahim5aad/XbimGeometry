@@ -99,6 +99,27 @@ static gp_Ax2 make_ax2(
         gp_Dir(xDirX, xDirY, xDirZ));
 }
 
+/* Extract a TopoDS_Solid from a shape that may be a Solid, Compound, or
+   CompSolid.  BRepOffsetAPI_MakePipeShell::Shape() and BRepAlgoAPI_Cut::Shape()
+   can return a Compound wrapping a single solid instead of a bare Solid. */
+static bool xbim_extract_solid(const TopoDS_Shape& shape, TopoDS_Solid& result)
+{
+    if (shape.ShapeType() == TopAbs_SOLID)
+    {
+        result = TopoDS::Solid(shape);
+        return true;
+    }
+    if (shape.ShapeType() == TopAbs_COMPOUND || shape.ShapeType() == TopAbs_COMPSOLID)
+    {
+        for (TopExp_Explorer exp(shape, TopAbs_SOLID); exp.More(); exp.Next())
+        {
+            result = TopoDS::Solid(exp.Current());
+            return true;
+        }
+    }
+    return false;
+}
+
 #pragma endregion
 
 #pragma region CSG Primitives
@@ -1687,7 +1708,12 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_sectioned_spine(
             return XBIM_ERROR;
         }
 
-        TopoDS_Solid outerSolid = TopoDS::Solid(outerPipe.Shape());
+        TopoDS_Solid outerSolid;
+        if (!xbim_extract_solid(outerPipe.Shape(), outerSolid))
+        {
+            xbim_set_error("xbim_solid_build_sectioned_spine: outer pipe result is not a solid");
+            return XBIM_ERROR;
+        }
 
         /* Count inner wires (voids) in the first section — assume all sections
            have the same hole topology (same count and ordering). */
@@ -1760,13 +1786,22 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_sectioned_spine(
                     continue;
                 }
 
-                TopoDS_Solid innerSolid = TopoDS::Solid(innerPipe.Shape());
+                TopoDS_Solid innerSolid;
+                if (!xbim_extract_solid(innerPipe.Shape(), innerSolid))
+                {
+                    xbim_log_warning(ctx, "SectionedSpine: inner pipe for hole %d is not a solid — skipping", holeIdx);
+                    continue;
+                }
 
                 BRepAlgoAPI_Cut cutter(outerSolid, innerSolid);
                 cutter.Build();
                 if (cutter.IsDone())
                 {
-                    outerSolid = TopoDS::Solid(cutter.Shape());
+                    TopoDS_Solid cutResult;
+                    if (xbim_extract_solid(cutter.Shape(), cutResult))
+                        outerSolid = cutResult;
+                    else
+                        xbim_log_warning(ctx, "SectionedSpine: boolean cut for hole %d did not produce a solid — skipping", holeIdx);
                 }
                 else
                 {

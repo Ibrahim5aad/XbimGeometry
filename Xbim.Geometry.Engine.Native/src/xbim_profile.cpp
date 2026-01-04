@@ -2087,6 +2087,14 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_derived(
             resultShape = brepTransform.Shape();
         }
 
+        /* If the 2D transform has a negative determinant (mirror/reflection),
+         * reverse the result to preserve face normal orientation.
+         * BRepBuilderAPI_Transform with copy=true flips face orientation for
+         * det < 0 transforms */
+        double det2d = m00 * m11 - m01 * m10;
+        if (det2d < 0)
+            resultShape.Reverse();
+
         *outHandle = xbim_shape_create_from(resultShape);
         if (!*outHandle)
         {

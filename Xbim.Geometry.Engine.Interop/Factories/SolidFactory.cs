@@ -433,9 +433,87 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private IXShape BuildFixedReferenceSweptAreaSolid(IIfcFixedReferenceSweptAreaSolid fixedRefSwept)
         {
-            // This requires both WireFactory (for directrix) and SurfaceFactory (for reference surface)
-            throw new NotImplementedException(
-                $"FixedReferenceSweptAreaSolid #{fixedRefSwept.EntityLabel} requires WireFactory and SurfaceFactory support (TOPO-002/TOPO-006).");
+            // Composite profiles: build a solid per sub-profile, combine into compound
+            if (fixedRefSwept.SweptArea is IIfcCompositeProfileDef compositeProfile)
+            {
+                var solidHandles = new List<NativeShapeHandle>();
+                try
+                {
+                    foreach (var profileDef in compositeProfile.Profiles)
+                        solidHandles.Add(BuildFixedReferenceSweptAreaSolidCore(fixedRefSwept, profileDef));
+
+                    using var nativeHandles = new NativeHandleArray(solidHandles.ToArray());
+
+                    int result = XbimGeometryNativeApi.xbim_compound_make(
+                        ContextHandle,
+                        nativeHandles.Ptrs,
+                        nativeHandles.Length,
+                        out var compoundHandle);
+
+                    if (result != 0)
+                        throw new InvalidOperationException(
+                            $"Failed to build compound for FixedReferenceSweptAreaSolid #{fixedRefSwept.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                    return NativeShapeWrapper.WrapShape(compoundHandle);
+                }
+                finally
+                {
+                    foreach (var h in solidHandles)
+                        h.Dispose();
+                }
+            }
+
+            var solidResult = BuildFixedReferenceSweptAreaSolidCore(fixedRefSwept, fixedRefSwept.SweptArea);
+            return NativeShapeWrapper.WrapSolid(solidResult);
+        }
+
+        private NativeShapeHandle BuildFixedReferenceSweptAreaSolidCore(
+            IIfcFixedReferenceSweptAreaSolid fixedRefSwept, IIfcProfileDef profileDef)
+        {
+            if (profileDef.ProfileType != IfcProfileTypeEnum.AREA)
+                throw new InvalidOperationException(
+                    $"FixedReferenceSweptAreaSolid #{fixedRefSwept.EntityLabel}: profile must be AREA type.");
+
+            // Build the swept area profile face
+            using var profileFace = (XbimFace)_modelService.ProfileFactory.BuildFace(profileDef);
+
+            // Extract fixed reference direction — this becomes the reference plane normal
+            if (!GeometryFactory.BuildDirection3d(fixedRefSwept.FixedReference, out double refDirX, out double refDirY, out double refDirZ))
+                throw new InvalidOperationException(
+                    $"FixedReferenceSweptAreaSolid #{fixedRefSwept.EntityLabel}: FixedReference direction has zero magnitude.");
+
+            // Build the directrix wire with optional parametric trimming
+            var wireFactory = (WireFactory)_modelService.WireFactory;
+            double? startParam = fixedRefSwept.StartParam.HasValue ? (double)fixedRefSwept.StartParam.Value : null;
+            double? endParam = fixedRefSwept.EndParam.HasValue ? (double)fixedRefSwept.EndParam.Value : null;
+            using var directrixWire = (XbimWire)wireFactory.BuildDirectrixWire(fixedRefSwept.Directrix, startParam, endParam);
+
+            // Build optional position location (NullHandle = identity)
+            var locationHandle = NativeLocationHandle.NullHandle;
+            if (fixedRefSwept.Position != null)
+            {
+                locationHandle = ((GeometryFactory)_modelService.GeometryFactory)
+                    .BuildLocationFromAxis3D(fixedRefSwept.Position).Handle;
+            }
+
+            // Reference surface is a plane with normal = FixedReference direction.
+            // Origin at (0,0,0) — for an infinite plane, OCCT projects the directrix onto it regardless.
+            int result = XbimGeometryNativeApi.xbim_solid_build_fixed_reference_swept(
+                ContextHandle,
+                profileFace.Handle,
+                directrixWire.Handle,
+                0.0, 0.0, 0.0,
+                refDirX, refDirY, refDirZ,
+                1, // isPlanarReferenceSurface — always planar for fixed reference
+                _modelService.Precision,
+                locationHandle,
+                out var solidHandle);
+
+            if (result != 0)
+                throw new XbimGeometryFactoryException(
+                    $"Failed to build FixedReferenceSweptAreaSolid #{fixedRefSwept.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return solidHandle;
         }
 
         private IXShape BuildSurfaceCurveSweptAreaSolid(IIfcSurfaceCurveSweptAreaSolid surfaceCurveSwept)

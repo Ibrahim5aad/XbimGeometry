@@ -780,7 +780,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         firstParameterizedLength = segParamLength;
 
                     // Build the segment curve and apply SameSense reversal
-                    var segCurve = (XbimCurve)_modelService.CurveFactory.Build(parentCurve);
+                    var curveFactory = (CurveFactory)_modelService.CurveFactory;
+                    var segCurve = curveFactory.Build3d(parentCurve);
 
                     if (!segment.SameSense)
                     {

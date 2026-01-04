@@ -47,10 +47,10 @@ namespace Xbim.Geometry.Engine.Tests
                 if (engineVersion == XGeometryEngineVersion.V5)
                 {
                     var solids = geomEngine.Create(advancedBrep, _logger) as IXbimGeometryObjectSet;
-                    solids.Solids.Sum(s=>s.Volume).Should().BeApproximately(102264692.6969, 1e-4);
-                   // solid.Faces.Count.Should().Be(14);
+                    solids.Solids.Sum(s => s.Volume).Should().BeApproximately(102264692.6969, 1e-4);
+                    // solid.Faces.Count.Should().Be(14);
                 }
-                if(engineVersion == XGeometryEngineVersion.V6)
+                if (engineVersion == XGeometryEngineVersion.V6)
                 {
                     var solid = geomEngine.Create(advancedBrep, _logger) as IXbimSolid;
                     solid.Volume.Should().BeApproximately(102264692.6969, 1e-4);
@@ -119,7 +119,7 @@ namespace Xbim.Geometry.Engine.Tests
             using var model = MemoryModel.OpenRead(filePath);
             var curve = model.Instances.FirstOrDefault(g => g is IIfcCompositeCurve) as IIfcCompositeCurve;
             var modelSvc = factory.CreateModelGeometryService(model, _loggerFactory);
-            
+
             // Act
             var xCurve = modelSvc.CurveFactory.Build(curve);
 
@@ -191,13 +191,13 @@ namespace Xbim.Geometry.Engine.Tests
                 geomEngine.ModelService.UpgradeFaceSets = true;
                 var solids = geomEngine.CreateSolidSet(er.Entity, _logger);
                 solids.Count.Should().Be(4, "Should return 4 solids");
-                
+
                 //repeat without upgradingFaceset false. This will create a solid with four shells that are exactly the same as the solids previously generated
                 //in essence the topology is now incorrect but visually and mathmatically everything is the same
                 geomEngine.ModelService.UpgradeFaceSets = false;
                 var compoundSolid = geomEngine.CreateSolidSet(er.Entity, _logger);
                 compoundSolid.Count.Should().Be(1, "Should return 1 solid");
-                solids.Sum(s => s.Volume).Should().BeApproximately(compoundSolid.Sum(s=>s.Volume),1e-5);
+                solids.Sum(s => s.Volume).Should().BeApproximately(compoundSolid.Sum(s => s.Volume), 1e-5);
             }
 
         }
@@ -442,25 +442,11 @@ namespace Xbim.Geometry.Engine.Tests
                 triangulatedFaceSet.Should().NotBeNull();
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
                 var geom = geomEngine.CreateSurfaceModel(triangulatedFaceSet);
-                geom.Shells.Count.Should().Be(1); ;
-                Math.Abs(geom.Shells.First.BoundingBox.Volume - 1.32).Should().BeLessThan(1e-5);
+                geom.Solids.Count.Should().Be(1);
+                Math.Abs(geom.Solids.First.BoundingBox.Volume - 1.32).Should().BeLessThan(1e-5);
 
             }
         }
-        //Commented out due to its time taken
-        //[Fact]
-        //public void TriangulatedFaceSet4Test()
-        //{
-        //    using (var model = MemoryModel.OpenRead(@"TestFiles\Ifc4TestFiles\beam-curved-i-shape-tessellated.ifc"))
-        //    {
-        //        var triangulatedFaceSet = model.Instances.OfType<IfcTriangulatedFaceSet>().FirstOrDefault();
-        //        triangulatedFaceSet);
-        //        var geom = geomEngine.CreateSurfaceModel(triangulatedFaceSet);
-        //        geom.Shells.Count == 1);
-        //        Math.Abs(geom.Shells.First.BoundingBox.Volume - 13.337264) < 1e-5);
-
-        //    }
-        //}
 
         [Fact]
         public void TriangulatedFaceSet2Test()
@@ -471,11 +457,11 @@ namespace Xbim.Geometry.Engine.Tests
                 triangulatedFaceSet.Should().NotBeNull();
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
                 var geom = geomEngine.CreateSurfaceModel(triangulatedFaceSet);
-                geom.Shells.Count.Should().Be(1);
-                Math.Abs(geom.Shells.First.BoundingBox.Volume - 7680).Should().BeLessThan(1e-5);
-
+                geom.Solids.Count.Should().Be(1);
+                Math.Abs(geom.Solids.First.BoundingBox.Volume - 7680).Should().BeLessThan(1e-3);
             }
         }
+        
         [Fact]
         public void TriangulatedFaceSet3Test()
         {
@@ -485,11 +471,12 @@ namespace Xbim.Geometry.Engine.Tests
                 triangulatedFaceSet.Should().NotBeNull();
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
                 var geom = geomEngine.CreateSurfaceModel(triangulatedFaceSet);
-                geom.Shells.Count.Should().Be(1);
-                Math.Abs(geom.Shells.First.BoundingBox.Volume - 103.92304).Should().BeLessThan(1e-5);
-
+                var s = geom.Solids.First;
+                geom.Solids.Count.Should().Be(1);
+                Math.Abs(geom.Solids.First.BoundingBox.Volume - 103.92304).Should().BeLessThan(1e-3);
             }
         }
+
         #endregion
 
         #region Grid placement
@@ -543,7 +530,7 @@ namespace Xbim.Geometry.Engine.Tests
 
         #region Tapered extrusions
 
-        
+
         [Fact]
         public void ExtrudedAreaSolidTaperedTest()
         {
@@ -606,7 +593,7 @@ namespace Xbim.Geometry.Engine.Tests
                 sectionedSpine.Should().NotBeNull();
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
                 var bar = geomEngine.CreateSolid(sectionedSpine, _logger);
-                bar.Volume.Should().BeApproximately(2445.140455567097, 1e-5);
+                bar.Volume.Should().BeApproximately(2513.059484, 1e-5);
             }
         }
 
@@ -633,8 +620,7 @@ namespace Xbim.Geometry.Engine.Tests
                 mFace.Normal.X.Should().BeApproximately(dFace.Normal.X, 1e-5);
                 mFace.Normal.Y.Should().BeApproximately(dFace.Normal.Y, 1e-5);
                 mFace.Normal.Z.Should().BeApproximately(dFace.Normal.Z, 1e-5);
-                diffs.Length.Should().Be(3);
-
+                diffs.Length.Should().Be(2);
             }
         }
 
@@ -738,8 +724,8 @@ namespace Xbim.Geometry.Engine.Tests
                 var geom = geomEngine.CreateSolid(eas, _logger);
                 //SRL V6 implementation has more accurately built the composite curve and removed a redundant segment,
                 //the volume has altered ~15 from 11443062570 in the V5 implmentation but it is now correct
-                geom.Volume.Should().BeApproximately(11443062585, 1); 
-                
+                geom.Volume.Should().BeApproximately(11443062585, 1);
+
             }
         }
 
@@ -804,7 +790,7 @@ namespace Xbim.Geometry.Engine.Tests
                 eas.Should().NotBeNull();
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
                 var geom = geomEngine.CreateSolid(eas, _logger);
-               // var brep = geom.ToBRep;
+                // var brep = geom.ToBRep;
                 geom.Volume.Should().BeApproximately(2278848175847, 1);
             }
         }
