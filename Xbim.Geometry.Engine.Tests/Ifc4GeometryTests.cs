@@ -105,8 +105,7 @@ namespace Xbim.Geometry.Engine.Tests
                 er.Entity.Should().NotBeNull();
                 var geomEngine = factory.CreateGeometryEngine(engineVersion, er.Model, _loggerFactory);
                 var face = geomEngine.CreateFace(er.Entity, _logger);
-                face.Area.Should().BeApproximately(22084775, 1);
-
+                face.Area.Should().BeApproximately(22084715, 1);
             }
         }
 
@@ -645,9 +644,10 @@ namespace Xbim.Geometry.Engine.Tests
                     geom.Volume.Should().BeGreaterThan(0);
                     solids.Add(geom);
                 }
-                solids.Sum(s => s.Volume).Should().BeApproximately(338123607, 1);
+                solids.Sum(s => s.Volume).Should().BeApproximately(338121272, 1);
             }
         }
+
         [Fact]
         public void NotClosedShellTest()
         {
@@ -658,9 +658,9 @@ namespace Xbim.Geometry.Engine.Tests
                 var solid = geomEngine.CreateSolidSet(er.Entity, _logger);
 
                 solid.IsValid.Should().BeTrue();
-
             }
         }
+
         /// <summary>
         /// This test checks a composite curve that has trimmed IfcLine segments
         /// </summary>

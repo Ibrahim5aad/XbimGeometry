@@ -171,14 +171,19 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"SurfaceOfRevolution #{ifcRevolution.EntityLabel}: only profiles of type CURVE are valid.");
 
-            if (ifcRevolution.SweptCurve is not IIfcArbitraryOpenProfileDef openProfile)
-                throw new NotSupportedException(
-                    $"SurfaceOfRevolution #{ifcRevolution.EntityLabel}: SweptCurve must be an ArbitraryOpenProfileDef, " +
-                    $"got {ifcRevolution.SweptCurve.ExpressType.ExpressName}.");
+            // Extract the curve from the profile — both open and closed profiles are valid
+            IIfcCurve ifcCurve = ifcRevolution.SweptCurve switch
+            {
+                IIfcArbitraryOpenProfileDef open => open.Curve,
+                IIfcArbitraryClosedProfileDef closed => closed.OuterCurve,
+                _ => throw new NotSupportedException(
+                    $"SurfaceOfRevolution #{ifcRevolution.EntityLabel}: unsupported SweptCurve profile type " +
+                    $"{ifcRevolution.SweptCurve.ExpressType.ExpressName}.")
+            };
 
             // Build the generatrix curve from the profile's curve property
             var curveFactory = (CurveFactory)_modelService.CurveFactory;
-            using var curve = (XbimCurve)curveFactory.Build(openProfile.Curve);
+            using var curve = (XbimCurve)curveFactory.Build(ifcCurve);
 
            
             // Extract revolution axis
@@ -217,10 +222,15 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new InvalidOperationException(
                     $"SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: only profiles of type CURVE are valid.");
 
-            if (ifcExtrusion.SweptCurve is not IIfcArbitraryOpenProfileDef openProfile)
-                throw new NotSupportedException(
-                    $"SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: SweptCurve must be an ArbitraryOpenProfileDef, " +
-                    $"got {ifcExtrusion.SweptCurve.ExpressType.ExpressName}.");
+            // Extract the curve from the profile — both open and closed profiles are valid
+            IIfcCurve ifcCurve = ifcExtrusion.SweptCurve switch
+            {
+                IIfcArbitraryOpenProfileDef open => open.Curve,
+                IIfcArbitraryClosedProfileDef closed => closed.OuterCurve,
+                _ => throw new NotSupportedException(
+                    $"SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: unsupported SweptCurve profile type " +
+                    $"{ifcExtrusion.SweptCurve.ExpressType.ExpressName}.")
+            };
 
             // Try the Revit arc-centre workaround first: early Revit exporters
             // double-transform the centre of trimmed circular arcs.
@@ -234,7 +244,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
             else
             {
-                curve = curveFactory.Build3d(openProfile.Curve);
+                curve = curveFactory.Build3d(ifcCurve);
             }
 
             using (curve)

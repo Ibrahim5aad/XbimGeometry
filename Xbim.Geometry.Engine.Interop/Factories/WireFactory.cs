@@ -278,7 +278,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     var parentCurve = segment.ParentCurve;
                     if (parentCurve == null) continue;
 
-                    var segCurve = (XbimCurve)_modelService.CurveFactory.Build(parentCurve);
+                    var curveFactory = (CurveFactory)_modelService.CurveFactory;
+                    var segCurve = curveFactory.Build3d(parentCurve);
 
                     if (!segment.SameSense)
                     {
