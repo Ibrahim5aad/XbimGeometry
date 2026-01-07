@@ -1692,6 +1692,24 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_surface(
     XbimShapeHandle*  outHandle);
 
 /*
+ * Build an unbounded face from any pre-built surface handle.
+ * Produces an infinite face (no boundary wires) covering the full parametric
+ * domain of the surface. Use tolerance to constrain the internal precision.
+ *
+ *   ctx           – a valid context handle (used for logging; may be NULL)
+ *   surfaceHandle – handle to a Geom_Surface (from xbim_surface_build_*)
+ *   tolerance     – modelling precision (e.g. model MinimumGap)
+ *   outHandle     – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_unbounded_from_surface(
+    XbimContextHandle  ctx,
+    XbimSurfaceHandle  surfaceHandle,
+    double             tolerance,
+    XbimShapeHandle*   outHandle);
+
+/*
  * Build a planar face from a closed wire.
  * The wire must define a planar polygon; OCCT infers the plane automatically.
  *
@@ -2956,6 +2974,77 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_linear_extrusion(
     double posXX,   double posXY,   double posXZ,
     int    hasPosition,
     XbimSurfaceHandle* outHandle);
+
+/*
+ * Build a toroidal surface from an axis-2 placement, major radius, and minor radius.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – placement origin (centre of the torus)
+ *   zDirX/Y/Z        – placement Z direction (torus axis)
+ *   xDirX/Y/Z        – placement X direction (reference)
+ *   majorRadius      – distance from the torus centre to the tube centre (must be >= 0)
+ *   minorRadius      – radius of the tube cross-section (must be > 0)
+ *   outHandle        – receives the new surface handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_toroidal(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double majorRadius,
+    double minorRadius,
+    XbimSurfaceHandle* outHandle);
+
+/*
+ * Build a rectangular trimmed surface by restricting a basis surface to
+ * a rectangular parameter range [U1, U2] x [V1, V2].
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   basisSurface     – the underlying surface to trim
+ *   u1, u2           – parameter bounds in the U direction
+ *   v1, v2           – parameter bounds in the V direction
+ *   outHandle        – receives the new surface handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_rectangular_trimmed(
+    XbimContextHandle ctx,
+    XbimSurfaceHandle basisSurface,
+    double u1, double u2,
+    double v1, double v2,
+    XbimSurfaceHandle* outHandle);
+
+/*
+ * Build a bounded planar face from a plane placement, an outer boundary wire,
+ * and optional inner boundary wires (holes).
+ *
+ * The boundary wires must be in the plane's local 2D space (z = 0). The
+ * resulting face is positioned at the given world placement.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   originX/Y/Z      – plane placement origin in world coordinates
+ *   zDirX/Y/Z        – plane normal (Z direction of placement)
+ *   xDirX/Y/Z        – reference direction (X direction of placement)
+ *   outerWire        – shape handle for the outer boundary wire (at z = 0)
+ *   innerWires       – array of shape handles for inner holes (may be NULL)
+ *   numInnerWires    – number of inner wire handles (0 if no holes)
+ *   tolerance        – geometric tolerance for face construction
+ *   outHandle        – receives the new face shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_curve_bounded_plane(
+    XbimContextHandle        ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    XbimShapeHandle          outerWire,
+    const XbimShapeHandle*   innerWires,
+    int                      numInnerWires,
+    double                   tolerance,
+    XbimShapeHandle*         outHandle);
 
 /*
  * Destroy a surface handle and free its resources.

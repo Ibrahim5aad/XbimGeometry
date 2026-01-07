@@ -72,7 +72,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             // Normalize direction
             double mag = Math.Sqrt(dx * dx + dy * dy);
             if (mag < 1e-15)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IIfcLine #{ifcLine.EntityLabel} has zero-length direction vector.");
             dx /= mag;
             dy /= mag;
@@ -84,7 +84,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var nativeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build 2D line #{ifcLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new XbimLine2d(nativeHandle,
@@ -132,7 +132,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var nativeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build 2D circle #{ifcCircle.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             var position = new XAxis2Placement2d(
@@ -177,7 +177,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var nativeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build 2D ellipse #{ifcEllipse.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             var position = new XAxis2Placement2d(
@@ -239,7 +239,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var nativeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build 2D B-spline curve #{ifcBSpline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             var curveType = ifcBSpline is IIfcRationalBSplineCurveWithKnots
@@ -266,7 +266,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             // Formal proposition: NoTrimOfBoundedCurves — stricter in 2D (throw, not warn)
             if (ifcTrimmed.BasisCurve is IIfcBoundedCurve)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Formal Proposition NoTrimOfBoundedCurves — " +
                     "already bounded curves shall not be trimmed.");
 
@@ -317,19 +317,19 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         ContextHandle, basisCurve.Handle,
                         px1, py1, _modelService.MinimumGap, out u1);
                     if (r1 != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Trim Point1 is not on the 2D basis curve.");
 
                     int r2 = XbimGeometryNativeApi.xbim_curve2d_project_point(
                         ContextHandle, basisCurve.Handle,
                         px2, py2, _modelService.MinimumGap, out u2);
                     if (r2 != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Trim Point2 is not on the 2D basis curve.");
                 }
                 else if (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))
                 {
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: TrimValuesConsistent — " +
                         "either a single value is specified for Trim, or the two trimming values are of different type.");
                 }
@@ -351,7 +351,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                 // Sanity check
                 if (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: error converting trim points.");
 
                 // Handle equal parameters
@@ -368,7 +368,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     {
                         _logger.LogInformation("IIfcTrimmedCurve #{Label}: parametric trim points are equal on non-conic — empty curve.",
                             ifcTrimmed.BasisCurve.EntityLabel);
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: trim parameters are equal on a non-conic basis, resulting in an empty curve.");
                     }
                 }
@@ -394,7 +394,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 if (trimResult != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build 2D trimmed curve #{ifcTrimmed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new XbimTrimmedCurve2d(trimHandle, basisCurve);
@@ -421,7 +421,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             int pointCount = ifcPoints.Count;
 
             if (pointCount < 2)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IIfcPolyline #{ifcPolyline.EntityLabel} has fewer than 2 points.");
 
             double precision = _modelService.Precision;
@@ -445,7 +445,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     _logger.LogInformation(
                         "IIfcPolyline #{Label}: only 2 identical points — ignored.",
                         ifcPolyline.EntityLabel);
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IIfcPolyline #{ifcPolyline.EntityLabel} has only 2 identical points.");
                 }
 
@@ -453,7 +453,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     ContextHandle, pts[0].X, pts[0].Y, pts[1].X, pts[1].Y, out var lineHandle);
 
                 if (lineResult != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build 2D polyline line segment #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new XbimBoundedCurve2d(lineHandle, XCurveType.IfcPolyline);
@@ -480,7 +480,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         ContextHandle, start.X, start.Y, end.X, end.Y, out var lineHandle);
 
                     if (lineResult != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"Failed to build 2D polyline segment #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                     segments.Add(lineHandle);
@@ -488,7 +488,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 if (segments.Count == 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IIfcPolyline #{ifcPolyline.EntityLabel} has no non-degenerate 2D segments.");
 
                 if (segments.Count == 1)
@@ -506,7 +506,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var compositeHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build 2D polyline #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new XbimBoundedCurve2d(compositeHandle, XCurveType.IfcPolyline);
@@ -549,7 +549,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     // Reparametrised segments with non-unit ParamLength are unsupported
                     if (segment is IIfcReparametrisedCompositeCurveSegment reparam
                         && (double)reparam.ParamLength != 1.0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"IIfcReparametrisedCompositeCurveSegment #{segment.EntityLabel} is currently unsupported (ParamLength != 1).");
 
                     if (segment.ParentCurve == null)
@@ -557,7 +557,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                     // Composite curve segments must be bounded curves
                     if (!IsBoundedCurve(segment.ParentCurve))
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             "Composite curve is invalid, only curve segments that are bounded curves are permitted.");
 
                     var segCurve = (XbimCurve2d)BuildCurve2d(segment.ParentCurve);
@@ -566,7 +566,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     {
                         int reverseResult = XbimGeometryNativeApi.xbim_curve2d_reverse(segCurve.Handle);
                         if (reverseResult != 0)
-                            throw new InvalidOperationException(
+                            throw new XbimGeometryServiceException(
                                 $"Failed to reverse 2D composite curve segment: {XbimGeometryNativeApi.GetLastError()}");
                     }
 
@@ -574,7 +574,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 if (segmentCurves.Count == 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IIfcCompositeCurve #{ifcComposite.EntityLabel} has no valid 2D segments.");
 
                 using var nativeSegments = new NativeHandleArray(
@@ -585,7 +585,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var compositeHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build 2D composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new XbimBoundedCurve2d(compositeHandle, XCurveType.IfcCompositeCurve);
@@ -622,7 +622,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         {
                             var indices = (System.Collections.IList)arcIndex.Value;
                             if (indices.Count != 3)
-                                throw new InvalidOperationException(
+                                throw new XbimGeometryServiceException(
                                     $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: ArcIndex must have exactly 3 indices.");
 
                             int i1 = (int)(long)indices[0]! - 1;
@@ -638,7 +638,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                                 ContextHandle, sx, sy, mx, my, ex, ey, out var arcHandle);
 
                             if (arcResult != 0)
-                                throw new InvalidOperationException(
+                                throw new XbimGeometryServiceException(
                                     $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: failed to build 2D arc segment: {XbimGeometryNativeApi.GetLastError()}");
 
                             segments.Add(arcHandle);
@@ -647,7 +647,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         {
                             var indices = (System.Collections.IList)lineIndex.Value;
                             if (indices.Count < 2)
-                                throw new InvalidOperationException(
+                                throw new XbimGeometryServiceException(
                                     $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: LineIndex must have at least 2 indices.");
 
                             for (int p = 0; p < indices.Count - 1; p++)
@@ -662,7 +662,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                                     ContextHandle, x1, y1, x2, y2, out var lineHandle);
 
                                 if (lineResult != 0)
-                                    throw new InvalidOperationException(
+                                    throw new XbimGeometryServiceException(
                                         $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: failed to build 2D line segment: {XbimGeometryNativeApi.GetLastError()}");
 
                                 segments.Add(lineHandle);
@@ -682,7 +682,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                             ContextHandle, x1, y1, x2, y2, out var lineHandle);
 
                         if (lineResult != 0)
-                            throw new InvalidOperationException(
+                            throw new XbimGeometryServiceException(
                                 $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: failed to build 2D sequential line segment: {XbimGeometryNativeApi.GetLastError()}");
 
                         segments.Add(lineHandle);
@@ -690,7 +690,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 if (segments.Count == 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel} has no valid 2D segments.");
 
                 // Single segment — no need for composite joining
@@ -710,7 +710,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var compositeHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to join 2D IndexedPolyCurve segments #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new XbimBoundedCurve2d(compositeHandle, XCurveType.IfcIndexedPolyCurve);
@@ -760,7 +760,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var offsetHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build 2D offset curve #{ifcOffset.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new XbimCurve2d(offsetHandle, XCurveType.IfcOffsetCurve2D);

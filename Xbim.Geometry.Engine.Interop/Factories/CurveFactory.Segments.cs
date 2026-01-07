@@ -7,6 +7,7 @@ using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Services;
+using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4x3.GeometryResource;
 
@@ -56,7 +57,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 if (heightSegmentHandles.Count == 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IfcGradientCurve #{ifcGradient.EntityLabel}: no valid height function segments.");
 
                 // Step 3: Join height segments into composite 2D B-spline
@@ -67,7 +68,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var heightFunctionHandle);
 
                 if (compositeResult != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IfcGradientCurve #{ifcGradient.EntityLabel}: failed to build height function: {XbimGeometryNativeApi.GetLastError()}");
 
                 // Step 4: Align the height function's X origin with horizontal projection
@@ -83,7 +84,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var curveHandle);
 
                 if (gradientResult != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IfcGradientCurve #{ifcGradient.EntityLabel}: failed to build gradient curve: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new XbimGradientCurve(curveHandle, ContextHandle, _modelService.Precision);
@@ -134,7 +135,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     }
 
                     if (segHandles.Count == 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"IfcGradientCurve #{ifcGradient.EntityLabel}: BaseCurve has no valid segments.");
 
                     using var nativeSegs = new NativeHandleArray(segHandles.ToArray());
@@ -144,7 +145,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         out var compositeHandle);
 
                     if (result != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"IfcGradientCurve #{ifcGradient.EntityLabel}: failed to build BaseCurve composite: {XbimGeometryNativeApi.GetLastError()}");
 
                     return compositeHandle;
@@ -177,7 +178,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var lineHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IfcGradientCurve #{ifcGradient.EntityLabel}: failed to build BaseCurve line: {XbimGeometryNativeApi.GetLastError()}");
 
                 return lineHandle;
@@ -331,7 +332,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             int alignResult = XbimGeometryNativeApi.xbim_curve2d_align_to_origin(trimHandle);
             if (alignResult != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to align curve to origin: {XbimGeometryNativeApi.GetLastError()}");
 
             return trimHandle;
@@ -364,7 +365,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             // Step 1: Build the base gradient curve (via cache to avoid redundant construction)
             if (ifcSegRef.BaseCurve is not IfcGradientCurve ifcGradient)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IfcSegmentedReferenceCurve #{ifcSegRef.EntityLabel}: BaseCurve must be an IfcGradientCurve.");
 
             var gradientCurve = GetOrBuildCached(ifcGradient.EntityLabel, () => BuildGradientCurve(ifcGradient));
@@ -429,7 +430,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var outHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IfcSegmentedReferenceCurve #{ifcSegRef.EntityLabel}: failed to build: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new XbimCurve(outHandle, XCurveType.IfcSegmentedReferenceCurve);
@@ -471,7 +472,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 int r = XbimGeometryNativeApi.xbim_location_create_from_axis2(
                     ox, oy, oz, zx, zy, zz, xx, xy, xz, out var locHandle);
                 if (r != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to create location from Axis2Placement3D: {XbimGeometryNativeApi.GetLastError()}");
                 return locHandle;
             }
@@ -492,7 +493,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 int r = XbimGeometryNativeApi.xbim_location_create_from_axis2(
                     ox, oy, 0.0, 0.0, 0.0, 1.0, dx, dy, 0.0, out var locHandle);
                 if (r != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to create location from Axis2Placement2D: {XbimGeometryNativeApi.GetLastError()}");
                 return locHandle;
             }
@@ -514,10 +515,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         public IXCurve BuildSpiral(IfcSpiral spiral, double startParam, double endParam)
         {
             var handle = BuildSpiralInternal(spiral, startParam, endParam) ??
-                         throw new InvalidOperationException("Failed to build spiral");
+                         throw new XbimGeometryServiceException("Failed to build spiral");
 
             if (XbimGeometryNativeApi.xbim_curve2d_align_to_origin(handle) != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to align spiral to origin: {XbimGeometryNativeApi.GetLastError()}");
             return new XbimCurve2d(handle, GetSpiralCurveType(spiral));
         }
@@ -622,10 +623,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             var handle = BuildPolynomialCurve(curve, startParam, endParam);
             if (handle == null)
-                throw new InvalidOperationException("Failed to build polynomial curve");
+                throw new XbimGeometryServiceException("Failed to build polynomial curve");
             int alignResult = XbimGeometryNativeApi.xbim_curve2d_align_to_origin(handle);
             if (alignResult != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to align polynomial curve to origin: {XbimGeometryNativeApi.GetLastError()}");
             return new XbimCurve2d(handle, XCurveType.IfcPolynomialCurve);
         }

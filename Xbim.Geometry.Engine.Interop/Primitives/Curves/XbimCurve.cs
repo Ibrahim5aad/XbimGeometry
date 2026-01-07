@@ -6,6 +6,7 @@ using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Primitives
 {
@@ -34,7 +35,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             {
                 int result = XbimGeometryNativeApi.xbim_curve_length(Handle, out double length);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to compute curve length: {XbimGeometryNativeApi.GetLastError()}");
                 return length;
             }
@@ -46,7 +47,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             {
                 int result = XbimGeometryNativeApi.xbim_curve_parameters(Handle, out double first, out _);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get curve parameters: {XbimGeometryNativeApi.GetLastError()}");
                 return first;
             }
@@ -58,7 +59,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             {
                 int result = XbimGeometryNativeApi.xbim_curve_parameters(Handle, out _, out double last);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get curve parameters: {XbimGeometryNativeApi.GetLastError()}");
                 return last;
             }
@@ -69,7 +70,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             int result = XbimGeometryNativeApi.xbim_curve_value(
                 Handle, uParam, out double x, out double y, out double z);
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to evaluate curve at u={uParam}: {XbimGeometryNativeApi.GetLastError()}");
             return new XPoint(x, y, z);
         }
@@ -81,7 +82,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
                 out double px, out double py, out double pz,
                 out double dx, out double dy, out double dz);
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to evaluate curve D1 at u={uParam}: {XbimGeometryNativeApi.GetLastError()}");
 
             double mag = Math.Sqrt(dx * dx + dy * dy + dz * dz);
@@ -101,7 +102,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
                 out double d1x, out double d1y, out double d1z,
                 out double d2x, out double d2y, out double d2z);
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to evaluate curve D2 at u={uParam}: {XbimGeometryNativeApi.GetLastError()}");
 
             double mag1 = Math.Sqrt(d1x * d1x + d1y * d1y + d1z * d1z);

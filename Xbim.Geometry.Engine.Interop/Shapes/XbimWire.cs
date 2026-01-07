@@ -6,6 +6,7 @@ using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
@@ -29,7 +30,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 int result = XbimGeometryNativeApi.xbim_wire_length(Handle, out double length);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get wire length: {XbimGeometryNativeApi.GetLastError()}");
                 return length;
             }
@@ -41,7 +42,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 int result = XbimGeometryNativeApi.xbim_wire_contour_area(Handle, out double area);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get wire contour area: {XbimGeometryNativeApi.GetLastError()}");
                 return area;
             }
@@ -89,7 +90,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 {
                     int result = XbimGeometryNativeApi.xbim_vertex_point(h, out double x, out double y, out double z);
                     if (result != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"Failed to get vertex point: {XbimGeometryNativeApi.GetLastError()}");
                     yield return new XbimPoint3D(x, y, z);
                 }
@@ -129,10 +130,10 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 var handles = GetSubShapeHandles(XShapeType.Vertex);
                 if (handles.Length == 0)
-                    throw new InvalidOperationException("Wire has no vertices.");
+                    throw new XbimGeometryServiceException("Wire has no vertices.");
                 int result = XbimGeometryNativeApi.xbim_vertex_point(handles[0], out double x, out double y, out double z);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get vertex point: {XbimGeometryNativeApi.GetLastError()}");
                 return new XbimPoint3D(x, y, z);
             }
@@ -144,11 +145,11 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 var handles = GetSubShapeHandles(XShapeType.Vertex);
                 if (handles.Length == 0)
-                    throw new InvalidOperationException("Wire has no vertices.");
+                    throw new XbimGeometryServiceException("Wire has no vertices.");
                 var last = handles[handles.Length - 1];
                 int result = XbimGeometryNativeApi.xbim_vertex_point(last, out double x, out double y, out double z);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get vertex point: {XbimGeometryNativeApi.GetLastError()}");
                 return new XbimPoint3D(x, y, z);
             }
@@ -163,7 +164,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 {
                     int result = XbimGeometryNativeApi.xbim_edge_length(((XbimEdge)edge).Handle, out double edgeLen);
                     if (result != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"Failed to get edge length: {XbimGeometryNativeApi.GetLastError()}");
                     total += edgeLen;
                 }

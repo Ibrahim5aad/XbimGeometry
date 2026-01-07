@@ -871,6 +871,13 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeShapeHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_build_unbounded_from_surface(
+            NativeContextHandle ctx,
+            NativeSurfaceHandle surfaceHandle,
+            double tolerance,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_face_build_from_wire(
             NativeContextHandle ctx,
             NativeShapeHandle wireHandle,
@@ -1320,6 +1327,36 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double posXX, double posXY, double posXZ,
             int hasPosition,
             out NativeSurfaceHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_surface_build_toroidal(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            double majorRadius,
+            double minorRadius,
+            out NativeSurfaceHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_surface_build_rectangular_trimmed(
+            NativeContextHandle ctx,
+            NativeSurfaceHandle basisSurface,
+            double u1, double u2,
+            double v1, double v2,
+            out NativeSurfaceHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_surface_build_curve_bounded_plane(
+            NativeContextHandle ctx,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            NativeShapeHandle outerWire,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] innerWires,
+            int numInnerWires,
+            double tolerance,
+            out NativeShapeHandle outHandle);
 
         #endregion
 

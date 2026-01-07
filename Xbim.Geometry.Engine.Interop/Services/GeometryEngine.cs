@@ -11,6 +11,8 @@ using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Exceptions;
+using Xbim.Geometry.WexBim;
 using Xbim.Ifc4;
 using Xbim.Ifc4.Interfaces;
 
@@ -90,13 +92,13 @@ namespace Xbim.Geometry.Engine.Interop.Services
             double zLen = bbox.ZDim;
 
             if (xLen <= 0 || yLen <= 0 || zLen <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"BoundingBox has zero or negative dimensions.");
 
             var corner = bbox.Corner;
             double ox = corner.X, oy = corner.Y, oz = corner.Z;
 
-            int result = Internal.XbimGeometryNativeApi.xbim_solid_build_block(
+            int result = XbimGeometryNativeApi.xbim_solid_build_block(
                 _service.ContextHandle,
                 ox, oy, oz,
                 0, 0, 1, // Z direction
@@ -105,15 +107,15 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
-                    $"Failed to build BoundingBox solid: {Internal.XbimGeometryNativeApi.GetLastError()}");
+                throw new XbimGeometryServiceException(
+                    $"Failed to build BoundingBox solid: {XbimGeometryNativeApi.GetLastError()}");
 
-            return Shapes.NativeShapeWrapper.WrapSolid(NativeShapeHandle);
+            return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
         }
 
         #endregion
 
-        #region IXModelGeometryService delegation
+        #region IXModelGeometryService
 
         public IXLoggingService LoggingService => _service.LoggingService;
         public IXVertexFactory VertexFactory => _service.VertexFactory;
@@ -175,7 +177,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         #endregion
 
-        #region IXbimGeometryEngine (legacy V5 API)
+        #region IXbimGeometryEngine
 
         // --- Generic Create ---
 
@@ -196,9 +198,9 @@ namespace Xbim.Geometry.Engine.Interop.Services
                     int moveResult = XbimGeometryNativeApi.xbim_shape_moved(
                         ((XbimShape)shape).Handle, location.Handle, out var movedHandle);
                     if (moveResult != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"Failed to apply placement: {XbimGeometryNativeApi.GetLastError()}");
-                    shape = Shapes.NativeShapeWrapper.WrapShape(movedHandle);
+                    shape = NativeShapeWrapper.WrapShape(movedHandle);
                 }
             }
             return (IXbimGeometryObject)shape;
@@ -416,7 +418,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXbimFace CreateFace(IIfcPolyLoop loop, ILogger logger)
         {
-            var points = new System.Collections.Generic.List<IXPoint>();
+            var points = new List<IXPoint>();
             foreach (var pt in loop.Polygon)
             {
                 double x = pt.Coordinates[0];
@@ -429,10 +431,13 @@ namespace Xbim.Geometry.Engine.Interop.Services
         }
 
         public IXbimFace CreateFace(IIfcSurface surface, ILogger logger)
-            => throw new NotSupportedException("CreateFace from IIfcSurface not yet supported.");
+        {
+            var built = _service.SurfaceFactory.Build(surface);
+            return SurfaceToFace(built, surface.EntityLabel);
+        }
 
         public IXbimFace CreateFace(IIfcPlane plane, ILogger logger)
-            => throw new NotSupportedException("CreateFace from IIfcPlane not yet supported.");
+            => CreateFace((IIfcSurface)plane, logger);
 
         public IXbimFace CreateFace(IXbimWire wire, ILogger logger)
         {
@@ -441,11 +446,12 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 int result = XbimGeometryNativeApi.xbim_face_build_from_wire(
                     _service.ContextHandle, wireShape.Handle, out var faceHandle);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build face from wire: {XbimGeometryNativeApi.GetLastError()}");
-                return (IXbimFace)Shapes.NativeShapeWrapper.WrapFace(faceHandle);
+                return (IXbimFace)NativeShapeWrapper.WrapFace(faceHandle);
             }
-            throw new InvalidOperationException("Wire must be a XbimWire from this geometry engine.");
+
+            throw new XbimGeometryServiceException("Wire must be a XbimWire from this geometry engine.");
         }
 
         // --- CreateSurfaceModel overloads ---
@@ -573,57 +579,80 @@ namespace Xbim.Geometry.Engine.Interop.Services
             return handles.ToArray();
         }
 
-        // --- Curve creation (not yet supported) ---
+        // --- Curve creation ---
 
         public IXbimCurve CreateCurve(IIfcCurve curve, ILogger logger)
-            => throw new NotSupportedException("V5 curve creation not yet supported.");
+            => ((CurveFactory)_service.CurveFactory).Build(curve) as IXbimCurve;
 
         public IXbimCurve CreateCurve(IIfcPolyline ifcPolyline, ILogger logger)
-            => throw new NotSupportedException("V5 curve creation not yet supported.");
+            => ((CurveFactory)_service.CurveFactory).Build(ifcPolyline) as IXbimCurve;
 
         public IXbimCurve CreateCurve(IIfcCircle curve, ILogger logger)
-            => throw new NotSupportedException("V5 curve creation not yet supported.");
+            => ((CurveFactory)_service.CurveFactory).Build(curve) as IXbimCurve;
 
         public IXbimCurve CreateCurve(IIfcEllipse curve, ILogger logger)
-            => throw new NotSupportedException("V5 curve creation not yet supported.");
+            => ((CurveFactory)_service.CurveFactory).Build(curve) as IXbimCurve;
 
         public IXbimCurve CreateCurve(IIfcLine curve, ILogger logger)
-            => throw new NotSupportedException("V5 curve creation not yet supported.");
+            => ((CurveFactory)_service.CurveFactory).Build(curve) as IXbimCurve;
 
         public IXbimCurve CreateCurve(IIfcTrimmedCurve curve, ILogger logger)
-            => throw new NotSupportedException("V5 curve creation not yet supported.");
+            => ((CurveFactory)_service.CurveFactory).Build(curve) as IXbimCurve;
 
         public IXbimCurve CreateCurve(IIfcBSplineCurveWithKnots curve, ILogger logger)
-            => throw new NotSupportedException("V5 curve creation not yet supported.");
+            => ((CurveFactory)_service.CurveFactory).Build(curve) as IXbimCurve;
 
         public IXbimCurve CreateCurve(IIfcRationalBSplineCurveWithKnots curve, ILogger logger)
-            => throw new NotSupportedException("V5 curve creation not yet supported.");
+            => ((CurveFactory)_service.CurveFactory).Build(curve) as IXbimCurve;
 
         public IXbimCurve CreateCurve(IIfcOffsetCurve3D curve, ILogger logger)
-            => throw new NotSupportedException("V5 curve creation not yet supported.");
+            => ((CurveFactory)_service.CurveFactory).Build(curve) as IXbimCurve;
 
         public IXbimCurve CreateCurve(IIfcOffsetCurve2D curve, ILogger logger)
-            => throw new NotSupportedException("V5 curve creation not yet supported.");
+            => ((CurveFactory)_service.CurveFactory).Build(curve) as IXbimCurve;
 
-        // --- Point creation (not yet supported) ---
+        // --- Point creation ---
 
         public IXbimPoint CreatePoint(double x, double y, double z, double tolerance)
-            => throw new NotSupportedException("V5 point creation not yet supported.");
+            => new XbimPoint(x, y, z, tolerance);
 
         public IXbimPoint CreatePoint(IIfcCartesianPoint p)
-            => throw new NotSupportedException("V5 point creation not yet supported.");
+        {
+            double x = p.Coordinates[0];
+            double y = p.Coordinates[1];
+            double z = p.Coordinates.Count == 3 ? (double)p.Coordinates[2] : 0.0;
+            return new XbimPoint(x, y, z, _service.Precision);
+        }
 
         public IXbimPoint CreatePoint(XbimPoint3D p, double tolerance)
-            => throw new NotSupportedException("V5 point creation not yet supported.");
+            => new XbimPoint(p.X, p.Y, p.Z, tolerance);
 
         public IXbimPoint CreatePoint(IIfcPoint pt)
-            => throw new NotSupportedException("V5 point creation not yet supported.");
+        {
+            if (pt is IIfcCartesianPoint cp)
+                return CreatePoint(cp);
+            if (pt is IIfcPointOnCurve poc)
+                return CreatePoint(poc, _logger);
+            if (pt is IIfcPointOnSurface pos)
+                return CreatePoint(pos, _logger);
+            throw new NotSupportedException($"IIfcPoint type {pt.GetType().Name} is not supported.");
+        }
 
         public IXbimPoint CreatePoint(IIfcPointOnCurve p, ILogger logger)
-            => throw new NotSupportedException("V5 point creation not yet supported.");
+        {
+            var factory = (CurveFactory)_service.CurveFactory;
+            using var curve = factory.Build3d(p.BasisCurve);
+            double param = p.PointParameter;
+            if (p.BasisCurve is IIfcConic)
+                param *= _service.RadianFactor;
+            var pt = curve.GetPoint(param);
+            return new XbimPoint(pt.X, pt.Y, pt.Z, _service.Precision);
+        }
 
-        public IXbimPoint CreatePoint(IIfcPointOnSurface p, ILogger logger)
-            => throw new NotSupportedException("V5 point creation not yet supported.");
+        public IXbimPoint CreatePoint(IIfcPointOnSurface pos, ILogger logger)
+        {
+            return CreatePoint(pos, _logger);
+        }
 
         // --- Vertex creation ---
 
@@ -632,7 +661,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
             int result = XbimGeometryNativeApi.xbim_vertex_build(
                 _service.ContextHandle, point.X, point.Y, point.Z, precision, out var handle);
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to create vertex: {XbimGeometryNativeApi.GetLastError()}");
             return new XbimVertex(handle);
         }
@@ -653,7 +682,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         {
             var shape = geometry as XbimShape;
             if (shape == null)
-                throw new InvalidOperationException("Geometry must originate from this geometry engine.");
+                throw new XbimGeometryServiceException("Geometry must originate from this geometry engine.");
 
             var gf = (GeometryFactory)_service.GeometryFactory;
             var matrix = gf.BuildTransform(cartesianTransform);
@@ -671,7 +700,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         {
             var shape = geometryObject as XbimShape;
             if (shape == null)
-                throw new InvalidOperationException("Geometry must originate from this geometry engine.");
+                throw new XbimGeometryServiceException("Geometry must originate from this geometry engine.");
 
             var gf = (GeometryFactory)_service.GeometryFactory;
             var loc = gf.BuildLocation(placement);
@@ -682,7 +711,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         {
             var shape = geometryObject as XbimShape;
             if (shape == null)
-                throw new InvalidOperationException("Geometry must originate from this geometry engine.");
+                throw new XbimGeometryServiceException("Geometry must originate from this geometry engine.");
 
             var gf = (GeometryFactory)_service.GeometryFactory;
             var loc = gf.BuildLocationFromAxis3D(placement);
@@ -693,7 +722,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         {
             var shape = geometryObject as XbimShape;
             if (shape == null)
-                throw new InvalidOperationException("Geometry must originate from this geometry engine.");
+                throw new XbimGeometryServiceException("Geometry must originate from this geometry engine.");
 
             var gf = (GeometryFactory)_service.GeometryFactory;
             var loc = gf.BuildLocationFromAxis2D(placement);
@@ -702,12 +731,11 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXbimGeometryObject Moved(IXbimGeometryObject geometryObject, IIfcObjectPlacement objectPlacement, ILogger logger)
         {
-            var shape = geometryObject as XbimShape;
-            if (shape == null)
-                throw new InvalidOperationException("Geometry must originate from this geometry engine.");
+            if (geometryObject is not XbimShape shape)
+                throw new XbimGeometryServiceException("Geometry must originate from this geometry engine.");
 
             var gf = (GeometryFactory)_service.GeometryFactory;
-            var loc = gf.ToLocation(objectPlacement);
+            using var loc = gf.ToLocation(objectPlacement);
             return MoveShape(shape, loc);
         }
 
@@ -722,7 +750,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         {
             var shape = geometryObject as XbimShape;
             if (shape == null)
-                throw new InvalidOperationException("Geometry must originate from this geometry engine.");
+                throw new XbimGeometryServiceException("Geometry must originate from this geometry engine.");
             return shape.BrepString();
         }
 
@@ -730,7 +758,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         {
             var shape = geomObj as XbimShape;
             if (shape == null)
-                throw new InvalidOperationException("Geometry must originate from this geometry engine.");
+                throw new XbimGeometryServiceException("Geometry must originate from this geometry engine.");
             shape.WriteBrep(filename);
         }
 
@@ -760,7 +788,104 @@ namespace Xbim.Geometry.Engine.Interop.Services
         }
 
         public void Mesh(IXbimMeshReceiver receiver, IXbimGeometryObject geometryObject, double precision, double deflection, double angle)
-            => throw new NotSupportedException("V5 Mesh not yet supported.");
+        {
+            IXShape v6Shape = ExtractV6Shape(geometryObject);
+            if (v6Shape == null)
+            {
+                _logger.LogWarning("Mesh: unable to extract shape from geometry object.");
+                return;
+            }
+
+            byte[] meshData = _service.WexBimMeshFactory.CreateWexBimMesh
+                            (v6Shape, precision, deflection, angle, 1.0, out _);
+            if (meshData == null || meshData.Length == 0)
+                return;
+
+            var mesh = new WexBimMesh(meshData);
+
+            receiver.BeginUpdate();
+            try
+            {
+                foreach (var face in mesh.Faces)
+                {
+                    int faceId = receiver.AddFace();
+                    var allIndices = face.Indices.ToArray(); // length = TriangleCount * 3
+                    int triCount = face.TriangleCount;
+
+                    if (face.IsPlanar)
+                    {
+                        // Single normal for the entire face — deduplicate nodes by global vertex index
+                        var faceNormal = face.NormalAt(0);
+                        double nx = faceNormal.X, ny = faceNormal.Y, nz = faceNormal.Z;
+
+                        var nodeMap = new Dictionary<int, int>(triCount * 3);
+                        var triangles = new (int a, int b, int c)[triCount];
+
+                        for (int i = 0; i < triCount; i++)
+                        {
+                            int gA = allIndices[i * 3];
+                            int gB = allIndices[i * 3 + 1];
+                            int gC = allIndices[i * 3 + 2];
+
+                            if (!nodeMap.TryGetValue(gA, out int nA))
+                            {
+                                var v = mesh[gA];
+                                nA = receiver.AddNode(faceId, v.X, v.Y, v.Z, nx, ny, nz);
+                                nodeMap[gA] = nA;
+                            }
+                            if (!nodeMap.TryGetValue(gB, out int nB))
+                            {
+                                var v = mesh[gB];
+                                nB = receiver.AddNode(faceId, v.X, v.Y, v.Z, nx, ny, nz);
+                                nodeMap[gB] = nB;
+                            }
+                            if (!nodeMap.TryGetValue(gC, out int nC))
+                            {
+                                var v = mesh[gC];
+                                nC = receiver.AddNode(faceId, v.X, v.Y, v.Z, nx, ny, nz);
+                                nodeMap[gC] = nC;
+                            }
+
+                            triangles[i] = (nA, nB, nC);
+                        }
+
+                        foreach (var (a, b, c) in triangles)
+                            receiver.AddTriangle(faceId, a, b, c);
+                    }
+                    else
+                    {
+                        // Per-vertex normals — deduplicate by global vertex index, using the
+                        // normal from the first occurrence (matches old engine behaviour).
+                        var nodeMap = new Dictionary<int, int>(triCount * 3);
+                        var triangleNodeIds = new int[triCount * 3];
+
+                        for (int i = 0; i < triCount; i++)
+                        {
+                            for (int j = 0; j < 3; j++)
+                            {
+                                int pos = i * 3 + j;
+                                int gIdx = allIndices[pos];
+                                if (!nodeMap.TryGetValue(gIdx, out int nodeId))
+                                {
+                                    var vertex = mesh[gIdx];
+                                    var normal = face.NormalAt(pos);
+                                    nodeId = receiver.AddNode(faceId, vertex.X, vertex.Y, vertex.Z, normal.X, normal.Y, normal.Z);
+                                    nodeMap[gIdx] = nodeId;
+                                }
+                                triangleNodeIds[pos] = nodeId;
+                            }
+                        }
+
+                        for (int i = 0; i < triCount; i++)
+                            receiver.AddTriangle(faceId, triangleNodeIds[i * 3], triangleNodeIds[i * 3 + 1], triangleNodeIds[i * 3 + 2]);
+                    }
+                }
+            }
+            finally
+            {
+                receiver.EndUpdate();
+            }
+        }
 
         #endregion
 
@@ -802,7 +927,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                     return null;
                 }
 
-                return Shapes.NativeShapeWrapper.WrapShape(compoundHandle);
+                return NativeShapeWrapper.WrapShape(compoundHandle);
             }
 
             return null;
@@ -833,7 +958,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
             if (solidHandles.Length > 0)
                 return new XbimSolid(solidHandles[0]);
 
-            throw new InvalidOperationException("Build result is not a solid.");
+            throw new XbimGeometryServiceException("Build result is not a solid.");
         }
 
         /// <summary>
@@ -857,21 +982,46 @@ namespace Xbim.Geometry.Engine.Interop.Services
         }
 
         /// <summary>
+        /// Creates an unbounded face from a built surface.
+        /// For bounded surfaces (e.g. IfcCurveBoundedPlane) that are already represented
+        /// as a face shape, wraps the handle directly. For geometric surfaces, calls the
+        /// native unbounded face builder.
+        /// </summary>
+        private IXbimFace SurfaceToFace(IXSurface built, int entityLabel)
+        {
+            if (built is FaceSurface faceSurface)
+                return (IXbimFace)NativeShapeWrapper.WrapFace(faceSurface.Handle);
+
+            if (built is Surface surf)
+            {
+                int result = XbimGeometryNativeApi.xbim_face_build_unbounded_from_surface(
+                    _service.ContextHandle, surf.Handle, _service.Precision, out var faceHandle);
+                if (result != 0)
+                    throw new XbimGeometryServiceException(
+                        $"Failed to build face from surface #{entityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+                return (IXbimFace)NativeShapeWrapper.WrapFace(faceHandle);
+            }
+
+            throw new NotSupportedException(
+                $"Cannot create face from surface type {built.GetType().Name} #{entityLabel}.");
+        }
+
+        /// <summary>
         /// Builds a planar face from a wire shape.
         /// </summary>
         private IXbimFace WrapWireAsFace(IXWire wire)
         {
             var wireShape = wire as XbimWire;
             if (wireShape == null)
-                throw new InvalidOperationException("Wire must be a XbimWire instance.");
+                throw new XbimGeometryServiceException("Wire must be a XbimWire instance.");
 
             int result = XbimGeometryNativeApi.xbim_face_build_from_wire(
                 _service.ContextHandle, wireShape.Handle, out var faceHandle);
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build face from wire: {XbimGeometryNativeApi.GetLastError()}");
 
-            return (IXbimFace)Shapes.NativeShapeWrapper.WrapFace(faceHandle);
+            return (IXbimFace)NativeShapeWrapper.WrapFace(faceHandle);
         }
 
         /// <summary>
@@ -879,15 +1029,12 @@ namespace Xbim.Geometry.Engine.Interop.Services
         /// </summary>
         private static IXbimGeometryObject MoveShape(XbimShape shape, XLocation location)
         {
-            using (location)
-            {
-                int moveResult = XbimGeometryNativeApi.xbim_shape_moved(
-                    shape.Handle, location.Handle, out var movedHandle);
-                if (moveResult != 0)
-                    throw new InvalidOperationException(
-                        $"Failed to move shape: {XbimGeometryNativeApi.GetLastError()}");
-                return (IXbimGeometryObject)Shapes.NativeShapeWrapper.WrapShape(movedHandle);
-            }
+            int moveResult = XbimGeometryNativeApi.xbim_shape_moved(
+                shape.Handle, location.Handle, out var movedHandle);
+            if (moveResult != 0)
+                throw new XbimGeometryServiceException(
+                    $"Failed to move shape: {XbimGeometryNativeApi.GetLastError()}");
+            return (IXbimGeometryObject)NativeShapeWrapper.WrapShape(movedHandle);
         }
 
         #endregion

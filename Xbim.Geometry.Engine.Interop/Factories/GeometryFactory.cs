@@ -5,6 +5,7 @@ using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4x3.GeometricConstraintResource;
 using Xbim.Ifc4x3.GeometryResource;
@@ -59,7 +60,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             // Get curve length for parameter normalization
             int lengthResult = XbimGeometryNativeApi.xbim_curve_length(curveHandle, out double curveLength);
             if (lengthResult != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IfcPointByDistanceExpression #{pointExpr.EntityLabel}: " +
                     $"failed to compute curve length: {XbimGeometryNativeApi.GetLastError()}");
 
@@ -75,7 +76,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 int paramResult = XbimGeometryNativeApi.xbim_curve_parameter_at_length(
                     curveHandle, lengthMeasure.Value, _modelService.Precision, out len);
                 if (paramResult != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IfcPointByDistanceExpression #{pointExpr.EntityLabel}: " +
                         $"failed to convert arc length {lengthMeasure.Value} to parameter: " +
                         XbimGeometryNativeApi.GetLastError());
@@ -90,7 +91,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
             else
             {
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IfcPointByDistanceExpression #{pointExpr.EntityLabel}: " +
                     "DistanceAlong must be IfcLengthMeasure or IfcParameterValue.");
             }
@@ -100,7 +101,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out double px, out double py, out double pz,
                 out double tx, out double ty, out double tz);
             if (d1Result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IfcPointByDistanceExpression #{pointExpr.EntityLabel}: " +
                     $"failed to evaluate curve at u={len}: {XbimGeometryNativeApi.GetLastError()}");
 
@@ -349,7 +350,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         public IXLocation BuildLocation(IfcAxis2PlacementLinear linearPlacement)
         {
             if (linearPlacement.Location is not IfcPointByDistanceExpression pointExpr)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IfcAxis2PlacementLinear #{linearPlacement.EntityLabel}: " +
                     "Location must be an IfcPointByDistanceExpression.");
 
@@ -361,7 +362,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (linearPlacement.RefDirection != null)
             {
                 if (!BuildDirection3d(linearPlacement.RefDirection, out tx, out ty, out tz))
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IfcAxis2PlacementLinear #{linearPlacement.EntityLabel}: " +
                         "RefDirection is invalid.");
                 Normalize(ref tx, ref ty, ref tz);
@@ -371,7 +372,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (linearPlacement.Axis != null)
             {
                 if (!BuildDirection3d(linearPlacement.Axis, out ax, out ay, out az))
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IfcAxis2PlacementLinear #{linearPlacement.EntityLabel}: " +
                         "Axis direction is invalid.");
                 Normalize(ref ax, ref ay, ref az);
@@ -385,7 +386,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var handle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IfcAxis2PlacementLinear #{linearPlacement.EntityLabel}: " +
                     $"failed to create location: {XbimGeometryNativeApi.GetLastError()}");
 
@@ -416,7 +417,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 ox, oy, oz, zx, zy, zz, xx, xy, xz, out var handle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to create location from axis2 placement: {XbimGeometryNativeApi.GetLastError()}");
 
             // Reconstruct the local-to-global transform matrix from the axis2 placement.
@@ -474,7 +475,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 px, py, 0, 0, 0, 1, xDirX, xDirY, 0, out var handle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to create location from 2D axis placement: {XbimGeometryNativeApi.GetLastError()}");
 
             // Y direction in 2D: perpendicular to X
@@ -529,7 +530,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     }
                     else
                     {
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             "RelativePlacement for IfcLinearPlacement must be specified.");
                     }
 
@@ -1002,7 +1003,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out double nx, out double ny, out double nz);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to compute normal at point: {XbimGeometryNativeApi.GetLastError()}");
 
             return BuildDirection3d(nx, ny, nz);

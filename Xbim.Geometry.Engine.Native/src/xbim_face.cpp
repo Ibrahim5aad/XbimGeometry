@@ -34,6 +34,10 @@
 #include <GProp_GProps.hxx>
 #include <ShapeFix_Wire.hxx>
 #include <ShapeFix_Shape.hxx>
+#include <ShapeFix_Edge.hxx>
+#include <gp_Trsf.hxx>
+#include <gp.hxx>
+#include <TopLoc_Location.hxx>
 #include <ShapeAnalysis_Surface.hxx>
 #include <GeomLProp_SLProps.hxx>
 #include <TopoDS.hxx>
@@ -165,6 +169,71 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_surface(
     {
         xbim_log_occt_failure(ctx, e, "xbim_face_build_from_surface");
         xbim_set_error("xbim_face_build_from_surface: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_unbounded_from_surface(
+    XbimContextHandle  ctx,
+    XbimSurfaceHandle  surfaceHandle,
+    double             tolerance,
+    XbimShapeHandle*   outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_face_build_unbounded_from_surface: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!surfaceHandle)
+    {
+        xbim_set_error("xbim_face_build_unbounded_from_surface: surfaceHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        Handle(Geom_Surface) surface = surfaceHandle->surface;
+        if (surface.IsNull())
+        {
+            xbim_set_error("xbim_face_build_unbounded_from_surface: surface is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        BRepBuilderAPI_MakeFace faceMaker;
+        faceMaker.Init(surface, Standard_False, tolerance);
+
+        if (!faceMaker.IsDone())
+        {
+            xbim_set_error("xbim_face_build_unbounded_from_surface: could not build face from surface");
+            xbim_log_error(ctx, "Could not build unbounded face from surface");
+            return XBIM_NULL_SHAPE;
+        }
+
+        TopoDS_Face face = faceMaker.Face();
+        if (face.IsNull())
+        {
+            xbim_set_error("xbim_face_build_unbounded_from_surface: resulting face is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        *outHandle = xbim_shape_create_from(face);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_face_build_unbounded_from_surface: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_face_build_unbounded_from_surface");
+        xbim_set_error("xbim_face_build_unbounded_from_surface: OCCT exception");
         return XBIM_ERROR;
     }
 }
@@ -516,6 +585,153 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced_with_surface(
     {
         xbim_log_occt_failure(ctx, e, "xbim_face_build_advanced_with_surface");
         xbim_set_error("xbim_face_build_advanced_with_surface: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_curve_bounded_plane(
+    XbimContextHandle        ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    XbimShapeHandle          outerWireHandle,
+    const XbimShapeHandle*   innerWireHandles,
+    int                      numInnerWires,
+    double                   tolerance,
+    XbimShapeHandle*         outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_surface_build_curve_bounded_plane: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!outerWireHandle)
+    {
+        xbim_set_error("xbim_surface_build_curve_bounded_plane: outerWireHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        /* Build the face on the standard XOY plane at origin. The boundary wires
+         * are in local 2D space (z = 0), which lies on this standard plane. */
+        Handle(Geom_Plane) localPlane = new Geom_Plane(gp::XOY());
+        Handle(Geom_Surface) localSurface = localPlane;
+
+        /* Extract outer wire */
+        const TopoDS_Shape& outerShape = outerWireHandle->shape;
+        if (outerShape.IsNull())
+        {
+            xbim_set_error("xbim_surface_build_curve_bounded_plane: outer wire shape is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        TopoDS_Wire outerWire;
+        if (outerShape.ShapeType() == TopAbs_WIRE)
+            outerWire = TopoDS::Wire(outerShape);
+        else if (outerShape.ShapeType() == TopAbs_FACE)
+        {
+            TopExp_Explorer ex(outerShape, TopAbs_WIRE);
+            if (ex.More())
+                outerWire = TopoDS::Wire(ex.Current());
+        }
+
+        if (outerWire.IsNull())
+        {
+            xbim_set_error("xbim_surface_build_curve_bounded_plane: could not extract outer wire");
+            return XBIM_INVALID_ARG;
+        }
+
+        /* Determine orientation; for planar surfaces add_parametric_curves
+         * skips ShapeFix_Wire but computes the area-based CCW check. */
+        bool outerIsCCW = add_parametric_curves(localSurface, outerWire, tolerance);
+
+        BRepBuilderAPI_MakeFace faceMaker(
+            localPlane,
+            outerIsCCW ? outerWire : TopoDS::Wire(outerWire.Reversed()),
+            false);
+
+        /* Add inner boundary wires as holes */
+        if (numInnerWires > 0 && innerWireHandles)
+        {
+            for (int i = 0; i < numInnerWires; ++i)
+            {
+                if (!innerWireHandles[i])
+                    continue;
+
+                const TopoDS_Shape& innerShape = innerWireHandles[i]->shape;
+                if (innerShape.IsNull())
+                    continue;
+
+                TopoDS_Wire innerWire;
+                if (innerShape.ShapeType() == TopAbs_WIRE)
+                    innerWire = TopoDS::Wire(innerShape);
+                else if (innerShape.ShapeType() == TopAbs_FACE)
+                {
+                    TopExp_Explorer ex(innerShape, TopAbs_WIRE);
+                    if (ex.More())
+                        innerWire = TopoDS::Wire(ex.Current());
+                }
+
+                if (innerWire.IsNull())
+                    continue;
+
+                bool innerIsCCW = add_parametric_curves(localSurface, innerWire, tolerance);
+                if (innerIsCCW)
+                    innerWire.Reverse();
+
+                faceMaker.Add(innerWire);
+            }
+        }
+
+        if (!faceMaker.IsDone())
+        {
+            xbim_set_error("xbim_surface_build_curve_bounded_plane: could not build face from wires");
+            xbim_log_error(ctx, "Face specification error: could not apply bounds to plane");
+            return XBIM_NULL_SHAPE;
+        }
+
+        TopoDS_Face face = faceMaker.Face();
+        if (face.IsNull())
+        {
+            xbim_set_error("xbim_surface_build_curve_bounded_plane: resulting face is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        /* Add parametric curves to edges (mirrors NSurfaceFactory::FixInvalidEdges). */
+        ShapeFix_Edge edgeFixer;
+        for (TopExp_Explorer exp(face, TopAbs_EDGE); exp.More(); exp.Next())
+            edgeFixer.FixAddPCurve(TopoDS::Edge(exp.Current()), face, Standard_False);
+
+        /* Displace the face from local XOY space to the world plane placement. */
+        gp_Ax3 worldFrame(
+            gp_Pnt(originX, originY, originZ),
+            gp_Dir(zDirX,   zDirY,   zDirZ),
+            gp_Dir(xDirX,   xDirY,   xDirZ));
+
+        gp_Trsf placement;
+        placement.SetDisplacement(gp::XOY(), worldFrame);
+        face.Move(TopLoc_Location(placement));
+
+        face.Closed(true);
+        *outHandle = xbim_shape_create_from(face);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_surface_build_curve_bounded_plane: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_surface_build_curve_bounded_plane");
+        xbim_set_error("xbim_surface_build_curve_bounded_plane: OCCT exception");
         return XBIM_ERROR;
     }
 }

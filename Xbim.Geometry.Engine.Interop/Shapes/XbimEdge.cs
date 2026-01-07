@@ -4,6 +4,7 @@ using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
@@ -27,7 +28,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 int result = XbimGeometryNativeApi.xbim_edge_length(Handle, out double length);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get edge length: {XbimGeometryNativeApi.GetLastError()}");
                 return length;
             }
@@ -39,7 +40,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 int result = XbimGeometryNativeApi.xbim_edge_tolerance(Handle, out double tol);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get edge tolerance: {XbimGeometryNativeApi.GetLastError()}");
                 return tol;
             }
@@ -52,7 +53,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 int result = XbimGeometryNativeApi.xbim_edge_get_curve(
                     Handle, out var curveHandle, out _, out _);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get edge curve: {XbimGeometryNativeApi.GetLastError()}");
                 return new XbimCurve(curveHandle, XCurveType.IfcLine);
             }
@@ -64,7 +65,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 int result = XbimGeometryNativeApi.xbim_edge_vertices(Handle, out var start, out var end);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get edge vertices: {XbimGeometryNativeApi.GetLastError()}");
                 end?.Dispose();
                 if (start == null || start.IsInvalid)
@@ -79,7 +80,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 int result = XbimGeometryNativeApi.xbim_edge_vertices(Handle, out var start, out var end);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get edge vertices: {XbimGeometryNativeApi.GetLastError()}");
                 start?.Dispose();
                 if (end == null || end.IsInvalid)
@@ -98,7 +99,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 var vertexHandles = GetSubShapeHandles(XShapeType.Vertex);
                 if (vertexHandles.Length == 0)
-                    throw new InvalidOperationException("Edge has no vertices.");
+                    throw new XbimGeometryServiceException("Edge has no vertices.");
                 return new XbimVertex(vertexHandles[0]);
             }
         }
@@ -109,7 +110,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 var vertexHandles = GetSubShapeHandles(XShapeType.Vertex);
                 if (vertexHandles.Length == 0)
-                    throw new InvalidOperationException("Edge has no vertices.");
+                    throw new XbimGeometryServiceException("Edge has no vertices.");
                 return new XbimVertex(vertexHandles[vertexHandles.Length > 1 ? 1 : 0]);
             }
         }

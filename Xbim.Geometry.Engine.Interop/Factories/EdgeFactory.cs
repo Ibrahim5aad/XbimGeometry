@@ -6,6 +6,7 @@ using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
@@ -39,7 +40,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build line edge: {XbimGeometryNativeApi.GetLastError()}");
 
             return new XbimEdge(NativeShapeHandle);
@@ -70,7 +71,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build edge from curve: {XbimGeometryNativeApi.GetLastError()}");
 
             return new XbimEdge(shapeHandle);

@@ -6,6 +6,7 @@ using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
 
 namespace Xbim.Geometry.Engine.Interop.Services
@@ -37,7 +38,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                         Math.PI / 180.0, 60, 1e-5,
                         null, out var ctx);
                     if (result != 0)
-                        throw new InvalidOperationException("Failed to create geometry context for shape service.");
+                        throw new XbimGeometryServiceException("Failed to create geometry context for shape service.");
                     _ctx = ctx;
                 }
                 return _ctx;
@@ -58,7 +59,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
             var handle = XbimGeometryNativeApi.xbim_shape_from_brep_string(brepString, brepString.Length);
 
             if (handle == null || handle.IsInvalid)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to parse BRep string: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapShape(handle);
@@ -71,7 +72,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public string Convert(IXShape shape)
         {
-            if (shape == null) throw new ArgumentNullException(nameof(shape));
+            ArgumentNullException.ThrowIfNull(shape);
             var native = shape as XbimShape
                 ?? throw new ArgumentException("Shape must be a XbimShape.", nameof(shape));
 
@@ -79,7 +80,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 native.Handle, out var brepPtr, out int strLen);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to convert shape to BRep: {XbimGeometryNativeApi.GetLastError()}");
 
             string brep = Marshal.PtrToStringAnsi(brepPtr, strLen) ?? string.Empty;
@@ -94,7 +95,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXShape Transform(IXShape shape, IXMatrix transformMatrix)
         {
-            if (shape == null) throw new ArgumentNullException(nameof(shape));
+            ArgumentNullException.ThrowIfNull(shape);
             if (transformMatrix == null || transformMatrix.IsIdentity) return shape;
 
             var native = shape as XbimShape
@@ -109,7 +110,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 out var transformedHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to transform shape: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapShape(transformedHandle);
@@ -158,14 +159,14 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXShape RemovePlacement(IXShape shape)
         {
-            if (shape == null) throw new ArgumentNullException(nameof(shape));
+            ArgumentNullException.ThrowIfNull(shape);
             var identity = new XLocation();
             return Moved(shape, identity);
         }
 
         public IXShape SetPlacement(IXShape shape, IIfcObjectPlacement placement)
         {
-            if (shape == null) throw new ArgumentNullException(nameof(shape));
+            ArgumentNullException.ThrowIfNull(shape);
             if (placement == null) return shape;
 
             var geoFactory = new Factories.GeometryFactory(
@@ -176,7 +177,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXShape Moved(IXShape shape, IIfcObjectPlacement placement, bool invertPlacement = false)
         {
-            if (shape == null) throw new ArgumentNullException(nameof(shape));
+            ArgumentNullException.ThrowIfNull(shape);
             if (placement == null) return shape;
 
             var geoFactory = new Factories.GeometryFactory(
@@ -195,7 +196,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXShape Moved(IXShape shape, IXLocation moveTo)
         {
-            if (shape == null) throw new ArgumentNullException(nameof(shape));
+            ArgumentNullException.ThrowIfNull(shape);
             if (moveTo == null || moveTo.IsIdentity) return shape;
 
             var native = shape as XbimShape
@@ -207,7 +208,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 native.Handle, loc.Handle, out var movedHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to move shape: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapShape(movedHandle);
@@ -215,7 +216,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXShape Scaled(IXShape shape, double scale)
         {
-            if (shape == null) throw new ArgumentNullException(nameof(shape));
+            ArgumentNullException.ThrowIfNull(shape);
             if (Math.Abs(scale - 1.0) < 1e-15) return shape;
 
             var native = shape as XbimShape
@@ -231,7 +232,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 out var scaledHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to scale shape: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapShape(scaledHandle);
@@ -251,11 +252,11 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXShape Combine(IEnumerable<IXShape> shapes)
         {
-            if (shapes == null) throw new ArgumentNullException(nameof(shapes));
+            ArgumentNullException.ThrowIfNull(shapes);
 
             var shapeList = shapes.ToList();
             if (shapeList.Count == 0)
-                throw new InvalidOperationException("Cannot combine zero shapes.");
+                throw new XbimGeometryServiceException("Cannot combine zero shapes.");
             if (shapeList.Count == 1)
                 return shapeList[0];
 
@@ -273,7 +274,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 Context, nativeHandles.Ptrs, nativeHandles.Length, out var compoundHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to combine shapes: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapShape(compoundHandle);
@@ -288,7 +289,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         public byte[] CreateWexBimMesh(IXShape shape, double tolerance, double linearDeflection,
             double angularDeflection, double scale, out IXAxisAlignedBoundingBox bounds)
         {
-            if (shape == null) throw new ArgumentNullException(nameof(shape));
+            ArgumentNullException.ThrowIfNull(shape);
 
             var native = shape as XbimShape
                 ?? throw new ArgumentException("Shape must be a XbimShape.", nameof(shape));
@@ -303,7 +304,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 out double maxX, out double maxY, out double maxZ);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to create WexBim mesh: {XbimGeometryNativeApi.GetLastError()}");
 
             bounds = new XAxisAlignedBoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
@@ -329,8 +330,8 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         private IXShape BooleanOp(IXShape body, IXShape tool, double precision, BooleanOpDelegate op)
         {
-            if (body == null) throw new ArgumentNullException(nameof(body));
-            if (tool == null) throw new ArgumentNullException(nameof(tool));
+            ArgumentNullException.ThrowIfNull(body);
+            ArgumentNullException.ThrowIfNull(tool);
 
             var nativeBody = body as XbimShape
                 ?? throw new ArgumentException("Body must be a XbimShape.");
@@ -341,7 +342,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 precision, out _, out var resultHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Boolean operation failed: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapShape(resultHandle);

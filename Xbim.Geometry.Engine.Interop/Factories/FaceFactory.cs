@@ -7,6 +7,7 @@ using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
 {
@@ -52,7 +53,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         out var faceHandle);
 
                     if (result != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"Failed to build planar face from wire: {XbimGeometryNativeApi.GetLastError()}");
 
                     return new XbimFace(faceHandle);
@@ -110,7 +111,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var faceHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build advanced face: {XbimGeometryNativeApi.GetLastError()}");
 
             return new XbimFace(faceHandle);

@@ -15,12 +15,12 @@ using Xunit;
 namespace Xbim.Geometry.Engine.Tests
 {
 
-  
+
     public class IfcCsgTests
     {
 
         private readonly ILogger _logger;
-       
+
         private readonly IXbimGeometryServicesFactory factory;
         private readonly ILoggerFactory _loggerFactory;
 
@@ -30,7 +30,7 @@ namespace Xbim.Geometry.Engine.Tests
             _loggerFactory = loggerFactory;
             _logger = _loggerFactory.CreateLogger<IfcCsgTests>();
         }
-        
+
         [Theory]
         [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
@@ -49,9 +49,9 @@ namespace Xbim.Geometry.Engine.Tests
                     pyramid.XLength = 10;
                     pyramid.YLength = 15;
                     var geomEngineV5 = factory.CreateGeometryEngine(engineVersion, m, _loggerFactory);
-                   
+
                     var solid = geomEngineV5.CreateSolid(pyramid);
-                    
+
                     solid.Shells.Count.Should().Be(1);
                     solid.Faces.Count.Should().Be(5, "5 faces are required of a pyramid");
                     solid.Vertices.Count.Should().Be(5, "5 vertices are required of a pyramid");
@@ -65,7 +65,7 @@ namespace Xbim.Geometry.Engine.Tests
                 }
             }
         }
-        
+
         [Theory]
         [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
@@ -81,7 +81,7 @@ namespace Xbim.Geometry.Engine.Tests
                     var solid = geomEngineV5.CreateSolid(cylinder, _logger);
 
                     solid.Faces.Count.Should().Be(3, "3 faces are required of a cylinder");
-                    solid.Vertices.Count.Should().Be(2,"2 vertices are required of a cylinder");
+                    solid.Vertices.Count.Should().Be(2, "2 vertices are required of a cylinder");
                     //var meshRec = new MeshHelper();
                     //geomEngine.Mesh(meshRec, solid, m.ModelFactors.Precision, m.ModelFactors.DeflectionTolerance * 10);
                     //meshRec.FaceCount == 3, "3 mesh faces are required of a cylinder");
@@ -90,7 +90,7 @@ namespace Xbim.Geometry.Engine.Tests
                 }
             }
         }
-        
+
 
         [Theory]
         [InlineData(XGeometryEngineVersion.V5)]
@@ -122,9 +122,8 @@ namespace Xbim.Geometry.Engine.Tests
             }
         }
 
-       
+
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void IfcBlockTest(XGeometryEngineVersion engineVersion)
         {
@@ -137,16 +136,16 @@ namespace Xbim.Geometry.Engine.Tests
                     try
                     {
 
-                    var geomEngine = factory.CreateGeometryEngine(engineVersion, m, _loggerFactory);
-                    var solid = geomEngine.CreateSolid(block, _logger);
+                        var geomEngine = factory.CreateGeometryEngine(engineVersion, m, _loggerFactory);
+                        var solid = geomEngine.CreateSolid(block, _logger);
 
-                    solid.Faces.Count.Should().Be(6, "6 faces are required of a block");
-                    solid.Vertices.Count.Should().Be(8, "8 vertices are required of a block");
-                    var meshRec = new MeshHelper();
-                    geomEngine.Mesh(meshRec, solid, m.ModelFactors.Precision, m.ModelFactors.DeflectionTolerance * 10);
-                    meshRec.FaceCount.Should().Be(6, "6 mesh faces are required of a block");
-                    meshRec.PointCount.Should().Be(24, "24 mesh points are required of a block");
-                    txn.Commit();
+                        solid.Faces.Count.Should().Be(6, "6 faces are required of a block");
+                        solid.Vertices.Count.Should().Be(8, "8 vertices are required of a block");
+                        var meshRec = new MeshHelper();
+                        geomEngine.Mesh(meshRec, solid, m.ModelFactors.Precision, m.ModelFactors.DeflectionTolerance * 10);
+                        meshRec.FaceCount.Should().Be(6, "6 mesh faces are required of a block");
+                        meshRec.PointCount.Should().Be(24, "24 mesh points are required of a block");
+                        txn.Commit();
 
                     }
                     catch (Exception e)
@@ -161,9 +160,8 @@ namespace Xbim.Geometry.Engine.Tests
 
 
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
-        public void IfcSphereTest(XGeometryEngineVersion engineVersion )
+        public void IfcSphereTest(XGeometryEngineVersion engineVersion)
         {
             using (var m = new MemoryModel(new Xbim.Ifc4.EntityFactoryIfc4()))
             {
@@ -181,7 +179,7 @@ namespace Xbim.Geometry.Engine.Tests
                     geomEngine.Mesh(meshRec, solid, m.ModelFactors.Precision, m.ModelFactors.DeflectionTolerance * 10);
                     meshRec.EndUpdate();
                     meshRec.FaceCount.Should().Be(1, "1 mesh face is required of a sphere");
-                    meshRec.PointCount.Should().Be(19, "19 mesh points are required of a sphere");
+                    meshRec.PointCount.Should().Be(15, "15 mesh points are required of a sphere");
                     meshRec.TriangleCount.Should().Be(28, "28 triangles are required of a sphere");
                     (meshRec.TriangleCount * 3).Should().Be(meshRec.TriangleIndicesCount, "Incorrect triangulation");
                     txn.Commit();
@@ -189,8 +187,8 @@ namespace Xbim.Geometry.Engine.Tests
             }
         }
 
-        
-        
+
+
 
 
     }

@@ -5,6 +5,7 @@ using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
@@ -28,7 +29,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 int result = XbimGeometryNativeApi.xbim_shape_surface_area(Handle, out double area);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to compute face area: {XbimGeometryNativeApi.GetLastError()}");
                 return area;
             }
@@ -40,7 +41,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 int result = XbimGeometryNativeApi.xbim_face_perimeter(Handle, out double perimeter);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to compute face perimeter: {XbimGeometryNativeApi.GetLastError()}");
                 return perimeter;
             }
@@ -52,7 +53,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 int result = XbimGeometryNativeApi.xbim_face_tolerance(Handle, out double tol);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get face tolerance: {XbimGeometryNativeApi.GetLastError()}");
                 return tol;
             }
@@ -64,7 +65,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 int result = XbimGeometryNativeApi.xbim_face_outer_wire(Handle, out var wireHandle);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get outer wire: {XbimGeometryNativeApi.GetLastError()}");
                 return new XbimWire(wireHandle);
             }
@@ -99,7 +100,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 int result = XbimGeometryNativeApi.xbim_face_get_surface(Handle, out var surfHandle, out int surfType);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get face surface: {XbimGeometryNativeApi.GetLastError()}");
                 return new Surface(surfHandle, (XSurfaceType)surfType);
             }
@@ -117,7 +118,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                     Handle, 0.5, 0.5,
                     out double nx, out double ny, out double nz);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get face normal: {XbimGeometryNativeApi.GetLastError()}");
                 return new XbimVector3D(nx, ny, nz);
             }

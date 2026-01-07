@@ -1,3 +1,4 @@
+using System;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
@@ -34,6 +35,36 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         public void WriteStl(string filePath) =>
             throw new NotSupportedException(
                 $"STL export is not supported for elementary surface type {_surfaceType}.");
+    }
+
+    /// <summary>
+    /// Wraps a native face shape handle as an <see cref="IXSurface"/>, used for
+    /// bounded surfaces such as IfcCurveBoundedPlane that are represented as faces.
+    /// </summary>
+    internal sealed class FaceSurface : NativeOwner<NativeShapeHandle>, IXSurface
+    {
+        internal FaceSurface(NativeShapeHandle handle, XSurfaceType surfaceType) : base(handle)
+        {
+            SurfaceType = surfaceType;
+        }
+
+        public XSurfaceType SurfaceType { get; }
+
+        public bool IsUPeriodic => false;
+
+        public bool IsVPeriodic => false;
+
+        public string BrepString() =>
+            throw new NotSupportedException(
+                $"BRep export is not supported for bounded surface type {SurfaceType}.");
+
+        public void WriteBrep(string filePath) =>
+            throw new NotSupportedException(
+                $"BRep export is not supported for bounded surface type {SurfaceType}.");
+
+        public void WriteStl(string filePath) =>
+            throw new NotSupportedException(
+                $"STL export is not supported for bounded surface type {SurfaceType}.");
     }
 
     /// <summary>

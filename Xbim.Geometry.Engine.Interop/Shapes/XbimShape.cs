@@ -6,6 +6,7 @@ using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Services;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
@@ -30,7 +31,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
                 int result = XbimGeometryNativeApi.xbim_shape_type(Handle, out int typeVal);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get shape type: {XbimGeometryNativeApi.GetLastError()}");
 
                 _cachedType = (XShapeType)typeVal;
@@ -60,7 +61,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             int result = XbimGeometryNativeApi.xbim_shape_write_brep(Handle, filePath);
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to write BRep file '{filePath}': {XbimGeometryNativeApi.GetLastError()}");
         }
 
@@ -68,7 +69,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             int result = XbimGeometryNativeApi.xbim_shape_write_stl(Handle, filePath, 0.1);
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to write STL file '{filePath}': {XbimGeometryNativeApi.GetLastError()}");
         }
 
@@ -252,7 +253,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 out var locationHandle);
 
             if (locResult != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to create location from matrix: {XbimGeometryNativeApi.GetLastError()}");
 
             using (locationHandle)
@@ -261,7 +262,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                     Handle, locationHandle, out var movedHandle);
 
                 if (moveResult != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to move shape: {XbimGeometryNativeApi.GetLastError()}");
 
                 return (XbimShape)NativeShapeWrapper.WrapShape(movedHandle);

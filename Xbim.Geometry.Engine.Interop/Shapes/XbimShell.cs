@@ -5,6 +5,7 @@ using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
@@ -28,7 +29,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 int result = XbimGeometryNativeApi.xbim_shape_surface_area(Handle, out double area);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to compute surface area: {XbimGeometryNativeApi.GetLastError()}");
                 return area;
             }
@@ -59,7 +60,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 out var solidHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to create solid from shell: {XbimGeometryNativeApi.GetLastError()}");
 
             return new XbimSolid(solidHandle);
@@ -124,7 +125,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 Handle, faceHandle, tolerance,
                 out var resultHandle);
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Section operation failed: {XbimGeometryNativeApi.GetLastError()}");
 
             var shape = (XbimShape)NativeShapeWrapper.WrapShape(resultHandle);
@@ -164,7 +165,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 Handle, toolHandle, tolerance,
                 out _, out var resultHandle);
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Boolean operation failed: {XbimGeometryNativeApi.GetLastError()}");
 
             return BuildObjectSet(resultHandle);
@@ -181,7 +182,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                     bodyHandle, toolHandle, tolerance,
                     out _, out var resultHandle);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Boolean operation failed: {XbimGeometryNativeApi.GetLastError()}");
                 bodyHandle = resultHandle;
             }

@@ -8,6 +8,8 @@ using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Services;
+using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4x3.GeometricConstraintResource;
 using Xbim.Ifc4x3.GeometricModelResource;
@@ -48,6 +50,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (surface is IIfcSphericalSurface ifcSphere)
                 return BuildSphericalSurface(ifcSphere);
 
+            if (surface is IIfcToroidalSurface ifcToroid)
+                return BuildToroidalSurface(ifcToroid);
+
             if (surface is IIfcBSplineSurfaceWithKnots ifcBSpline)
                 return BuildBSplineSurface(ifcBSpline);
 
@@ -59,6 +64,16 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (surface is IIfcSurfaceOfLinearExtrusion ifcExtrusion)
                 return BuildSurfaceOfLinearExtrusion(ifcExtrusion);
+
+            if (surface is IIfcRectangularTrimmedSurface ifcRectTrimmed)
+                return BuildRectangularTrimmedSurface(ifcRectTrimmed);
+
+            if (surface is IIfcCurveBoundedPlane ifcCurveBoundedPlane)
+                return BuildCurveBoundedPlane(ifcCurveBoundedPlane);
+
+            if (surface is IIfcCurveBoundedSurface)
+                throw new NotSupportedException(
+                    $"IfcCurveBoundedSurface #{surface.EntityLabel} is not supported.");
 
             throw new NotSupportedException(
                 $"Surface type {surface.ExpressType.ExpressName} #{surface.EntityLabel} is not yet supported.");
@@ -75,7 +90,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out double refX, out double refY, out double refZ);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build plane: {XbimGeometryNativeApi.GetLastError()}");
 
             var refDir = new XDirection(refX, refY, refZ);
@@ -100,7 +115,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out _, out _, out _);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build plane #{ifcPlane.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             var origin = new XPoint(ox, oy, oz);
@@ -129,7 +144,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeSurfaceHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build cylindrical surface #{ifcCylinder.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new Surface(NativeSurfaceHandle, XSurfaceType.IfcCylindricalSurface);
@@ -155,10 +170,124 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeSurfaceHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build spherical surface #{ifcSphere.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new Surface(NativeSurfaceHandle, XSurfaceType.IfcSphericalSurface);
+        }
+
+        #endregion
+
+        #region Toroidal
+
+        private Surface BuildToroidalSurface(IIfcToroidalSurface ifcToroid)
+        {
+            if (ifcToroid.MajorRadius < 0)
+                throw new XbimGeometryServiceException(
+                    $"ToroidalSurface #{ifcToroid.EntityLabel}: MajorRadius must be >= 0.");
+            if (ifcToroid.MinorRadius <= 0)
+                throw new XbimGeometryServiceException(
+                    $"ToroidalSurface #{ifcToroid.EntityLabel}: MinorRadius must be > 0.");
+
+            GeometryFactory.BuildAxis2Placement3d(ifcToroid.Position,
+                out double ox, out double oy, out double oz,
+                out double zx, out double zy, out double zz,
+                out double xx, out double xy, out double xz);
+
+            int result = XbimGeometryNativeApi.xbim_surface_build_toroidal(
+                ContextHandle,
+                ox, oy, oz,
+                zx, zy, zz,
+                xx, xy, xz,
+                ifcToroid.MajorRadius,
+                ifcToroid.MinorRadius,
+                out var nativeSurfaceHandle);
+
+            if (result != 0)
+                throw new XbimGeometryServiceException(
+                    $"Failed to build toroidal surface #{ifcToroid.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new Surface(nativeSurfaceHandle, XSurfaceType.IfcToroidalSurface);
+        }
+
+        #endregion
+
+        #region Rectangular Trimmed Surface
+
+        private Surface BuildRectangularTrimmedSurface(IIfcRectangularTrimmedSurface ifcRectTrimmed)
+        {
+            var basisSurface = Build(ifcRectTrimmed.BasisSurface);
+
+            if (basisSurface is not Surface basis)
+                throw new XbimGeometryServiceException(
+                    $"RectangularTrimmedSurface #{ifcRectTrimmed.EntityLabel}: " +
+                    $"basis surface type {basisSurface.SurfaceType} cannot be trimmed.");
+
+            int result = XbimGeometryNativeApi.xbim_surface_build_rectangular_trimmed(
+                ContextHandle,
+                basis.Handle,
+                ifcRectTrimmed.U1,
+                ifcRectTrimmed.U2,
+                ifcRectTrimmed.V1,
+                ifcRectTrimmed.V2,
+                out var nativeSurfaceHandle);
+
+            if (result != 0)
+                throw new XbimGeometryServiceException(
+                    $"Failed to build rectangular trimmed surface #{ifcRectTrimmed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return new Surface(nativeSurfaceHandle, XSurfaceType.IfcRectangularTrimmedSurface);
+        }
+
+        #endregion
+
+        #region Curve Bounded Plane
+
+        private FaceSurface BuildCurveBoundedPlane(IIfcCurveBoundedPlane ifcCurveBoundedPlane)
+        {
+            GeometryFactory.BuildAxis2Placement3d(ifcCurveBoundedPlane.BasisSurface.Position,
+                out double ox, out double oy, out double oz,
+                out double zx, out double zy, out double zz,
+                out double xx, out double xy, out double xz);
+
+            var wireFactory = (WireFactory)_modelService.WireFactory;
+
+            // Build outer boundary wire (in local 2D space, z = 0)
+            using var outerWire = (XbimWire)wireFactory.Build(ifcCurveBoundedPlane.OuterBoundary);
+
+            // Build inner boundary wires (holes)
+            var innerBoundaries = ifcCurveBoundedPlane.InnerBoundaries.ToArray();
+            var innerWires = innerBoundaries
+                .Select(c => (XbimWire)wireFactory.Build(c))
+                .ToArray();
+
+            try
+            {
+                var innerHandles = innerWires.Select(w => w.Handle).ToArray();
+                using var innerWireArray = new NativeHandleArray(innerHandles);
+
+                int result = XbimGeometryNativeApi.xbim_surface_build_curve_bounded_plane(
+                    ContextHandle,
+                    ox, oy, oz,
+                    zx, zy, zz,
+                    xx, xy, xz,
+                    outerWire.Handle,
+                    innerWireArray.Ptrs,
+                    innerWireArray.Length,
+                    _modelService.Precision,
+                    out var faceHandle);
+
+                if (result != 0)
+                    throw new XbimGeometryServiceException(
+                        $"Failed to build curve bounded plane #{ifcCurveBoundedPlane.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                return new FaceSurface(faceHandle, XSurfaceType.IfcCurveBoundedPlane);
+            }
+            finally
+            {
+                foreach (var w in innerWires)
+                    w.Dispose();
+            }
         }
 
         #endregion
@@ -168,7 +297,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private Surface BuildSurfaceOfRevolution(IIfcSurfaceOfRevolution ifcRevolution)
         {
             if (ifcRevolution.SweptCurve.ProfileType != Ifc4.Interfaces.IfcProfileTypeEnum.CURVE)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"SurfaceOfRevolution #{ifcRevolution.EntityLabel}: only profiles of type CURVE are valid.");
 
             // Extract the curve from the profile — both open and closed profiles are valid
@@ -193,7 +322,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             {
                 if (!GeometryFactory.BuildDirection3d(ifcRevolution.AxisPosition.Axis,
                         out axisDirX, out axisDirY, out axisDirZ))
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"SurfaceOfRevolution #{ifcRevolution.EntityLabel}: axis direction is incorrectly defined.");
             }
 
@@ -205,7 +334,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeSurfaceHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build SurfaceOfRevolution #{ifcRevolution.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new Surface(NativeSurfaceHandle, XSurfaceType.IfcSurfaceOfRevolution);
@@ -219,7 +348,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private Surface BuildSurfaceOfLinearExtrusion(IIfcSurfaceOfLinearExtrusion ifcExtrusion)
         {
             if (ifcExtrusion.SweptCurve.ProfileType != Ifc4.Interfaces.IfcProfileTypeEnum.CURVE)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: only profiles of type CURVE are valid.");
 
             // Extract the curve from the profile — both open and closed profiles are valid
@@ -256,7 +385,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 // making the magnitude irrelevant for surface construction.
                 if (!GeometryFactory.BuildDirection3d(ifcExtrusion.ExtrudedDirection,
                         out double dirX, out double dirY, out double dirZ))
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: extrusion direction is incorrectly defined.");
 
                 // Determine whether to apply the IFC Position transform.
@@ -289,7 +418,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var nativeSurfaceHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new Surface(nativeSurfaceHandle, XSurfaceType.IfcSurfaceOfLinearExtrusion);
@@ -373,7 +502,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeSurfaceHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build B-spline surface #{ifcBSpline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             var surfaceType = ifcBSpline is IIfcRationalBSplineSurfaceWithKnots
@@ -391,7 +520,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             int sectionCount = ifcSurface.CrossSections.Count;
             if (ifcSurface.CrossSectionPositions.Count != sectionCount)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IfcSectionedSurface #{ifcSurface.EntityLabel}: " +
                     "number of cross-section positions doesn't match the number of cross-sections.");
 
@@ -406,12 +535,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             for (int i = 0; i < sectionCount; i++)
             {
                 if (!(ifcSurface.CrossSections[i] is IfcOpenCrossProfileDef section))
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IfcSectionedSurface #{ifcSurface.EntityLabel}: " +
                         $"cross-section [{i}] must be IfcOpenCrossProfileDef.");
 
                 if (section.ProfileType != Xbim.Ifc4x3.ProfileResource.IfcProfileTypeEnum.CURVE)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IfcOpenCrossProfileDef #{section.EntityLabel}: " +
                         "ProfileType must be CURVE.");
 
@@ -479,7 +608,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var shapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build sectioned surface #{ifcSurface.EntityLabel}: " +
                     XbimGeometryNativeApi.GetLastError());
 

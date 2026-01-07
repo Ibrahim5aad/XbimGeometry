@@ -3,6 +3,7 @@ using System.IO;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Primitives
 {
@@ -35,7 +36,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
                 out _scale);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to read location transform: {XbimGeometryNativeApi.GetLastError()}");
         }
 
@@ -75,7 +76,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         {
             int result = XbimGeometryNativeApi.xbim_location_create_identity(out var handle);
             if (result != 0)
-                throw new InvalidOperationException("Failed to create identity location.");
+                throw new XbimGeometryServiceException("Failed to create identity location.");
             return handle;
         }
 
@@ -208,7 +209,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             // Semantics: "apply this first, then other"
             int result = XbimGeometryNativeApi.xbim_location_compose(other.Handle, Handle, out var composed);
             if (result != 0)
-                throw new InvalidOperationException($"Failed to compose locations: {XbimGeometryNativeApi.GetLastError()}");
+                throw new XbimGeometryServiceException($"Failed to compose locations: {XbimGeometryNativeApi.GetLastError()}");
 
             // Read the matrix from the composed native handle — single source of truth
             return new XLocation(composed);
@@ -218,7 +219,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         {
             int result = XbimGeometryNativeApi.xbim_location_invert(Handle, out var inverted);
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to invert location: {XbimGeometryNativeApi.GetLastError()}");
 
             return new XLocation(inverted);
@@ -228,7 +229,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         {
             int result = XbimGeometryNativeApi.xbim_location_scaled(Handle, scaleFactor, out var scaled);
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to scale location: {XbimGeometryNativeApi.GetLastError()}");
 
             return new XLocation(scaled);
@@ -243,7 +244,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         {
             int result = XbimGeometryNativeApi.xbim_location_translated(Handle, x, y, z, out var translated);
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to translate location: {XbimGeometryNativeApi.GetLastError()}");
 
             return new XLocation(translated);

@@ -9,6 +9,7 @@ using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
@@ -153,7 +154,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 nsFace.Handle, nativeHandles.Ptrs, wires.Length, out var outHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to add wires to face: {XbimGeometryNativeApi.GetLastError()}");
 
             return new XbimFace(outHandle);
@@ -180,14 +181,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 ox, oy, oz, m31, m32, m33, m11, m12, m13, out var locHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to create transform location: {XbimGeometryNativeApi.GetLastError()}");
 
             try
             {
                 result = XbimGeometryNativeApi.xbim_shape_moved(ns.Handle, locHandle, out var movedHandle);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to move shape: {XbimGeometryNativeApi.GetLastError()}");
 
                 return NativeShapeWrapper.WrapShape(movedHandle);
@@ -207,7 +208,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             int result = XbimGeometryNativeApi.xbim_shape_moved(ns.Handle, loc.Handle, out var movedHandle);
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to move shape: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapShape(movedHandle);
@@ -317,7 +318,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 fuzzyTolerance, out _, out var outHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Boolean operation failed: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapShape(outHandle);

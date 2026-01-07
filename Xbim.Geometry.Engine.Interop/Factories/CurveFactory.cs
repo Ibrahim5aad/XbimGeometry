@@ -6,6 +6,7 @@ using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Services;
+using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4x3.GeometryResource;
 
@@ -66,7 +67,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         public IXCurve BuildDirectrix(IIfcCurve curve, double? startParam, double? endParam)
         {
             if ((int)curve.Dim != 3)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     "Directrix must be a 3D curve.");
 
             var builtCurve = (XbimCurve)BuildCurve3d(curve);
@@ -95,7 +96,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var trimmedHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to trim directrix curve #{curve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new XbimCurve(trimmedHandle, builtCurve.CurveType);

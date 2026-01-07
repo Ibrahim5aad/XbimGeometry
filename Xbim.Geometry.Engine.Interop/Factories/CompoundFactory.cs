@@ -7,6 +7,7 @@ using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
 {
@@ -36,7 +37,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 ContextHandle, handles, 0, out var outHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to create empty compound: {XbimGeometryNativeApi.GetLastError()}");
 
             return new XbimCompound(outHandle);
@@ -65,7 +66,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 ContextHandle, nativeHandles.Ptrs, nativeHandles.Length, out var outHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to create compound from {shapeList.Count} shapes: {XbimGeometryNativeApi.GetLastError()}");
 
             return new XbimCompound(outHandle);

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Services
 {
@@ -22,7 +23,8 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public byte[] ToArray(IXShape shape, bool withTriangles = false, bool withNormals = false)
         {
-            if (shape == null) throw new ArgumentNullException(nameof(shape));
+            ArgumentNullException.ThrowIfNull(shape);
+            
             var Shape = shape as XbimShape
                 ?? throw new ArgumentException("Shape must be a XbimShape instance.", nameof(shape));
 
@@ -36,7 +38,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
             if (result != 0 || bufferPtr == IntPtr.Zero)
             {
                 string error = XbimGeometryNativeApi.GetLastError();
-                throw new InvalidOperationException($"Failed to serialize shape to binary: {error}");
+                throw new XbimGeometryServiceException($"Failed to serialize shape to binary: {error}");
             }
 
             try
@@ -53,7 +55,8 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXShape FromArray(byte[] bytes)
         {
-            if (bytes == null) throw new ArgumentNullException(nameof(bytes));
+            ArgumentNullException.ThrowIfNull(bytes);
+            
             if (bytes.Length == 0) throw new ArgumentException("Cannot deserialize from empty byte array.", nameof(bytes));
 
             // Pin the managed array and pass to native
@@ -66,7 +69,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 if (handle == null || handle.IsInvalid)
                 {
                     string error = XbimGeometryNativeApi.GetLastError();
-                    throw new InvalidOperationException($"Failed to deserialize shape from binary: {error}");
+                    throw new XbimGeometryServiceException($"Failed to deserialize shape from binary: {error}");
                 }
 
                 return NativeShapeWrapper.WrapShape(handle);
@@ -90,7 +93,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
             if (result != 0 || strPtr == IntPtr.Zero)
             {
                 string error = XbimGeometryNativeApi.GetLastError();
-                throw new InvalidOperationException($"Failed to serialize shape to BRep: {error}");
+                throw new XbimGeometryServiceException($"Failed to serialize shape to BRep: {error}");
             }
 
             try
@@ -116,7 +119,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
             if (handle == null || handle.IsInvalid)
             {
                 string error = XbimGeometryNativeApi.GetLastError();
-                throw new InvalidOperationException($"Failed to deserialize shape from BRep: {error}");
+                throw new XbimGeometryServiceException($"Failed to deserialize shape from BRep: {error}");
             }
 
             return NativeShapeWrapper.WrapShape(handle);

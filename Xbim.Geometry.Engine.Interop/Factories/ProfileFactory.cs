@@ -9,6 +9,7 @@ using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Ifc4.Interfaces;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
 {
@@ -101,7 +102,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXFace BuildRectangleFace(IIfcRectangleProfileDef rectangleProfile)
         {
             if (rectangleProfile.XDim <= 0 || rectangleProfile.YDim <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"RectangleProfileDef #{rectangleProfile.EntityLabel} has zero or negative dimensions.");
 
             BuildProfilePlacement(rectangleProfile.Position,
@@ -116,7 +117,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build RectangleProfileDef #{rectangleProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -125,11 +126,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXFace BuildRoundedRectangleFace(IIfcRoundedRectangleProfileDef roundedRectProfile)
         {
             if (roundedRectProfile.XDim <= 0 || roundedRectProfile.YDim <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"RoundedRectangleProfileDef #{roundedRectProfile.EntityLabel} has zero or negative dimensions.");
 
             if (roundedRectProfile.RoundingRadius <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"RoundedRectangleProfileDef #{roundedRectProfile.EntityLabel} has zero or negative rounding radius.");
 
             BuildProfilePlacement(roundedRectProfile.Position,
@@ -144,7 +145,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build RoundedRectangleProfileDef #{roundedRectProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -153,7 +154,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXFace BuildCircleFace(IIfcCircleProfileDef circleProfile)
         {
             if (circleProfile.Radius <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"CircleProfileDef #{circleProfile.EntityLabel} has zero or negative radius.");
 
             BuildProfilePlacement(circleProfile.Position,
@@ -168,7 +169,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build CircleProfileDef #{circleProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -177,7 +178,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXFace BuildEllipseFace(IIfcEllipseProfileDef ellipseProfile)
         {
             if (ellipseProfile.SemiAxis1 <= 0 || ellipseProfile.SemiAxis2 <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"EllipseProfileDef #{ellipseProfile.EntityLabel} has zero or negative semi-axis.");
 
             BuildProfilePlacement(ellipseProfile.Position,
@@ -192,7 +193,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build EllipseProfileDef #{ellipseProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -205,11 +206,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXFace BuildRectangleHollowFace(IIfcRectangleHollowProfileDef hollowProfile)
         {
             if (hollowProfile.XDim <= 0 || hollowProfile.YDim <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"RectangleHollowProfileDef #{hollowProfile.EntityLabel} has zero or negative dimensions.");
 
             if (hollowProfile.WallThickness <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"RectangleHollowProfileDef #{hollowProfile.EntityLabel} has zero or negative wall thickness.");
 
             BuildProfilePlacement(hollowProfile.Position,
@@ -230,7 +231,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build RectangleHollowProfileDef #{hollowProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -239,11 +240,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXFace BuildCircleHollowFace(IIfcCircleHollowProfileDef hollowProfile)
         {
             if (hollowProfile.Radius <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"CircleHollowProfileDef #{hollowProfile.EntityLabel} has zero or negative radius.");
 
             if (hollowProfile.WallThickness <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"CircleHollowProfileDef #{hollowProfile.EntityLabel} has zero or negative wall thickness.");
 
             BuildProfilePlacement(hollowProfile.Position,
@@ -258,7 +259,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build CircleHollowProfileDef #{hollowProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -272,7 +273,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             if (iProfile.OverallWidth <= 0 || iProfile.OverallDepth <= 0 ||
                 iProfile.WebThickness <= 0 || iProfile.FlangeThickness <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IShapeProfileDef #{iProfile.EntityLabel} has zero or negative dimensions.");
 
             BuildProfilePlacement(iProfile.Position,
@@ -292,7 +293,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build IShapeProfileDef #{iProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -303,7 +304,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (asymProfile.BottomFlangeWidth <= 0 || asymProfile.OverallDepth <= 0 ||
                 asymProfile.WebThickness <= 0 || asymProfile.BottomFlangeThickness <= 0 ||
                 asymProfile.TopFlangeWidth <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"AsymmetricIShapeProfileDef #{asymProfile.EntityLabel} has zero or negative dimensions.");
 
             BuildProfilePlacement(asymProfile.Position,
@@ -338,7 +339,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build AsymmetricIShapeProfileDef #{asymProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -347,7 +348,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXFace BuildLShapeFace(IIfcLShapeProfileDef lProfile)
         {
             if (lProfile.Depth <= 0 || lProfile.Thickness <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"LShapeProfileDef #{lProfile.EntityLabel} has zero or negative dimensions.");
 
             BuildProfilePlacement(lProfile.Position,
@@ -371,7 +372,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build LShapeProfileDef #{lProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -381,7 +382,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             if (tProfile.Depth <= 0 || tProfile.FlangeWidth <= 0 ||
                 tProfile.WebThickness <= 0 || tProfile.FlangeThickness <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"TShapeProfileDef #{tProfile.EntityLabel} has zero or negative dimensions.");
 
             BuildProfilePlacement(tProfile.Position,
@@ -410,7 +411,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build TShapeProfileDef #{tProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -420,7 +421,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             if (uProfile.Depth <= 0 || uProfile.FlangeWidth <= 0 ||
                 uProfile.WebThickness <= 0 || uProfile.FlangeThickness <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"UShapeProfileDef #{uProfile.EntityLabel} has zero or negative dimensions.");
 
             BuildProfilePlacement(uProfile.Position,
@@ -444,7 +445,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build UShapeProfileDef #{uProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -454,7 +455,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             if (zProfile.Depth <= 0 || zProfile.FlangeWidth <= 0 ||
                 zProfile.WebThickness <= 0 || zProfile.FlangeThickness <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"ZShapeProfileDef #{zProfile.EntityLabel} has zero or negative dimensions.");
 
             BuildProfilePlacement(zProfile.Position,
@@ -476,7 +477,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build ZShapeProfileDef #{zProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -485,7 +486,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXFace BuildCShapeFace(IIfcCShapeProfileDef cProfile)
         {
             if (cProfile.Depth <= 0 || cProfile.Width <= 0 || cProfile.WallThickness <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"CShapeProfileDef #{cProfile.EntityLabel} has zero or negative dimensions.");
 
             BuildProfilePlacement(cProfile.Position,
@@ -505,7 +506,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build CShapeProfileDef #{cProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -514,7 +515,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXFace BuildTrapeziumFace(IIfcTrapeziumProfileDef trapProfile)
         {
             if (trapProfile.BottomXDim <= 0 || trapProfile.TopXDim <= 0 || trapProfile.YDim <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"TrapeziumProfileDef #{trapProfile.EntityLabel} has zero or negative dimensions.");
 
             BuildProfilePlacement(trapProfile.Position,
@@ -530,7 +531,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build TrapeziumProfileDef #{trapProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -544,7 +545,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             var outerCurve = arbitraryProfile.OuterCurve;
             if (outerCurve == null)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"ArbitraryClosedProfileDef #{arbitraryProfile.EntityLabel} has no OuterCurve.");
 
             // Extract polyline points from the outer curve
@@ -552,7 +553,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             {
                 var points = polyline.Points.ToList();
                 if (points.Count < 3)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"ArbitraryClosedProfileDef #{arbitraryProfile.EntityLabel} polyline has less than 3 points.");
 
                 double[] pointsX = new double[points.Count];
@@ -571,7 +572,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var NativeShapeHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build ArbitraryClosedProfileDef #{arbitraryProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -597,7 +598,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             var pointList = indexedPolyCurve.Points;
             if (pointList == null)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IndexedPolyCurve #{entityLabel} has no Points coordinate list.");
 
             if (!(pointList is IIfcCartesianPointList2D pointList2D))
@@ -612,7 +613,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
 
             if (coords.Count < 3)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IndexedPolyCurve #{entityLabel} has less than 3 points.");
 
             // If segments exist, build 2D curve via CurveFactory respecting line/arc types
@@ -647,7 +648,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
 
             if (orderedPoints.Count < 3)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IndexedPolyCurve #{entityLabel} resolved to less than 3 unique points.");
 
             double[] pointsX = orderedPoints.Select(p => p.x).ToArray();
@@ -659,7 +660,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var profileHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build IndexedPolyCurve profile #{entityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapFace(profileHandle);
@@ -701,7 +702,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var resultHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build ArbitraryProfileDefWithVoids #{arbitraryWithVoids.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 outerFace.Dispose();
@@ -780,7 +781,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             var profiles = compositeProfile.Profiles?.ToList();
             if (profiles == null || profiles.Count == 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"CompositeProfileDef #{compositeProfile.EntityLabel} has no profiles.");
 
             var faceShapes = new List<XbimFace>();
@@ -800,7 +801,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var compositeHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build CompositeProfileDef #{compositeProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 // Composite profiles produce a compound of faces, not a single face.
@@ -819,14 +820,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             var parentProfile = derivedProfile.ParentProfile;
             if (parentProfile == null)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"DerivedProfileDef #{derivedProfile.EntityLabel} has no ParentProfile.");
 
             var parentFace = (XbimFace)BuildFace(parentProfile);
 
             var op = derivedProfile.Operator;
             if (op == null)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"DerivedProfileDef #{derivedProfile.EntityLabel} has no Operator.");
 
             // Determine if this is a non-uniform scale transform
@@ -848,7 +849,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var NativeShapeHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build DerivedProfileDef #{derivedProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -863,7 +864,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             var parentProfile = mirroredProfile.ParentProfile;
             if (parentProfile == null)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"MirroredProfileDef #{mirroredProfile.EntityLabel} has no ParentProfile.");
 
             var parentFace = (XbimFace)BuildFace(parentProfile);
@@ -876,7 +877,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var NativeShapeHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build MirroredProfileDef #{mirroredProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return NativeShapeWrapper.WrapFace(NativeShapeHandle);
@@ -1074,7 +1075,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 if (curves.Count == 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"CompositeCurve for profile #{entityLabel} produced no valid 2D curves.");
 
                 return BuildFaceFrom2dCurves(curves, entityLabel);
@@ -1100,7 +1101,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             try
             {
                 if (wireResult != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build wire from 2D curves for profile #{entityLabel}: " +
                         XbimGeometryNativeApi.GetLastError());
 
@@ -1108,7 +1109,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     ContextHandle, wireHandle, out var faceHandle);
 
                 if (faceResult != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build face from 2D curve wire for profile #{entityLabel}: " +
                         XbimGeometryNativeApi.GetLastError());
 
@@ -1147,7 +1148,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         ContextHandle, sx, sy, ex, ey, out var lineHandle);
 
                     if (result != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"Failed to build line segment for polyline #{curve.EntityLabel}: " +
                             XbimGeometryNativeApi.GetLastError());
 

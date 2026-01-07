@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Primitives
 {
@@ -34,7 +35,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
                 Handle, out IntPtr strPtr, out int strLen);
 
             if (result != 0 || strPtr == IntPtr.Zero)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to serialize surface to BRep: {XbimGeometryNativeApi.GetLastError()}");
 
             try
@@ -54,7 +55,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         {
             int result = XbimGeometryNativeApi.xbim_shape_write_brep(Handle, filePath);
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to write BRep file '{filePath}': {XbimGeometryNativeApi.GetLastError()}");
         }
 
@@ -65,7 +66,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         {
             int result = XbimGeometryNativeApi.xbim_shape_write_stl(Handle, filePath, 0.1);
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to write STL file '{filePath}': {XbimGeometryNativeApi.GetLastError()}");
         }
     }

@@ -21,6 +21,8 @@
 #include <Geom_Plane.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_SphericalSurface.hxx>
+#include <Geom_ToroidalSurface.hxx>
+#include <Geom_RectangularTrimmedSurface.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <Geom_SurfaceOfLinearExtrusion.hxx>
 #include <Geom_TrimmedCurve.hxx>
@@ -583,6 +585,107 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_linear_extrusion(
     {
         xbim_log_occt_failure(ctx, e, "xbim_surface_build_linear_extrusion");
         xbim_set_error("xbim_surface_build_linear_extrusion: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_toroidal(
+    XbimContextHandle ctx,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    double majorRadius,
+    double minorRadius,
+    XbimSurfaceHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_surface_build_toroidal: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (majorRadius < 0)
+    {
+        xbim_set_error("xbim_surface_build_toroidal: majorRadius must be >= 0");
+        return XBIM_INVALID_ARG;
+    }
+    if (minorRadius <= Precision::Confusion())
+    {
+        xbim_set_error("xbim_surface_build_toroidal: minorRadius must be > 0");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        gp_Pnt origin(originX, originY, originZ);
+        gp_Dir zDir(zDirX, zDirY, zDirZ);
+        gp_Dir xDir(xDirX, xDirY, xDirZ);
+        gp_Ax3 ax3(origin, zDir, xDir);
+
+        Handle(Geom_ToroidalSurface) torus = new Geom_ToroidalSurface(ax3, majorRadius, minorRadius);
+
+        *outHandle = xbim_surface_create_from(torus);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_surface_build_toroidal: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_surface_build_toroidal");
+        xbim_set_error("xbim_surface_build_toroidal: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_rectangular_trimmed(
+    XbimContextHandle ctx,
+    XbimSurfaceHandle basisSurface,
+    double u1, double u2,
+    double v1, double v2,
+    XbimSurfaceHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_surface_build_rectangular_trimmed: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!basisSurface || basisSurface->surface.IsNull())
+    {
+        xbim_set_error("xbim_surface_build_rectangular_trimmed: basisSurface is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        Handle(Geom_RectangularTrimmedSurface) trimmed =
+            new Geom_RectangularTrimmedSurface(basisSurface->surface, u1, u2, v1, v2);
+
+        *outHandle = xbim_surface_create_from(trimmed);
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_surface_build_rectangular_trimmed: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_surface_build_rectangular_trimmed");
+        xbim_set_error("xbim_surface_build_rectangular_trimmed: OCCT exception");
         return XBIM_ERROR;
     }
 }

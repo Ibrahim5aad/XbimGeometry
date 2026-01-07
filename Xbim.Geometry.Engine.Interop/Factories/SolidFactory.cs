@@ -63,7 +63,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out double xx, out double xy, out double xz);
 
             if (ifcBlock.XLength <= 0 || ifcBlock.YLength <= 0 || ifcBlock.ZLength <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"CSG Block #{ifcBlock.EntityLabel} has zero or negative dimensions.");
 
             int result = XbimGeometryNativeApi.xbim_solid_build_block(
@@ -73,7 +73,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build CSG Block #{ifcBlock.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
@@ -87,7 +87,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out double xx, out double xy, out double xz);
 
             if (ifcSphere.Radius <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"CSG Sphere #{ifcSphere.EntityLabel} has zero or negative radius.");
 
             int result = XbimGeometryNativeApi.xbim_solid_build_sphere(
@@ -97,7 +97,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build CSG Sphere #{ifcSphere.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
@@ -111,7 +111,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out double xx, out double xy, out double xz);
 
             if (ifcCylinder.Radius <= 0 || ifcCylinder.Height <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"CSG RightCircularCylinder #{ifcCylinder.EntityLabel} has zero or negative dimensions.");
 
             int result = XbimGeometryNativeApi.xbim_solid_build_right_circular_cylinder(
@@ -121,7 +121,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build CSG RightCircularCylinder #{ifcCylinder.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
@@ -135,7 +135,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out double xx, out double xy, out double xz);
 
             if (ifcCone.BottomRadius <= 0 || ifcCone.Height <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"CSG RightCircularCone #{ifcCone.EntityLabel} has zero or negative dimensions.");
 
             int result = XbimGeometryNativeApi.xbim_solid_build_right_circular_cone(
@@ -145,7 +145,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build CSG RightCircularCone #{ifcCone.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
@@ -159,7 +159,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out double xx, out double xy, out double xz);
 
             if (ifcPyramid.XLength <= 0 || ifcPyramid.YLength <= 0 || ifcPyramid.Height <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"CSG RectangularPyramid #{ifcPyramid.EntityLabel} has zero or negative dimensions.");
 
             int result = XbimGeometryNativeApi.xbim_solid_build_rectangular_pyramid(
@@ -169,7 +169,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build CSG RectangularPyramid #{ifcPyramid.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
@@ -208,12 +208,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXShape BuildExtrudedAreaSolid(IIfcExtrudedAreaSolid extrudedSolid)
         {
             if (extrudedSolid.Depth <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Extruded area solid #{extrudedSolid.EntityLabel} has depth <= 0.");
 
             if (!GeometryFactory.BuildDirection3d(extrudedSolid.ExtrudedDirection,
                     out double dirX, out double dirY, out double dirZ))
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Extruded area solid #{extrudedSolid.EntityLabel} has invalid extrusion direction.");
 
             // Build the swept profile face
@@ -236,7 +236,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build extruded area solid #{extrudedSolid.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
@@ -245,12 +245,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXShape BuildExtrudedAreaSolidTapered(IIfcExtrudedAreaSolidTapered extrudedTapered)
         {
             if (extrudedTapered.Depth <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Extruded area solid tapered #{extrudedTapered.EntityLabel} has depth <= 0.");
 
             if (!GeometryFactory.BuildDirection3d(extrudedTapered.ExtrudedDirection,
                     out double dirX, out double dirY, out double dirZ))
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Extruded area solid tapered #{extrudedTapered.EntityLabel} has invalid extrusion direction.");
 
             // Build start and end profile faces
@@ -276,7 +276,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build extruded area solid tapered #{extrudedTapered.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
@@ -285,7 +285,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXShape BuildRevolvedAreaSolid(IIfcRevolvedAreaSolid revolvedSolid)
         {
             if (revolvedSolid.Angle <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Revolved area solid #{revolvedSolid.EntityLabel} has angle <= 0.");
 
             // Build the swept profile face
@@ -297,7 +297,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (!GeometryFactory.BuildDirection3d(revolvedSolid.Axis.Axis,
                     out double axisDirX, out double axisDirY, out double axisDirZ))
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Revolved area solid #{revolvedSolid.EntityLabel} has invalid revolution axis direction.");
 
             // Convert angle to radians
@@ -321,7 +321,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build revolved area solid #{revolvedSolid.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
@@ -330,7 +330,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXShape BuildRevolvedAreaSolidTapered(IIfcRevolvedAreaSolidTapered revolvedTapered)
         {
             if (revolvedTapered.Angle <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Revolved area solid tapered #{revolvedTapered.EntityLabel} has angle <= 0.");
 
             // Build start and end profile faces
@@ -343,7 +343,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (!GeometryFactory.BuildDirection3d(revolvedTapered.Axis.Axis,
                     out double axisDirX, out double axisDirY, out double axisDirZ))
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Revolved area solid tapered #{revolvedTapered.EntityLabel} has invalid revolution axis direction.");
 
             double angleRadians = revolvedTapered.Angle * _modelService.RadianFactor;
@@ -368,7 +368,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build revolved area solid tapered #{revolvedTapered.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapSolid(NativeShapeHandle);
@@ -377,11 +377,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXShape BuildSweptDiskSolid(IIfcSweptDiskSolid sweptDisk)
         {
             if (sweptDisk.Radius <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Swept disk solid #{sweptDisk.EntityLabel} has radius <= 0.");
 
             if (sweptDisk.InnerRadius.HasValue && sweptDisk.InnerRadius.Value >= sweptDisk.Radius)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Swept disk solid #{sweptDisk.EntityLabel} has inner radius >= outer radius.");
 
             // Build the directrix wire, applying optional parametric trimming
@@ -404,7 +404,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out NativeShapeHandle solidHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build swept disk solid #{sweptDisk.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapSolid(solidHandle);
@@ -451,7 +451,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         out var compoundHandle);
 
                     if (result != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"Failed to build compound for FixedReferenceSweptAreaSolid #{fixedRefSwept.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                     return NativeShapeWrapper.WrapShape(compoundHandle);
@@ -471,7 +471,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             IIfcFixedReferenceSweptAreaSolid fixedRefSwept, IIfcProfileDef profileDef)
         {
             if (profileDef.ProfileType != IfcProfileTypeEnum.AREA)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"FixedReferenceSweptAreaSolid #{fixedRefSwept.EntityLabel}: profile must be AREA type.");
 
             // Build the swept area profile face
@@ -479,7 +479,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             // Extract fixed reference direction — this becomes the reference plane normal
             if (!GeometryFactory.BuildDirection3d(fixedRefSwept.FixedReference, out double refDirX, out double refDirY, out double refDirZ))
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"FixedReferenceSweptAreaSolid #{fixedRefSwept.EntityLabel}: FixedReference direction has zero magnitude.");
 
             // Build the directrix wire with optional parametric trimming
@@ -536,7 +536,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         out var compoundHandle);
 
                     if (result != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"Failed to build compound for SurfaceCurveSweptAreaSolid #{surfaceCurveSwept.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                     return NativeShapeWrapper.WrapShape(compoundHandle);
@@ -556,7 +556,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             IIfcSurfaceCurveSweptAreaSolid surfaceCurveSwept, IIfcProfileDef profileDef)
         {
             if (profileDef.ProfileType != IfcProfileTypeEnum.AREA)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"SurfaceCurveSweptAreaSolid #{surfaceCurveSwept.EntityLabel}: profile must be AREA type.");
 
             // Build the swept area profile face
@@ -686,7 +686,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 if (faceHandles.Count < 4)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Closed shell requires at least 4 faces but only {faceHandles.Count} were built.");
 
                 // Use the combined sew+solid API which merges shared edges
@@ -696,7 +696,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     ContextHandle, nativeFaces.Ptrs, nativeFaces.Length, tolerance, out var solidHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build closed shell solid: {XbimGeometryNativeApi.GetLastError()}");
 
                 return solidHandle;
@@ -916,7 +916,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 ContextHandle, tolerance, out var builder);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to create advanced BRep builder: {XbimGeometryNativeApi.GetLastError()}");
 
             try
@@ -1055,14 +1055,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 if (faceCount < 4)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Advanced BRep closed shell requires at least 4 faces but only {faceCount} were built.");
 
                 // Build the complete BRep topology natively
                 result = XbimGeometryNativeApi.xbim_advanced_brep_build(builder, out var solidHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build advanced BRep solid: {XbimGeometryNativeApi.GetLastError()}");
 
                 return solidHandle;
@@ -1142,7 +1142,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 if (shellHandles.Count == 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"FaceBasedSurfaceModel #{ifcSurfaceModel.EntityLabel}: no valid shells were built.");
 
                 if (shellHandles.Count == 1)
@@ -1160,7 +1160,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     ContextHandle, nativeShells.Ptrs, nativeShells.Length, out var compoundHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"FaceBasedSurfaceModel #{ifcSurfaceModel.EntityLabel}: failed to create compound: " +
                         XbimGeometryNativeApi.GetLastError());
 
@@ -1245,7 +1245,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             var elementarySurface = halfSpace.BaseSurface as IIfcElementarySurface;
             if (elementarySurface == null)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Half-space #{halfSpace.EntityLabel}: only elementary surfaces are supported.");
 
             int surfaceType;
@@ -1293,7 +1293,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out NativeShapeHandle outHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build half-space #{halfSpace.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapSolid(outHandle);
@@ -1307,7 +1307,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             int agreementFlag, double oneMeter, double precision)
         {
             if (!(polyBounded.BaseSurface is IIfcPlane))
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Polygonal bounded half-space #{polyBounded.EntityLabel}: base surface must be planar.");
 
             var polyline = polyBounded.PolygonalBoundary as IIfcPolyline;
@@ -1317,7 +1317,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             int pointCount = polyline.Points.Count;
             if (pointCount < 3)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Polygonal bounded half-space #{polyBounded.EntityLabel}: boundary needs at least 3 points.");
 
             var xCoords = new double[pointCount];
@@ -1349,7 +1349,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var outHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build polygonal bounded half-space #{polyBounded.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapSolid(outHandle);
@@ -1386,7 +1386,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 if (shellHandles.Count == 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"ShellBasedSurfaceModel #{ifcSurfaceModel.EntityLabel}: no valid shells were built.");
 
                 if (shellHandles.Count == 1)
@@ -1403,7 +1403,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     ContextHandle, nativeShells.Ptrs, nativeShells.Length, out var compoundHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"ShellBasedSurfaceModel #{ifcSurfaceModel.EntityLabel}: failed to create compound: " +
                         XbimGeometryNativeApi.GetLastError());
 
@@ -1453,7 +1453,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             var coordList = triangulated.Coordinates;
             if (coordList == null)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"TriangulatedFaceSet #{triangulated.EntityLabel}: missing Coordinates.");
 
             double tolerance = _modelService.Precision;
@@ -1527,7 +1527,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 if (faceHandles.Count == 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"TriangulatedFaceSet #{triangulated.EntityLabel}: no valid faces were built.");
 
                 return AssembleTessellatedShell(faceHandles, triangulated.Closed.HasValue && (bool)triangulated.Closed.Value,
@@ -1548,7 +1548,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             var coordList = polygonal.Coordinates;
             if (coordList == null)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"PolygonalFaceSet #{polygonal.EntityLabel}: missing Coordinates.");
 
             double tolerance = _modelService.Precision;
@@ -1652,7 +1652,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 if (faceHandles.Count == 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"PolygonalFaceSet #{polygonal.EntityLabel}: no valid faces were built.");
 
                 return AssembleTessellatedShell(faceHandles, polygonal.Closed.HasValue && (bool)polygonal.Closed.Value,
@@ -1726,7 +1726,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 ContextHandle, nativeFaces.Ptrs, nativeFaces.Length, tolerance, out var rawShellHandle);
 
             if (shellResult != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"TessellatedFaceSet #{entityLabel}: failed to build shell: {XbimGeometryNativeApi.GetLastError()}");
 
             // Sew the shell
@@ -1736,7 +1736,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             rawShellHandle.Dispose();
 
             if (sewResult != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"TessellatedFaceSet #{entityLabel}: failed to sew shell: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapShape(sewedHandle);
@@ -1748,11 +1748,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var positions = ifcSectionedSpine.CrossSectionPositions.ToList();
 
             if (crossSections.Count < 2)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IfcSectionedSpine #{ifcSectionedSpine.EntityLabel} requires at least 2 cross-sections but has {crossSections.Count}.");
 
             if (crossSections.Count != positions.Count)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IfcSectionedSpine #{ifcSectionedSpine.EntityLabel}: cross-section count ({crossSections.Count}) does not match position count ({positions.Count}).");
 
             // Build the spine wire from the composite curve
@@ -1776,7 +1776,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     {
                         face.Handle.Dispose();
                         location.Handle.Dispose();
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"IfcSectionedSpine #{ifcSectionedSpine.EntityLabel}: failed to position cross-section {i}: {XbimGeometryNativeApi.GetLastError()}");
                     }
 
@@ -1796,7 +1796,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var solidHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build IfcSectionedSpine #{ifcSectionedSpine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return NativeShapeWrapper.WrapSolid(solidHandle);

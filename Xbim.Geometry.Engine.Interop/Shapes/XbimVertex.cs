@@ -4,6 +4,7 @@ using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
@@ -27,7 +28,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 int result = XbimGeometryNativeApi.xbim_vertex_tolerance(Handle, out double tol);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get vertex tolerance: {XbimGeometryNativeApi.GetLastError()}");
                 return tol;
             }
@@ -40,7 +41,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 int result = XbimGeometryNativeApi.xbim_vertex_point(
                     Handle, out double x, out double y, out double z);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get vertex point: {XbimGeometryNativeApi.GetLastError()}");
                 return new XPoint(x, y, z);
             }
@@ -57,7 +58,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 int result = XbimGeometryNativeApi.xbim_vertex_point(
                     Handle, out double x, out double y, out double z);
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to get vertex point: {XbimGeometryNativeApi.GetLastError()}");
                 return new XbimPoint3D(x, y, z);
             }

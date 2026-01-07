@@ -5,6 +5,7 @@ using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
 {
@@ -33,7 +34,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var NativeShapeHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build vertex at ({x}, {y}, {z}): {XbimGeometryNativeApi.GetLastError()}");
 
             return new XbimVertex(NativeShapeHandle);

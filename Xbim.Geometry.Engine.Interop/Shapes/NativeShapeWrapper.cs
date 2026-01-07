@@ -2,6 +2,7 @@ using System;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
@@ -59,7 +60,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
             int result = XbimGeometryNativeApi.xbim_shape_type(handle, out int typeVal);
             if (result != 0)
-                throw new InvalidOperationException("Failed to determine shape type.");
+                throw new XbimGeometryServiceException("Failed to determine shape type.");
 
             var shapeType = (XShapeType)typeVal;
 
@@ -71,15 +72,14 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 int countResult = XbimGeometryNativeApi.xbim_shape_count_subshapes(
                     handle, (int)XShapeType.Solid, out int solidCount);
                 if (countResult != 0 || solidCount == 0)
-                    throw new InvalidOperationException(
-                        "Compound shape contains no solids.");
+                    throw new XbimGeometryServiceException("Compound shape contains no solids.");
 
                 var ptrs = new IntPtr[solidCount];
                 int capacity = solidCount;
                 int getResult = XbimGeometryNativeApi.xbim_shape_get_subshapes(
                     handle, (int)XShapeType.Solid, ptrs, ref capacity);
                 if (getResult != 0 || capacity == 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         "Failed to extract solids from compound shape.");
 
                 // Take the first solid; dispose any extras
@@ -91,7 +91,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 return new XbimSolid(solidHandle);
             }
 
-            throw new InvalidOperationException(
+            throw new XbimGeometryServiceException(
                 $"Expected a Solid shape but got {shapeType}.");
         }
 
@@ -106,7 +106,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
             int result = XbimGeometryNativeApi.xbim_shape_type(handle, out int typeVal);
             if (result != 0 || (XShapeType)typeVal != XShapeType.Face)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Expected a Face shape but got {(XShapeType)typeVal}.");
 
             return new XbimFace(handle);

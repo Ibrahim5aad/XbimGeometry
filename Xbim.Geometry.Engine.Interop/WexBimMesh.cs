@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Abstractions.WexBim;
+using Xbim.Geometry.Engine.Interop.Primitives;
 
 namespace Xbim.Geometry.WexBim
 {
@@ -237,7 +238,8 @@ namespace Xbim.Geometry.WexBim
 
         IXDirection IWexBimMeshFace.NormalAt(int index)
         {
-            throw new NotImplementedException();
+            var vec = NormalAt(index);
+            return new XDirection(vec.X, vec.Y, vec.Z);
         }
 
         public IEnumerable<IFloat3> Normals
@@ -272,7 +274,6 @@ namespace Xbim.Geometry.WexBim
             }
         }
 
-        
     }
 
     /// <summary>

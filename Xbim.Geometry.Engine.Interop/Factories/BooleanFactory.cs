@@ -5,6 +5,7 @@ using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
@@ -30,7 +31,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var resultHandle = BuildBooleanResult(boolResult);
 
             if (resultHandle == null || resultHandle.IsInvalid)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Boolean result #{boolResult.EntityLabel} produced an empty shape.");
 
             // WrapShape takes ownership of the handle
@@ -99,11 +100,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     boolResult.Operator, boolResult.EntityLabel);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Boolean {boolResult.Operator} #{boolResult.EntityLabel} failed: {XbimGeometryNativeApi.GetLastError()}");
 
             if (outHandle == null || outHandle.IsInvalid)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Boolean {boolResult.Operator} #{boolResult.EntityLabel} returned an empty shape.");
 
             return outHandle;
@@ -147,7 +148,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 return xbimShape.DetachHandle();
             }
 
-            throw new InvalidOperationException(
+            throw new XbimGeometryServiceException(
                 $"Boolean operand {operand.GetType().Name} produced a non-native shape.");
         }
     }

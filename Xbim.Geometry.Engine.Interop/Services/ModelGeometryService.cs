@@ -51,8 +51,8 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public ModelGeometryService(IModel model, ILoggerFactory loggerFactory)
         {
-            if (model == null) throw new ArgumentNullException(nameof(model));
-            if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
+            ArgumentNullException.ThrowIfNull(model);
+            ArgumentNullException.ThrowIfNull(loggerFactory);
 
             _logger = loggerFactory.CreateLogger<ModelGeometryService>();
 

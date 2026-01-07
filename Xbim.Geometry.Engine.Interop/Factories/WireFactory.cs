@@ -13,6 +13,7 @@ using Xbim.Common;
 using Xbim.Common.Geometry;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4.MeasureResource;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
 {
@@ -56,7 +57,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var wireHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build wire from {points.Length} points: {XbimGeometryNativeApi.GetLastError()}");
 
             return new XbimWire(wireHandle);
@@ -122,7 +123,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             var points = ifcPolyline.Points;
             if (points.Count < 2)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IIfcPolyline #{ifcPolyline.EntityLabel} has fewer than 2 points.");
 
             var pointsXYZ = new double[points.Count * 3];
@@ -141,7 +142,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var wireHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build wire from polyline #{ifcPolyline.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new XbimWire(wireHandle);
@@ -166,7 +167,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var wireHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build indexed poly curve #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new XbimWire(wireHandle);
@@ -211,7 +212,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                                 allPointsXYZ[endIdx * 3], allPointsXYZ[endIdx * 3 + 1], allPointsXYZ[endIdx * 3 + 2],
                                 out edgeHandle);
                             if (r != 0)
-                                throw new InvalidOperationException(
+                                throw new XbimGeometryServiceException(
                                     $"Failed to build fallback line edge in indexed poly curve #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
                         }
 
@@ -237,7 +238,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                                 segPointsXYZ[(i + 1) * 3], segPointsXYZ[(i + 1) * 3 + 1], segPointsXYZ[(i + 1) * 3 + 2],
                                 out var edgeHandle);
                             if (r != 0)
-                                throw new InvalidOperationException(
+                                throw new XbimGeometryServiceException(
                                     $"Failed to build line edge in indexed poly curve #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
                             edgeHandles.Add(edgeHandle);
                         }
@@ -252,7 +253,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var resultWireHandle);
 
                 if (buildResult != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build wire from edges in indexed poly curve #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new XbimWire(resultWireHandle);
@@ -285,7 +286,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     {
                         int reverseResult = XbimGeometryNativeApi.xbim_curve_reverse(segCurve.Handle);
                         if (reverseResult != 0)
-                            throw new InvalidOperationException(
+                            throw new XbimGeometryServiceException(
                                 $"Failed to reverse composite curve segment #{segment.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
                     }
 
@@ -293,7 +294,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 if (segmentCurves.Count == 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IIfcCompositeCurve #{ifcComposite.EntityLabel} has no valid segments.");
 
                 // Build wire from curves with shared vertex connectivity
@@ -307,7 +308,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var wireHandle);
 
                 if (buildResult != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build wire from composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new XbimWire(wireHandle);
@@ -332,7 +333,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var wireHandle);
 
             if (result != 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build wire from {curveDescription}: {XbimGeometryNativeApi.GetLastError()}");
 
             return new XbimWire(wireHandle);
@@ -359,7 +360,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         out var edgeHandle);
 
                     if (r != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"Failed to build edge from trimmed curve #{ifcTrimmed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                     return WrapEdgeAsWire(edgeHandle, $"trimmed curve #{ifcTrimmed.EntityLabel}");
@@ -385,7 +386,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         out var wireHandle);
 
                     if (r != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"Failed to build wire from 2D trimmed curve #{ifcTrimmed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                     return new XbimWire(wireHandle);
@@ -442,7 +443,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         out var edgeHandle);
 
                     if (r != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"Failed to build edge from offset curve #{ifcCurve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                     return WrapEdgeAsWire(edgeHandle, $"offset curve #{ifcCurve.EntityLabel}");
@@ -468,7 +469,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         out var wireHandle);
 
                     if (r != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"Failed to build wire from 2D offset curve #{ifcCurve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                     return new XbimWire(wireHandle);
@@ -487,12 +488,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXWire BuildOpenProfileWire(IIfcArbitraryOpenProfileDef openProfile)
         {
             if (openProfile.ProfileType != Xbim.Ifc4.Interfaces.IfcProfileTypeEnum.CURVE)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IfcArbitraryOpenProfileDef #{openProfile.EntityLabel} must have ProfileType=CURVE.");
 
             var curve = openProfile.Curve;
             if (curve == null)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IfcArbitraryOpenProfileDef #{openProfile.EntityLabel} has no Curve.");
 
             return Build(curve);
@@ -501,7 +502,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private IXWire BuildCenterLineProfileWire(IIfcCenterLineProfileDef centerLine)
         {
             if (centerLine.Thickness <= 0)
-                throw new InvalidOperationException(
+                throw new XbimGeometryServiceException(
                     $"IfcCenterLineProfileDef #{centerLine.EntityLabel} has invalid thickness.");
 
             var curveFactory = (CurveFactory)_modelService.CurveFactory;
@@ -523,7 +524,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     (centreStart.Y - centreEnd.Y) * (centreStart.Y - centreEnd.Y));
 
                 if (dist < _modelService.Precision)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IfcCenterLineProfileDef #{centerLine.EntityLabel} must have an open curve for the centre line.");
 
                 // Build two offset curves at ±thickness/2
@@ -532,21 +533,21 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 int rA = XbimGeometryNativeApi.xbim_curve2d_build_offset(
                     ContextHandle, centre.Handle, halfThickness, out aCurveHandle);
                 if (rA != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build offset curve A for IfcCenterLineProfileDef #{centerLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 int rB = XbimGeometryNativeApi.xbim_curve2d_build_offset(
                     ContextHandle, centre.Handle, -halfThickness, out bCurveHandle);
                 if (rB != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build offset curve B for IfcCenterLineProfileDef #{centerLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 // Evaluate endpoints of both offset curves
                 int rAParams = XbimGeometryNativeApi.xbim_curve2d_parameters(aCurveHandle, out double aFirst, out double aLast);
-                if (rAParams != 0) throw new InvalidOperationException($"Failed to get offset curve A parameters: {XbimGeometryNativeApi.GetLastError()}");
+                if (rAParams != 0) throw new XbimGeometryServiceException($"Failed to get offset curve A parameters: {XbimGeometryNativeApi.GetLastError()}");
 
                 int rBParams = XbimGeometryNativeApi.xbim_curve2d_parameters(bCurveHandle, out double bFirst, out double bLast);
-                if (rBParams != 0) throw new InvalidOperationException($"Failed to get offset curve B parameters: {XbimGeometryNativeApi.GetLastError()}");
+                if (rBParams != 0) throw new XbimGeometryServiceException($"Failed to get offset curve B parameters: {XbimGeometryNativeApi.GetLastError()}");
 
                 XbimGeometryNativeApi.xbim_curve2d_value(aCurveHandle, aFirst, out double aStartX, out double aStartY);
                 XbimGeometryNativeApi.xbim_curve2d_value(aCurveHandle, aLast, out double aEndX, out double aEndY);
@@ -557,13 +558,13 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 int rLine1 = XbimGeometryNativeApi.xbim_curve2d_build_line(
                     ContextHandle, aEndX, aEndY, bEndX, bEndY, out lineAEndToBEnd);
                 if (rLine1 != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build connecting line for IfcCenterLineProfileDef #{centerLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 int rLine2 = XbimGeometryNativeApi.xbim_curve2d_build_line(
                     ContextHandle, bStartX, bStartY, aStartX, aStartY, out lineBStartToAStart);
                 if (rLine2 != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build connecting line for IfcCenterLineProfileDef #{centerLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 // Reverse bCurve so it goes bEnd→bStart (completing the closed loop)
@@ -581,7 +582,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var wireHandle);
 
                 if (rWire != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build wire for IfcCenterLineProfileDef #{centerLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new XbimWire(wireHandle);
@@ -654,7 +655,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var trimmedHandle);
 
                 if (result != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to trim directrix wire for #{ifcCurve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new XbimWire(trimmedHandle);
@@ -693,7 +694,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         out var edgeHandle);
 
                     if (r != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"Failed to build edge from directrix curve #{ifcCurve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                     return WrapEdgeAsWire(edgeHandle, $"directrix #{ifcCurve.EntityLabel}");
@@ -719,7 +720,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         out var wireHandle);
 
                     if (r != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"Failed to build wire from 2D directrix curve #{ifcCurve.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                     return new XbimWire(wireHandle);
@@ -788,7 +789,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     {
                         int reverseResult = XbimGeometryNativeApi.xbim_curve_reverse(segCurve.Handle);
                         if (reverseResult != 0)
-                            throw new InvalidOperationException(
+                            throw new XbimGeometryServiceException(
                                 $"Failed to reverse composite directrix segment #{segment.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
                     }
 
@@ -826,7 +827,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 if (segmentCurves.Count == 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"IIfcCompositeCurve #{ifcComposite.EntityLabel} has no valid segments for directrix.");
 
                 // Build wire from curves with shared vertex connectivity
@@ -840,7 +841,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var wireHandle);
 
                 if (buildResult != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to build directrix wire from composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 var wire = new XbimWire(wireHandle);
@@ -861,7 +862,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         out var trimmedHandle);
 
                     if (trimResult != 0)
-                        throw new InvalidOperationException(
+                        throw new XbimGeometryServiceException(
                             $"Failed to trim composite directrix #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                     return new XbimWire(trimmedHandle);
@@ -1032,7 +1033,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     out var trimmedHandle);
 
                 if (trimResult != 0)
-                    throw new InvalidOperationException(
+                    throw new XbimGeometryServiceException(
                         $"Failed to trim indexed poly curve directrix #{ifcIndexed.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
                 return new XbimWire(trimmedHandle);
