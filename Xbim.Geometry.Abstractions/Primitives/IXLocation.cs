@@ -6,6 +6,7 @@
         IXPoint Translation { get;  }
         IXQuaternion Rotation { get; }
         IXLocation Multiplied(IXLocation location);
+        IXLocation PreMultiplied(IXLocation location);
         IXLocation Inverted();
         IXLocation ScaledBy(double scaleFactor);
         void SetTranslation(double x, double y, double z);

@@ -329,14 +329,14 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_location_create_identity(
  * Compose two locations into a single combined transform: result = loc1 * loc2.
  * Neither input location is modified; a new handle is allocated.
  *
- *   loc1      – first location (applied second geometrically)
- *   loc2      – second location (applied first geometrically)
- *   outHandle – receives the composed location handle on success
+ *   loc1      – first location 
+ *   loc2      – second location 
+ *   outHandle – 
  *
  * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if loc1 or loc2 is NULL;
  * XBIM_INVALID_ARG if outHandle is NULL.
  */
-XBIM_EXPORT XbimResult XBIM_CALL xbim_location_compose(
+XBIM_EXPORT XbimResult XBIM_CALL xbim_location_multiplied(
     XbimLocationHandle  loc1,
     XbimLocationHandle  loc2,
     XbimLocationHandle* outHandle);

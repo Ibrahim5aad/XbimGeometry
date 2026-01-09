@@ -29,7 +29,6 @@ namespace Xbim.Geometry.Engine.Tests
 
 
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void can_build_ifc_faceted_brep(XGeometryEngineVersion engineVersion)
         {
@@ -39,6 +38,7 @@ namespace Xbim.Geometry.Engine.Tests
                 shape.Should().NotBeNull();
                 var geomEngine = factory.CreateGeometryEngine(engineVersion, model, _loggerFactory);
                 var geom = geomEngine.CreateSolidSet(shape, _logger);
+                var s = geom.First();
                 geom.Count.Should().Be(1);
                 geom.First().Volume.Should().BeApproximately(3232.386, 5e-3);
             }

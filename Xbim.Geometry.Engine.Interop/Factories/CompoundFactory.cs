@@ -45,7 +45,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXCompound CreateFrom(IEnumerable<IXShape> shapes)
         {
-            if (shapes == null) throw new ArgumentNullException(nameof(shapes));
+            ArgumentNullException.ThrowIfNull(shapes);
 
             var shapeList = shapes.ToList();
             if (shapeList.Count == 0)

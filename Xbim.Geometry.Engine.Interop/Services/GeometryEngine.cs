@@ -39,8 +39,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXShape Build(IIfcGeometricRepresentationItem geomRep)
         {
-            if (geomRep == null)
-                throw new ArgumentNullException(nameof(geomRep));
+            ArgumentNullException.ThrowIfNull(geomRep);
 
             // Solid models (extruded, revolved, CSG, swept disk, BRep, etc.)
             if (geomRep is IIfcSolidModel solidModel)
@@ -423,7 +422,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
             {
                 double x = pt.Coordinates[0];
                 double y = pt.Coordinates[1];
-                double z = (int)pt.Dim == 3 ? (double)pt.Coordinates[2] : 0.0;
+                double z = (int)(long)pt.Dim == 3 ? (double)pt.Coordinates[2] : 0.0;
                 points.Add(new XPoint(x, y, z));
             }
             var wire = _service.WireFactory.BuildWire(points.ToArray());
@@ -688,9 +687,9 @@ namespace Xbim.Geometry.Engine.Interop.Services
             var matrix = gf.BuildTransform(cartesianTransform);
 
             var m = new XbimMatrix3D(
-                matrix.M11, matrix.M12, matrix.M13, 0,
-                matrix.M21, matrix.M22, matrix.M23, 0,
-                matrix.M31, matrix.M32, matrix.M33, 0,
+                matrix.M11 * matrix.ScaleX, matrix.M12 * matrix.ScaleX, matrix.M13 * matrix.ScaleX, 0,
+                matrix.M21 * matrix.ScaleY, matrix.M22 * matrix.ScaleY, matrix.M23 * matrix.ScaleY, 0,
+                matrix.M31 * matrix.ScaleZ, matrix.M32 * matrix.ScaleZ, matrix.M33 * matrix.ScaleZ, 0,
                 matrix.OffsetX, matrix.OffsetY, matrix.OffsetZ, 1);
 
             return shape.Transform(m);
@@ -735,7 +734,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                 throw new XbimGeometryServiceException("Geometry must originate from this geometry engine.");
 
             var gf = (GeometryFactory)_service.GeometryFactory;
-            using var loc = gf.ToLocation(objectPlacement);
+            var loc = gf.ToLocation(objectPlacement);
             return MoveShape(shape, loc);
         }
 

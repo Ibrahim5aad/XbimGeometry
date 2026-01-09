@@ -514,7 +514,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     }
 
                     var stepLocation = BuildLocationFromAxis3D(axis3D);
-                    accumulated = ComposeLocation(accumulated, stepLocation);
+                    accumulated = PreMultiplied(accumulated, stepLocation);
 
                     // Navigate up: PlacementRelTo can be local or linear
                     EvaluateNextPlacement(localPlacement.PlacementRelTo,
@@ -526,7 +526,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     if (linearPlacement.RelativePlacement is IfcAxis2PlacementLinear axisLinear)
                     {
                         var stepLocation = (XLocation)BuildLocation(axisLinear);
-                        accumulated = ComposeLocation(accumulated, stepLocation);
+                        accumulated = PreMultiplied(accumulated, stepLocation);
                     }
                     else
                     {
@@ -543,7 +543,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 {
                     var stepLocation = BuildLocationFromGridPlacement(gridPlacement);
                     if (stepLocation != null)
-                        accumulated = ComposeLocation(accumulated, stepLocation);
+                        accumulated = PreMultiplied(accumulated, stepLocation);
 
                     // Grid placement doesn't chain further in the same way
                     localPlacement = null;
@@ -556,17 +556,20 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         }
 
         /// <summary>
-        /// Composes a new step location onto the accumulated transform.
-        /// Matches the legacy trsf.PreMultiply(relTrsf) pattern.
+        /// = accumulated.PreMultiply(stepLocation)
         /// </summary>
-        private static XLocation ComposeLocation(XLocation? accumulated, XLocation stepLocation)
+        private static XLocation PreMultiplied(XLocation? accumulated, XLocation stepLocation)
         {
             if (accumulated == null)
                 return stepLocation;
+ 
+            var composed = (XLocation)accumulated.PreMultiplied(stepLocation);
 
-            var composed = (XLocation)stepLocation.Multiplied(accumulated);
-            accumulated.Dispose();
-            stepLocation.Dispose();
+            // PreMultiplied may return 'this' when the argument is identity; only dispose if distinct.
+            if (!ReferenceEquals(composed, accumulated))
+                accumulated.Dispose();
+            if (!ReferenceEquals(composed, stepLocation))
+                stepLocation.Dispose();
             return composed;
         }
 
@@ -694,7 +697,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (grid?.ObjectPlacement != null)
             {
                 var gridObjLoc = ToLocation(grid.ObjectPlacement);
-                var composed = ComposeLocation(gridLoc, gridObjLoc);
+                var composed = PreMultiplied(gridLoc, gridObjLoc);
                 return composed;
             }
 

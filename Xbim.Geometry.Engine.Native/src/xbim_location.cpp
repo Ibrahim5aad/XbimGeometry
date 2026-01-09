@@ -111,7 +111,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_location_create_identity(
     return XBIM_OK;
 }
 
-XBIM_EXPORT XbimResult XBIM_CALL xbim_location_compose(
+XBIM_EXPORT XbimResult XBIM_CALL xbim_location_multiplied(
     XbimLocationHandle loc1,
     XbimLocationHandle loc2,
     XbimLocationHandle* outHandle)
@@ -120,7 +120,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_location_compose(
 
     if (!outHandle)
     {
-        xbim_set_error("xbim_location_compose: outHandle is NULL");
+        xbim_set_error("xbim_location_multiplied: outHandle is NULL");
         return XBIM_INVALID_ARG;
     }
 
@@ -128,12 +128,12 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_location_compose(
 
     if (!loc1)
     {
-        xbim_set_error("xbim_location_compose: loc1 is NULL");
+        xbim_set_error("xbim_location_multiplied: loc1 is NULL");
         return XBIM_INVALID_HANDLE;
     }
     if (!loc2)
     {
-        xbim_set_error("xbim_location_compose: loc2 is NULL");
+        xbim_set_error("xbim_location_multiplied: loc2 is NULL");
         return XBIM_INVALID_HANDLE;
     }
 
@@ -144,7 +144,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_location_compose(
 
         if (!*outHandle)
         {
-            xbim_set_error("xbim_location_compose: allocation failed");
+            xbim_set_error("xbim_location_multiplied: allocation failed");
             return XBIM_ERROR;
         }
 
@@ -153,7 +153,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_location_compose(
     catch (Standard_Failure& e)
     {
         xbim_set_error(e.GetMessageString() ? e.GetMessageString()
-                       : "xbim_location_compose: OCCT exception");
+                       : "xbim_location_multiplied: OCCT exception");
         return XBIM_ERROR;
     }
 }

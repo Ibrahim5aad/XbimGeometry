@@ -261,6 +261,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_bounding_box(
     {
         Bnd_Box box;
         BRepBndLib::Add(handle->shape, box);
+        box.SetGap(0.0);
 
         if (box.IsVoid())
         {

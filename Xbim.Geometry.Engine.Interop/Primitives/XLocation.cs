@@ -201,15 +201,28 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             if (location == null || location.IsIdentity)
                 return this;
 
-            var other = location as XLocation;
-            if (other == null)
+            if (location is not XLocation other)
                 throw new ArgumentException("Location must be an XLocation from the native interop layer.", nameof(location));
 
-            // Native compose: result = other * this (OCCT column-vector convention)
-            // Semantics: "apply this first, then other"
-            int result = XbimGeometryNativeApi.xbim_location_compose(other.Handle, Handle, out var composed);
+            int result = XbimGeometryNativeApi.xbim_location_multiplied(Handle, other.Handle, out var composed);
             if (result != 0)
-                throw new XbimGeometryServiceException($"Failed to compose locations: {XbimGeometryNativeApi.GetLastError()}");
+                throw new XbimGeometryServiceException($"Failed to multiply locations: {XbimGeometryNativeApi.GetLastError()}");
+
+            // Read the matrix from the composed native handle — single source of truth
+            return new XLocation(composed);
+        }
+
+        public IXLocation PreMultiplied(IXLocation location)
+        {
+            if (location == null || location.IsIdentity)
+                return this;
+
+            if (location is not XLocation other)
+                throw new ArgumentException("Location must be an XLocation from the native interop layer.", nameof(location));
+
+            int result = XbimGeometryNativeApi.xbim_location_multiplied(other.Handle, Handle, out var composed);
+            if (result != 0)
+                throw new XbimGeometryServiceException($"Failed to multiply locations: {XbimGeometryNativeApi.GetLastError()}");
 
             // Read the matrix from the composed native handle — single source of truth
             return new XLocation(composed);

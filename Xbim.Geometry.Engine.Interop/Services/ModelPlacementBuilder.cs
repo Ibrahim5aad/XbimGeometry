@@ -130,7 +130,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                         stepLocation = new XLocation();
                     }
 
-                    accumulated = ComposeLocation(accumulated, stepLocation);
+                    accumulated = PreMultiplied(accumulated, stepLocation);
 
                     // Navigate up: PlacementRelTo can be local or linear
                     EvaluateNextPlacement(localPlacement.PlacementRelTo,
@@ -158,7 +158,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                         stepLocation = new XLocation();
                     }
 
-                    accumulated = ComposeLocation(accumulated, stepLocation);
+                    accumulated = PreMultiplied(accumulated, stepLocation);
 
                     // Navigate up: PlacementRelTo can be local or linear
                     EvaluateNextPlacement(linearPlacement.PlacementRelTo,
@@ -169,14 +169,14 @@ namespace Xbim.Geometry.Engine.Interop.Services
             return accumulated ?? new XLocation();
         }
 
-        private static XLocation ComposeLocation(XLocation? accumulated, XLocation stepLocation)
+        private static XLocation PreMultiplied(XLocation? accumulated, XLocation stepLocation)
         {
             if (accumulated == null)
                 return stepLocation;
 
-            var composed = (XLocation)accumulated.Multiplied(stepLocation);
+            var composed = (XLocation)accumulated.PreMultiplied(stepLocation);
 
-            // Multiplied may return 'this' when the argument is identity; only dispose if distinct.
+            // PreMultiplied may return 'this' when the argument is identity; only dispose if distinct.
             if (!ReferenceEquals(composed, accumulated))
                 accumulated.Dispose();
             if (!ReferenceEquals(composed, stepLocation))

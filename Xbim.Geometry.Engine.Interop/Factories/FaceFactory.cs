@@ -33,8 +33,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXFace BuildFace(IXSurface surface, IXWire[] wires)
         {
-            if (surface == null)
-                throw new ArgumentNullException(nameof(surface));
+            ArgumentNullException.ThrowIfNull(surface);
             if (wires == null || wires.Length == 0)
                 throw new ArgumentException("At least one wire is required.", nameof(wires));
 

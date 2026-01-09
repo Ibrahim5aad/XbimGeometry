@@ -1233,8 +1233,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         }
 
         #endregion
-
-        #region Not Yet Implemented (future features)
+ 
 
         public IXSolid Build(IIfcHalfSpaceSolid ifcHalfSpaceSolid)
         {
@@ -1807,7 +1806,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     h.Dispose();
             }
         }
-
-        #endregion
+ 
     }
 }

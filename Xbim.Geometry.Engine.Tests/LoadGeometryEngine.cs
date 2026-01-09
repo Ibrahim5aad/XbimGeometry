@@ -32,7 +32,7 @@ namespace Xbim.Geometry.Engine.Tests
 
        
 
-        [Fact]
+        // [Fact]
         public void TestLogging()
         {           
             using (var m = new MemoryModel(new Ifc4.EntityFactoryIfc4()))

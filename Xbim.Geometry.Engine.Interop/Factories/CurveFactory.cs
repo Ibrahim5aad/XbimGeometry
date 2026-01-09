@@ -53,7 +53,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 return GetOrBuildCached(ifcGradient.EntityLabel, () => BuildGradientCurve(ifcGradient));
 
             // Route to 2D or 3D builder based on dimensionality
-            if ((int)curve.Dim == 2)
+            if (curve.Dim == 2)
                 return BuildCurve2d(curve);
 
             return BuildCurve3d(curve);

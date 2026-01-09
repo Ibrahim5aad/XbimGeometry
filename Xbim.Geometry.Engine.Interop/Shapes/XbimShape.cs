@@ -242,31 +242,19 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         private XbimShape ApplyMatrix(XbimMatrix3D m)
         {
-            double ox = m.OffsetX, oy = m.OffsetY, oz = m.OffsetZ;
-            double xDirX = m.M11, xDirY = m.M12, xDirZ = m.M13;
-            double zDirX = m.M31, zDirY = m.M32, zDirZ = m.M33;
+            int result = XbimGeometryNativeApi.xbim_shape_gtransform(
+                Handle,
+                m.M11, m.M21, m.M31, m.OffsetX,
+                m.M12, m.M22, m.M32, m.OffsetY,
+                m.M13, m.M23, m.M33, m.OffsetZ,
+                m.M44, m.M44, m.M44,
+                out var transformedHandle);
 
-            int locResult = XbimGeometryNativeApi.xbim_location_create_from_axis2(
-                ox, oy, oz,
-                zDirX, zDirY, zDirZ,
-                xDirX, xDirY, xDirZ,
-                out var locationHandle);
-
-            if (locResult != 0)
+            if (result != 0)
                 throw new XbimGeometryServiceException(
-                    $"Failed to create location from matrix: {XbimGeometryNativeApi.GetLastError()}");
+                    $"Failed to transform shape: {XbimGeometryNativeApi.GetLastError()}");
 
-            using (locationHandle)
-            {
-                int moveResult = XbimGeometryNativeApi.xbim_shape_moved(
-                    Handle, locationHandle, out var movedHandle);
-
-                if (moveResult != 0)
-                    throw new XbimGeometryServiceException(
-                        $"Failed to move shape: {XbimGeometryNativeApi.GetLastError()}");
-
-                return (XbimShape)NativeShapeWrapper.WrapShape(movedHandle);
-            }
+            return (XbimShape)NativeShapeWrapper.WrapShape(transformedHandle);
         }
 
         #endregion

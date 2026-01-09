@@ -138,7 +138,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeLocationHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
-        internal static extern int xbim_location_compose(
+        internal static extern int xbim_location_multiplied(
             NativeLocationHandle loc1,
             NativeLocationHandle loc2,
             out NativeLocationHandle outHandle);

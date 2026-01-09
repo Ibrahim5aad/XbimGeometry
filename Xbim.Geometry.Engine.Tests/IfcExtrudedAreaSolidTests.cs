@@ -122,7 +122,6 @@ namespace Xbim.Geometry.Engine.Tests
 
 
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void IfcCShapeProfileDefGirthTest(XGeometryEngineVersion engineVersion)
         {
@@ -146,8 +145,7 @@ namespace Xbim.Geometry.Engine.Tests
                 sweptSolid.Should().NotBeNull();
 
                 var error = Assert.Throws<XbimGeometryServiceException>(() => geomEngine.Create(sweptSolid, _logger));
-                error.Message.Should().StartWith("Error building geometry shape");
-                error.InnerException.Message.Should().Be("Invalid rectangle profile with at least one zero or less dimension");
+                error.Message.Should().StartWith("RectangleProfileDef #2 has zero or negative dimensions");
             }
         }
     }

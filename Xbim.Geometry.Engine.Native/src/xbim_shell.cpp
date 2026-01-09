@@ -326,37 +326,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_make_solid(
 }
 
 
-/*
- * Helper: converts a single shell to a solid with orientation checking.
- * Returns true if successful, populating outSolid.
- */
-static bool shell_to_solid(
-    XbimContextHandle ctx,
-    const TopoDS_Shell& shell,
-    double tolerance,
-    TopoDS_Solid& outSolid)
-{
-    if (shell.IsNull() || shell.NbChildren() == 0)
-        return false;
-
-    BRep_Builder b;
-    TopoDS_Solid solid;
-    b.MakeSolid(solid);
-    b.Add(solid, shell);
-
-    if (BRep_Tool::IsClosed(shell))
-    {
-        BRepClass3d_SolidClassifier classifier(solid);
-        classifier.PerformInfinitePoint(Precision::Confusion());
-        if (classifier.State() == TopAbs_IN)
-            solid.Reverse();
-    }
-
-    outSolid = solid;
-    return true;
-}
-
-
 XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_closed_shell(
     XbimContextHandle        ctx,
     const XbimShapeHandle*   faceHandles,
