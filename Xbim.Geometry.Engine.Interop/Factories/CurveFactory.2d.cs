@@ -10,6 +10,7 @@ using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.GeometryResource;
 using Xbim.Ifc4.Interfaces;
+using Xbim.Ifc4.MeasureResource;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
 {
@@ -43,7 +44,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 return BuildPolyline2d(ifcPolyline);
 
             if (curve is IIfcCompositeCurve ifcComposite)
+            {
+                if (curve is Ifc4x3.GeometryResource.IfcCompositeCurve composite4x3)
+                {
+                    var handle = Build4x3CompositeCurve(null, composite4x3);
+                    return new XbimBoundedCurve2d(handle, XCurveType.IfcCompositeCurve);
+                }
                 return BuildCompositeCurve2d(ifcComposite);
+            }
 
             if (curve is IIfcOffsetCurve2D ifcOffset2D)
                 return BuildOffsetCurve2d(ifcOffset2D);
@@ -625,9 +633,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                                 throw new XbimGeometryServiceException(
                                     $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: ArcIndex must have exactly 3 indices.");
 
-                            int i1 = (int)(long)indices[0]! - 1;
-                            int i2 = (int)(long)indices[1]! - 1;
-                            int i3 = (int)(long)indices[2]! - 1;
+                            int i1 = (int)(long)((IfcPositiveInteger)indices[0]!).Value - 1;
+                            int i2 = (int)(long)((IfcPositiveInteger)indices[1]!).Value - 1;
+                            int i3 = (int)(long)((IfcPositiveInteger)indices[2]!).Value - 1;
 
                             var (sx, sy) = points[i1];
                             var (mx, my) = points[i2];
@@ -652,8 +660,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                             for (int p = 0; p < indices.Count - 1; p++)
                             {
-                                int idx1 = (int)(long)indices[p]! - 1;
-                                int idx2 = (int)(long)indices[p + 1]! - 1;
+                                int idx1 = (int)(long)((IfcPositiveInteger)indices[p]!).Value - 1;
+                                int idx2 = (int)(long)((IfcPositiveInteger)indices[p + 1]!).Value - 1;
 
                                 var (x1, y1) = points[idx1];
                                 var (x2, y2) = points[idx2];

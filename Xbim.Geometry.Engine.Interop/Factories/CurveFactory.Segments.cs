@@ -103,58 +103,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             // If BaseCurve is a composite curve (typical), build each segment as 2D and join
             if (baseCurve is IfcCompositeCurve composite)
             {
-                var segHandles = new List<NativeCurve2dHandle>();
-                try
-                {
-                    foreach (var segment in composite.Segments)
-                    {
-                        if (segment is not IfcCurveSegment curveSegment)
-                            continue;
-
-                        var segHandle = BuildCurveSegment2d(curveSegment);
-                        if (segHandle == null || segHandle.IsInvalid)
-                            continue;
-
-                        if (curveSegment.Placement is IIfcAxis2Placement2D axis2d)
-                        {
-                            double px = axis2d.Location.Coordinates[0];
-                            double py = axis2d.Location.Coordinates[1];
-                            double dx = 1.0, dy = 0.0;
-                            if (axis2d.RefDirection != null)
-                            {
-                                dx = axis2d.RefDirection.DirectionRatios[0];
-                                dy = axis2d.RefDirection.DirectionRatios[1];
-                                double mag = Math.Sqrt(dx * dx + dy * dy);
-                                if (mag > 1e-15) { dx /= mag; dy /= mag; }
-                            }
-
-                            XbimGeometryNativeApi.xbim_curve2d_transform(segHandle, px, py, dx, dy);
-                        }
-
-                        segHandles.Add(segHandle);
-                    }
-
-                    if (segHandles.Count == 0)
-                        throw new XbimGeometryServiceException(
-                            $"IfcGradientCurve #{ifcGradient.EntityLabel}: BaseCurve has no valid segments.");
-
-                    using var nativeSegs = new NativeHandleArray(segHandles.ToArray());
-                    int result = XbimGeometryNativeApi.xbim_curve2d_build_composite_bspline(
-                        ContextHandle, nativeSegs.Ptrs, nativeSegs.Length,
-                        _modelService.MinimumGap,
-                        out var compositeHandle);
-
-                    if (result != 0)
-                        throw new XbimGeometryServiceException(
-                            $"IfcGradientCurve #{ifcGradient.EntityLabel}: failed to build BaseCurve composite: {XbimGeometryNativeApi.GetLastError()}");
-
-                    return compositeHandle;
-                }
-                finally
-                {
-                    foreach (var h in segHandles)
-                        h.Dispose();
-                }
+                return Build4x3CompositeCurve(ifcGradient, composite);
             }
 
             // For a simple line BaseCurve, build directly as 2D
@@ -186,6 +135,74 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             throw new NotSupportedException(
                 $"IfcGradientCurve #{ifcGradient.EntityLabel}: unsupported BaseCurve type {baseCurve.GetType().Name}.");
+        }
+
+        private NativeCurve2dHandle Build4x3CompositeCurve(IfcGradientCurve ifcGradient, IfcCompositeCurve composite)
+        {
+            var segHandles = new List<NativeCurve2dHandle>();
+            try
+            {
+                foreach (var segment in composite.Segments)
+                {
+                    if (segment is not IfcCurveSegment curveSegment)
+                        continue;
+
+                    var segHandle = BuildCurveSegment2d(curveSegment);
+                    if (segHandle == null || segHandle.IsInvalid)
+                        continue;
+
+                    if (curveSegment.Placement is IIfcAxis2Placement2D axis2d)
+                    {
+                        double px = axis2d.Location.Coordinates[0];
+                        double py = axis2d.Location.Coordinates[1];
+                        double dx = 1.0, dy = 0.0;
+                        if (axis2d.RefDirection != null)
+                        {
+                            dx = axis2d.RefDirection.DirectionRatios[0];
+                            dy = axis2d.RefDirection.DirectionRatios[1];
+                            double mag = Math.Sqrt(dx * dx + dy * dy);
+                            if (mag > 1e-15) { dx /= mag; dy /= mag; }
+                        }
+
+                        XbimGeometryNativeApi.xbim_curve2d_transform(segHandle, px, py, dx, dy);
+                    }
+
+                    segHandles.Add(segHandle);
+                }
+
+                if (segHandles.Count == 0)
+                {
+                    if (ifcGradient is not null)
+                        throw new XbimGeometryServiceException(
+                            $"IfcGradientCurve #{ifcGradient.EntityLabel}: BaseCurve has no valid segments.");
+                    else
+                        throw new XbimGeometryServiceException(
+                        $"IfcCompositeCurve #{composite.EntityLabel} has no valid segments.");
+                }
+
+                using var nativeSegs = new NativeHandleArray(segHandles.ToArray());
+                int result = XbimGeometryNativeApi.xbim_curve2d_build_composite_bspline(
+                    ContextHandle, nativeSegs.Ptrs, nativeSegs.Length,
+                    _modelService.MinimumGap,
+                    out var compositeHandle);
+
+                if (result != 0)
+                {
+                    if (ifcGradient is not null)
+                        throw new XbimGeometryServiceException(
+                            $"IfcGradientCurve #{ifcGradient.EntityLabel}: failed to build BaseCurve composite: {XbimGeometryNativeApi.GetLastError()}");
+                    else
+                        throw new XbimGeometryServiceException(
+                            $"IfcCompositeCurve #{composite.EntityLabel}: failed to build.");
+                }
+
+                return compositeHandle;
+            }
+            finally
+            {
+                foreach (var h in segHandles)
+                    h.Dispose();
+            }
         }
 
         private NativeCurve2dHandle? BuildCurveSegment2d(IfcCurveSegment segment)

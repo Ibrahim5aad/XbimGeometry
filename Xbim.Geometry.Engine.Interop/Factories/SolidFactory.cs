@@ -666,46 +666,24 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         }
 
         /// <summary>
-        /// Builds a closed shell from an IIfcConnectedFaceSet (typically IIfcClosedShell)
-        /// by constructing planar faces from polygon loops, sewing them together to merge
-        /// shared edges, and converting to a solid.
+        /// Builds a solid from a closed shell (used by IIfcFacetedBrep and IIfcClosedShell)
+        /// by marshalling face topology to the native shared-topology shell builder.
         /// </summary>
         private NativeShapeHandle BuildClosedShellAsSolid(IIfcConnectedFaceSet faceSet)
         {
             double tolerance = _modelService.MinimumGap;
-            var faceHandles = new List<NativeShapeHandle>();
+            var (pointsXYZ, numPoints, faceData, numFaces) = MarshalFaceSet(faceSet);
 
-            try
-            {
-                // Build each face from its polygon bounds
-                foreach (var ifcFace in faceSet.CfsFaces)
-                {
-                    var faceHandle = BuildPlanarFace(ifcFace, tolerance);
-                    if (faceHandle != null && !faceHandle.IsInvalid)
-                        faceHandles.Add(faceHandle);
-                }
+            int upgrade = _modelService.UpgradeFaceSets ? 1 : 0;
+            int result = XbimGeometryNativeApi.xbim_shell_build_connected_face_set(
+                ContextHandle, pointsXYZ, numPoints, faceData, faceData.Length,
+                numFaces, tolerance, 1 /* makeSolid */, upgrade, out var solidHandle);
 
-                if (faceHandles.Count < 4)
-                    throw new XbimGeometryServiceException(
-                        $"Closed shell requires at least 4 faces but only {faceHandles.Count} were built.");
+            if (result != 0)
+                throw new XbimGeometryServiceException(
+                    $"Failed to build closed shell solid: {XbimGeometryNativeApi.GetLastError()}");
 
-                // Use the combined sew+solid API which merges shared edges
-                using var nativeFaces = new NativeHandleArray(faceHandles.ToArray());
-
-                int result = XbimGeometryNativeApi.xbim_shell_build_closed_shell(
-                    ContextHandle, nativeFaces.Ptrs, nativeFaces.Length, tolerance, out var solidHandle);
-
-                if (result != 0)
-                    throw new XbimGeometryServiceException(
-                        $"Failed to build closed shell solid: {XbimGeometryNativeApi.GetLastError()}");
-
-                return solidHandle;
-            }
-            finally
-            {
-                foreach (var h in faceHandles)
-                    h.Dispose();
-            }
+            return solidHandle;
         }
 
         /// <summary>
@@ -1129,7 +1107,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         public IXShape Build(IIfcFaceBasedSurfaceModel ifcSurfaceModel)
         {
-            double tolerance = _modelService.Precision;
+            double tolerance = _modelService.MinimumGap;
             var shellHandles = new List<NativeShapeHandle>();
 
             try
@@ -1174,66 +1152,176 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         }
 
         /// <summary>
-        /// Builds a sewn shell from a connected face set by constructing planar faces
-        /// from polygon loops and sewing them together.
+        /// Builds a shell from a connected face set using shared-topology construction.
+        /// Routes to the advanced BRep path when faces are IIfcAdvancedFace.
         /// </summary>
         private NativeShapeHandle? BuildShellFromConnectedFaceSet(
             IIfcConnectedFaceSet faceSet, double tolerance)
         {
-            var faceHandles = new List<NativeShapeHandle>();
-
-            try
+            // Check for advanced faces — delegate to existing advanced BRep path
+            var firstFace = faceSet.CfsFaces.FirstOrDefault();
+            if (firstFace is IIfcAdvancedFace)
             {
-                foreach (var ifcFace in faceSet.CfsFaces)
-                {
-                    var faceHandle = BuildPlanarFace(ifcFace, tolerance);
-                    if (faceHandle != null && !faceHandle.IsInvalid)
-                        faceHandles.Add(faceHandle);
-                }
+                if (faceSet is IIfcClosedShell closedShell)
+                    return BuildAdvancedShellAsSolid(closedShell);
 
-                if (faceHandles.Count == 0)
-                {
-                    _logger.LogWarning("Connected face set produced no valid faces.");
-                    return null;
-                }
-
-                using var nativeFaces = new NativeHandleArray(faceHandles.ToArray());
-
-                // Build raw shell from faces
-                int result = XbimGeometryNativeApi.xbim_shell_build_from_faces(
-                    ContextHandle, nativeFaces.Ptrs, nativeFaces.Length, tolerance, out var rawShellHandle);
-
-                if (result != 0)
-                {
-                    _logger.LogWarning("Failed to build shell from connected face set: {Error}",
-                        XbimGeometryNativeApi.GetLastError());
-                    return null;
-                }
-
-                // Sew the shell to merge shared edges and fix orientation
-                result = XbimGeometryNativeApi.xbim_shell_sew(
-                    ContextHandle, rawShellHandle, tolerance, out _, out var sewedHandle);
-
-                rawShellHandle.Dispose();
-
-                if (result != 0)
-                {
-                    _logger.LogWarning("Failed to sew shell: {Error}",
-                        XbimGeometryNativeApi.GetLastError());
-                    return null;
-                }
-
-                return sewedHandle;
+                _logger.LogWarning("Advanced faces in non-closed shell not yet supported.");
+                return null;
             }
-            finally
+
+            var (pointsXYZ, numPoints, faceData, numFaces) = MarshalFaceSet(faceSet);
+
+            if (numFaces == 0)
             {
-                foreach (var h in faceHandles)
-                    h.Dispose();
+                _logger.LogWarning("Connected face set produced no valid faces.");
+                return null;
             }
+
+            int result = XbimGeometryNativeApi.xbim_shell_build_connected_face_set(
+                ContextHandle, pointsXYZ, numPoints, faceData, faceData.Length,
+                numFaces, tolerance, 0 /* shell only */, 0, out var shellHandle);
+
+            if (result != 0)
+            {
+                _logger.LogWarning("Failed to build shell: {Error}",
+                    XbimGeometryNativeApi.GetLastError());
+                return null;
+            }
+
+            return shellHandle;
+        }
+
+        /// <summary>
+        /// Extracts unique points and face topology from an IIfcConnectedFaceSet
+        /// into flat arrays for the native shared-topology shell builder.
+        /// </summary>
+        private (double[] pointsXYZ, int numPoints, int[] faceData, int numFaces)
+            MarshalFaceSet(IIfcConnectedFaceSet faceSet)
+        {
+            var pointMap = new Dictionary<int, int>(); // entityLabel -> index
+            var pointCoords = new List<double>();
+
+            int GetOrAddPoint(IIfcCartesianPoint cp)
+            {
+                if (pointMap.TryGetValue(cp.EntityLabel, out int idx))
+                    return idx;
+                idx = pointMap.Count;
+                pointMap[cp.EntityLabel] = idx;
+                pointCoords.Add(cp.X);
+                pointCoords.Add(cp.Y);
+                pointCoords.Add(cp.Z);
+                return idx;
+            }
+
+            var faceDataList = new List<int>();
+            int faceCount = 0;
+
+            foreach (var ifcFace in faceSet.CfsFaces)
+            {
+                var validBounds = new List<(bool isOuter, List<int> indices)>();
+
+                foreach (var bound in ifcFace.Bounds)
+                {
+                    if (bound.Bound is not IIfcPolyLoop polyLoop)
+                        continue;
+
+                    var polygon = polyLoop.Polygon;
+                    if (polygon == null || polygon.Count < 3)
+                        continue;
+
+                    bool isOuter = bound is IIfcFaceOuterBound
+                        || ifcFace.Bounds.Count == 1;
+
+                    var indices = new List<int>();
+                    if (bound.Orientation)
+                    {
+                        foreach (var cp in polygon)
+                            indices.Add(GetOrAddPoint(cp));
+                    }
+                    else
+                    {
+                        for (int i = polygon.Count - 1; i >= 0; i--)
+                            indices.Add(GetOrAddPoint(polygon[i]));
+                    }
+                    // Close the loop by repeating the first index
+                    indices.Add(indices[0]);
+
+                    validBounds.Add((isOuter, indices));
+                }
+
+                if (validBounds.Count == 0)
+                    continue;
+
+                // Encode: [numBounds, bound0..., bound1..., ...]
+                faceDataList.Add(validBounds.Count);
+                foreach (var (isOuter, indices) in validBounds)
+                {
+                    faceDataList.Add(indices.Count);
+                    faceDataList.Add(isOuter ? 1 : 0);
+                    faceDataList.AddRange(indices);
+                }
+                faceCount++;
+            }
+
+            return (pointCoords.ToArray(), pointMap.Count, faceDataList.ToArray(), faceCount);
+        }
+
+        /// <summary>
+        /// Extracts points and face topology from an IIfcPolygonalFaceSet
+        /// into flat arrays for the native shared-topology shell builder.
+        /// </summary>
+        private (double[] pointsXYZ, int numPoints, int[] faceData, int numFaces)
+            MarshalPolygonalFaceSet(IIfcPolygonalFaceSet polygonal)
+        {
+            var coords = ExtractCoordinates(polygonal.Coordinates);
+            int numPoints = polygonal.Coordinates.CoordList.Count;
+
+            var faceDataList = new List<int>();
+            int faceCount = 0;
+
+            foreach (var face in polygonal.Faces)
+            {
+                var outerIndices = new List<int>();
+                foreach (var idx in face.CoordIndex)
+                    outerIndices.Add((int)(long)idx - 1); // 1-based to 0-based
+                outerIndices.Add(outerIndices[0]); // close
+
+                int numBounds = 1;
+                var innerBoundsList = new List<List<int>>();
+
+                if (face is IIfcIndexedPolygonalFaceWithVoids faceWithVoids)
+                {
+                    foreach (var innerLoop in faceWithVoids.InnerCoordIndices)
+                    {
+                        var innerIndices = new List<int>();
+                        foreach (var idx in innerLoop)
+                            innerIndices.Add((int)(long)idx - 1);
+                        innerIndices.Add(innerIndices[0]); // close
+                        innerBoundsList.Add(innerIndices);
+                        numBounds++;
+                    }
+                }
+
+                faceDataList.Add(numBounds);
+                // Outer bound
+                faceDataList.Add(outerIndices.Count);
+                faceDataList.Add(1); // isOuter
+                faceDataList.AddRange(outerIndices);
+                // Inner bounds
+                foreach (var inner in innerBoundsList)
+                {
+                    faceDataList.Add(inner.Count);
+                    faceDataList.Add(0); // isInner
+                    faceDataList.AddRange(inner);
+                }
+                faceCount++;
+            }
+
+            return (coords, numPoints, faceDataList.ToArray(), faceCount);
         }
 
         #endregion
- 
+
 
         public IXSolid Build(IIfcHalfSpaceSolid ifcHalfSpaceSolid)
         {
@@ -1360,7 +1448,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         public IXShape Build(IIfcShellBasedSurfaceModel ifcSurfaceModel)
         {
-            double tolerance = _modelService.Precision;
+            double tolerance = _modelService.MinimumGap;
             var shellHandles = new List<NativeShapeHandle>();
 
             try
@@ -1540,8 +1628,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         }
 
         /// <summary>
-        /// Builds a shell (or solid if closed) from a polygonal face set by constructing
-        /// planar polygon faces from indexed coordinate data and sewing them together.
+        /// Builds a shell (or solid if closed) from a polygonal face set using
+        /// shared-topology construction from indexed coordinate data.
         /// </summary>
         private IXShape BuildPolygonalFaceSet(IIfcPolygonalFaceSet polygonal)
         {
@@ -1550,118 +1638,26 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new XbimGeometryServiceException(
                     $"PolygonalFaceSet #{polygonal.EntityLabel}: missing Coordinates.");
 
-            double tolerance = _modelService.Precision;
-            var coords = ExtractCoordinates(coordList);
-            int numCoords = coordList.CoordList.Count;
-            var faceHandles = new List<NativeShapeHandle>();
+            double tolerance = _modelService.MinimumGap;
+            bool isClosed = polygonal.Closed.HasValue && (bool)polygonal.Closed.Value;
 
-            try
-            {
-                foreach (var face in polygonal.Faces)
-                {
-                    // Build the outer polygon wire from coordinate indices (1-based)
-                    var outerWire = BuildWireFromCoordIndices(face.CoordIndex, coords, numCoords, tolerance);
-                    if (outerWire == null)
-                    {
-                        _logger.LogWarning("PolygonalFaceSet #{Label}: skipping face with invalid outer loop.",
-                            polygonal.EntityLabel);
-                        continue;
-                    }
+            var (pointsXYZ, numPoints, faceData, numFaces) =
+                MarshalPolygonalFaceSet(polygonal);
 
-                    NativeShapeHandle faceHandle;
+            if (numFaces == 0)
+                throw new XbimGeometryServiceException(
+                    $"PolygonalFaceSet #{polygonal.EntityLabel}: no valid faces.");
 
-                    // Check for faces with voids
-                    if (face is IIfcIndexedPolygonalFaceWithVoids faceWithVoids
-                        && faceWithVoids.InnerCoordIndices.Count > 0)
-                    {
-                        var innerWires = new List<NativeShapeHandle>();
-                        try
-                        {
-                            foreach (var innerLoop in faceWithVoids.InnerCoordIndices)
-                            {
-                                var innerWire = BuildWireFromCoordIndices(innerLoop, coords, numCoords, tolerance);
-                                if (innerWire != null)
-                                    innerWires.Add(innerWire);
-                            }
+            int upgrade = _modelService.UpgradeFaceSets ? 1 : 0;
+            int result = XbimGeometryNativeApi.xbim_shell_build_connected_face_set(
+                ContextHandle, pointsXYZ, numPoints, faceData, faceData.Length,
+                numFaces, tolerance, isClosed ? 1 : 0, upgrade, out var handle);
 
-                            if (innerWires.Count > 0)
-                            {
-                                using var nativeInnerWires = new NativeHandleArray(innerWires.ToArray());
+            if (result != 0)
+                throw new XbimGeometryServiceException(
+                    $"PolygonalFaceSet #{polygonal.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                                int result = XbimGeometryNativeApi.xbim_face_build_advanced(
-                                    ContextHandle,
-                                    0, // PLANE
-                                    0, 0, 0, // origin (inferred)
-                                    0, 0, 1, // zDir
-                                    1, 0, 0, // xDir
-                                    0,       // radius
-                                    outerWire,
-                                    nativeInnerWires.Ptrs,
-                                    nativeInnerWires.Length,
-                                    tolerance,
-                                    1, // sameSense
-                                    out faceHandle);
-
-                                outerWire.Dispose();
-
-                                if (result != 0)
-                                {
-                                    _logger.LogWarning("PolygonalFaceSet #{Label}: failed to build face with voids: {Error}",
-                                        polygonal.EntityLabel, XbimGeometryNativeApi.GetLastError());
-                                    continue;
-                                }
-                            }
-                            else
-                            {
-                                // All inner wires failed — build simple face
-                                int result = XbimGeometryNativeApi.xbim_face_build_from_wire(
-                                    ContextHandle, outerWire, out faceHandle);
-                                outerWire.Dispose();
-
-                                if (result != 0)
-                                {
-                                    _logger.LogWarning("PolygonalFaceSet #{Label}: failed to build face: {Error}",
-                                        polygonal.EntityLabel, XbimGeometryNativeApi.GetLastError());
-                                    continue;
-                                }
-                            }
-                        }
-                        finally
-                        {
-                            foreach (var w in innerWires)
-                                w.Dispose();
-                        }
-                    }
-                    else
-                    {
-                        // Simple face without voids
-                        int result = XbimGeometryNativeApi.xbim_face_build_from_wire(
-                            ContextHandle, outerWire, out faceHandle);
-                        outerWire.Dispose();
-
-                        if (result != 0)
-                        {
-                            _logger.LogWarning("PolygonalFaceSet #{Label}: failed to build face: {Error}",
-                                polygonal.EntityLabel, XbimGeometryNativeApi.GetLastError());
-                            continue;
-                        }
-                    }
-
-                    faceHandles.Add(faceHandle);
-                }
-
-                if (faceHandles.Count == 0)
-                    throw new XbimGeometryServiceException(
-                        $"PolygonalFaceSet #{polygonal.EntityLabel}: no valid faces were built.");
-
-                return AssembleTessellatedShell(faceHandles, polygonal.Closed.HasValue && (bool)polygonal.Closed.Value,
-                    tolerance, polygonal.EntityLabel);
-            }
-            finally
-            {
-                foreach (var h in faceHandles)
-                    h.Dispose();
-            }
+            return NativeShapeWrapper.WrapShape(handle);
         }
 
         /// <summary>

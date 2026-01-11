@@ -2479,6 +2479,53 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_closed_shell(
     double                   tolerance,
     XbimShapeHandle*         outHandle);
 
+/*
+ * Build a shell (or solid) from connected planar faces using shared topology.
+ *
+ * Unlike xbim_shell_build_closed_shell which sews independent faces,
+ * this function builds proper topological connectivity from the start by
+ * deduplicating vertices within tolerance and sharing edges between
+ * adjacent faces that reference the same vertex pair.
+ *
+ * Face data encoding:
+ *   The faceData array is a packed sequence of face descriptors:
+ *     [numBounds, bound0..., bound1..., ...]
+ *   Each bound is:
+ *     [numPoints, isOuter, pt0_idx, pt1_idx, ..., ptN_idx, pt0_idx]
+ *   Where:
+ *     - numPoints is the number of point indices that follow (including the
+ *       repeated closing index)
+ *     - isOuter is 1 for the outer bound, 0 for inner (hole) bounds
+ *     - pt_idx values are 0-based indices into allPointsXYZ
+ *     - The last index repeats the first to close the loop
+ *
+ *   ctx            - context handle (for logging; may be NULL)
+ *   allPointsXYZ   - flat array [x0,y0,z0, x1,y1,z1, ...] of all unique points
+ *   numPoints      - number of points (array length = numPoints * 3)
+ *   faceData       - packed face topology (see encoding above)
+ *   faceDataLength - total number of ints in faceData
+ *   numFaces       - number of faces encoded in faceData
+ *   tolerance        - precision for vertex merging (typically MinimumGap)
+ *   makeSolid        - if non-zero, convert the shell to a solid with orientation fix
+ *   upgradeFaceSets  - if non-zero and makeSolid is set, detect multi-solid shells
+ *                      and split them into individual solids (returns compound).
+ *                      If zero, just does a simple shell-to-solid conversion.
+ *   outHandle        - receives the resulting shape (solid, compound, or shell)
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_connected_face_set(
+    XbimContextHandle  ctx,
+    const double*      allPointsXYZ,
+    int                numPoints,
+    const int*         faceData,
+    int                faceDataLength,
+    int                numFaces,
+    double             tolerance,
+    int                makeSolid,
+    int                upgradeFaceSets,
+    XbimShapeHandle*   outHandle);
+
 #pragma endregion
 
 #pragma region Curve Lifecycle

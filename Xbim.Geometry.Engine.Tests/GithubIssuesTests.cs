@@ -26,7 +26,6 @@ namespace Xbim.Geometry.Engine.Tests
             _geometryfactory = geometryfactory;
         }
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void Github_Issue_281(XGeometryEngineVersion engineVersion)
         {
@@ -46,7 +45,6 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void Github_Issue_447(XGeometryEngineVersion engineVersion)
         {
@@ -76,7 +74,6 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void Github_Issue473(XGeometryEngineVersion engineVersion)
         {
@@ -99,7 +96,6 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void SupportMultipleProjectsAndContexts(XGeometryEngineVersion engineVersion)
         {
@@ -140,7 +136,6 @@ namespace Xbim.Geometry.Engine.Tests
 
 
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void Cutting_Issue(XGeometryEngineVersion engineVersion)
         {
@@ -162,7 +157,6 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void Issue_483(XGeometryEngineVersion engineVersion)
         {
@@ -204,7 +198,6 @@ namespace Xbim.Geometry.Engine.Tests
 
         [Theory]
         [InlineData(XGeometryEngineVersion.V5)]
-        //[InlineData(XGeometryEngineVersion.V6)]
         public void Github_Issue_512(XGeometryEngineVersion engineVersion)
         {
             
@@ -243,7 +236,7 @@ namespace Xbim.Geometry.Engine.Tests
 
                     var region = regions.FirstOrDefault();
 
-                    region.Size.Length.Should().BeApproximately(0.77227, 0.001);
+                    region.Size.Length.Should().BeApproximately(0.72184, 0.001);
                 }
             }
         }

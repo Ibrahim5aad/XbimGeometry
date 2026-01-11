@@ -122,6 +122,44 @@ async function evalWriteShape(name, method, filePath) {
     return fs.existsSync(filePath);
 }
 
+// ── Set helpers (XbimSolidSet, XbimGeometryObjectSet) ───────────────────────
+
+async function tryGetSetCount(name) {
+    for (const expr of [
+        `${name}.Count`,
+        `((Xbim.Common.Geometry.IXbimSolidSet)${name}).Count`,
+        `((Xbim.Common.Geometry.IXbimGeometryObjectSet)${name}).Count`,
+    ]) {
+        const result = await debugEval(expr);
+        if (result && result.result) {
+            const count = parseInt(result.result);
+            if (!isNaN(count) && count > 0) return count;
+        }
+    }
+    return null;
+}
+
+async function evalWriteSetStl(name, basePath, count) {
+    const paths = [];
+    for (let i = 0; i < count; i++) {
+        const stlPath = basePath.replace('.stl', `_${i}.stl`);
+        for (const expr of [
+            `((Xbim.Geometry.Engine.Interop.Shapes.XbimShape)System.Linq.Enumerable.ElementAt(${name}, ${i})).WriteStl("${stlPath}")`,
+            `((Xbim.Geometry.Engine.Interop.Shapes.XbimShape)${name}.ElementAt(${i})).WriteStl("${stlPath}")`,
+            `((Xbim.Geometry.Engine.Interop.Shapes.XbimShape)System.Linq.Enumerable.ElementAt((System.Collections.Generic.IEnumerable<Xbim.Common.Geometry.IXbimGeometryObject>)${name}, ${i})).WriteStl("${stlPath}")`,
+        ]) {
+            await debugEval(expr);
+            if (fs.existsSync(stlPath)) break;
+        }
+        if (fs.existsSync(stlPath)) {
+            paths.push(stlPath);
+        } else {
+            outputChannel.appendLine(`[xbim] Failed to write STL for element ${i}`);
+        }
+    }
+    return paths;
+}
+
 // ── WebView Panel ───────────────────────────────────────────────────────────
 
 async function createViewerPanel(context, variableName, stlBase64) {
@@ -161,7 +199,11 @@ async function createViewerPanel(context, variableName, stlBase64) {
     panel.webview.onDidReceiveMessage(
         message => {
             if (message.type === 'ready') {
-                panel.webview.postMessage({ type: 'loadSTL', data: stlBase64 });
+                if (Array.isArray(stlBase64)) {
+                    panel.webview.postMessage({ type: 'loadMultiSTL', data: stlBase64 });
+                } else {
+                    panel.webview.postMessage({ type: 'loadSTL', data: stlBase64 });
+                }
             }
         },
         undefined,
@@ -192,19 +234,38 @@ function activate(context) {
                 { location: vscode.ProgressLocation.Notification, title: `Rendering "${name}"...` },
                 async () => {
                     const stlPath = path.join(require('os').tmpdir(), `xbim_${name}_${Date.now()}.stl`).replace(/\\/g, '/');
-                    const ok = await evalWriteShape(name, 'WriteStl', stlPath);
 
+                    // Try single shape first
+                    const ok = await evalWriteShape(name, 'WriteStl', stlPath);
                     outputChannel.appendLine(`[xbim] STL: ${stlPath}`);
 
-                    if (!ok) {
-                        vscode.window.showErrorMessage(`STL file not created. Check "xbim Shape Viewer" output.`);
-                        outputChannel.show(true);
+                    if (ok) {
+                        const stlBase64 = fs.readFileSync(stlPath).toString('base64');
+                        outputChannel.appendLine(`[xbim] STL size: ${fs.statSync(stlPath).size} bytes`);
+                        await createViewerPanel(context, name, stlBase64);
                         return;
                     }
 
-                    const stlBase64 = fs.readFileSync(stlPath).toString('base64');
-                    outputChannel.appendLine(`[xbim] STL size: ${fs.statSync(stlPath).size} bytes`);
-                    await createViewerPanel(context, name, stlBase64);
+                    // Try as geometry set (XbimSolidSet / XbimGeometryObjectSet)
+                    outputChannel.appendLine(`[xbim] Single shape failed, trying as geometry set...`);
+                    const count = await tryGetSetCount(name);
+
+                    if (count != null) {
+                        outputChannel.appendLine(`[xbim] Geometry set detected: ${count} elements`);
+                        const stlPaths = await evalWriteSetStl(name, stlPath, count);
+
+                        if (stlPaths.length > 0) {
+                            const stlDataArray = stlPaths.map(p => {
+                                outputChannel.appendLine(`[xbim] STL: ${p} (${fs.statSync(p).size} bytes)`);
+                                return fs.readFileSync(p).toString('base64');
+                            });
+                            await createViewerPanel(context, name, stlDataArray);
+                            return;
+                        }
+                    }
+
+                    vscode.window.showErrorMessage(`STL file not created. Check "xbim Shape Viewer" output.`);
+                    outputChannel.show(true);
                 }
             );
         })
@@ -222,9 +283,26 @@ function activate(context) {
                 { location: vscode.ProgressLocation.Notification, title: `Opening OCCT viewer for "${name}"...` },
                 async () => {
                     const result = await debugEval(`${DEBUGVIZ}.Show(${name})`);
-                    if (!result) {
-                        outputChannel.appendLine(`[xbim] Direct Show failed, casting to XbimShape...`);
-                        await debugEval(`${DEBUGVIZ}.Show((Xbim.Geometry.Engine.Interop.Shapes.XbimShape)${name})`);
+                    if (result) return;
+
+                    outputChannel.appendLine(`[xbim] Direct Show failed, casting to XbimShape...`);
+                    const castResult = await debugEval(`${DEBUGVIZ}.Show((Xbim.Geometry.Engine.Interop.Shapes.XbimShape)${name})`);
+                    if (castResult) return;
+
+                    // Try as geometry set (XbimSolidSet / XbimGeometryObjectSet)
+                    outputChannel.appendLine(`[xbim] Cast failed, trying as geometry set...`);
+                    const count = await tryGetSetCount(name);
+                    if (count != null) {
+                        outputChannel.appendLine(`[xbim] Geometry set: showing ${count} elements`);
+                        for (let i = 0; i < count; i++) {
+                            for (const expr of [
+                                `${DEBUGVIZ}.Show((Xbim.Geometry.Engine.Interop.Shapes.XbimShape)System.Linq.Enumerable.ElementAt(${name}, ${i}))`,
+                                `${DEBUGVIZ}.Show((Xbim.Geometry.Engine.Interop.Shapes.XbimShape)System.Linq.Enumerable.ElementAt((System.Collections.Generic.IEnumerable<Xbim.Common.Geometry.IXbimGeometryObject>)${name}, ${i}))`,
+                            ]) {
+                                const r = await debugEval(expr);
+                                if (r) break;
+                            }
+                        }
                     }
                 }
             );
@@ -250,18 +328,48 @@ function activate(context) {
             const savePath = uri.fsPath.replace(/\\/g, '/');
             const ok = await evalWriteShape(name, 'WriteBrep', savePath);
 
-            if (!ok) {
-                vscode.window.showErrorMessage(`BREP file was not created. Check "xbim Shape Viewer" output for details.`);
-                outputChannel.show(true);
+            if (ok) {
+                const action = await vscode.window.showInformationMessage(
+                    `BREP saved to: ${uri.fsPath}`, 'Open Folder');
+                if (action === 'Open Folder') {
+                    vscode.commands.executeCommand('revealFileInOS',
+                        vscode.Uri.file(path.dirname(uri.fsPath)));
+                }
                 return;
             }
 
-            const action = await vscode.window.showInformationMessage(
-                `BREP saved to: ${uri.fsPath}`, 'Open Folder');
-            if (action === 'Open Folder') {
-                vscode.commands.executeCommand('revealFileInOS',
-                    vscode.Uri.file(path.dirname(uri.fsPath)));
+            // Try as geometry set — save each element as name_0.brep, name_1.brep, etc.
+            outputChannel.appendLine(`[xbim] Single shape BREP failed, trying as geometry set...`);
+            const count = await tryGetSetCount(name);
+            if (count != null) {
+                outputChannel.appendLine(`[xbim] Geometry set: writing ${count} BREP files`);
+                const dir = path.dirname(savePath);
+                const base = path.basename(savePath, '.brep');
+                let written = 0;
+                for (let i = 0; i < count; i++) {
+                    const solidPath = path.join(dir, `${base}_${i}.brep`).replace(/\\/g, '/');
+                    for (const expr of [
+                        `((Xbim.Geometry.Engine.Interop.Shapes.XbimShape)System.Linq.Enumerable.ElementAt(${name}, ${i})).WriteBrep("${solidPath}")`,
+                        `((Xbim.Geometry.Engine.Interop.Shapes.XbimShape)${name}.ElementAt(${i})).WriteBrep("${solidPath}")`,
+                        `((Xbim.Geometry.Engine.Interop.Shapes.XbimShape)System.Linq.Enumerable.ElementAt((System.Collections.Generic.IEnumerable<Xbim.Common.Geometry.IXbimGeometryObject>)${name}, ${i})).WriteBrep("${solidPath}")`,
+                    ]) {
+                        await debugEval(expr);
+                        if (fs.existsSync(solidPath)) { written++; break; }
+                    }
+                }
+                if (written > 0) {
+                    const action = await vscode.window.showInformationMessage(
+                        `${written} BREP files saved to: ${path.dirname(uri.fsPath)}`, 'Open Folder');
+                    if (action === 'Open Folder') {
+                        vscode.commands.executeCommand('revealFileInOS',
+                            vscode.Uri.file(path.dirname(uri.fsPath)));
+                    }
+                    return;
+                }
             }
+
+            vscode.window.showErrorMessage(`BREP file was not created. Check "xbim Shape Viewer" output for details.`);
+            outputChannel.show(true);
         })
     );
 }

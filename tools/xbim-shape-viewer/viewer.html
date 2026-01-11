@@ -106,6 +106,17 @@ scene.add(dirLight2);
 let meshGroup = null;
 let wireframeMode = false;
 
+const SOLID_COLORS = [
+    0x808080, // gray
+    0x4488cc, // steel blue
+    0xcc6644, // terra cotta
+    0x44aa66, // green
+    0xcc8844, // amber
+    0x8866aa, // purple
+    0x44aaaa, // teal
+    0xaa6688, // rose
+];
+
 const shadedMaterial = new THREE.MeshPhongMaterial({
     color: 0x808080,
     specular: 0x111111,
@@ -164,7 +175,9 @@ function loadSTL(base64Data) {
     if (meshGroup) scene.remove(meshGroup);
     meshGroup = new THREE.Group();
 
-    const mesh = new THREE.Mesh(geometry, shadedMaterial);
+    var mat = shadedMaterial.clone();
+    mat._baseColor = 0x808080;
+    const mesh = new THREE.Mesh(geometry, mat);
     mesh.name = 'shape';
     meshGroup.add(mesh);
 
@@ -186,6 +199,65 @@ function loadSTL(base64Data) {
     document.getElementById('shapeInfo').textContent =
         numTriangles.toLocaleString() + ' triangles | ' +
         size.x.toFixed(1) + ' x ' + size.y.toFixed(1) + ' x ' + size.z.toFixed(1);
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('toolbar').style.display = 'flex';
+    document.getElementById('info').style.display = 'flex';
+}
+
+// ── Load multiple STLs (solid set) ──────────────────────────────────────────
+
+function decodeBase64STL(base64Data) {
+    var binary = atob(base64Data);
+    var buffer = new ArrayBuffer(binary.length);
+    var view = new Uint8Array(buffer);
+    for (var i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
+    return buffer;
+}
+
+function loadMultiSTL(stlDataArray) {
+    if (meshGroup) scene.remove(meshGroup);
+    meshGroup = new THREE.Group();
+
+    var totalTriangles = 0;
+
+    for (var idx = 0; idx < stlDataArray.length; idx++) {
+        var buffer = decodeBase64STL(stlDataArray[idx]);
+        var parsed = parseBinarySTL(buffer);
+        totalTriangles += parsed.numTriangles;
+
+        var color = SOLID_COLORS[idx % SOLID_COLORS.length];
+
+        var material = new THREE.MeshPhongMaterial({
+            color: color,
+            specular: 0x111111,
+            shininess: 20,
+            side: THREE.DoubleSide,
+        });
+        material._baseColor = color;
+
+        var mesh = new THREE.Mesh(parsed.geometry, material);
+        mesh.name = 'shape_' + idx;
+        meshGroup.add(mesh);
+
+        var edges = new THREE.EdgesGeometry(parsed.geometry, 30);
+        var edgeMat = new THREE.LineBasicMaterial({ color: 0x2a2a2a, transparent: true, opacity: 0.5 });
+        var edgeLines = new THREE.LineSegments(edges, edgeMat);
+        edgeLines.name = 'edges_' + idx;
+        meshGroup.add(edgeLines);
+    }
+
+    scene.add(meshGroup);
+    fitAll();
+
+    // Compute combined bounding box
+    var box = new THREE.Box3().setFromObject(meshGroup);
+    var size = new THREE.Vector3();
+    box.getSize(size);
+    document.getElementById('shapeInfo').textContent =
+        stlDataArray.length + ' solids | ' +
+        totalTriangles.toLocaleString() + ' triangles | ' +
+        size.x.toFixed(1) + ' \u00d7 ' + size.y.toFixed(1) + ' \u00d7 ' + size.z.toFixed(1);
 
     document.getElementById('loading').style.display = 'none';
     document.getElementById('toolbar').style.display = 'flex';
@@ -223,10 +295,25 @@ function setView(x, y, z) {
 function setWireframe(on) {
     wireframeMode = on;
     if (!meshGroup) return;
-    var mesh = meshGroup.getObjectByName('shape');
-    var edges = meshGroup.getObjectByName('edges');
-    if (mesh) mesh.material = on ? wireframeMaterial : shadedMaterial;
-    if (edges) edges.visible = !on;
+    meshGroup.children.forEach(function(child) {
+        if (child.isMesh) {
+            if (on) {
+                var color = (child.material && child.material._baseColor) || 0x808080;
+                child.material = new THREE.MeshBasicMaterial({ color: color, wireframe: true });
+                child.material._baseColor = color;
+            } else {
+                var color = (child.material && child.material._baseColor) || 0x808080;
+                var mat = new THREE.MeshPhongMaterial({
+                    color: color, specular: 0x111111, shininess: 20, side: THREE.DoubleSide,
+                });
+                mat._baseColor = color;
+                child.material = mat;
+            }
+        }
+        if (child.isLineSegments) {
+            child.visible = !on;
+        }
+    });
     document.getElementById('btnShaded').classList.toggle('active', !on);
     document.getElementById('btnWire').classList.toggle('active', on);
 }
@@ -274,6 +361,8 @@ window.addEventListener('message', function(event) {
     var msg = event.data;
     if (msg.type === 'loadSTL') {
         loadSTL(msg.data);
+    } else if (msg.type === 'loadMultiSTL') {
+        loadMultiSTL(msg.data);
     }
 });
 

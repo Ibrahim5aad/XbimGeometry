@@ -1003,6 +1003,19 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double tolerance,
             out NativeShapeHandle outHandle);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shell_build_connected_face_set(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] double[] allPointsXYZ,
+            int numPoints,
+            [MarshalAs(UnmanagedType.LPArray)] int[] faceData,
+            int faceDataLength,
+            int numFaces,
+            double tolerance,
+            int makeSolid,
+            int upgradeFaceSets,
+            out NativeShapeHandle outHandle);
+
         #endregion
 
         #region Shape Traversal
