@@ -48,7 +48,7 @@ namespace Xbim.Geometry.Engine.Interop.Diagnostics
 
         /// <summary>
         /// Opens an interactive 3D viewer showing the shape.
-        /// Blocks until the viewer window is closed.
+        /// The viewer runs on a background thread and this method returns immediately.
         /// Controls: left-drag=rotate, right-drag=pan, wheel=zoom,
         /// F=fit, W=wireframe, S=shaded, T=top, Esc=close.
         /// </summary>
@@ -63,6 +63,7 @@ namespace Xbim.Geometry.Engine.Interop.Diagnostics
 
         /// <summary>
         /// Opens a viewer showing multiple shapes overlaid with distinct colors.
+        /// The viewer runs on a background thread and this method returns immediately.
         /// The first shape is opaque; subsequent shapes are semi-transparent.
         /// </summary>
         public static void Show(params IXShape[] shapes)

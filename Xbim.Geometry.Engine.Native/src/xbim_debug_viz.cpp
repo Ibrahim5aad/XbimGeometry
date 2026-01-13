@@ -33,6 +33,7 @@
 
 #include <cstdio>
 #include <string>
+#include <vector>
 
 // ── Viewer state ────────────────────────────────────────────────────────────
 
@@ -345,18 +346,93 @@ static XbimResult RunViewer(
     return XBIM_OK;
 }
 
+// ── Background thread launcher ──────────────────────────────────────────────
+//
+// The viewer runs a blocking Win32 message loop, which would deadlock
+// if called from a debugger funceval (expression evaluation at a breakpoint).
+// We spawn the viewer on its own OS thread so the call returns immediately.
+
+struct ViewerThreadData
+{
+    std::vector<XbimShape_>  shapes;     // owned copies (TopoDS_Shape is ref-counted)
+    std::vector<double>      r, g, b;
+    bool                     hasColors = false;
+};
+
+static DWORD WINAPI ViewerThread(LPVOID param)
+{
+    auto* data = static_cast<ViewerThreadData*>(param);
+
+    // Build handle array pointing into our owned copies
+    std::vector<XbimShapeHandle> ptrs(data->shapes.size());
+    for (size_t i = 0; i < data->shapes.size(); i++)
+        ptrs[i] = &data->shapes[i];
+
+    RunViewer(
+        ptrs.data(),
+        static_cast<int>(ptrs.size()),
+        data->hasColors ? data->r.data() : nullptr,
+        data->hasColors ? data->g.data() : nullptr,
+        data->hasColors ? data->b.data() : nullptr);
+
+    delete data;
+    return 0;
+}
+
+static XbimResult LaunchViewer(ViewerThreadData* data)
+{
+    HANDLE thread = CreateThread(nullptr, 0, ViewerThread, data, 0, nullptr);
+    if (!thread) {
+        delete data;
+        xbim_set_error("Failed to create viewer thread");
+        return XBIM_ERROR;
+    }
+    CloseHandle(thread);
+    return XBIM_OK;
+}
+
 // ── Public API ──────────────────────────────────────────────────────────────
 
 XbimResult XBIM_CALL xbim_debug_view_shape(XbimShapeHandle shape)
 {
-    return RunViewer(&shape, 1, nullptr, nullptr, nullptr);
+    if (!shape) {
+        xbim_set_error("Null shape handle");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    auto* data = new ViewerThreadData();
+    data->shapes.push_back(*shape);
+    return LaunchViewer(data);
 }
 
 XbimResult XBIM_CALL xbim_debug_view_shapes(
     XbimShapeHandle* shapes, int count,
     const double* r, const double* g, const double* b)
 {
-    return RunViewer(shapes, count, r, g, b);
+    if (!shapes || count <= 0) {
+        xbim_set_error("No shapes provided");
+        return XBIM_INVALID_ARG;
+    }
+
+    auto* data = new ViewerThreadData();
+    data->shapes.resize(count);
+    for (int i = 0; i < count; i++) {
+        if (!shapes[i]) {
+            delete data;
+            xbim_set_error("Null shape handle in array");
+            return XBIM_INVALID_HANDLE;
+        }
+        data->shapes[i] = *shapes[i];
+    }
+
+    if (r && g && b) {
+        data->hasColors = true;
+        data->r.assign(r, r + count);
+        data->g.assign(g, g + count);
+        data->b.assign(b, b + count);
+    }
+
+    return LaunchViewer(data);
 }
 
 XbimResult XBIM_CALL xbim_debug_dump_brep(

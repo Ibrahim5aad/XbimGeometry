@@ -878,6 +878,21 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeShapeHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_build_surface_with_depth(
+            NativeContextHandle ctx,
+            NativeSurfaceHandle surfaceHandle,
+            double depth,
+            double tolerance,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_build_surface_natural_bounds(
+            NativeContextHandle ctx,
+            NativeSurfaceHandle surfaceHandle,
+            double tolerance,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_face_build_from_wire(
             NativeContextHandle ctx,
             NativeShapeHandle wireHandle,
@@ -1698,7 +1713,8 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         internal static extern int xbim_advanced_brep_begin_face(
             NativeAdvancedBrepBuilderHandle builder,
             NativeSurfaceHandle surfaceHandle,
-            int sameSense);
+            int sameSense,
+            int buildRuledSurface);
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_advanced_brep_begin_bound(

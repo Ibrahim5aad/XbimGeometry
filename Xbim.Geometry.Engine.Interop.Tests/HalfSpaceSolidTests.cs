@@ -4,6 +4,7 @@ using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Geometry.Engine.Interop.Tests.Helpers;
+using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
 using Xunit;
 
@@ -199,7 +200,7 @@ public class HalfSpaceSolidTests : IDisposable
 
         // Act & Assert
         var act = () => _solidFactory.Build(hsMoq.Object);
-        act.Should().Throw<InvalidOperationException>()
+        act.Should().Throw<XbimGeometryServiceException>()
             .WithMessage("*only elementary surfaces*");
     }
 }

@@ -40,7 +40,9 @@
 #include <BinTools.hxx>
 #include <ShapeAnalysis.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
+#include <gp_Trsf.hxx>
 #include <gp_GTrsf.hxx>
+#include <BRepBuilderAPI_Transform.hxx>
 #include <BRepBuilderAPI_GTransform.hxx>
 
 #pragma region Shape Helpers
@@ -1076,21 +1078,50 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_gtransform(
             trsf = trsf.Multiplied(scale);
         }
 
-        BRepBuilderAPI_GTransform transformer(shapeHandle->shape, trsf, Standard_True);
-        if (!transformer.IsDone())
+        /* For pure uniform scale from origin, use BRepBuilderAPI_Transform (exact geometry)
+           instead of BRepBuilderAPI_GTransform which approximates curved surfaces. */
+        Standard_Real s = trsf.Value(1, 1);
+        bool isUniformScaleFromOrigin =
+            (s > 0) &&
+            (fabs(trsf.Value(2, 2) - s) < 1e-15) &&
+            (fabs(trsf.Value(3, 3) - s) < 1e-15) &&
+            (fabs(trsf.Value(1, 2)) < 1e-15) && (fabs(trsf.Value(1, 3)) < 1e-15) &&
+            (fabs(trsf.Value(2, 1)) < 1e-15) && (fabs(trsf.Value(2, 3)) < 1e-15) &&
+            (fabs(trsf.Value(3, 1)) < 1e-15) && (fabs(trsf.Value(3, 2)) < 1e-15) &&
+            (fabs(trsf.Value(1, 4)) < 1e-15) && (fabs(trsf.Value(2, 4)) < 1e-15) &&
+            (fabs(trsf.Value(3, 4)) < 1e-15);
+
+        TopoDS_Shape transformed;
+        if (isUniformScaleFromOrigin)
         {
-            xbim_set_error("xbim_shape_gtransform: BRepBuilderAPI_GTransform failed");
-            return XBIM_ERROR;
+            gp_Trsf simpleTrsf;
+            simpleTrsf.SetScale(gp_Pnt(0.0, 0.0, 0.0), s);
+            BRepBuilderAPI_Transform simpleTransformer(shapeHandle->shape, simpleTrsf, Standard_True);
+            if (!simpleTransformer.IsDone())
+            {
+                xbim_set_error("xbim_shape_gtransform: BRepBuilderAPI_Transform failed");
+                return XBIM_ERROR;
+            }
+            transformed = simpleTransformer.Shape();
+        }
+        else
+        {
+            BRepBuilderAPI_GTransform transformer(shapeHandle->shape, trsf, Standard_True);
+            if (!transformer.IsDone())
+            {
+                xbim_set_error("xbim_shape_gtransform: BRepBuilderAPI_GTransform failed");
+                return XBIM_ERROR;
+            }
+            transformed = transformer.Shape();
         }
 
-        const TopoDS_Shape& result = transformer.Shape();
-        if (result.IsNull())
+        if (transformed.IsNull())
         {
             xbim_set_error("xbim_shape_gtransform: result shape is null");
             return XBIM_ERROR;
         }
 
-        *outHandle = xbim_shape_create_from(result);
+        *outHandle = xbim_shape_create_from(transformed);
         if (!*outHandle)
         {
             xbim_set_error("xbim_shape_gtransform: allocation failed");

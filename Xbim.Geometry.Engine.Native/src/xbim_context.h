@@ -28,7 +28,7 @@ struct XbimContext_
     double minimumGap;
     double minAreaM2;
 
-    /* Logging callback (may be NULL if caller doesn't need logs) */
+    /* Logging callback (may be NULL) */
     XbimLogCallback logCallback;
 };
 

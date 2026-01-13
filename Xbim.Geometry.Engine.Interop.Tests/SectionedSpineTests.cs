@@ -4,6 +4,7 @@ using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Geometry.Engine.Interop.Tests.Helpers;
+using Xbim.Geometry.Exceptions;
 using Xunit;
 
 namespace Xbim.Geometry.Engine.Interop.Tests;
@@ -220,7 +221,7 @@ public class SectionedSpineTests : IDisposable
 
         // Act & Assert
         var act = () => _solidFactory.Build(sectionedSpine);
-        act.Should().Throw<InvalidOperationException>()
+        act.Should().Throw<XbimGeometryServiceException>()
             .WithMessage("*at least 2*");
     }
 
@@ -244,7 +245,7 @@ public class SectionedSpineTests : IDisposable
 
         // Act & Assert
         var act = () => _solidFactory.Build(sectionedSpine);
-        act.Should().Throw<InvalidOperationException>()
+        act.Should().Throw<XbimGeometryServiceException>()
             .WithMessage("*does not match*");
     }
 }

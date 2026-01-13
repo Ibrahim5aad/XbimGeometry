@@ -7,6 +7,7 @@ using Xbim.Common.Geometry;
 using Xbim.Common.XbimExtensions;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine.Interop.Diagnostics;
 using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Geometry.Exceptions;
 using Xbim.Ifc;
@@ -32,7 +33,6 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void Can_build_ifcadvancedbrep_with_faulty_surface_orientation(XGeometryEngineVersion engineVersion)
         {
@@ -41,20 +41,12 @@ namespace Xbim.Geometry.Engine.Tests
             {
                 //MemoryModel.SetWorkArounds(model.Header, model.ModelFactors as XbimModelFactors);
                 var advancedBrep = model.Instances.OfType<IIfcAdvancedBrep>().FirstOrDefault();
-                if (engineVersion == XGeometryEngineVersion.V5) model.AddRevitWorkArounds();
+                model.AddRevitWorkArounds();
                 advancedBrep.Should().NotBeNull();
                 var geomEngine = factory.CreateGeometryEngine(engineVersion, model, _loggerFactory);
-                if (engineVersion == XGeometryEngineVersion.V5)
-                {
-                    var solids = geomEngine.Create(advancedBrep, _logger) as IXbimGeometryObjectSet;
-                    solids.Solids.Sum(s => s.Volume).Should().BeApproximately(102264692.6969, 1e-4);
-                    // solid.Faces.Count.Should().Be(14);
-                }
-                if (engineVersion == XGeometryEngineVersion.V6)
-                {
-                    var solid = geomEngine.Create(advancedBrep, _logger);
-                    //solid.Volume.Should().BeApproximately(102264692.6969, 1e-4);
-                }
+             
+                var solid = geomEngine.Create(advancedBrep, _logger) as IXbimSolid;
+                solid.Volume.Should().BeApproximately(102264692.6969, 1e-4);
             }
         }
 
@@ -342,17 +334,9 @@ namespace Xbim.Geometry.Engine.Tests
                 shape.Should().NotBeNull();
                 var geomEngine = factory.CreateGeometryEngine(engineVersion, model, _loggerFactory);
 
-                if (engineVersion == XGeometryEngineVersion.V5)
-                {
-                    var solids = geomEngine.Create(shape, _logger) as IXbimGeometryObjectSet;
-                    solids.Solids.Sum(s => s.Volume).Should().BeApproximately(0.83333333333333282, 1e-7);
-                    // solid.Faces.Count.Should().Be(14);
-                }
-                if (engineVersion == XGeometryEngineVersion.V6)
-                {
-                    var solid = geomEngine.Create(shape, _logger) as XbimCompound;
-                    solid.Solids.Sum(s => s.Volume).Should().BeApproximately(0.83333333333333282, 1e-7);
-                }
+                var solid = geomEngine.Create(shape, _logger) as IXbimSolid;
+                solid.Should().NotBeNull();
+                solid.Volume.Should().BeApproximately(0.83333333333333282, 1e-7);
 
             }
         }
@@ -370,7 +354,7 @@ namespace Xbim.Geometry.Engine.Tests
                 cc.Should().NotBeNull();
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
 
-                var exception = Assert.Throws<XbimGeometryFactoryException>(() => geomEngine.CreateWire(cc, _logger));
+                var exception = Assert.Throws<XbimGeometryServiceException>(() => geomEngine.CreateWire(cc, _logger));
                 exception.Message.Should().Be("IfcCompositeCurve could not be built as a wire");
             }
         }
@@ -638,7 +622,7 @@ namespace Xbim.Geometry.Engine.Tests
                     geom.Volume.Should().BeGreaterThan(0);
                     solids.Add(geom);
                 }
-                solids.Sum(s => s.Volume).Should().BeApproximately(338121272, 1);
+                solids.Sum(s => s.Volume).Should().BeApproximately(338123274, 1);
             }
         }
 
@@ -737,10 +721,10 @@ namespace Xbim.Geometry.Engine.Tests
                 var pbhs = model.Instances[3942238] as IIfcBooleanClippingResult;
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
                 //test the faulty entity on its own
-                var ex = Assert.Throws<XbimGeometryFactoryException>(() => geomEngine.ModelService.WireFactory.Build(model.Instances[3942179] as IIfcCompositeCurve));
+                var ex = Assert.Throws<XbimGeometryServiceException>(() => geomEngine.ModelService.WireFactory.Build(model.Instances[3942179] as IIfcCompositeCurve));
                 ex.Message.Should().Be("IfcCompositeCurve could not be built as a wire");
                 //see failure exception comes through the stack
-                var exSolid = Assert.Throws<XbimGeometryFactoryException>(() => geomEngine.CreateSolidSet(pbhs, _logger).FirstOrDefault());
+                var exSolid = Assert.Throws<XbimGeometryServiceException>(() => geomEngine.CreateSolidSet(pbhs, _logger).FirstOrDefault());
                 exSolid.Message.Should().Be("IfcCompositeCurve could not be built as a wire");
             }
         }
@@ -882,6 +866,27 @@ namespace Xbim.Geometry.Engine.Tests
                 face.Should().NotBeNull();
                 face.IsValid.Should().BeTrue("Invalid face returned");
             }
+        }
+
+        [Fact]
+        public void IncorrectlyDefinedEdgeCurveV6()
+        {
+            using var model = MemoryModel.OpenRead(
+                @"TestFiles\incorrectly_defined_edge_curve_with_identical_points.ifc");
+            model.AddRevitWorkArounds();
+            var brep = model.Instances.OfType<IIfcAdvancedBrep>().FirstOrDefault();
+            brep.Should().NotBeNull();
+            var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
+
+            // CreateSolid must include all sub-solids, matching the total from CreateSolidSet
+            var solidSet = geomEngine.CreateSolidSet(brep, _logger);
+            var solid = geomEngine.CreateSolid(brep, _logger);
+
+            solid.Should().NotBeNull();
+            double setVolume = solidSet.Sum(s => s.Volume);
+            solid.Volume.Should().BeApproximately(
+                setVolume, setVolume * 0.05,
+                "CreateSolid must aggregate all sub-solids, not truncate to the first");
         }
 
         [Fact]

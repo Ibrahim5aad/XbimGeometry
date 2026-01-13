@@ -4,11 +4,16 @@
 
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepCheck_Shell.hxx>
+#include <BRepExtrema_DistShapeShape.hxx>
+#include <BRepFill.hxx>
+#include <BRepFill_Filling.hxx>
 #include <BRep_Tool.hxx>
 #include <Geom_Line.hxx>
 #include <GeomAdaptor_Curve.hxx>
+#include <GCPnts_AbscissaPoint.hxx>
 #include <Extrema_ExtPC.hxx>
 #include <Precision.hxx>
 #include <ShapeFix_Edge.hxx>
@@ -16,8 +21,11 @@
 #include <ShapeFix_Face.hxx>
 #include <ShapeFix_Shape.hxx>
 #include <ShapeFix_Shell.hxx>
+#include <ShapeFix_Solid.hxx>
 #include <ShapeAnalysis.hxx>
 #include <Standard_Failure.hxx>
+#include <BRepTools_WireExplorer.hxx>
+#include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
 #include <Geom_TrimmedCurve.hxx>
@@ -85,6 +93,123 @@ static bool locate_point_on_curve(
             return true;
         }
     }
+    return false;
+}
+
+
+/*
+ * Check whether all edges of a wire lie within tolerance of a face's surface.
+ * Uses BRepExtrema_DistShapeShape — same approach as old V5 WithinTolerance.
+ */
+static bool within_tolerance(
+    const TopoDS_Wire& wire,
+    const TopoDS_Face& face,
+    double tolerance)
+{
+    try
+    {
+        for (TopExp_Explorer edgeExp(wire, TopAbs_EDGE); edgeExp.More(); edgeExp.Next())
+        {
+            BRepExtrema_DistShapeShape distCalc(edgeExp.Current(), face);
+            if (!distCalc.IsDone())
+                return false;
+            if (distCalc.Value() > tolerance)
+                return false;
+        }
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
+/*
+ * Try to rebuild a face surface from the outer wire edges when the IFC-defined
+ * surface doesn't match the wire geometry (ruled surface fallback).
+ *
+ * For 4-edge loops (2 curves + 2 lines): BRepFill::Face on the 2 non-line edges.
+ * Fallback: BRepFill_Filling fitted to all wire edges.
+ */
+static bool rebuild_ruled_surface(
+    XbimAdvancedBrepBuilder_& b,
+    TopoDS_Wire& outerWire,   /* may be updated with pcurves fixed for new surface */
+    TopoDS_Face& outFace)
+{
+    /* Collect edges in wire traversal order (BRepTools_WireExplorer respects
+     * vertex connectivity, unlike TopExp_Explorer which may give arbitrary order).
+     * This matches the old NativeAdvancedFacesBuilder::BuildFace approach. */
+    std::vector<TopoDS_Edge> curveEdges;
+    std::vector<TopoDS_Edge> allEdges;
+
+    for (BRepTools_WireExplorer exp(outerWire); exp.More(); exp.Next())
+    {
+        TopoDS_Edge edge = exp.Current();
+        allEdges.push_back(edge);
+
+        double f, l;
+        Handle(Geom_Curve) c3d = BRep_Tool::Curve(edge, f, l);
+        if (!c3d.IsNull() && Handle(Geom_Line)::DownCast(c3d).IsNull())
+            curveEdges.push_back(edge);
+    }
+
+    /* Helper: fix wire pcurves against a new surface and update outerWire */
+    auto fix_wire_for_surface = [&](const TopoDS_Face& face)
+    {
+        ShapeFix_Wire wf(outerWire, face, b.tolerance);
+        if (wf.Perform())
+            outerWire = wf.Wire();
+    };
+
+    /* Try BRepFill::Face for 4-edge loops with exactly 2 non-line edges.
+     *
+     * In a 4-edge wire (curve → line → curve → line) explored in wire order,
+     * the two curve edges are ALWAYS anti-parallel relative to the ruling:
+     * curve1 goes A→B while curve2 goes C→D in wire order, but for a correct
+     * ruled surface we need them oriented the same way (D→C in this example).
+     * This is a topological fact, so we always reverse the second curve —
+     * matching the old NativeAdvancedFacesBuilder::BuildFace behaviour. */
+    if (allEdges.size() == 4 && curveEdges.size() == 2)
+    {
+        try
+        {
+            TopoDS_Edge e2 = TopoDS::Edge(curveEdges[1].Reversed());
+            TopoDS_Face ruledFace = BRepFill::Face(curveEdges[0], e2);
+            if (!ruledFace.IsNull())
+            {
+                fix_wire_for_surface(ruledFace);
+                outFace = ruledFace;
+                return true;
+            }
+        }
+        catch (const Standard_Failure& sf)
+        {
+            xbim_log_warning(b.ctx, "BRepFill::Face failed: %s",
+                sf.GetMessageString() ? sf.GetMessageString() : "unknown");
+        }
+    }
+
+    /* Fallback: BRepFill_Filling from all wire edges */
+    try
+    {
+        BRepFill_Filling filling;
+        for (const auto& edge : allEdges)
+            filling.Add(edge, GeomAbs_C0);
+        filling.Build();
+        if (filling.IsDone())
+        {
+            TopoDS_Face filledFace = filling.Face();
+            fix_wire_for_surface(filledFace);
+            outFace = filledFace;
+            return !outFace.IsNull();
+        }
+    }
+    catch (const Standard_Failure& sf)
+    {
+        xbim_log_warning(b.ctx, "BRepFill_Filling failed: %s",
+            sf.GetMessageString() ? sf.GetMessageString() : "unknown");
+    }
+
     return false;
 }
 
@@ -160,6 +285,20 @@ TopoDS_Edge xbim_brep_build_orient_edge(
         xbim_log_warning(b.ctx, "Vertices not found for edge #%d (start=%d, end=%d)",
             edgeLabel, startVertexLabel, endVertexLabel);
         return TopoDS_Edge();
+    }
+
+    /* Fuse geometrically identical vertices — matches old engine IsGeometricallySame.
+     * Some IFC files (e.g. Revit exports) define two separate VertexPoint entities
+     * with the same CartesianPoint for the start and end of a closed curve.
+     * Both vertices project to the same curve parameter, causing
+     * BRepBuilderAPI_MakeEdge to fail with DifferentPointsOnClosedCurve.
+     * Fusing them enables the closed-edge path below. */
+    if (sharedEdgeGeom->IsClosed() && !startV.IsSame(endV))
+    {
+        gp_Pnt p1 = BRep_Tool::Pnt(startV);
+        gp_Pnt p2 = BRep_Tool::Pnt(endV);
+        if (p1.Distance(p2) <= b.tolerance)
+            endV = startV;
     }
 
     ShapeFix_Edge edgeFixer;
@@ -271,23 +410,27 @@ void xbim_brep_build_loop_wire(
         loopEdges.push_back(topoEdge);
     }
 
+    /* Add per-edge pcurves for non-planar surfaces (matching old V5 approach:
+       ShapeFix_Edge::FixAddPCurve per-edge before building the wire) */
+    if (!isPlanar)
+    {
+        ShapeFix_Edge edgeFixer;
+        for (auto& edge : loopEdges)
+        {
+            edgeFixer.FixAddPCurve(edge, face, Standard_False);
+        }
+    }
+
     /* Add edges to wire via BRep_Builder (preserves exact topology) */
     for (const auto& edge : loopEdges)
         b.builder.Add(loopWire, edge);
 
-    /* Fix pcurves (non-planar) and reorder edges in a single ShapeFix_Wire pass.
-       Wire-level FixEdgeCurves matches the legacy AddParameterisedCurves approach
-       and handles periodic surface boundaries (e.g. revolution surfaces) better
-       than per-edge FixAddPCurve. */
+    /* Reorder edges only (matching old V5: FixReorder but NOT FixAddPCurve
+       at wire level — pcurves were already added per-edge above) */
     {
         Handle(ShapeFix_Wire) wireFixer = new ShapeFix_Wire(loopWire, face, b.tolerance);
         wireFixer->ClearModes();
         wireFixer->FixReorderMode() = 1;
-        if (!isPlanar)
-        {
-            wireFixer->FixAddPCurveMode() = 1;
-            wireFixer->FixSameParameterMode() = 1;
-        }
         wireFixer->Perform();
         loopWire = wireFixer->Wire();
     }
@@ -373,14 +516,54 @@ TopoDS_Face xbim_brep_build_face(
     if (outerLoop.IsNull())
         return baseFace;
 
-    /* Check outer-loop orientation on the surface (legacy AddParameterisedCurves
-       approach): build a temporary face, compute surface-area sign, and reverse
-       the wire when it is CW so that BRepBuilderAPI_MakeFace always receives a
-       CCW outer loop. */
+    /* Ruled surface rebuild for IIfcSurfaceOfLinearExtrusion faces.
+     *
+     *  1. If the wire lies within tolerance of the IFC surface, fix edge pcurves
+     *     (ShapeFix_Wire::FixEdgeCurves) and validate with BRepCheck_Analyzer.
+     *     Only if the face is already valid do we keep the IFC surface.
+     *  2. Otherwise fall through to rebuild_ruled_surface which uses
+     *     BRepFill::Face for 4-edge loops. */
+    Handle(Geom_Surface) faceSurface = faceData.surface;
+    if (faceData.buildRuledSurface)
+    {
+        bool needRebuild = true;
+
+        if (within_tolerance(outerLoop, baseFace, b.tolerance))
+        {
+            ShapeFix_Wire wfIfc(outerLoop, baseFace, b.tolerance);
+            if (wfIfc.FixEdgeCurves())
+                outerLoop = wfIfc.Wire();
+
+            BRepBuilderAPI_MakeFace tryMaker(faceSurface, outerLoop, false);
+            if (tryMaker.IsDone())
+            {
+                BRepCheck_Analyzer analyser(tryMaker.Face(), Standard_True);
+                if (analyser.IsValid())
+                    needRebuild = false;
+            }
+        }
+
+        if (needRebuild)
+        {
+            TopoDS_Face rebuiltFace;
+            if (rebuild_ruled_surface(b, outerLoop, rebuiltFace))
+            {
+                faceSurface = BRep_Tool::Surface(rebuiltFace);
+                if (faceSurface.IsNull())
+                    faceSurface = faceData.surface;
+            }
+        }
+    }
+
+    /* Check outer-loop winding on the surface: the outer wire must be CCW
+       relative to the surface normal for BRepBuilderAPI_MakeFace to work
+       correctly.  Skip this for ruled-surface faces where the IFC surface
+       may be wrong (the rebuilt surface already has correct orientation). */
+    if (!faceData.buildRuledSurface)
     {
         BRep_Builder bb;
         TopoDS_Face tempFace;
-        bb.MakeFace(tempFace, faceData.surface, b.tolerance);
+        bb.MakeFace(tempFace, faceSurface, b.tolerance);
         bb.Add(tempFace, outerLoop);
         GProp_GProps gProps;
         BRepGProp::SurfaceProperties(tempFace, gProps, b.tolerance);
@@ -388,8 +571,8 @@ TopoDS_Face xbim_brep_build_face(
             outerLoop = TopoDS::Wire(outerLoop.Reversed());
     }
 
-    /* Build the face from the surface and the oriented outer wire */
-    BRepBuilderAPI_MakeFace faceMaker(faceData.surface, outerLoop, false);
+    /* Build the face from the (possibly rebuilt) surface and oriented outer wire */
+    BRepBuilderAPI_MakeFace faceMaker(faceSurface, outerLoop, false);
     if (!faceMaker.IsDone())
     {
         xbim_log_warning(b.ctx, "Could not create face from surface and outer wire");
@@ -404,16 +587,6 @@ TopoDS_Face xbim_brep_build_face(
         {
             for (auto& innerWire : innerLoops)
             {
-                /* Inner wires must be CW — reverse if they are CCW */
-                BRep_Builder bb;
-                TopoDS_Face tempFace;
-                bb.MakeFace(tempFace, faceData.surface, b.tolerance);
-                bb.Add(tempFace, innerWire);
-                GProp_GProps gProps;
-                BRepGProp::SurfaceProperties(tempFace, gProps, b.tolerance);
-                if (gProps.Mass() > 0)
-                    innerWire = TopoDS::Wire(innerWire.Reversed());
-
                 faceMaker.Add(innerWire);
                 if (!faceMaker.IsDone())
                 {
@@ -423,6 +596,14 @@ TopoDS_Face xbim_brep_build_face(
             }
 
             topoAdvancedFace = faceMaker.Face();
+
+            /* Use ShapeFix_Face::FixOrientation to correctly orient inner
+               loops relative to the face (matching old V5 approach — handles
+               non-planar surfaces correctly, unlike area-sign heuristics). */
+            ShapeFix_Face faceFixer(topoAdvancedFace);
+            faceFixer.SetPrecision(b.tolerance);
+            if (faceFixer.FixOrientation())
+                topoAdvancedFace = faceFixer.Face();
         }
         catch (const Standard_Failure& sf)
         {
@@ -621,7 +802,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_add_edge_curve(
 XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_begin_face(
     XbimAdvancedBrepBuilderHandle builder,
     XbimSurfaceHandle surfaceHandle,
-    int sameSense)
+    int sameSense,
+    int buildRuledSurface)
 {
     xbim_clear_error();
 
@@ -640,6 +822,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_begin_face(
     builder->currentFace = &builder->faces.back();
     builder->currentFace->surface = surfaceHandle->surface;
     builder->currentFace->sameSense = sameSense;
+    builder->currentFace->buildRuledSurface = buildRuledSurface;
     builder->currentBound = nullptr;
     return XBIM_OK;
 }
@@ -725,27 +908,35 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_end_face(
 
 
 /*
- * Helper: wraps a shell as a solid with orientation checking.
+ * Helper: wraps a shell as a solid using ShapeFix_Solid::SolidFromShell
+ * (matching old V6 approach), with BRepClass3d_SolidClassifier safety net.
  */
 static bool shell_to_solid(
     const TopoDS_Shell& shell,
-    TopoDS_Solid& outSolid)
+    TopoDS_Solid& outSolid,
+    double tolerance)
 {
     if (shell.IsNull() || shell.NbChildren() == 0)
         return false;
 
-    BRep_Builder b;
-    TopoDS_Solid solid;
-    b.MakeSolid(solid);
-    b.Add(solid, shell);
+    ShapeFix_Solid sfs;
+    sfs.SetPrecision(tolerance);
+    sfs.SetMinTolerance(tolerance);
+    sfs.SetMaxTolerance(tolerance * 10);
+    TopoDS_Solid solid = sfs.SolidFromShell(shell);
 
-    if (BRep_Tool::IsClosed(shell))
+    if (solid.IsNull())
     {
-        BRepClass3d_SolidClassifier classifier(solid);
-        classifier.PerformInfinitePoint(Precision::Confusion());
-        if (classifier.State() == TopAbs_IN)
-            solid.Reverse();
+        /* Fallback: bare MakeSolid */
+        BRep_Builder b;
+        b.MakeSolid(solid);
+        b.Add(solid, shell);
     }
+
+    BRepClass3d_SolidClassifier classifier(solid);
+    classifier.PerformInfinitePoint(Precision::Confusion());
+    if (classifier.State() == TopAbs_IN)
+        solid.Reverse();
 
     outSolid = solid;
     return true;
@@ -799,7 +990,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_build(
         if (result.ShapeType() == TopAbs_SHELL)
         {
             TopoDS_Solid solid;
-            if (shell_to_solid(TopoDS::Shell(result), solid))
+            if (shell_to_solid(TopoDS::Shell(result), solid, builder->tolerance))
                 *outHandle = xbim_shape_create_from(solid);
             else
                 *outHandle = xbim_shape_create_from(result);
@@ -816,7 +1007,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_build(
         for (TopExp_Explorer shellExp(result, TopAbs_SHELL); shellExp.More(); shellExp.Next())
         {
             TopoDS_Solid solid;
-            if (shell_to_solid(TopoDS::Shell(shellExp.Current()), solid))
+            if (shell_to_solid(TopoDS::Shell(shellExp.Current()), solid, builder->tolerance))
             {
                 b.Add(compound, solid);
                 solidCount++;

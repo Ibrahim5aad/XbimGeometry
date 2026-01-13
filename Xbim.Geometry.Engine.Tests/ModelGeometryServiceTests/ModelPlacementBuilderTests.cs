@@ -78,11 +78,11 @@ namespace Xbim.Geometry.Engine.Tests.ModelGeometryServiceTests
             location.Translation.X.Should().BeApproximately(wallRelativeCoordX, precision);
             location.Translation.Y.Should().BeApproximately(wallRelativeCoordY, precision);
             
-            // Multiplying by the inverse root placement should negate any rotation
-            // and align the placement with the canonical basis
+            // Pre-multiplying by the inverse root placement cancels the root rotation
+            // and aligns the placement with the canonical basis.
             // this is just for asserting the location is correct
             var inverseRoot = builder.RootPlacement.Inverted();
-            var adjustedLocation = location.Multiplied(inverseRoot);
+            var adjustedLocation = location.PreMultiplied(inverseRoot);
             adjustedLocation.Translation.X.Should().BeApproximately(wallRelativeCoordXAxisAligned, precision);
             adjustedLocation.Translation.Y.Should().BeApproximately(wallRelativeCoordYAxisAligned, precision);
             adjustedLocation.Translation.Z.Should().BeApproximately(0d, precision);

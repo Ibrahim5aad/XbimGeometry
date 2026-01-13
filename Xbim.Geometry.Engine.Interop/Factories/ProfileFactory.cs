@@ -243,26 +243,45 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new XbimGeometryServiceException(
                     $"CircleHollowProfileDef #{hollowProfile.EntityLabel} has zero or negative radius.");
 
-            if (hollowProfile.WallThickness <= 0)
-                throw new XbimGeometryServiceException(
-                    $"CircleHollowProfileDef #{hollowProfile.EntityLabel} has zero or negative wall thickness.");
-
             BuildProfilePlacement(hollowProfile.Position,
-                out double ox, out double oy, out double oz,
-                out double zx, out double zy, out double zz,
-                out double xx, out double xy, out double xz);
+                            out double ox, out double oy, out double oz,
+                            out double zx, out double zy, out double zz,
+                            out double xx, out double xy, out double xz);
 
-            int result = XbimGeometryNativeApi.xbim_profile_build_circle_hollow(
+            NativeShapeHandle shape;
+            int result;
+
+            if (hollowProfile.WallThickness <= 0)
+            {
+                _logger.LogWarning(
+                    "CircleHollowProfileDef #{EntityLabel} has zero or negative wall thickness.", hollowProfile.EntityLabel);
+
+                result = XbimGeometryNativeApi.xbim_profile_build_circle(
+                                        ContextHandle,
+                                        ox, oy, oz, zx, zy, zz, xx, xy, xz,
+                                        hollowProfile.Radius,
+                                        out shape);
+
+                if (result != 0)
+                    throw new XbimGeometryServiceException(
+                        $"Failed to build CircleHollowProfileDef #{hollowProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                return NativeShapeWrapper.WrapFace(shape);
+            }
+
+
+
+            result = XbimGeometryNativeApi.xbim_profile_build_circle_hollow(
                 ContextHandle,
                 ox, oy, oz, zx, zy, zz, xx, xy, xz,
                 hollowProfile.Radius, hollowProfile.WallThickness,
-                out var NativeShapeHandle);
+                out shape);
 
             if (result != 0)
                 throw new XbimGeometryServiceException(
                     $"Failed to build CircleHollowProfileDef #{hollowProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return NativeShapeWrapper.WrapFace(NativeShapeHandle);
+            return NativeShapeWrapper.WrapFace(shape);
         }
 
         #endregion
@@ -543,10 +562,15 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private IXFace BuildArbitraryClosedFace(IIfcArbitraryClosedProfileDef arbitraryProfile)
         {
-            var outerCurve = arbitraryProfile.OuterCurve;
-            if (outerCurve == null)
-                throw new XbimGeometryServiceException(
+            var outerCurve = arbitraryProfile.OuterCurve ?? throw new XbimGeometryServiceException(
                     $"ArbitraryClosedProfileDef #{arbitraryProfile.EntityLabel} has no OuterCurve.");
+
+            if (outerCurve is IIfcLine)
+                throw new XbimGeometryServiceException(
+                    $"WR2 ArbitraryClosedProfileDef #{arbitraryProfile.EntityLabel}: outer curve shall not be IfcLine (not a closed curve).");
+            if (outerCurve is IIfcOffsetCurve2D)
+                throw new XbimGeometryServiceException(
+                    $"WR3 ArbitraryClosedProfileDef #{arbitraryProfile.EntityLabel}: outer curve shall not be IfcOffsetCurve2D.");
 
             // Extract polyline points from the outer curve
             if (outerCurve is IIfcPolyline polyline)
@@ -596,12 +620,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private IXFace BuildArbitraryFromIndexedPolyCurve(IIfcIndexedPolyCurve indexedPolyCurve, int entityLabel)
         {
-            var pointList = indexedPolyCurve.Points;
-            if (pointList == null)
-                throw new XbimGeometryServiceException(
+            var pointList = indexedPolyCurve.Points ?? throw new XbimGeometryServiceException(
                     $"IndexedPolyCurve #{entityLabel} has no Points coordinate list.");
 
-            if (!(pointList is IIfcCartesianPointList2D pointList2D))
+            if (pointList is not IIfcCartesianPointList2D pointList2D)
                 throw new NotSupportedException(
                     $"IndexedPolyCurve #{entityLabel} points type {pointList.ExpressType.ExpressName} is not supported for 2D profiles.");
 
@@ -616,20 +638,20 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new XbimGeometryServiceException(
                     $"IndexedPolyCurve #{entityLabel} has less than 3 points.");
 
-            // If segments exist, build 2D curve via CurveFactory respecting line/arc types
+            // If segments exist, build individual arc/line segments and wire them directly into a face.
+            // Bypassing B-spline joining preserves segment topology and correct face orientation.
             if (indexedPolyCurve.Segments != null && indexedPolyCurve.Segments.Any())
             {
                 var curveFactory = (CurveFactory)_modelService.CurveFactory;
-                var builtCurve = (XbimCurve2d)curveFactory.BuildCurve2d(indexedPolyCurve);
-                var curves = new List<NativeCurve2dHandle> { builtCurve.DetachHandle() };
+                var segments = curveFactory.BuildIndexedPolyCurveSegments2d(indexedPolyCurve);
                 try
                 {
-                    return BuildFaceFrom2dCurves(curves, entityLabel);
+                    return BuildFaceFrom2dCurves(segments, entityLabel);
                 }
                 finally
                 {
-                    foreach (var curve in curves)
-                        curve.Dispose();
+                    foreach (var s in segments)
+                        s.Dispose();
                 }
             }
 
@@ -982,7 +1004,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             out double m00, out double m01, out double m02,
             out double m10, out double m11, out double m12)
         {
-            double d1x = 1, d1y = 0;
             double scale1 = op.Scl;
             double scale2 = scale1;
 
@@ -994,8 +1015,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (op.Axis1 != null)
             {
-                d1x = op.Axis1.X;
-                d1y = op.Axis1.Y;
+                double d1x = op.Axis1.X;
+                double d1y = op.Axis1.Y;
                 double mag = Math.Sqrt(d1x * d1x + d1y * d1y);
                 if (mag > 1e-15) { d1x /= mag; d1y /= mag; }
 
@@ -1015,8 +1036,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
             else if (op.Axis2 != null)
             {
-                d1x = op.Axis2.X;
-                d1y = op.Axis2.Y;
+                double d1x = op.Axis2.X;
+                double d1y = op.Axis2.Y;
                 double mag = Math.Sqrt(d1x * d1x + d1y * d1y);
                 if (mag > 1e-15) { d1x /= mag; d1y /= mag; }
 

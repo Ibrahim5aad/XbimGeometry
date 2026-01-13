@@ -510,7 +510,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var solidHandle);
 
             if (result != 0)
-                throw new XbimGeometryFactoryException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build FixedReferenceSweptAreaSolid #{fixedRefSwept.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return solidHandle;
@@ -591,7 +591,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out var solidHandle);
 
             if (result != 0)
-                throw new XbimGeometryFactoryException(
+                throw new XbimGeometryServiceException(
                     $"Failed to build SurfaceCurveSweptAreaSolid #{surfaceCurveSwept.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return solidHandle;
@@ -980,8 +980,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         continue;
                     }
 
+                    int buildRuledSurface = advancedFace.FaceSurface is IIfcSurfaceOfLinearExtrusion ? 1 : 0;
                     result = XbimGeometryNativeApi.xbim_advanced_brep_begin_face(
-                        builder, surfaceHandle, advancedFace.SameSense ? 1 : 0);
+                        builder, surfaceHandle, advancedFace.SameSense ? 1 : 0, buildRuledSurface);
                     surfaceHandle.Dispose();
 
                     if (result != 0)
@@ -1065,7 +1066,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             try
             {
                 var curveFactory = (CurveFactory)_modelService.CurveFactory;
-                var curve = (XbimCurve)curveFactory.Build(ifcCurve);
+                var curve = curveFactory.Build3d(ifcCurve);
                 var curveHandle = curve.DetachHandle();
                 curveCache[curveLabel] = curveHandle;
                 return curveHandle;

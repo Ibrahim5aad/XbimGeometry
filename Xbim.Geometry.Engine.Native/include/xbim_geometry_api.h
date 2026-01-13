@@ -1710,6 +1710,30 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_unbounded_from_surface(
     XbimShapeHandle*   outHandle);
 
 /*
+ * Build a bounded face from a surface using its natural U parameter range
+ * and an explicit extrusion depth for the V range [0, depth].
+ * Used for Geom_SurfaceOfLinearExtrusion whose V direction is infinite.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_surface_with_depth(
+    XbimContextHandle  ctx,
+    XbimSurfaceHandle  surfaceHandle,
+    double             depth,
+    double             tolerance,
+    XbimShapeHandle*   outHandle);
+
+/*
+ * Build a bounded face using the surface's natural parameter bounds.
+ * Used for surfaces like Geom_SurfaceOfRevolution where an unbounded face
+ * cannot be constructed but the natural bounds (U=[0,2π], V from basis curve)
+ * are finite and well-defined.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_surface_natural_bounds(
+    XbimContextHandle  ctx,
+    XbimSurfaceHandle  surfaceHandle,
+    double             tolerance,
+    XbimShapeHandle*   outHandle);
+
+/*
  * Build a planar face from a closed wire.
  * The wire must define a planar polygon; OCCT infers the plane automatically.
  *
@@ -3973,11 +3997,14 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_add_edge_curve(
 /*
  * Begin a new face with the given surface and sameSense flag.
  * Must be followed by bound/edge calls and ended with end_face.
+ * buildRuledSurface: nonzero if the face surface is IIfcSurfaceOfLinearExtrusion,
+ * enabling ruled-surface fallback when the IFC surface doesn't match the wire geometry.
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_begin_face(
     XbimAdvancedBrepBuilderHandle builder,
     XbimSurfaceHandle surfaceHandle,
-    int sameSense);
+    int sameSense,
+    int buildRuledSurface);
 
 /*
  * Begin a new bound (wire loop) within the current face.

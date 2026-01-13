@@ -6,6 +6,7 @@
  */
 
 #include <cmath>
+#include <vector>
 #include "xbim_profile.h"
 #include "xbim_shape.h"
 #include "xbim_context.h"
@@ -1666,11 +1667,32 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_arbitrary_closed(
 
     try
     {
-        /* Build a closed polygon wire from the 2D point array */
-        BRepBuilderAPI_MakePolygon polyMaker;
+        /* Deduplicate adjacent points (including the wrap-around closing point) */
+        std::vector<gp_Pnt> uniquePts;
+        uniquePts.reserve(pointCount);
         for (int i = 0; i < pointCount; i++)
         {
-            polyMaker.Add(gp_Pnt(pointsX[i], pointsY[i], 0.0));
+            gp_Pnt p(pointsX[i], pointsY[i], 0.0);
+            if (uniquePts.empty() || uniquePts.back().Distance(p) >= ctx->precision)
+                uniquePts.push_back(p);
+        }
+        if (uniquePts.size() >= 2 &&
+            uniquePts.back().Distance(uniquePts.front()) < ctx->precision)
+        {
+            uniquePts.pop_back();
+        }
+
+        if ((int)uniquePts.size() < 3)
+        {
+            xbim_set_error("xbim_profile_build_arbitrary_closed: fewer than 3 unique points after deduplication");
+            return XBIM_ERROR;
+        }
+
+        /* Build a closed polygon wire from the deduplicated point array */
+        BRepBuilderAPI_MakePolygon polyMaker;
+        for (const auto& p : uniquePts)
+        {
+            polyMaker.Add(p);
         }
         polyMaker.Close();
 

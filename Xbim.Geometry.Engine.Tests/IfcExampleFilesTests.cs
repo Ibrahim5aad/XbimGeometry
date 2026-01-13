@@ -33,7 +33,7 @@ namespace Xbim.Geometry.Engine.Tests
             var geomEngineV6 = _factory.CreateGeometryEngineV6(model, _loggerFactory);
             foreach (var geomRep in model.Instances.OfType<IIfcSolidModel>())
             {
-               var brep = geomEngineV6.Create(geomRep);
+                var brep = geomEngineV6.Create(geomRep);
                 brep.Should().NotBeNull();
             }
         }

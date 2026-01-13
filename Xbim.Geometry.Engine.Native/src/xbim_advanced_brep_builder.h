@@ -47,6 +47,7 @@ struct XbimBrepFaceData
 {
     Handle(Geom_Surface) surface;
     int sameSense;
+    int buildRuledSurface;  /* nonzero if surface is IIfcSurfaceOfLinearExtrusion */
     std::vector<XbimBrepBoundData> bounds;
 };
 

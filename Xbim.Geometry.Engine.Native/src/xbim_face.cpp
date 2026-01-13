@@ -239,6 +239,130 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_unbounded_from_surface(
 }
 
 
+/*
+ * Build a bounded face from a surface with explicit parameter bounds.
+ * Intended for surfaces that have infinite natural bounds in one direction
+ * (e.g. Geom_SurfaceOfLinearExtrusion) where OCCT cannot build an unbounded face.
+ * U bounds are taken from the surface's natural range; V bounds use [0, vMax].
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_surface_with_depth(
+    XbimContextHandle  ctx,
+    XbimSurfaceHandle  surfaceHandle,
+    double             depth,
+    double             tolerance,
+    XbimShapeHandle*   outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_face_build_surface_with_depth: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!surfaceHandle)
+    {
+        xbim_set_error("xbim_face_build_surface_with_depth: surfaceHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        Handle(Geom_Surface) surface = surfaceHandle->surface;
+        if (surface.IsNull())
+        {
+            xbim_set_error("xbim_face_build_surface_with_depth: surface is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        double uMin, uMax, vMin, vMax;
+        surface->Bounds(uMin, uMax, vMin, vMax);
+
+        /* For the V direction (extrusion depth), use [0, depth] instead of
+           the surface's infinite natural range. */
+        vMin = 0.0;
+        vMax = depth;
+
+        BRepBuilderAPI_MakeFace faceMaker(surface, uMin, uMax, vMin, vMax, tolerance);
+        if (!faceMaker.IsDone())
+        {
+            xbim_set_error("xbim_face_build_surface_with_depth: could not build bounded face");
+            return XBIM_NULL_SHAPE;
+        }
+
+        TopoDS_Face face = faceMaker.Face();
+        *outHandle = xbim_shape_create_from(face);
+        return *outHandle ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_face_build_surface_with_depth");
+        xbim_set_error("xbim_face_build_surface_with_depth: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+/*
+ * Build a bounded face from a surface using its natural parameter bounds.
+ * Used for surfaces like Geom_SurfaceOfRevolution where BRepBuilderAPI_MakeFace
+ * cannot construct an unbounded face but the natural bounds (U=[0,2π], V from
+ * the basis curve) are finite and well-defined.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_surface_natural_bounds(
+    XbimContextHandle  ctx,
+    XbimSurfaceHandle  surfaceHandle,
+    double             tolerance,
+    XbimShapeHandle*   outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_face_build_surface_natural_bounds: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!surfaceHandle)
+    {
+        xbim_set_error("xbim_face_build_surface_natural_bounds: surfaceHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        Handle(Geom_Surface) surface = surfaceHandle->surface;
+        if (surface.IsNull())
+        {
+            xbim_set_error("xbim_face_build_surface_natural_bounds: surface is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        double uMin, uMax, vMin, vMax;
+        surface->Bounds(uMin, uMax, vMin, vMax);
+
+        BRepBuilderAPI_MakeFace faceMaker(surface, uMin, uMax, vMin, vMax, tolerance);
+        if (!faceMaker.IsDone())
+        {
+            xbim_set_error("xbim_face_build_surface_natural_bounds: could not build bounded face");
+            return XBIM_NULL_SHAPE;
+        }
+
+        TopoDS_Face face = faceMaker.Face();
+        *outHandle = xbim_shape_create_from(face);
+        return *outHandle ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_face_build_surface_natural_bounds");
+        xbim_set_error("xbim_face_build_surface_natural_bounds: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
 XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_wire(
     XbimContextHandle ctx,
     XbimShapeHandle   wireHandle,

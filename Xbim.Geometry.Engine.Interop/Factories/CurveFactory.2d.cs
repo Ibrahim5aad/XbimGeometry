@@ -112,11 +112,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private XbimCircle2d BuildCircle2d(IIfcCircle ifcCircle)
         {
             if (ifcCircle.Radius <= 0)
-                throw new XbimGeometryFactoryException(
+                throw new XbimGeometryServiceException(
                     $"IIfcCircle #{ifcCircle.EntityLabel} has invalid radius {ifcCircle.Radius}. Radius must be greater than zero.");
 
             if (ifcCircle.Position is not IIfcAxis2Placement2D axis2d)
-                throw new XbimGeometryFactoryException(
+                throw new XbimGeometryServiceException(
                     $"IIfcCircle #{ifcCircle.EntityLabel} (Dim=2) has no valid 2D placement.");
 
             double cx = axis2d.Location.Coordinates[0];
@@ -161,7 +161,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private XbimEllipse2d BuildEllipse2d(IIfcEllipse ifcEllipse)
         {
             if (ifcEllipse.Position is not IIfcAxis2Placement2D axis2d)
-                throw new XbimGeometryFactoryException(
+                throw new XbimGeometryServiceException(
                     $"IIfcEllipse #{ifcEllipse.EntityLabel} (Dim=2) has no valid 2D placement.");
 
             double cx = axis2d.Location.Coordinates[0];
@@ -617,86 +617,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         private XbimBoundedCurve2d BuildIndexedPolyCurve2d(IIfcIndexedPolyCurve ifcIndexed)
         {
-            var points = ExtractPoints2d(ifcIndexed);
-            var segments = new List<NativeCurve2dHandle>();
-
+            var segments = BuildIndexedPolyCurveSegments2d(ifcIndexed);
             try
             {
-                if (ifcIndexed.Segments != null && ifcIndexed.Segments.Any())
-                {
-                    foreach (var segment in ifcIndexed.Segments)
-                    {
-                        if (segment is IfcArcIndex arcIndex)
-                        {
-                            var indices = (System.Collections.IList)arcIndex.Value;
-                            if (indices.Count != 3)
-                                throw new XbimGeometryServiceException(
-                                    $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: ArcIndex must have exactly 3 indices.");
-
-                            int i1 = (int)(long)((IfcPositiveInteger)indices[0]!).Value - 1;
-                            int i2 = (int)(long)((IfcPositiveInteger)indices[1]!).Value - 1;
-                            int i3 = (int)(long)((IfcPositiveInteger)indices[2]!).Value - 1;
-
-                            var (sx, sy) = points[i1];
-                            var (mx, my) = points[i2];
-                            var (ex, ey) = points[i3];
-
-                            // Native function handles collinear fallback internally (returns line segment)
-                            int arcResult = XbimGeometryNativeApi.xbim_curve2d_build_arc_3pt(
-                                ContextHandle, sx, sy, mx, my, ex, ey, out var arcHandle);
-
-                            if (arcResult != 0)
-                                throw new XbimGeometryServiceException(
-                                    $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: failed to build 2D arc segment: {XbimGeometryNativeApi.GetLastError()}");
-
-                            segments.Add(arcHandle);
-                        }
-                        else if (segment is IfcLineIndex lineIndex)
-                        {
-                            var indices = (System.Collections.IList)lineIndex.Value;
-                            if (indices.Count < 2)
-                                throw new XbimGeometryServiceException(
-                                    $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: LineIndex must have at least 2 indices.");
-
-                            for (int p = 0; p < indices.Count - 1; p++)
-                            {
-                                int idx1 = (int)(long)((IfcPositiveInteger)indices[p]!).Value - 1;
-                                int idx2 = (int)(long)((IfcPositiveInteger)indices[p + 1]!).Value - 1;
-
-                                var (x1, y1) = points[idx1];
-                                var (x2, y2) = points[idx2];
-
-                                int lineResult = XbimGeometryNativeApi.xbim_curve2d_build_line(
-                                    ContextHandle, x1, y1, x2, y2, out var lineHandle);
-
-                                if (lineResult != 0)
-                                    throw new XbimGeometryServiceException(
-                                        $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: failed to build 2D line segment: {XbimGeometryNativeApi.GetLastError()}");
-
-                                segments.Add(lineHandle);
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    // No segments — connect all points sequentially with straight lines
-                    for (int p = 0; p < points.Count - 1; p++)
-                    {
-                        var (x1, y1) = points[p];
-                        var (x2, y2) = points[p + 1];
-
-                        int lineResult = XbimGeometryNativeApi.xbim_curve2d_build_line(
-                            ContextHandle, x1, y1, x2, y2, out var lineHandle);
-
-                        if (lineResult != 0)
-                            throw new XbimGeometryServiceException(
-                                $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: failed to build 2D sequential line segment: {XbimGeometryNativeApi.GetLastError()}");
-
-                        segments.Add(lineHandle);
-                    }
-                }
-
                 if (segments.Count == 0)
                     throw new XbimGeometryServiceException(
                         $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel} has no valid 2D segments.");
@@ -728,6 +651,93 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 foreach (var s in segments)
                     s.Dispose();
             }
+        }
+
+        /// <summary>
+        /// Builds the individual 2D curve segments for an indexed poly curve without joining them.
+        /// The caller is responsible for disposing the returned handles.
+        /// </summary>
+        internal List<NativeCurve2dHandle> BuildIndexedPolyCurveSegments2d(IIfcIndexedPolyCurve ifcIndexed)
+        {
+            var points = ExtractPoints2d(ifcIndexed);
+            var segments = new List<NativeCurve2dHandle>();
+
+            if (ifcIndexed.Segments != null && ifcIndexed.Segments.Any())
+            {
+                foreach (var segment in ifcIndexed.Segments)
+                {
+                    if (segment is IfcArcIndex arcIndex)
+                    {
+                        var indices = (System.Collections.IList)arcIndex.Value;
+                        if (indices.Count != 3)
+                            throw new XbimGeometryServiceException(
+                                $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: ArcIndex must have exactly 3 indices.");
+
+                        int i1 = (int)(long)((IfcPositiveInteger)indices[0]!).Value - 1;
+                        int i2 = (int)(long)((IfcPositiveInteger)indices[1]!).Value - 1;
+                        int i3 = (int)(long)((IfcPositiveInteger)indices[2]!).Value - 1;
+
+                        var (sx, sy) = points[i1];
+                        var (mx, my) = points[i2];
+                        var (ex, ey) = points[i3];
+
+                        // Native function handles collinear fallback internally (returns line segment)
+                        int arcResult = XbimGeometryNativeApi.xbim_curve2d_build_arc_3pt(
+                            ContextHandle, sx, sy, mx, my, ex, ey, out var arcHandle);
+
+                        if (arcResult != 0)
+                            throw new XbimGeometryServiceException(
+                                $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: failed to build 2D arc segment: {XbimGeometryNativeApi.GetLastError()}");
+
+                        segments.Add(arcHandle);
+                    }
+                    else if (segment is IfcLineIndex lineIndex)
+                    {
+                        var indices = (System.Collections.IList)lineIndex.Value;
+                        if (indices.Count < 2)
+                            throw new XbimGeometryServiceException(
+                                $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: LineIndex must have at least 2 indices.");
+
+                        for (int p = 0; p < indices.Count - 1; p++)
+                        {
+                            int idx1 = (int)(long)((IfcPositiveInteger)indices[p]!).Value - 1;
+                            int idx2 = (int)(long)((IfcPositiveInteger)indices[p + 1]!).Value - 1;
+
+                            var (x1, y1) = points[idx1];
+                            var (x2, y2) = points[idx2];
+
+                            int lineResult = XbimGeometryNativeApi.xbim_curve2d_build_line(
+                                ContextHandle, x1, y1, x2, y2, out var lineHandle);
+
+                            if (lineResult != 0)
+                                throw new XbimGeometryServiceException(
+                                    $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: failed to build 2D line segment: {XbimGeometryNativeApi.GetLastError()}");
+
+                            segments.Add(lineHandle);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // No segments — connect all points sequentially with straight lines
+                for (int p = 0; p < points.Count - 1; p++)
+                {
+                    var (x1, y1) = points[p];
+                    var (x2, y2) = points[p + 1];
+
+                    int lineResult = XbimGeometryNativeApi.xbim_curve2d_build_line(
+                        ContextHandle, x1, y1, x2, y2, out var lineHandle);
+
+                    if (lineResult != 0)
+                        throw new XbimGeometryServiceException(
+                            $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: failed to build 2D sequential line segment: {XbimGeometryNativeApi.GetLastError()}");
+
+                    segments.Add(lineHandle);
+                }
+            }
+
+            return segments;
         }
 
         /// <summary>

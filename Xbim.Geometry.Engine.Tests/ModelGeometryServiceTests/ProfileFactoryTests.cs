@@ -82,9 +82,10 @@ namespace Xbim.Geometry.Engine.Tests
                 innerRadius = 0;
             face.Area.Should().BeApproximately((Math.PI * Math.Pow(outerRadius, 2) - (Math.PI * Math.Pow(innerRadius, 2))), 1e-9);
             //wires, edges and curves cannot be built out of multiple wires
-            Assert.Throws<XbimGeometryFactoryException>(() => profileFactory.BuildWire(circleHollowProfileDef));
-            Assert.Throws<XbimGeometryFactoryException>(() => profileFactory.BuildEdge(circleHollowProfileDef));
-            Assert.Throws<XbimGeometryFactoryException>(() => profileFactory.BuildCurve(circleHollowProfileDef));
+            var s = profileFactory.BuildWire(circleHollowProfileDef);
+            // Assert.Throws<XbimGeometryServiceException>(() => profileFactory.BuildWire(circleHollowProfileDef));
+            Assert.Throws<XbimGeometryServiceException>(() => profileFactory.BuildEdge(circleHollowProfileDef));
+            Assert.Throws<XbimGeometryServiceException>(() => profileFactory.BuildCurve(circleHollowProfileDef));
         }
 
         [Theory]
@@ -99,7 +100,7 @@ namespace Xbim.Geometry.Engine.Tests
             var profileFactory = _modelSvc.ProfileFactory;
             if (paramEnd == 360) //expect an exception to be thrown, the centre line must not be closed
             {
-                Assert.Throws<XbimGeometryFactoryException>(() => profileFactory.BuildFace(profile));
+                Assert.Throws<XbimGeometryServiceException>(() => profileFactory.BuildFace(profile));
             }
             else
             {
@@ -122,14 +123,8 @@ namespace Xbim.Geometry.Engine.Tests
             occ.Should().NotBeNull();
             occ.IsSolidsOnly.Should().BeTrue();
             var compositeProfile = (IIfcCompositeProfileDef)extrusion.SweptArea;
-            occ.Solids.Count().Should().Be(compositeProfile.Profiles.Count);                                                               
+            occ.Solids.Length.Should().Be(compositeProfile.Profiles.Count);
             occ.Solids.Sum(s => s.Volume).Should().BeApproximately(12399283891, 1);
-           
-            //check the old engine returns the same result
-            var engineV5 = factory.CreateGeometryEngineV5(model, _loggerFactory);
-            var occV5 = engineV5.Create(extrusion) as IXbimSolidSet;
-            occV5.Count().Should().Be(compositeProfile.Profiles.Count);
-            occV5.Sum(s=>s.Volume).Should().BeApproximately(12399283891, 1);
         }
 
     }

@@ -33,6 +33,7 @@ internal static class IfcMoq
 
     public static IIfcCartesianPoint CartesianPoint3d(double x = 0, double y = 0, double z = 0)
     {
+        var label = Interlocked.Increment(ref _cartesianPointEntityLabelCounter);
         var cpMoq = MakeMoq<IIfcCartesianPoint>();
         cpMoq.SetupGet(v => v.Dim).Returns(new IfcDimensionCount(3));
         var cp = cpMoq.Object;
@@ -40,7 +41,7 @@ internal static class IfcMoq
         cpMoq.SetupGet(v => v.X).Returns(cp.Coordinates[0]);
         cpMoq.SetupGet(v => v.Y).Returns(cp.Coordinates[1]);
         cpMoq.SetupGet(v => v.Z).Returns(cp.Coordinates[2]);
-        cpMoq.SetupGet(v => v.EntityLabel).Returns(1);
+        cpMoq.SetupGet(v => v.EntityLabel).Returns(label);
         return cp;
     }
 
@@ -919,6 +920,7 @@ internal static class IfcMoq
 
     // ── Advanced BRep mocks ────────────────────────────────────────
 
+    private static int _cartesianPointEntityLabelCounter = 3000;
     private static int _advancedBrepEntityLabelCounter = 5000;
 
     public static IIfcVertexPoint VertexPoint(double x, double y, double z)

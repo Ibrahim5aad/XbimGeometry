@@ -431,8 +431,51 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXbimFace CreateFace(IIfcSurface surface, ILogger logger)
         {
+            if (surface is IIfcSurfaceOfLinearExtrusion linearExtrusion)
+                return CreateFaceOfLinearExtrusion(linearExtrusion);
+            if (surface is IIfcSurfaceOfRevolution)
+                return CreateFaceFromNaturalBounds(surface);
+
             var built = _service.SurfaceFactory.Build(surface);
             return SurfaceToFace(built, surface.EntityLabel);
+        }
+
+        private IXbimFace CreateFaceFromNaturalBounds(IIfcSurface ifcSurface)
+        {
+            var built = _service.SurfaceFactory.Build(ifcSurface);
+            if (built is not Surface surf)
+                throw new XbimGeometryServiceException(
+                    $"Failed to build surface #{ifcSurface.EntityLabel}: unexpected type.");
+
+            int result = XbimGeometryNativeApi.xbim_face_build_surface_natural_bounds(
+                _service.ContextHandle, surf.Handle, _service.Precision, out var faceHandle);
+
+            if (result != 0)
+                throw new XbimGeometryServiceException(
+                    $"Failed to build face from surface #{ifcSurface.EntityLabel}: " +
+                    $"{XbimGeometryNativeApi.GetLastError()}");
+
+            return (IXbimFace)NativeShapeWrapper.WrapFace(faceHandle);
+        }
+
+        private IXbimFace CreateFaceOfLinearExtrusion(IIfcSurfaceOfLinearExtrusion ifcExtrusion)
+        {
+            var built = _service.SurfaceFactory.Build(ifcExtrusion);
+            if (built is not Surface surf)
+                throw new XbimGeometryServiceException(
+                    $"SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: unexpected surface type.");
+
+            double depth = ifcExtrusion.Depth;
+
+            int result = XbimGeometryNativeApi.xbim_face_build_surface_with_depth(
+                _service.ContextHandle, surf.Handle, depth, _service.Precision, out var faceHandle);
+
+            if (result != 0)
+                throw new XbimGeometryServiceException(
+                    $"Failed to build face from SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: " +
+                    $"{XbimGeometryNativeApi.GetLastError()}");
+
+            return (IXbimFace)NativeShapeWrapper.WrapFace(faceHandle);
         }
 
         public IXbimFace CreateFace(IIfcPlane plane, ILogger logger)
@@ -854,7 +897,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
                     else
                     {
                         // Per-vertex normals — deduplicate by global vertex index, using the
-                        // normal from the first occurrence (matches old engine behaviour).
+                        // normal from the first occurrence
                         var nodeMap = new Dictionary<int, int>(triCount * 3);
                         var triangleNodeIds = new int[triCount * 3];
 
@@ -944,18 +987,17 @@ namespace Xbim.Geometry.Engine.Interop.Services
         /// <summary>
         /// Returns an IXShape result as IXbimSolid.
         /// If the result is already a solid, casts directly.
-        /// If it's a compound, extracts the first solid.
+        /// If it's a compound of solids, wraps the full compound so that Volume
+        /// and Faces aggregate across all sub-solids rather than truncating to the first.
         /// </summary>
         private static IXbimSolid WrapShapeAsSolid(IXShape shape)
         {
             if (shape is XbimSolid solid)
                 return solid;
 
-            // For compound results, extract the first solid
             var s = (XbimShape)shape;
-            var solidHandles = s.GetSubShapeHandles(XShapeType.Solid);
-            if (solidHandles.Length > 0)
-                return new XbimSolid(solidHandles[0]);
+            if (s.GetSubShapeHandles(XShapeType.Solid).Length > 0)
+                return new XbimSolid(s.Handle);
 
             throw new XbimGeometryServiceException("Build result is not a solid.");
         }

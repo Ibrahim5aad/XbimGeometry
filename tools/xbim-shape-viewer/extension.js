@@ -112,14 +112,22 @@ async function debugEval(expression) {
 }
 
 async function evalWriteShape(name, method, filePath) {
-    // Try directly first (works when variable is typed as Shape/Solid/etc.)
-    await debugEval(`${name}.${method}("${filePath}")`);
-    if (fs.existsSync(filePath)) return true;
+    const expressions = [
+        // 1. Direct call — works when variable is typed as IXShape or a concrete shape
+        `${name}.${method}("${filePath}")`,
+        // 2. Cast to IXShape — works when variable is typed as IXbimGeometryObject
+        `((Xbim.Geometry.Abstractions.IXShape)${name}).${method}("${filePath}")`,
+        // 3. Cast to XbimShape — last resort via concrete internal type
+        `((Xbim.Geometry.Engine.Interop.Shapes.XbimShape)${name}).${method}("${filePath}")`,
+    ];
 
-    // Debugger may see the variable as IXbimGeometryObject — cast to Shape
-    outputChannel.appendLine(`[xbim] Direct call failed, casting to XbimShape...`);
-    await debugEval(`((Xbim.Geometry.Engine.Interop.Shapes.XbimShape)${name}).${method}("${filePath}")`);
-    return fs.existsSync(filePath);
+    for (const expr of expressions) {
+        await debugEval(expr);
+        if (fs.existsSync(filePath)) return true;
+        outputChannel.appendLine(`[xbim] ${method}: file not created, trying next expression...`);
+    }
+
+    return false;
 }
 
 // ── Set helpers (XbimSolidSet, XbimGeometryObjectSet) ───────────────────────

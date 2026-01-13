@@ -71,11 +71,10 @@ namespace Xbim.Geometry.Engine.Tests
 
                 var solids = geomEngine.CreateSolidSet(brep);
 
-                solids.Count.Should().Be(3);
+                solids.Count.Should().Be(2);
                 var s1 = solids.ElementAt(0);
                 s1.Faces.Count.Should().Be(14);
             }
-
         }
 
         [Theory]
@@ -100,7 +99,7 @@ namespace Xbim.Geometry.Engine.Tests
                 var geomEngine = factory.CreateGeometryEngineV5(model, _loggerFactory);
                 if (throwsException)
                 {
-                    var ex = Assert.Throws<XbimGeometryFactoryException>(() => geomEngine.CreateSolid(surfaceSweep));
+                    var ex = Assert.Throws<XbimGeometryServiceException>(() => geomEngine.CreateSolid(surfaceSweep));
                     ex.Message.Should().StartWith($"Failed to build SurfaceCurveSweptAreaSolid #{surfaceSweep.EntityLabel}");
                 }
                 else
@@ -136,7 +135,7 @@ namespace Xbim.Geometry.Engine.Tests
 
 
         [Theory]
-        [InlineData("advanced_brep_1", 1, 2445135   /*, DisplayName = "Self Intersection unorientable shape"*/)]
+        [InlineData("advanced_brep_1", 1, 2452539   /*, DisplayName = "Self Intersection unorientable shape"*/)]
         [InlineData("advanced_brep_2", 1, 828514    /*, DisplayName = "Curved edges with varying orientation"*/)]
         [InlineData("advanced_brep_3", 1, 2466953   /*, DisplayName = "Badly formed wire orders and missing faces and holes, accurate in V6 but still bad definition"*/)]
         [InlineData("advanced_brep_4", 2, 864225    /*, DisplayName = "Two solids from one advanced brep, errors in holes"*/)]

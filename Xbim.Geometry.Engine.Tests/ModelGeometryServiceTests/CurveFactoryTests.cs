@@ -156,7 +156,7 @@ namespace Xbim.Geometry.Engine.Tests
             var ifcCircle = IfcMoq.IfcCircle2dMock(radius: radius, location: location3d ? IfcMoq.IfcAxis2Placement3DMock() : null);
             var curveFactory = _modelSvc.CurveFactory;
             if (checkException)
-                ifcCircle.Invoking(c => curveFactory.Build(c)).Should().Throw<XbimGeometryFactoryException>();
+                ifcCircle.Invoking(c => curveFactory.Build(c)).Should().Throw<XbimGeometryServiceException>();
             else
             {
                 var circle = curveFactory.Build(ifcCircle);
