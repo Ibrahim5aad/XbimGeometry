@@ -224,8 +224,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         private XbimBoundedCurve3d BuildPolylineAsBSpline(IIfcPolyline ifcPolyline)
         {
-            var ifcPoints = ifcPolyline.Points;
-            int pointCount = ifcPoints.Count;
+            var (px, py, pz) = ExtractPolylinePoints3d(ifcPolyline);
+            int pointCount = px.Length;
 
             if (pointCount < 2)
                 throw new XbimGeometryServiceException(
@@ -235,13 +235,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             if (pointCount == 2)
             {
-                var p0 = GeometryFactory.BuildPoint3d(ifcPoints[0]);
-                var p1 = GeometryFactory.BuildPoint3d(ifcPoints[1]);
-
                 double dist = Math.Sqrt(
-                    (p1.X - p0.X) * (p1.X - p0.X) +
-                    (p1.Y - p0.Y) * (p1.Y - p0.Y) +
-                    (p1.Z - p0.Z) * (p1.Z - p0.Z));
+                    (px[1] - px[0]) * (px[1] - px[0]) +
+                    (py[1] - py[0]) * (py[1] - py[0]) +
+                    (pz[1] - pz[0]) * (pz[1] - pz[0]));
 
                 if (dist < precision)
                 {
@@ -253,7 +250,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 int lineResult = XbimGeometryNativeApi.xbim_curve_build_trimmed_line_3d(
-                    ContextHandle, p0.X, p0.Y, p0.Z, p1.X, p1.Y, p1.Z, out var lineHandle);
+                    ContextHandle, px[0], py[0], pz[0], px[1], py[1], pz[1], out var lineHandle);
 
                 if (lineResult != 0)
                     throw new XbimGeometryServiceException(
@@ -266,29 +263,20 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var segments = new List<NativeCurveHandle>();
             try
             {
-                var pts = new (double X, double Y, double Z)[pointCount];
-                for (int i = 0; i < pointCount; i++)
-                {
-                    var p = GeometryFactory.BuildPoint3d(ifcPoints[i]);
-                    pts[i] = (p.X, p.Y, p.Z);
-                }
 
                 int lastIdx = 0;
                 for (int i = 1; i < pointCount; i++)
                 {
-                    var start = pts[lastIdx];
-                    var end = pts[i];
-
-                    double dist = Math.Sqrt(
-                        (end.X - start.X) * (end.X - start.X) +
-                        (end.Y - start.Y) * (end.Y - start.Y) +
-                        (end.Z - start.Z) * (end.Z - start.Z));
+                    double dx = px[i] - px[lastIdx];
+                    double dy = py[i] - py[lastIdx];
+                    double dz = pz[i] - pz[lastIdx];
+                    double dist = Math.Sqrt(dx * dx + dy * dy + dz * dz);
 
                     if (dist < precision)
                         continue; // skip degenerate segment
 
                     int lineResult = XbimGeometryNativeApi.xbim_curve_build_trimmed_line_3d(
-                        ContextHandle, start.X, start.Y, start.Z, end.X, end.Y, end.Z,
+                        ContextHandle, px[lastIdx], py[lastIdx], pz[lastIdx], px[i], py[i], pz[i],
                         out var lineHandle);
 
                     if (lineResult != 0)
@@ -539,7 +527,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private XbimBoundedCurve3d BuildIndexedPolyCurve(IIfcIndexedPolyCurve ifcIndexed)
         {
             // Extract 3D points from the coordinate list (IFC indices are 1-based)
-            var points = ExtractPoints3d(ifcIndexed);
+            var points = ExtractIndexedPoints3d(ifcIndexed);
             var segments = new List<NativeCurveHandle>();
 
             try
@@ -690,33 +678,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
         }
 
-        /// <summary>
-        /// Extracts 3D point coordinates from an IIfcIndexedPolyCurve's point list.
-        /// Handles both IIfcCartesianPointList3D (native 3D) and IIfcCartesianPointList2D (Z=0).
-        /// </summary>
-        private static List<(double x, double y, double z)> ExtractPoints3d(IIfcIndexedPolyCurve ifcIndexed)
-        {
-            var coordList = ifcIndexed.Points;
-
-            if (coordList is IIfcCartesianPointList3D pointList3D)
-            {
-                var points = new List<(double, double, double)>(pointList3D.CoordList.Count);
-                foreach (var coords in pointList3D.CoordList)
-                    points.Add((coords[0], coords[1], coords.Count > 2 ? coords[2] : 0.0));
-                return points;
-            }
-
-            if (coordList is IIfcCartesianPointList2D pointList2D)
-            {
-                var points = new List<(double, double, double)>(pointList2D.CoordList.Count);
-                foreach (var coords in pointList2D.CoordList)
-                    points.Add((coords[0], coords[1], 0.0));
-                return points;
-            }
-
-            throw new NotSupportedException(
-                $"Unsupported point list type in IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}.");
-        }
+        // Point extraction delegated to CurveFactory.ExtractIndexedPoints3d (centralized helper)
 
         #endregion
 

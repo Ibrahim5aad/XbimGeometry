@@ -125,6 +125,101 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         #endregion
 
+        #region Point Extraction Helpers
+
+        /// <summary>
+        /// Extracts 2D coordinates from a polyline into separate X and Y arrays.
+        /// </summary>
+        internal static (double[] x, double[] y) ExtractPolylinePoints2d(IIfcPolyline polyline)
+        {
+            var ifcPoints = polyline.Points;
+            int count = ifcPoints.Count;
+            var x = new double[count];
+            var y = new double[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                var coords = ifcPoints[i].Coordinates;
+                x[i] = coords[0];
+                y[i] = coords[1];
+            }
+
+            return (x, y);
+        }
+
+        /// <summary>
+        /// Extracts 3D coordinates from a polyline into separate X, Y, and Z arrays.
+        /// Points with Dim=2 are promoted to 3D with Z=0.
+        /// </summary>
+        internal static (double[] x, double[] y, double[] z) ExtractPolylinePoints3d(IIfcPolyline polyline)
+        {
+            var ifcPoints = polyline.Points;
+            int count = ifcPoints.Count;
+            var x = new double[count];
+            var y = new double[count];
+            var z = new double[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                var cp = ifcPoints[i];
+                x[i] = cp.Coordinates[0];
+                y[i] = cp.Coordinates[1];
+                z[i] = (int)cp.Dim == 3 ? (double)cp.Coordinates[2] : 0.0;
+            }
+
+            return (x, y, z);
+        }
+
+        /// <summary>
+        /// Extracts 2D point coordinates from an indexed poly curve's point list.
+        /// </summary>
+        internal static List<(double x, double y)> ExtractIndexedPoints2d(IIfcIndexedPolyCurve ifcIndexed)
+        {
+            var coordList = ifcIndexed.Points;
+
+            if (coordList is IIfcCartesianPointList2D pointList2D)
+            {
+                var points = new List<(double, double)>(pointList2D.CoordList.Count);
+                foreach (var coords in pointList2D.CoordList)
+                    points.Add((coords[0], coords[1]));
+                return points;
+            }
+
+            throw new NotSupportedException(
+                $"2D IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel} requires IIfcCartesianPointList2D, " +
+                $"but found {coordList?.GetType().Name ?? "null"}.");
+        }
+
+        /// <summary>
+        /// Extracts 3D point coordinates from an indexed poly curve's point list.
+        /// Handles both IIfcCartesianPointList3D (native 3D) and IIfcCartesianPointList2D (Z=0).
+        /// </summary>
+        internal static List<(double x, double y, double z)> ExtractIndexedPoints3d(IIfcIndexedPolyCurve ifcIndexed)
+        {
+            var coordList = ifcIndexed.Points;
+
+            if (coordList is IIfcCartesianPointList3D pointList3D)
+            {
+                var points = new List<(double, double, double)>(pointList3D.CoordList.Count);
+                foreach (var coords in pointList3D.CoordList)
+                    points.Add((coords[0], coords[1], coords.Count > 2 ? coords[2] : 0.0));
+                return points;
+            }
+
+            if (coordList is IIfcCartesianPointList2D pointList2D)
+            {
+                var points = new List<(double, double, double)>(pointList2D.CoordList.Count);
+                foreach (var coords in pointList2D.CoordList)
+                    points.Add((coords[0], coords[1], 0.0));
+                return points;
+            }
+
+            throw new NotSupportedException(
+                $"Unsupported point list type in IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}.");
+        }
+
+        #endregion
+
         #region Cache
 
         /// <summary>

@@ -425,8 +425,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         private XbimBoundedCurve2d BuildPolyline2d(IIfcPolyline ifcPolyline)
         {
-            var ifcPoints = ifcPolyline.Points;
-            int pointCount = ifcPoints.Count;
+            var (px, py) = ExtractPolylinePoints2d(ifcPolyline);
+            int pointCount = px.Length;
 
             if (pointCount < 2)
                 throw new XbimGeometryServiceException(
@@ -434,19 +434,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             double precision = _modelService.Precision;
 
-            // Extract 2D coordinates
-            var pts = new (double X, double Y)[pointCount];
-            for (int i = 0; i < pointCount; i++)
-            {
-                var coords = ifcPoints[i].Coordinates;
-                pts[i] = (coords[0], coords[1]);
-            }
-
             if (pointCount == 2)
             {
                 double dist = Math.Sqrt(
-                    (pts[1].X - pts[0].X) * (pts[1].X - pts[0].X) +
-                    (pts[1].Y - pts[0].Y) * (pts[1].Y - pts[0].Y));
+                    (px[1] - px[0]) * (px[1] - px[0]) +
+                    (py[1] - py[0]) * (py[1] - py[0]));
 
                 if (dist < precision)
                 {
@@ -458,7 +450,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 }
 
                 int lineResult = XbimGeometryNativeApi.xbim_curve2d_build_line(
-                    ContextHandle, pts[0].X, pts[0].Y, pts[1].X, pts[1].Y, out var lineHandle);
+                    ContextHandle, px[0], py[0], px[1], py[1], out var lineHandle);
 
                 if (lineResult != 0)
                     throw new XbimGeometryServiceException(
@@ -474,18 +466,15 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 int lastIdx = 0;
                 for (int i = 1; i < pointCount; i++)
                 {
-                    var start = pts[lastIdx];
-                    var end = pts[i];
-
-                    double dist = Math.Sqrt(
-                        (end.X - start.X) * (end.X - start.X) +
-                        (end.Y - start.Y) * (end.Y - start.Y));
+                    double dx = px[i] - px[lastIdx];
+                    double dy = py[i] - py[lastIdx];
+                    double dist = Math.Sqrt(dx * dx + dy * dy);
 
                     if (dist < precision)
                         continue; // skip degenerate segment
 
                     int lineResult = XbimGeometryNativeApi.xbim_curve2d_build_line(
-                        ContextHandle, start.X, start.Y, end.X, end.Y, out var lineHandle);
+                        ContextHandle, px[lastIdx], py[lastIdx], px[i], py[i], out var lineHandle);
 
                     if (lineResult != 0)
                         throw new XbimGeometryServiceException(
@@ -659,7 +648,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         internal List<NativeCurve2dHandle> BuildIndexedPolyCurveSegments2d(IIfcIndexedPolyCurve ifcIndexed)
         {
-            var points = ExtractPoints2d(ifcIndexed);
+            var points = ExtractIndexedPoints2d(ifcIndexed);
             var segments = new List<NativeCurve2dHandle>();
 
             if (ifcIndexed.Segments != null && ifcIndexed.Segments.Any())
@@ -740,25 +729,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             return segments;
         }
 
-        /// <summary>
-        /// Extracts 2D point coordinates from an IIfcIndexedPolyCurve's point list.
-        /// </summary>
-        private static List<(double x, double y)> ExtractPoints2d(IIfcIndexedPolyCurve ifcIndexed)
-        {
-            var coordList = ifcIndexed.Points;
-
-            if (coordList is IIfcCartesianPointList2D pointList2D)
-            {
-                var points = new List<(double, double)>(pointList2D.CoordList.Count);
-                foreach (var coords in pointList2D.CoordList)
-                    points.Add((coords[0], coords[1]));
-                return points;
-            }
-
-            throw new NotSupportedException(
-                $"2D IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel} requires IIfcCartesianPointList2D, " +
-                $"but found {coordList?.GetType().Name ?? "null"}.");
-        }
+        // Point extraction delegated to CurveFactory.ExtractIndexedPoints2d (centralized helper)
 
         #endregion
 
