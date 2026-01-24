@@ -5,6 +5,7 @@ using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
+using Xbim.Geometry.Engine.Interop.Rules;
 using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
@@ -107,20 +108,126 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
         }
 
-        #region Helpers
+        #region Composite Curve Segment Helpers
 
         /// <summary>
-        /// Returns whether an IFC curve is bounded. Unbounded curves (lines, pcurves,
-        /// surface curves) are not valid as composite curve segments.
+        /// Iterates composite curve segments, applying ArchiCAD duplicate-skip and bounded-curve
+        /// validation, builds each segment as a 3D curve, and reverses if !SameSense.
+        /// The caller is responsible for disposing the returned curve wrappers.
         /// </summary>
-        private static bool IsBoundedCurve(IIfcCurve curve)
+        internal List<XbimCurve> BuildCompositeCurveSegments3d(IIfcCompositeCurve ifcComposite)
         {
-            if (curve is IIfcLine) return false;
-            if (curve is IIfcOffsetCurve3D oc3d) return IsBoundedCurve(oc3d.BasisCurve);
-            if (curve is IIfcOffsetCurve2D oc2d) return IsBoundedCurve(oc2d.BasisCurve);
-            if (curve is IIfcPcurve) return false;
-            if (curve is IIfcSurfaceCurve) return false;
-            return true;
+            var segmentCurves = new List<XbimCurve>();
+            try
+            {
+                int lastLabel = -1;
+                foreach (var segment in ifcComposite.Segments)
+                {
+                    // ArchiCAD bug workaround: skip consecutive duplicate segments (same EntityLabel)
+                    if (segment.EntityLabel == lastLabel)
+                    {
+                        _logger.LogInformation(
+                            "IIfcCompositeCurve #{Label}: skipping duplicate segment #{SegLabel} (ArchiCAD bug).",
+                            ifcComposite.EntityLabel, segment.EntityLabel);
+                        continue;
+                    }
+                    lastLabel = segment.EntityLabel;
+
+                    // Reparametrised segments with non-unit ParamLength are unsupported
+                    if (segment is IIfcReparametrisedCompositeCurveSegment reparam
+                        && (double)reparam.ParamLength != 1.0)
+                        throw new XbimGeometryServiceException(
+                            $"IIfcReparametrisedCompositeCurveSegment #{segment.EntityLabel} is currently unsupported (ParamLength != 1).");
+
+                    if (segment.ParentCurve == null)
+                        continue;
+
+                    // Composite curve segments must be bounded curves
+                    if (!CurveRules.IsBoundedCurve(segment.ParentCurve))
+                        throw new XbimGeometryServiceException(
+                            "Composite curve is invalid, only curve segments that are bounded curves are permitted.");
+
+                    var segCurve = (XbimCurve)Build(segment.ParentCurve);
+
+                    if (!segment.SameSense)
+                    {
+                        int reverseResult = XbimGeometryNativeApi.xbim_curve_reverse(segCurve.Handle);
+                        if (reverseResult != 0)
+                            throw new XbimGeometryServiceException(
+                                $"Failed to reverse composite curve segment: {XbimGeometryNativeApi.GetLastError()}");
+                    }
+
+                    segmentCurves.Add(segCurve);
+                }
+            }
+            catch
+            {
+                foreach (var c in segmentCurves)
+                    c.Dispose();
+                throw;
+            }
+
+            return segmentCurves;
+        }
+
+        /// <summary>
+        /// Iterates composite curve segments, applying ArchiCAD duplicate-skip and bounded-curve
+        /// validation, builds each segment as a 2D curve, and reverses if !SameSense.
+        /// The caller is responsible for disposing the returned curve wrappers.
+        /// </summary>
+        internal List<XbimCurve2d> BuildCompositeCurveSegments2d(IIfcCompositeCurve ifcComposite)
+        {
+            var segmentCurves = new List<XbimCurve2d>();
+            try
+            {
+                int lastLabel = -1;
+                foreach (var segment in ifcComposite.Segments)
+                {
+                    // ArchiCAD bug workaround: skip consecutive duplicate segments (same EntityLabel)
+                    if (segment.EntityLabel == lastLabel)
+                    {
+                        _logger.LogInformation(
+                            "IIfcCompositeCurve #{Label}: skipping duplicate segment #{SegLabel} (ArchiCAD bug).",
+                            ifcComposite.EntityLabel, segment.EntityLabel);
+                        continue;
+                    }
+                    lastLabel = segment.EntityLabel;
+
+                    // Reparametrised segments with non-unit ParamLength are unsupported
+                    if (segment is IIfcReparametrisedCompositeCurveSegment reparam
+                        && (double)reparam.ParamLength != 1.0)
+                        throw new XbimGeometryServiceException(
+                            $"IIfcReparametrisedCompositeCurveSegment #{segment.EntityLabel} is currently unsupported (ParamLength != 1).");
+
+                    if (segment.ParentCurve == null)
+                        continue;
+
+                    // Composite curve segments must be bounded curves
+                    if (!CurveRules.IsBoundedCurve(segment.ParentCurve))
+                        throw new XbimGeometryServiceException(
+                            "Composite curve is invalid, only curve segments that are bounded curves are permitted.");
+
+                    var segCurve = (XbimCurve2d)BuildCurve2d(segment.ParentCurve);
+
+                    if (!segment.SameSense)
+                    {
+                        int reverseResult = XbimGeometryNativeApi.xbim_curve2d_reverse(segCurve.Handle);
+                        if (reverseResult != 0)
+                            throw new XbimGeometryServiceException(
+                                $"Failed to reverse 2D composite curve segment: {XbimGeometryNativeApi.GetLastError()}");
+                    }
+
+                    segmentCurves.Add(segCurve);
+                }
+            }
+            catch
+            {
+                foreach (var c in segmentCurves)
+                    c.Dispose();
+                throw;
+            }
+
+            return segmentCurves;
         }
 
         #endregion

@@ -526,50 +526,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         private XbimBoundedCurve2d BuildCompositeCurve2d(IIfcCompositeCurve ifcComposite)
         {
-            var segmentCurves = new List<XbimCurve2d>();
-
+            var segmentCurves = BuildCompositeCurveSegments2d(ifcComposite);
             try
             {
-                int lastLabel = -1;
-                foreach (var segment in ifcComposite.Segments)
-                {
-                    // ArchiCAD bug workaround: skip consecutive duplicate segments (same EntityLabel)
-                    if (segment.EntityLabel == lastLabel)
-                    {
-                        _logger.LogInformation(
-                            "IIfcCompositeCurve #{Label}: skipping duplicate segment #{SegLabel} (ArchiCAD bug).",
-                            ifcComposite.EntityLabel, segment.EntityLabel);
-                        continue;
-                    }
-                    lastLabel = segment.EntityLabel;
-
-                    // Reparametrised segments with non-unit ParamLength are unsupported
-                    if (segment is IIfcReparametrisedCompositeCurveSegment reparam
-                        && (double)reparam.ParamLength != 1.0)
-                        throw new XbimGeometryServiceException(
-                            $"IIfcReparametrisedCompositeCurveSegment #{segment.EntityLabel} is currently unsupported (ParamLength != 1).");
-
-                    if (segment.ParentCurve == null)
-                        continue;
-
-                    // Composite curve segments must be bounded curves
-                    if (!IsBoundedCurve(segment.ParentCurve))
-                        throw new XbimGeometryServiceException(
-                            "Composite curve is invalid, only curve segments that are bounded curves are permitted.");
-
-                    var segCurve = (XbimCurve2d)BuildCurve2d(segment.ParentCurve);
-
-                    if (!segment.SameSense)
-                    {
-                        int reverseResult = XbimGeometryNativeApi.xbim_curve2d_reverse(segCurve.Handle);
-                        if (reverseResult != 0)
-                            throw new XbimGeometryServiceException(
-                                $"Failed to reverse 2D composite curve segment: {XbimGeometryNativeApi.GetLastError()}");
-                    }
-
-                    segmentCurves.Add(segCurve);
-                }
-
                 if (segmentCurves.Count == 0)
                     throw new XbimGeometryServiceException(
                         $"IIfcCompositeCurve #{ifcComposite.EntityLabel} has no valid 2D segments.");
@@ -728,8 +687,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             return segments;
         }
-
-        // Point extraction delegated to CurveFactory.ExtractIndexedPoints2d (centralized helper)
 
         #endregion
 
