@@ -23,7 +23,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         private readonly ModelGeometryService _modelService;
         private readonly ILogger _logger;
 
-        // Caches owning handles for expensive-to-build gradient and segmented reference curves.
+        // Caches owning handles for gradient and segmented reference curves.
         // Keyed by IFC entity label. Callers receive borrowed (non-owning) Curve wrappers.
         private readonly object _cacheLock = new();
         private readonly Dictionary<int, (NativeCurveHandle Handle, XCurveType CurveType)> _curveCache = new();
@@ -107,6 +107,116 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 builtCurve.Dispose();
             }
         }
+
+        #region Trim Parameter Helpers
+
+        /// <summary>
+        /// Parses Trim1/Trim2 selects from an IFC trimmed curve and resolves parametric values.
+        /// When Cartesian trim points should be used (either preferred or because parametric values
+        /// are missing), sets <paramref name="useCartesian"/> to true and returns the points in
+        /// <paramref name="cp1"/> and <paramref name="cp2"/> for the caller to project onto the
+        /// basis curve. Otherwise, applies radian factor (for conics) or line magnitude scaling
+        /// (for lines) to the parametric values and handles the equal-parameter case.
+        /// </summary>
+        internal void ExtractTrimParameters(
+            IIfcTrimmedCurve ifcTrimmed,
+            bool isConic,
+            out double u1,
+            out double u2,
+            ref bool sense,
+            out bool useCartesian,
+            out IIfcCartesianPoint? cp1,
+            out IIfcCartesianPoint? cp2)
+        {
+            bool preferCartesian = ifcTrimmed.MasterRepresentation == Ifc4.Interfaces.IfcTrimmingPreference.CARTESIAN;
+
+            // Parse trim selects
+            u1 = double.NegativeInfinity;
+            u2 = double.PositiveInfinity;
+            cp1 = null;
+            cp2 = null;
+
+            foreach (var trim in ifcTrimmed.Trim1)
+            {
+                if (trim is IIfcCartesianPoint pt)
+                    cp1 = pt;
+                else if (trim is Xbim.Ifc4.MeasureResource.IfcParameterValue pv)
+                    u1 = (double)pv;
+            }
+
+            foreach (var trim in ifcTrimmed.Trim2)
+            {
+                if (trim is IIfcCartesianPoint pt)
+                    cp2 = pt;
+                else if (trim is Xbim.Ifc4.MeasureResource.IfcParameterValue pv)
+                    u2 = (double)pv;
+            }
+
+            // Determine whether to use Cartesian projection
+            if ((preferCartesian && cp1 != null && cp2 != null) ||
+                (cp1 != null && cp2 != null &&
+                 (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))))
+            {
+                useCartesian = true;
+                return;
+            }
+
+            useCartesian = false;
+
+            if (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))
+            {
+                throw new XbimGeometryServiceException(
+                    $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: TrimValuesConsistent — " +
+                    "either a single value is specified for Trim, or the two trimming values are of different type.");
+            }
+
+            // Apply parametric scaling
+            if (isConic)
+            {
+                u1 *= _modelService.RadianFactor;
+                u2 *= _modelService.RadianFactor;
+            }
+            else if (ifcTrimmed.BasisCurve is IIfcLine ifcBaseLine)
+            {
+                u1 *= ifcBaseLine.Dir.Magnitude;
+                u2 *= ifcBaseLine.Dir.Magnitude;
+            }
+
+            // Handle equal parameters
+            HandleEqualTrimParams(ifcTrimmed, isConic, ref u1, ref u2, ref sense);
+        }
+
+        /// <summary>
+        /// Handles the equal-parameter case after Cartesian trim point projection. When both
+        /// parameters are within precision of each other, conics produce a full circle (u1=0,
+        /// u2=2*PI, sense=true) and non-conics throw.
+        /// </summary>
+        internal void HandleEqualTrimParams(
+            IIfcTrimmedCurve ifcTrimmed,
+            bool isConic,
+            ref double u1,
+            ref double u2,
+            ref bool sense)
+        {
+            if (Math.Abs(u1 - u2) < _modelService.Precision)
+            {
+                if (isConic)
+                {
+                    u1 = 0.0;
+                    u2 = Math.PI * 2.0;
+                    sense = true;
+                }
+                else
+                {
+                    _logger.LogInformation("IIfcTrimmedCurve #{Label}: parametric trim points are equal on non-conic — empty curve.",
+                        ifcTrimmed.BasisCurve.EntityLabel);
+                    throw new XbimGeometryServiceException(
+                        $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: trim parameters are equal on a non-conic basis, resulting in an empty curve.");
+                }
+            }
+        }
+
+        #endregion
 
         #region Composite Curve Segment Helpers
 

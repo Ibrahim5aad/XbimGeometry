@@ -286,39 +286,16 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 bool isCircle = ifcTrimmed.BasisCurve is IIfcCircle;
                 bool isEllipse = ifcTrimmed.BasisCurve is IIfcEllipse;
                 bool sense = ifcTrimmed.SenseAgreement;
-                bool preferCartesian = ifcTrimmed.MasterRepresentation == IfcTrimmingPreference.CARTESIAN;
 
-                // Parse trim selects
-                double u1 = double.NegativeInfinity;
-                double u2 = double.PositiveInfinity;
-                IIfcCartesianPoint? cp1 = null;
-                IIfcCartesianPoint? cp2 = null;
+                ExtractTrimParameters(ifcTrimmed, isConic,
+                    out double u1, out double u2, ref sense,
+                    out bool useCartesian, out var cp1, out var cp2);
 
-                foreach (var trim in ifcTrimmed.Trim1)
+                if (useCartesian)
                 {
-                    if (trim is IIfcCartesianPoint pt)
-                        cp1 = pt;
-                    else if (trim is Xbim.Ifc4.MeasureResource.IfcParameterValue pv)
-                        u1 = (double)pv;
-                }
-
-                foreach (var trim in ifcTrimmed.Trim2)
-                {
-                    if (trim is IIfcCartesianPoint pt)
-                        cp2 = pt;
-                    else if (trim is Xbim.Ifc4.MeasureResource.IfcParameterValue pv)
-                        u2 = (double)pv;
-                }
-
-                // Resolve trim parameters
-                if ((preferCartesian && cp1 != null && cp2 != null) ||
-                    (cp1 != null && cp2 != null &&
-                     (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))))
-                {
-                    // Use Cartesian points projected onto the 2D basis curve
-                    double px1 = cp1.Coordinates[0];
+                    double px1 = cp1!.Coordinates[0];
                     double py1 = cp1.Coordinates[1];
-                    double px2 = cp2.Coordinates[0];
+                    double px2 = cp2!.Coordinates[0];
                     double py2 = cp2.Coordinates[1];
 
                     int r1 = XbimGeometryNativeApi.xbim_curve2d_project_point(
@@ -334,51 +311,13 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     if (r2 != 0)
                         throw new XbimGeometryServiceException(
                             $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Trim Point2 is not on the 2D basis curve.");
-                }
-                else if (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))
-                {
-                    throw new XbimGeometryServiceException(
-                        $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: TrimValuesConsistent — " +
-                        "either a single value is specified for Trim, or the two trimming values are of different type.");
-                }
-                else
-                {
-                    // Use parametric values, converting from IFC to OCCT parameter space
-                    if (isConic)
-                    {
-                        u1 *= _modelService.RadianFactor;
-                        u2 *= _modelService.RadianFactor;
-                    }
-                    else if (ifcTrimmed.BasisCurve is IIfcLine ifcBaseLine)
-                    {
-                        // IFC line parameters are scaled by the direction vector magnitude
-                        u1 *= ifcBaseLine.Dir.Magnitude;
-                        u2 *= ifcBaseLine.Dir.Magnitude;
-                    }
-                }
 
-                // Sanity check
-                if (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))
-                    throw new XbimGeometryServiceException(
-                        $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: error converting trim points.");
-
-                // Handle equal parameters
-                if (Math.Abs(u1 - u2) < _modelService.Precision)
-                {
-                    if (isConic)
-                    {
-                        // Equal params on a conic → build a full circle/ellipse
-                        u1 = 0.0;
-                        u2 = Math.PI * 2.0;
-                        sense = true;
-                    }
-                    else
-                    {
-                        _logger.LogInformation("IIfcTrimmedCurve #{Label}: parametric trim points are equal on non-conic — empty curve.",
-                            ifcTrimmed.BasisCurve.EntityLabel);
+                    // Sanity check
+                    if (double.IsNegativeInfinity(u1) || double.IsPositiveInfinity(u2))
                         throw new XbimGeometryServiceException(
-                            $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: trim parameters are equal on a non-conic basis, resulting in an empty curve.");
-                    }
+                            $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: error converting trim points.");
+
+                    HandleEqualTrimParams(ifcTrimmed, isConic, ref u1, ref u2, ref sense);
                 }
 
                 // Build trimmed curve using specialized native functions based on basis type
