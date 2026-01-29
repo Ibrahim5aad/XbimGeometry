@@ -9,6 +9,7 @@ using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Ifc4.Interfaces;
+using Xbim.Geometry.Engine.Interop.Rules;
 using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
@@ -565,12 +566,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var outerCurve = arbitraryProfile.OuterCurve ?? throw new XbimGeometryServiceException(
                     $"ArbitraryClosedProfileDef #{arbitraryProfile.EntityLabel} has no OuterCurve.");
 
-            if (outerCurve is IIfcLine)
-                throw new XbimGeometryServiceException(
-                    $"WR2 ArbitraryClosedProfileDef #{arbitraryProfile.EntityLabel}: outer curve shall not be IfcLine (not a closed curve).");
-            if (outerCurve is IIfcOffsetCurve2D)
-                throw new XbimGeometryServiceException(
-                    $"WR3 ArbitraryClosedProfileDef #{arbitraryProfile.EntityLabel}: outer curve shall not be IfcOffsetCurve2D.");
+            ProfileRules.Validate(arbitraryProfile);
 
             // Extract polyline points from the outer curve
             if (outerCurve is IIfcPolyline polyline)

@@ -505,11 +505,28 @@ internal static class IfcMoq
 
         // Build polyline from points
         var polyMoq = MakeMoq<IIfcPolyline>();
+        polyMoq.SetupGet(c => c.Dim).Returns(new IfcDimensionCount(2));
         var poly = polyMoq.Object;
         foreach (var (x, y) in points)
             poly.Points.Add(CartesianPoint2d(x, y));
 
         moq.SetupGet(x => x.OuterCurve).Returns(poly);
+        moq.SetupGet(x => x.ExpressType)
+            .Returns(MetaData.ExpressType(typeof(IfcArbitraryClosedProfileDef)));
+        return obj;
+    }
+
+    /// <summary>
+    /// Creates an IIfcArbitraryClosedProfileDef with a custom outer curve.
+    /// </summary>
+    public static IIfcArbitraryClosedProfileDef ArbitraryClosedProfileWithCurve(
+        IIfcCurve outerCurve, int label = 42)
+    {
+        var moq = MakeMoq<IIfcArbitraryClosedProfileDef>();
+        var obj = moq.Object;
+        obj.ProfileType = IfcProfileTypeEnum.AREA;
+        moq.SetupGet(x => x.OuterCurve).Returns(outerCurve);
+        moq.SetupGet(x => x.EntityLabel).Returns(label);
         moq.SetupGet(x => x.ExpressType)
             .Returns(MetaData.ExpressType(typeof(IfcArbitraryClosedProfileDef)));
         return obj;
@@ -528,6 +545,7 @@ internal static class IfcMoq
 
         // Outer curve
         var polyMoq = MakeMoq<IIfcPolyline>();
+        polyMoq.SetupGet(c => c.Dim).Returns(new IfcDimensionCount(2));
         var poly = polyMoq.Object;
         foreach (var (x, y) in outerPoints)
             poly.Points.Add(CartesianPoint2d(x, y));
@@ -538,6 +556,7 @@ internal static class IfcMoq
         foreach (var innerPts in innerCurves)
         {
             var iPoly = MakeMoq<IIfcPolyline>();
+            iPoly.SetupGet(c => c.Dim).Returns(new IfcDimensionCount(2));
             var ip = iPoly.Object;
             foreach (var (x, y) in innerPts)
                 ip.Points.Add(CartesianPoint2d(x, y));
