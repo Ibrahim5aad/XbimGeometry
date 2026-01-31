@@ -6,7 +6,6 @@ using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Services;
-using Xbim.Geometry.Engine.Interop.Primitives;
 using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Geometry.Engine.Interop.Rules;
@@ -1063,33 +1062,13 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         private IXFace BuildFaceFromCompositeCurve(IIfcCompositeCurve compositeCurve, int entityLabel)
         {
+            var curveFactory = (CurveFactory)_modelService.CurveFactory;
+            var segmentCurves = curveFactory.BuildCompositeCurveSegments2d(compositeCurve);
             var curves = new List<NativeCurve2dHandle>();
             try
             {
-                int lastLabel = -1;
-                foreach (var segment in compositeCurve.Segments)
-                {
-                    // Skip duplicate segments (archicad bug workaround)
-                    if (segment.EntityLabel == lastLabel)
-                        continue;
-                    lastLabel = segment.EntityLabel;
-
-                    var parentCurve = segment.ParentCurve;
-                    if (parentCurve == null) continue;
-
-                    var segmentCurves = new List<NativeCurve2dHandle>();
-                    BuildCurves2dFromCurve(parentCurve, segmentCurves);
-
-                    if (!segment.SameSense)
-                    {
-                        // Reverse each curve and reverse the order (matching legacy curve->Reverse())
-                        segmentCurves.Reverse();
-                        foreach (var c in segmentCurves)
-                            XbimGeometryNativeApi.xbim_curve2d_reverse(c);
-                    }
-
-                    curves.AddRange(segmentCurves);
-                }
+                foreach (var seg in segmentCurves)
+                    curves.Add(seg.DetachHandle());
 
                 if (curves.Count == 0)
                     throw new XbimGeometryServiceException(
@@ -1099,6 +1078,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
             finally
             {
+                foreach (var seg in segmentCurves)
+                    seg.Dispose();
                 foreach (var curve in curves)
                     curve.Dispose();
             }
@@ -1138,46 +1119,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
         }
 
-        /// <summary>
-        /// Builds 2D curves from an IFC curve and adds the detached handles to the list.
-        /// Multi-point polylines are expanded into separate line segments to preserve
-        /// individual edge topology in the profile wire.
-        /// </summary>
-        private void BuildCurves2dFromCurve(IIfcCurve curve, List<NativeCurve2dHandle> curves)
-        {
-            // Multi-point polylines must produce separate line edges, not a single
-            // composite BSpline. The pipe sweep (BRepOffsetAPI_MakePipeShell) creates
-            // one face per profile edge per spine segment; merging edges into a BSpline
-            // changes the face topology and breaks corner transitions.
-            if (curve is IIfcPolyline polyline && polyline.Points.Count > 2)
-            {
-                for (int i = 0; i < polyline.Points.Count - 1; i++)
-                {
-                    var p1 = polyline.Points[i];
-                    var p2 = polyline.Points[i + 1];
-                    double sx = p1.Coordinates[0], sy = p1.Coordinates[1];
-                    double ex = p2.Coordinates[0], ey = p2.Coordinates[1];
-
-                    double dist = Math.Sqrt((ex - sx) * (ex - sx) + (ey - sy) * (ey - sy));
-                    if (dist < _modelService.Precision) continue;
-
-                    int result = XbimGeometryNativeApi.xbim_curve2d_build_line(
-                        ContextHandle, sx, sy, ex, ey, out var lineHandle);
-
-                    if (result != 0)
-                        throw new XbimGeometryServiceException(
-                            $"Failed to build line segment for polyline #{curve.EntityLabel}: " +
-                            XbimGeometryNativeApi.GetLastError());
-
-                    curves.Add(lineHandle);
-                }
-                return;
-            }
-
-            var curveFactory = (CurveFactory)_modelService.CurveFactory;
-            var builtCurve = (XbimCurve2d)curveFactory.BuildCurve2d(curve);
-            curves.Add(builtCurve.DetachHandle());
-        }
 
         #endregion
     }
