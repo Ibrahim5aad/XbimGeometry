@@ -13,6 +13,7 @@ using Xbim.Common;
 using Xbim.Common.Geometry;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4.MeasureResource;
+using Xbim.Geometry.Engine.Interop.Rules;
 using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
@@ -126,18 +127,18 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new XbimGeometryServiceException(
                     $"IIfcPolyline #{ifcPolyline.EntityLabel} has fewer than 2 points.");
 
-            var pointsXYZ = new double[points.Count * 3];
-            for (int i = 0; i < points.Count; i++)
+            var (x, y, z) = CurveFactory.ExtractPolylinePoints3d(ifcPolyline);
+            var pointsXYZ = new double[x.Length * 3];
+            for (int i = 0; i < x.Length; i++)
             {
-                var cp = points[i];
-                pointsXYZ[i * 3 + 0] = cp.Coordinates[0];
-                pointsXYZ[i * 3 + 1] = cp.Coordinates[1];
-                pointsXYZ[i * 3 + 2] = (int)cp.Dim == 3 ? (double)cp.Coordinates[2] : 0.0;
+                pointsXYZ[i * 3 + 0] = x[i];
+                pointsXYZ[i * 3 + 1] = y[i];
+                pointsXYZ[i * 3 + 2] = z[i];
             }
 
             int result = XbimGeometryNativeApi.xbim_wire_build_polyline(
                 ContextHandle,
-                pointsXYZ, points.Count,
+                pointsXYZ, x.Length,
                 _modelService.Precision,
                 out var wireHandle);
 
@@ -154,7 +155,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private IXWire BuildFromIndexedPolyCurve(IIfcIndexedPolyCurve ifcIndexed)
         {
-            List<double> allPointsXYZ = ExtractPointCoordinates(ifcIndexed);
+            List<double> allPointsXYZ = ExtractPointCoordinatesFlat(ifcIndexed);
 
             // If no segments specified, build a polyline through all points in order
             if (ifcIndexed.Segments == null || !ifcIndexed.Segments.Any())
@@ -271,28 +272,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private IXWire BuildFromCompositeCurve(IIfcCompositeCurve ifcComposite)
         {
-            var segmentCurves = new List<XbimCurve>();
+            var curveFactory = (CurveFactory)_modelService.CurveFactory;
+            var segmentCurves = curveFactory.BuildCompositeCurveSegments3d(ifcComposite);
             try
             {
-                foreach (var segment in ifcComposite.Segments)
-                {
-                    var parentCurve = segment.ParentCurve;
-                    if (parentCurve == null) continue;
-
-                    var curveFactory = (CurveFactory)_modelService.CurveFactory;
-                    var segCurve = curveFactory.Build3d(parentCurve);
-
-                    if (!segment.SameSense)
-                    {
-                        int reverseResult = XbimGeometryNativeApi.xbim_curve_reverse(segCurve.Handle);
-                        if (reverseResult != 0)
-                            throw new XbimGeometryServiceException(
-                                $"Failed to reverse composite curve segment #{segment.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
-                    }
-
-                    segmentCurves.Add(segCurve);
-                }
-
                 if (segmentCurves.Count == 0)
                     throw new XbimGeometryServiceException(
                         $"IIfcCompositeCurve #{ifcComposite.EntityLabel} has no valid segments.");
@@ -752,11 +735,22 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var segmentCurves = new List<XbimCurve>();
             try
             {
+                int lastLabel = -1;
                 foreach (var segment in ifcComposite.Segments)
                 {
                     // Skip remaining segments if both params are consumed
                     if (startPar <= 0 && endPar <= 0)
                         continue;
+
+                    // ArchiCAD bug workaround: skip consecutive duplicate segments (same EntityLabel)
+                    if (segment.EntityLabel == lastLabel)
+                    {
+                        _logger.LogInformation(
+                            "Composite directrix #{Label}: skipping duplicate segment #{SegLabel} (ArchiCAD bug).",
+                            ifcComposite.EntityLabel, segment.EntityLabel);
+                        continue;
+                    }
+                    lastLabel = segment.EntityLabel;
 
                     // Reject reparameterised segments with non-unit param length
                     if (segment is IIfcReparametrisedCompositeCurveSegment reparam &&
@@ -768,6 +762,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                     var parentCurve = segment.ParentCurve;
                     if (parentCurve == null) continue;
+
+                    // Composite curve segments must be bounded curves
+                    if (!CurveRules.IsBoundedCurve(parentCurve))
+                        throw new XbimGeometryServiceException(
+                            "Composite curve is invalid, only curve segments that are bounded curves are permitted.");
 
                     // Determine this segment's parameterized length based on its type
                     double segParamLength;
@@ -902,7 +901,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (ifcIndexed.Segments != null && ifcIndexed.Segments.Any())
             {
                 // Extract point coordinates for per-segment geometric length computation
-                List<double> allPointsXYZ = ExtractPointCoordinates(ifcIndexed);
+                List<double> allPointsXYZ = ExtractPointCoordinatesFlat(ifcIndexed);
 
                 // Walk segments, consuming startPar/endPar per-segment like legacy code
                 foreach (var segment in ifcIndexed.Segments)
@@ -982,7 +981,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 // No explicit segments — polyline through all points in order.
                 // Each sub-segment has parametric length 1 (total = nPoints - 1).
                 // Map from parametric space to arc-length.
-                List<double> allPointsXYZ = ExtractPointCoordinates(ifcIndexed);
+                List<double> allPointsXYZ = ExtractPointCoordinatesFlat(ifcIndexed);
                 int numPoints = allPointsXYZ.Count / 3;
 
                 for (int i = 0; i < numPoints - 1; i++)
@@ -1048,36 +1047,21 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         #region Parameterization Helpers
 
-        private static List<double> ExtractPointCoordinates(IIfcIndexedPolyCurve ifcIndexed)
+        /// <summary>
+        /// Extracts point coordinates from an indexed poly curve as a flat XYZ array.
+        /// Delegates to <see cref="CurveFactory.ExtractIndexedPoints3d"/> and flattens the result.
+        /// </summary>
+        private static List<double> ExtractPointCoordinatesFlat(IIfcIndexedPolyCurve ifcIndexed)
         {
-            if (ifcIndexed.Points is IIfcCartesianPointList3D pts3D)
+            var tuples = CurveFactory.ExtractIndexedPoints3d(ifcIndexed);
+            var result = new List<double>(tuples.Count * 3);
+            foreach (var (x, y, z) in tuples)
             {
-                var coords = pts3D.CoordList;
-                var result = new List<double>(coords.Count * 3);
-                foreach (var pt in coords)
-                {
-                    result.Add(pt[0]);
-                    result.Add(pt[1]);
-                    result.Add(pt.Count > 2 ? pt[2] : 0.0);
-                }
-                return result;
+                result.Add(x);
+                result.Add(y);
+                result.Add(z);
             }
-
-            if (ifcIndexed.Points is IIfcCartesianPointList2D pts2D)
-            {
-                var coords = pts2D.CoordList;
-                var result = new List<double>(coords.Count * 3);
-                foreach (var pt in coords)
-                {
-                    result.Add(pt[0]);
-                    result.Add(pt[1]);
-                    result.Add(0.0);
-                }
-                return result;
-            }
-
-            throw new NotSupportedException(
-                $"Unsupported point list type in IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}.");
+            return result;
         }
 
         /// <summary>
@@ -1153,7 +1137,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             List<double> allPointsXYZ;
             try
             {
-                allPointsXYZ = ExtractPointCoordinates(ifcIndexed);
+                allPointsXYZ = ExtractPointCoordinatesFlat(ifcIndexed);
             }
             catch (NotSupportedException)
             {

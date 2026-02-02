@@ -138,8 +138,8 @@ public class DirectrixTests : IDisposable
         // Second polyline: (100,0,0) → (100,100,0) = length 100, paramLen 1
         var poly1 = IfcMoq.Polyline3d((0, 0, 0), (100, 0, 0));
         var poly2 = IfcMoq.Polyline3d((100, 0, 0), (100, 100, 0));
-        var seg1 = IfcMoq.CompositeCurveSegment(poly1);
-        var seg2 = IfcMoq.CompositeCurveSegment(poly2);
+        var seg1 = IfcMoq.CompositeCurveSegment(poly1, entityLabel: 10);
+        var seg2 = IfcMoq.CompositeCurveSegment(poly2, entityLabel: 11);
         var cc = IfcMoq.CompositeCurve(seg1, seg2);
 
         var wire = _wireFactory.BuildDirectrixWire(cc, null, null);
@@ -155,8 +155,8 @@ public class DirectrixTests : IDisposable
         // Trim: start=0, end=1 → maps to first 100 units of arc-length
         var poly1 = IfcMoq.Polyline3d((0, 0, 0), (100, 0, 0));
         var poly2 = IfcMoq.Polyline3d((100, 0, 0), (100, 100, 0));
-        var seg1 = IfcMoq.CompositeCurveSegment(poly1);
-        var seg2 = IfcMoq.CompositeCurveSegment(poly2);
+        var seg1 = IfcMoq.CompositeCurveSegment(poly1, entityLabel: 10);
+        var seg2 = IfcMoq.CompositeCurveSegment(poly2, entityLabel: 11);
         var cc = IfcMoq.CompositeCurve(seg1, seg2);
 
         // endParam=1 <= firstParamLen=1, startParam=0 → special case, takes full geo length
@@ -178,8 +178,8 @@ public class DirectrixTests : IDisposable
         // Total paramLen=2. Trim: start=0, end=0.5 → maps to first 50 units
         var poly1 = IfcMoq.Polyline3d((0, 0, 0), (100, 0, 0));
         var poly2 = IfcMoq.Polyline3d((100, 0, 0), (100, 100, 0));
-        var seg1 = IfcMoq.CompositeCurveSegment(poly1);
-        var seg2 = IfcMoq.CompositeCurveSegment(poly2);
+        var seg1 = IfcMoq.CompositeCurveSegment(poly1, entityLabel: 10);
+        var seg2 = IfcMoq.CompositeCurveSegment(poly2, entityLabel: 11);
         var cc = IfcMoq.CompositeCurve(seg1, seg2);
 
         var wire = _wireFactory.BuildDirectrixWire(cc, 0, 0.5);
@@ -197,8 +197,8 @@ public class DirectrixTests : IDisposable
         // Trim: start=0.5, end=1.5 → skip first 50, take next 100 (50 from seg1 + 50 from seg2)
         var poly1 = IfcMoq.Polyline3d((0, 0, 0), (100, 0, 0));
         var poly2 = IfcMoq.Polyline3d((100, 0, 0), (100, 100, 0));
-        var seg1 = IfcMoq.CompositeCurveSegment(poly1);
-        var seg2 = IfcMoq.CompositeCurveSegment(poly2);
+        var seg1 = IfcMoq.CompositeCurveSegment(poly1, entityLabel: 10);
+        var seg2 = IfcMoq.CompositeCurveSegment(poly2, entityLabel: 11);
         var cc = IfcMoq.CompositeCurve(seg1, seg2);
 
         var wire = _wireFactory.BuildDirectrixWire(cc, 0.5, 1.5);
@@ -227,8 +227,8 @@ public class DirectrixTests : IDisposable
         var circle = IfcMoq.IfcCircle3d(100, circlePos);
         var trimmedArc = IfcMoq.IfcTrimmedCurve3d(circle, 0, 90);
 
-        var seg1 = IfcMoq.CompositeCurveSegment(poly);
-        var seg2 = IfcMoq.CompositeCurveSegment(trimmedArc);
+        var seg1 = IfcMoq.CompositeCurveSegment(poly, entityLabel: 10);
+        var seg2 = IfcMoq.CompositeCurveSegment(trimmedArc, entityLabel: 11);
         var cc = IfcMoq.CompositeCurve(seg1, seg2);
 
         var wire = _wireFactory.BuildDirectrixWire(cc, null, null);
@@ -246,9 +246,9 @@ public class DirectrixTests : IDisposable
         var poly1 = IfcMoq.Polyline3d((0, 0, 0), (100, 0, 0));
         var poly2 = IfcMoq.Polyline3d((100, 0, 0), (100, 100, 0));
         var poly3 = IfcMoq.Polyline3d((100, 100, 0), (200, 100, 0));
-        var seg1 = IfcMoq.CompositeCurveSegment(poly1);
-        var seg2 = IfcMoq.CompositeCurveSegment(poly2);
-        var seg3 = IfcMoq.CompositeCurveSegment(poly3);
+        var seg1 = IfcMoq.CompositeCurveSegment(poly1, entityLabel: 10);
+        var seg2 = IfcMoq.CompositeCurveSegment(poly2, entityLabel: 11);
+        var seg3 = IfcMoq.CompositeCurveSegment(poly3, entityLabel: 12);
         var cc = IfcMoq.CompositeCurve(seg1, seg2, seg3);
 
         var wire = _wireFactory.BuildDirectrixWire(cc, 1, 2);
