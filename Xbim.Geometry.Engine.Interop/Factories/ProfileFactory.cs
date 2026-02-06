@@ -89,7 +89,15 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (profileDef is IIfcArbitraryOpenProfileDef openProfile)
                 return BuildOpenProfileWire(openProfile);
 
-            // All other profile types: build face, extract outer wire
+            // Arbitrary closed profiles: build wire from outer curve directly (no face roundtrip)
+            if (profileDef is IIfcArbitraryClosedProfileDef arbitraryClosed)
+            {
+                var outerCurve = arbitraryClosed.OuterCurve ?? throw new XbimGeometryServiceException(
+                    $"ArbitraryClosedProfileDef #{arbitraryClosed.EntityLabel} has no OuterCurve.");
+                return BuildWireFromClosedCurve(outerCurve, arbitraryClosed.EntityLabel);
+            }
+
+            // Standard parametric profiles: build face, extract outer wire
             var face = (XbimFace)BuildFace(profileDef);
             try
             {
@@ -701,53 +709,124 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             ProfileRules.Validate(arbitraryProfile);
 
-            // Extract polyline points from the outer curve
-            if (outerCurve is IIfcPolyline polyline)
+            return BuildFaceFromClosedCurve(outerCurve, arbitraryProfile.EntityLabel);
+        }
+
+        private IXFace BuildArbitraryWithVoidsFace(IIfcArbitraryProfileDefWithVoids arbitraryWithVoids)
+        {
+            // Build the outer face first
+            var outerFace = BuildArbitraryClosedFace(arbitraryWithVoids);
+
+            var innerCurves = arbitraryWithVoids.InnerCurves;
+            if (innerCurves == null || !innerCurves.Any())
+                return outerFace;
+
+            // Build each inner curve as a face via the same curve→face path, then punch holes
+            var innerShapeHandles = new List<NativeShapeHandle>();
+
+            try
             {
-                var points = polyline.Points.ToList();
-                if (points.Count < 3)
-                    throw new XbimGeometryServiceException(
-                        $"ArbitraryClosedProfileDef #{arbitraryProfile.EntityLabel} polyline has less than 3 points.");
-
-                double[] pointsX = new double[points.Count];
-                double[] pointsY = new double[points.Count];
-
-                for (int i = 0; i < points.Count; i++)
+                foreach (var innerCurve in innerCurves.DistinctBy(c => c.EntityLabel))
                 {
-                    var coords = points[i].Coordinates;
-                    pointsX[i] = coords[0];
-                    pointsY[i] = coords[1];
+                    try
+                    {
+                        var innerFace = (XbimFace)BuildFaceFromClosedCurve(innerCurve, innerCurve.EntityLabel);
+                        innerShapeHandles.Add(innerFace.Handle);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning("Failed to build inner void curve #{EntityLabel}: {Message}",
+                            innerCurve.EntityLabel, ex.Message);
+                    }
                 }
 
-                int result = XbimGeometryNativeApi.xbim_profile_build_arbitrary_closed(
+                if (innerShapeHandles.Count == 0)
+                    return outerFace;
+
+                // Get the outer face handle
+                var outerShapeHandle = ((XbimFace)outerFace).Handle;
+
+                using var nativeInnerHandles = new NativeHandleArray(innerShapeHandles.ToArray());
+                int result = XbimGeometryNativeApi.xbim_profile_build_with_voids(
                     ContextHandle,
-                    pointsX, pointsY, points.Count,
-                    out var NativeShapeHandle);
+                    outerShapeHandle,
+                    nativeInnerHandles.Ptrs,
+                    nativeInnerHandles.Length,
+                    out var resultHandle);
 
                 if (result != 0)
                     throw new XbimGeometryServiceException(
-                        $"Failed to build ArbitraryClosedProfileDef #{arbitraryProfile.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+                        $"Failed to build ArbitraryProfileDefWithVoids #{arbitraryWithVoids.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-                return NativeShapeWrapper.WrapFace(NativeShapeHandle);
+                outerFace.Dispose();
+                return NativeShapeWrapper.WrapFace(resultHandle);
             }
-
-            if (outerCurve is IIfcIndexedPolyCurve indexedPolyCurve)
+            finally
             {
-                return BuildArbitraryFromIndexedPolyCurve(indexedPolyCurve, arbitraryProfile.EntityLabel);
+                foreach (var h in innerShapeHandles)
+                    h.Dispose();
             }
-
-            if (outerCurve is IIfcCompositeCurve compositeCurve)
-            {
-                return BuildFaceFromCompositeCurve(compositeCurve, arbitraryProfile.EntityLabel);
-            }
-
-            throw new NotSupportedException(
-                $"ArbitraryClosedProfileDef #{arbitraryProfile.EntityLabel} outer curve type " +
-                $"{outerCurve.ExpressType.ExpressName} is not yet supported. " +
-                "Only IIfcPolyline, IIfcIndexedPolyCurve, and IIfcCompositeCurve are supported.");
         }
 
-        private IXFace BuildArbitraryFromIndexedPolyCurve(IIfcIndexedPolyCurve indexedPolyCurve, int entityLabel)
+        /// <summary>
+        /// Builds a planar face from a closed 2D curve. Handles polyline, indexed poly curve,
+        /// and composite curve types. Used for both outer profile curves and inner void curves.
+        /// </summary>
+        private IXFace BuildFaceFromClosedCurve(IIfcCurve curve, int entityLabel)
+        {
+            if (curve is IIfcPolyline polyline)
+                return BuildFaceFromPolyline(polyline, entityLabel);
+
+            if (curve is IIfcIndexedPolyCurve indexedPolyCurve)
+                return BuildFaceFromIndexedPolyCurve(indexedPolyCurve, entityLabel);
+
+            if (curve is IIfcCompositeCurve compositeCurve)
+                return BuildFaceFromCompositeCurve(compositeCurve, entityLabel);
+
+            // Fallback: build the curve as 2D via CurveFactory, then wire→face
+            var curveFactory = (CurveFactory)_modelService.CurveFactory;
+            var curve2d = (XbimCurve2d)curveFactory.BuildCurve2d(curve);
+            try
+            {
+                var handle = curve2d.DetachHandle();
+                return BuildFaceFrom2dCurves(new List<NativeCurve2dHandle> { handle }, entityLabel);
+            }
+            finally
+            {
+                curve2d.Dispose();
+            }
+        }
+
+        private IXFace BuildFaceFromPolyline(IIfcPolyline polyline, int entityLabel)
+        {
+            var points = polyline.Points.ToList();
+            if (points.Count < 3)
+                throw new XbimGeometryServiceException(
+                    $"Profile #{entityLabel} polyline has less than 3 points.");
+
+            double[] pointsX = new double[points.Count];
+            double[] pointsY = new double[points.Count];
+
+            for (int i = 0; i < points.Count; i++)
+            {
+                var coords = points[i].Coordinates;
+                pointsX[i] = coords[0];
+                pointsY[i] = coords[1];
+            }
+
+            int result = XbimGeometryNativeApi.xbim_profile_build_arbitrary_closed(
+                ContextHandle,
+                pointsX, pointsY, points.Count,
+                out var shapeHandle);
+
+            if (result != 0)
+                throw new XbimGeometryServiceException(
+                    $"Failed to build profile #{entityLabel} from polyline: {XbimGeometryNativeApi.GetLastError()}");
+
+            return NativeShapeWrapper.WrapFace(shapeHandle);
+        }
+
+        private IXFace BuildFaceFromIndexedPolyCurve(IIfcIndexedPolyCurve indexedPolyCurve, int entityLabel)
         {
             var pointList = indexedPolyCurve.Points ?? throw new XbimGeometryServiceException(
                     $"IndexedPolyCurve #{entityLabel} has no Points coordinate list.");
@@ -767,8 +846,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new XbimGeometryServiceException(
                     $"IndexedPolyCurve #{entityLabel} has less than 3 points.");
 
-            // If segments exist, build individual arc/line segments and wire them directly into a face.
-            // Bypassing B-spline joining preserves segment topology and correct face orientation.
+            // If segments exist, build individual arc/line segments and wire them directly into a face
             if (indexedPolyCurve.Segments != null && indexedPolyCurve.Segments.Any())
             {
                 var curveFactory = (CurveFactory)_modelService.CurveFactory;
@@ -815,113 +893,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     $"Failed to build IndexedPolyCurve profile #{entityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
             return NativeShapeWrapper.WrapFace(profileHandle);
-        }
-
-        private IXFace BuildArbitraryWithVoidsFace(IIfcArbitraryProfileDefWithVoids arbitraryWithVoids)
-        {
-            // Build the outer face first
-            var outerFace = BuildArbitraryClosedFace(arbitraryWithVoids);
-
-            var innerCurves = arbitraryWithVoids.InnerCurves;
-            if (innerCurves == null || !innerCurves.Any())
-                return outerFace;
-
-            // Build each inner curve as a closed face, then use with_voids to punch holes
-            var innerShapeHandles = new List<NativeShapeHandle>();
-
-            try
-            {
-                foreach (var innerCurve in innerCurves.DistinctBy(c => c.EntityLabel))
-                {
-                    NativeShapeHandle innerHandle = BuildClosedCurveAsShape(innerCurve);
-                    if (innerHandle != null && !innerHandle.IsInvalid)
-                        innerShapeHandles.Add(innerHandle);
-                }
-
-                if (innerShapeHandles.Count == 0)
-                    return outerFace;
-
-                // Get the outer face handle
-                var outerShapeHandle = ((XbimFace)outerFace).Handle;
-
-                using var nativeInnerHandles = new NativeHandleArray(innerShapeHandles.ToArray());
-                int result = XbimGeometryNativeApi.xbim_profile_build_with_voids(
-                    ContextHandle,
-                    outerShapeHandle,
-                    nativeInnerHandles.Ptrs,
-                    nativeInnerHandles.Length,
-                    out var resultHandle);
-
-                if (result != 0)
-                    throw new XbimGeometryServiceException(
-                        $"Failed to build ArbitraryProfileDefWithVoids #{arbitraryWithVoids.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
-
-                outerFace.Dispose();
-                return NativeShapeWrapper.WrapFace(resultHandle);
-            }
-            finally
-            {
-                foreach (var h in innerShapeHandles)
-                    h.Dispose();
-            }
-        }
-
-        private NativeShapeHandle BuildClosedCurveAsShape(IIfcCurve curve)
-        {
-            if (curve is IIfcPolyline polyline)
-            {
-                var points = polyline.Points.ToList();
-                if (points.Count < 3) return null;
-
-                double[] pointsX = new double[points.Count];
-                double[] pointsY = new double[points.Count];
-
-                for (int i = 0; i < points.Count; i++)
-                {
-                    var coords = points[i].Coordinates;
-                    pointsX[i] = coords[0];
-                    pointsY[i] = coords[1];
-                }
-
-                int result = XbimGeometryNativeApi.xbim_profile_build_arbitrary_closed(
-                    ContextHandle,
-                    pointsX, pointsY, points.Count,
-                    out var profileHandle);
-
-                return result == 0 ? profileHandle : null;
-            }
-
-            if (curve is IIfcCompositeCurve compositeCurve)
-            {
-                try
-                {
-                    var face = BuildFaceFromCompositeCurve(compositeCurve, 0);
-                    return ((XbimFace)face).Handle;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning("Failed to build inner composite curve: {Message}", ex.Message);
-                    return null;
-                }
-            }
-
-            if (curve is IIfcIndexedPolyCurve indexedPolyCurve)
-            {
-                try
-                {
-                    var face = BuildArbitraryFromIndexedPolyCurve(indexedPolyCurve, 0);
-                    return ((XbimFace)face).Handle;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning("Failed to build inner indexed poly curve: {Message}", ex.Message);
-                    return null;
-                }
-            }
-
-            _logger.LogWarning("Inner curve type {CurveType} is not yet supported for void extraction, skipping",
-                curve.ExpressType.ExpressName);
-            return null;
         }
 
         #endregion
@@ -1188,7 +1159,68 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         #endregion
 
-        #region Composite Curve Helpers
+        #region Curve-to-Wire / Wire-to-Face Helpers
+
+        /// <summary>
+        /// Builds a closed wire from a 2D curve. Handles composite curve (segment-based),
+        /// indexed poly curve (segment or polygon), polyline, and generic curves via CurveFactory.
+        /// </summary>
+        private IXWire BuildWireFromClosedCurve(IIfcCurve curve, int entityLabel)
+        {
+            if (curve is IIfcCompositeCurve compositeCurve)
+            {
+                var curveFactory = (CurveFactory)_modelService.CurveFactory;
+                var segmentCurves = curveFactory.BuildCompositeCurveSegments2d(compositeCurve);
+                var curves = new List<NativeCurve2dHandle>();
+                try
+                {
+                    foreach (var seg in segmentCurves)
+                        curves.Add(seg.DetachHandle());
+
+                    if (curves.Count == 0)
+                        throw new XbimGeometryServiceException(
+                            $"CompositeCurve for profile #{entityLabel} produced no valid 2D curves.");
+
+                    return BuildWireFrom2dCurves(curves, entityLabel);
+                }
+                finally
+                {
+                    foreach (var seg in segmentCurves)
+                        seg.Dispose();
+                    foreach (var c in curves)
+                        c.Dispose();
+                }
+            }
+
+            if (curve is IIfcIndexedPolyCurve indexedPolyCurve
+                && indexedPolyCurve.Segments != null && indexedPolyCurve.Segments.Any())
+            {
+                var curveFactory = (CurveFactory)_modelService.CurveFactory;
+                var segments = curveFactory.BuildIndexedPolyCurveSegments2d(indexedPolyCurve);
+                try
+                {
+                    return BuildWireFrom2dCurves(segments, entityLabel);
+                }
+                finally
+                {
+                    foreach (var s in segments)
+                        s.Dispose();
+                }
+            }
+
+            // Polyline and no-segment indexed poly curve: build face, extract outer wire.
+            // The native xbim_profile_build_arbitrary_closed handles point deduplication and
+            // winding correction, so we go through the face path and extract the wire.
+            var face = (XbimFace)BuildFaceFromClosedCurve(curve, entityLabel);
+            try
+            {
+                return face.OuterBound;
+            }
+            finally
+            {
+                face.Dispose();
+            }
+        }
 
         /// <summary>
         /// Builds a planar face from a composite curve by constructing 2D curves
@@ -1214,15 +1246,15 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             {
                 foreach (var seg in segmentCurves)
                     seg.Dispose();
-                foreach (var curve in curves)
-                    curve.Dispose();
+                foreach (var c in curves)
+                    c.Dispose();
             }
         }
 
         /// <summary>
-        /// Builds a wire from 2D curves and creates a planar face from the wire.
+        /// Builds a wire from an array of 2D curve handles.
         /// </summary>
-        private IXFace BuildFaceFrom2dCurves(List<NativeCurve2dHandle> curves, int entityLabel)
+        private IXWire BuildWireFrom2dCurves(List<NativeCurve2dHandle> curves, int entityLabel)
         {
             using var nativeCurves = new NativeHandleArray(curves.ToArray());
             int wireResult = XbimGeometryNativeApi.xbim_wire_build_from_2d_curves(
@@ -1230,15 +1262,24 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 _modelService.Precision, _modelService.MinimumGap,
                 out var wireHandle);
 
+            if (wireResult != 0)
+                throw new XbimGeometryServiceException(
+                    $"Failed to build wire from 2D curves for profile #{entityLabel}: " +
+                    XbimGeometryNativeApi.GetLastError());
+
+            return new XbimWire(wireHandle);
+        }
+
+        /// <summary>
+        /// Builds a wire from 2D curves and creates a planar face from the wire.
+        /// </summary>
+        private IXFace BuildFaceFrom2dCurves(List<NativeCurve2dHandle> curves, int entityLabel)
+        {
+            var wire = (XbimWire)BuildWireFrom2dCurves(curves, entityLabel);
             try
             {
-                if (wireResult != 0)
-                    throw new XbimGeometryServiceException(
-                        $"Failed to build wire from 2D curves for profile #{entityLabel}: " +
-                        XbimGeometryNativeApi.GetLastError());
-
                 int faceResult = XbimGeometryNativeApi.xbim_face_build_from_wire(
-                    ContextHandle, wireHandle, out var faceHandle);
+                    ContextHandle, wire.Handle, out var faceHandle);
 
                 if (faceResult != 0)
                     throw new XbimGeometryServiceException(
@@ -1249,10 +1290,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
             finally
             {
-                wireHandle?.Dispose();
+                wire.Dispose();
             }
         }
-
 
         #endregion
     }
