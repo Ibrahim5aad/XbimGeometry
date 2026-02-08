@@ -7,6 +7,7 @@ using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Engine.Interop.Primitives;
+using Xbim.Geometry.Engine.Interop.Rules;
 using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.GeometryResource;
 using Xbim.Ifc4.Interfaces;
@@ -272,11 +273,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         private XbimTrimmedCurve2d BuildTrimmedCurve2d(IIfcTrimmedCurve ifcTrimmed)
         {
-            // Formal proposition: NoTrimOfBoundedCurves — stricter in 2D (throw, not warn)
-            if (ifcTrimmed.BasisCurve is IIfcBoundedCurve)
-                throw new XbimGeometryServiceException(
-                    $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Formal Proposition NoTrimOfBoundedCurves — " +
-                    "already bounded curves shall not be trimmed.");
+            CurveRules.Validate(ifcTrimmed);
 
             // Build the 2D basis curve — ownership transfers to XbimTrimmedCurve2d on success
             var basisCurve = (XbimCurve2d)BuildCurve2d(ifcTrimmed.BasisCurve);

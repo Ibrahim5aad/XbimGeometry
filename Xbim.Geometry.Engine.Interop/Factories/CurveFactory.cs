@@ -227,6 +227,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         internal List<XbimCurve> BuildCompositeCurveSegments3d(IIfcCompositeCurve ifcComposite)
         {
+            CurveRules.Validate(ifcComposite);
+
             var segmentCurves = new List<XbimCurve>();
             try
             {
@@ -251,11 +253,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                     if (segment.ParentCurve == null)
                         continue;
-
-                    // Composite curve segments must be bounded curves
-                    if (!CurveRules.IsBoundedCurve(segment.ParentCurve))
-                        throw new XbimGeometryServiceException(
-                            "Composite curve is invalid, only curve segments that are bounded curves are permitted.");
 
                     var segCurve = (XbimCurve)Build(segment.ParentCurve);
 
@@ -287,6 +284,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         internal List<XbimCurve2d> BuildCompositeCurveSegments2d(IIfcCompositeCurve ifcComposite)
         {
+            CurveRules.Validate(ifcComposite);
+
             var segmentCurves = new List<XbimCurve2d>();
             try
             {
@@ -311,11 +310,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                     if (segment.ParentCurve == null)
                         continue;
-
-                    // Composite curve segments must be bounded curves
-                    if (!CurveRules.IsBoundedCurve(segment.ParentCurve))
-                        throw new XbimGeometryServiceException(
-                            "Composite curve is invalid, only curve segments that are bounded curves are permitted.");
 
                     var segCurve = (XbimCurve2d)BuildCurve2d(segment.ParentCurve);
 
