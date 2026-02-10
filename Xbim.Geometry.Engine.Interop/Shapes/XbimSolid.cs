@@ -10,8 +10,8 @@ using Xbim.Geometry.Exceptions;
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
     /// <summary>
-    /// Represents a solid shape (TopoDS_Solid), implementing both the V6 <see cref="IXSolid"/>
-    /// and the legacy <see cref="IXbimSolid"/> interfaces.
+    /// Represents a solid shape (TopoDS_Solid), implementing <see cref="IXSolid"/>
+    /// and <see cref="IXbimSolid"/> interfaces.
     /// </summary>
     internal class XbimSolid : XbimShape, IXSolid, IXbimSolid, IEquatable<IXbimSolid>
     {
@@ -66,8 +66,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                var v6Shells = Shells;
-                var shells = v6Shells.Select(s => (IXbimShell)s).ToArray();
+                var shells = Shells.Select(s => (IXbimShell)s).ToArray();
                 return new XbimShellSet(shells);
             }
         }

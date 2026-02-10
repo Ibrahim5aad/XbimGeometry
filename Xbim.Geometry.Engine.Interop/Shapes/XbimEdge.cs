@@ -9,8 +9,8 @@ using Xbim.Geometry.Exceptions;
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
     /// <summary>
-    /// Represents an edge shape (TopoDS_Edge), implementing both the V6 <see cref="IXEdge"/>
-    /// and the legacy <see cref="IXbimEdge"/> interfaces.
+    /// Represents an edge shape (TopoDS_Edge), implementing <see cref="IXEdge"/>
+    /// and <see cref="IXbimEdge"/> interfaces.
     /// </summary>
     internal class XbimEdge : XbimShape, IXEdge, IXbimEdge, IEquatable<IXbimEdge>
     {
@@ -52,10 +52,44 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 int result = XbimGeometryNativeApi.xbim_edge_get_curve(
                     Handle, out var curveHandle, out _, out _);
+                // Null curve for degenerate edges (e.g. vertex loop at cone apex)
                 if (result != 0)
-                    throw new XbimGeometryServiceException(
-                        $"Failed to get edge curve: {XbimGeometryNativeApi.GetLastError()}");
-                return new XbimCurve(curveHandle, XCurveType.IfcLine);
+                    return null;
+
+                int propsResult = XbimGeometryNativeApi.xbim_curve_get_elementary_props(
+                    curveHandle,
+                    out int curveTypeVal,
+                    out double ox, out double oy, out double oz,
+                    out double dx, out double dy, out double dz,
+                    out double xx, out double xy, out double xz,
+                    out double r1, out double r2);
+
+                if (propsResult != 0)
+                    return new XbimCurve(curveHandle, XCurveType.IfcCurve);
+
+                var curveType = (XCurveType)curveTypeVal;
+                switch (curveType)
+                {
+                    case XCurveType.IfcLine:
+                        return new XbimLine3d(curveHandle,
+                            new XPoint(ox, oy, oz),
+                            new XVector(dx, dy, dz),
+                            1.0);
+                    case XCurveType.IfcCircle:
+                        return new XbimCircle3d(curveHandle, r1,
+                            new XAxis2Placement3d(
+                                new XPoint(ox, oy, oz),
+                                new XDirection(dx, dy, dz),
+                                new XDirection(xx, xy, xz)));
+                    case XCurveType.IfcEllipse:
+                        return new XbimEllipse3d(curveHandle, r1, r2,
+                            new XAxis2Placement3d(
+                                new XPoint(ox, oy, oz),
+                                new XDirection(dx, dy, dz),
+                                new XDirection(xx, xy, xz)));
+                    default:
+                        return new XbimCurve(curveHandle, curveType);
+                }
             }
         }
 
@@ -91,37 +125,13 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         #endregion
 
-        #region IXbimEdge (explicit for clashing names)
+        #region IXbimEdge
 
-        IXbimVertex IXbimEdge.EdgeStart
-        {
-            get
-            {
-                var vertexHandles = GetSubShapeHandles(XShapeType.Vertex);
-                if (vertexHandles.Length == 0)
-                    throw new XbimGeometryServiceException("Edge has no vertices.");
-                return new XbimVertex(vertexHandles[0]);
-            }
-        }
+        IXbimVertex IXbimEdge.EdgeStart => EdgeStart as IXbimVertex;
 
-        IXbimVertex IXbimEdge.EdgeEnd
-        {
-            get
-            {
-                var vertexHandles = GetSubShapeHandles(XShapeType.Vertex);
-                if (vertexHandles.Length == 0)
-                    throw new XbimGeometryServiceException("Edge has no vertices.");
-                return new XbimVertex(vertexHandles[vertexHandles.Length > 1 ? 1 : 0]);
-            }
-        }
+        IXbimVertex IXbimEdge.EdgeEnd => EdgeEnd as IXbimVertex;
 
-        IXbimCurve IXbimEdge.EdgeGeometry
-        {
-            get
-            {
-                return (XbimCurve)EdgeGeometry;
-            }
-        }
+        IXbimCurve IXbimEdge.EdgeGeometry => EdgeGeometry as IXbimCurve;
 
         public string ToBRep => BrepString();
 

@@ -19,8 +19,10 @@
 #include <gp_Ax3.hxx>
 #include <Precision.hxx>
 #include <Geom_Plane.hxx>
+#include <Geom_ElementarySurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_SphericalSurface.hxx>
+#include <Geom_ConicalSurface.hxx>
 #include <Geom_ToroidalSurface.hxx>
 #include <Geom_RectangularTrimmedSurface.hxx>
 #include <Geom_BSplineSurface.hxx>
@@ -688,6 +690,75 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_rectangular_trimmed(
         xbim_set_error("xbim_surface_build_rectangular_trimmed: OCCT exception");
         return XBIM_ERROR;
     }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_get_elementary_props(
+    XbimSurfaceHandle handle,
+    double* outOriginX, double* outOriginY, double* outOriginZ,
+    double* outZDirX,   double* outZDirY,   double* outZDirZ,
+    double* outXDirX,   double* outXDirY,   double* outXDirZ,
+    double* outRadius)
+{
+    xbim_clear_error();
+
+    if (!handle || handle->surface.IsNull())
+    {
+        xbim_set_error("xbim_surface_get_elementary_props: handle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!outOriginX || !outOriginY || !outOriginZ ||
+        !outZDirX || !outZDirY || !outZDirZ ||
+        !outXDirX || !outXDirY || !outXDirZ ||
+        !outRadius)
+    {
+        xbim_set_error("xbim_surface_get_elementary_props: output pointer is NULL");
+        return XBIM_INVALID_ARG;
+    }
+
+    Handle(Geom_ElementarySurface) elem =
+        Handle(Geom_ElementarySurface)::DownCast(handle->surface);
+    if (elem.IsNull())
+    {
+        xbim_set_error("xbim_surface_get_elementary_props: surface is not an elementary surface");
+        return XBIM_INVALID_ARG;
+    }
+
+    const gp_Ax3& pos = elem->Position();
+    const gp_Pnt& loc = pos.Location();
+    const gp_Dir& zDir = pos.Direction();
+    const gp_Dir& xDir = pos.XDirection();
+
+    *outOriginX = loc.X();
+    *outOriginY = loc.Y();
+    *outOriginZ = loc.Z();
+    *outZDirX = zDir.X();
+    *outZDirY = zDir.Y();
+    *outZDirZ = zDir.Z();
+    *outXDirX = xDir.X();
+    *outXDirY = xDir.Y();
+    *outXDirZ = xDir.Z();
+
+    /* Extract radius based on the concrete surface type */
+    *outRadius = 0.0;
+    Handle(Geom_CylindricalSurface) cyl =
+        Handle(Geom_CylindricalSurface)::DownCast(elem);
+    if (!cyl.IsNull()) { *outRadius = cyl->Radius(); return XBIM_OK; }
+
+    Handle(Geom_SphericalSurface) sph =
+        Handle(Geom_SphericalSurface)::DownCast(elem);
+    if (!sph.IsNull()) { *outRadius = sph->Radius(); return XBIM_OK; }
+
+    Handle(Geom_ConicalSurface) con =
+        Handle(Geom_ConicalSurface)::DownCast(elem);
+    if (!con.IsNull()) { *outRadius = con->RefRadius(); return XBIM_OK; }
+
+    Handle(Geom_ToroidalSurface) tor =
+        Handle(Geom_ToroidalSurface)::DownCast(elem);
+    if (!tor.IsNull()) { *outRadius = tor->MajorRadius(); return XBIM_OK; }
+
+    /* Plane or unknown elementary — radius stays 0 */
+    return XBIM_OK;
 }
 
 #pragma endregion

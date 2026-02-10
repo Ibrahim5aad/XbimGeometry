@@ -7,7 +7,8 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
     {
         public double X { get; }
         public double Y { get; }
-        public double Z { get; }
+        private readonly double _z;
+        public double Z => Is3d ? _z : throw new InvalidOperationException("Z is not defined for a 2D direction.");
         public bool Is3d { get; }
         public bool IsNull { get; }
 
@@ -16,9 +17,9 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             double mag = Math.Sqrt(x * x + y * y);
             if (mag < 1e-15)
             {
-                X = 0;
-                Y = 0;
-                Z = 0;
+                X = double.NaN;
+                Y = double.NaN;
+                _z = 0;
                 Is3d = false;
                 IsNull = true;
             }
@@ -26,7 +27,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             {
                 X = x / mag;
                 Y = y / mag;
-                Z = 0;
+                _z = 0;
                 Is3d = false;
                 IsNull = false;
             }
@@ -37,9 +38,9 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             double mag = Math.Sqrt(x * x + y * y + z * z);
             if (mag < 1e-15)
             {
-                X = 0;
-                Y = 0;
-                Z = 0;
+                X = double.NaN;
+                Y = double.NaN;
+                _z = double.NaN;
                 Is3d = true;
                 IsNull = true;
             }
@@ -47,7 +48,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             {
                 X = x / mag;
                 Y = y / mag;
-                Z = z / mag;
+                _z = z / mag;
                 Is3d = true;
                 IsNull = false;
             }

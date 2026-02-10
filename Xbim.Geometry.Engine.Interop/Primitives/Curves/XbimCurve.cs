@@ -11,8 +11,8 @@ using Xbim.Geometry.Exceptions;
 namespace Xbim.Geometry.Engine.Interop.Primitives
 {
     /// <summary>
-    /// Wraps a native curve handle (Geom_Curve), implementing both the V6 <see cref="IXCurve"/>
-    /// and the legacy <see cref="IXbimCurve"/> interfaces.
+    /// Wraps a native curve handle (Geom_Curve), implementing <see cref="IXCurve"/>
+    /// and <see cref="IXbimCurve"/> interfaces.
     /// </summary>
     internal class XbimCurve : NativeOwner<NativeCurveHandle>, IXCurve, IXbimCurve
     {
@@ -115,7 +115,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             if (mag2 > 1e-15)
                 normal = new XDirection(d2x / mag2, d2y / mag2, d2z / mag2);
             else
-                normal = new XDirection(0, 0, 1);
+                normal = new XDirection(0, 0, 0);
 
             return new XPoint(px, py, pz);
         }
@@ -160,7 +160,12 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
 
         double IXbimCurve.GetParameter(XbimPoint3D point, double tolerance)
         {
-            throw new NotSupportedException("Curve parameter projection not yet supported.");
+            int result = XbimGeometryNativeApi.xbim_curve_project_point_3d(
+                NativeContextHandle.NullHandle, Handle,
+                point.X, point.Y, point.Z, tolerance, out double param);
+            if (result != 0)
+                return 0;
+            return param;
         }
 
         XbimPoint3D IXbimCurve.GetPoint(double parameter)

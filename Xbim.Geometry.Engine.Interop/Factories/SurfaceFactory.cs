@@ -147,14 +147,20 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new XbimGeometryServiceException(
                     $"Failed to build cylindrical surface #{ifcCylinder.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Surface(NativeSurfaceHandle, XSurfaceType.IfcCylindricalSurface);
+            return new CylindricalSurface(NativeSurfaceHandle, ifcCylinder.Radius)
+            {
+                Position = new XAxis2Placement3d(
+                    new XPoint(ox, oy, oz),
+                    new XDirection(zx, zy, zz),
+                    new XDirection(xx, xy, xz))
+            };
         }
 
         #endregion
 
         #region Spherical
 
-        private Surface BuildSphericalSurface(IIfcSphericalSurface ifcSphere)
+        private SphericalSurface BuildSphericalSurface(IIfcSphericalSurface ifcSphere)
         {
             GeometryFactory.BuildAxis2Placement3d(ifcSphere.Position,
                 out double ox, out double oy, out double oz,
@@ -173,14 +179,20 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new XbimGeometryServiceException(
                     $"Failed to build spherical surface #{ifcSphere.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Surface(NativeSurfaceHandle, XSurfaceType.IfcSphericalSurface);
+            return new SphericalSurface(NativeSurfaceHandle, ifcSphere.Radius)
+            {
+                Position = new XAxis2Placement3d(
+                    new XPoint(ox, oy, oz),
+                    new XDirection(zx, zy, zz),
+                    new XDirection(xx, xy, xz))
+            };
         }
 
         #endregion
 
         #region Toroidal
 
-        private Surface BuildToroidalSurface(IIfcToroidalSurface ifcToroid)
+        private ToroidalSurface BuildToroidalSurface(IIfcToroidalSurface ifcToroid)
         {
             if (ifcToroid.MajorRadius < 0)
                 throw new XbimGeometryServiceException(
@@ -207,7 +219,13 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new XbimGeometryServiceException(
                     $"Failed to build toroidal surface #{ifcToroid.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
-            return new Surface(nativeSurfaceHandle, XSurfaceType.IfcToroidalSurface);
+            return new ToroidalSurface(nativeSurfaceHandle, ifcToroid.MajorRadius)
+            {
+                Position = new XAxis2Placement3d(
+                    new XPoint(ox, oy, oz),
+                    new XDirection(zx, zy, zz),
+                    new XDirection(xx, xy, xz))
+            };
         }
 
         #endregion

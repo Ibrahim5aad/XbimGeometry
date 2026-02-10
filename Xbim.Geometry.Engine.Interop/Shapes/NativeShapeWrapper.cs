@@ -1,4 +1,5 @@
 using System;
+using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
@@ -50,8 +51,9 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         /// <summary>
         /// Wraps a native shape handle as an <see cref="IXSolid"/>.
-        /// If the shape is a Compound, extracts the single solid from it.
-        /// Throws if the underlying shape is not a solid or a compound containing exactly one solid.
+        /// If the shape is a Compound containing a single solid, extracts it.
+        /// If the compound contains multiple solids, returns an <see cref="XbimSolidSet"/>
+        /// that implements both <see cref="IXSolid"/> and <see cref="IXbimSolidSet"/>.
         /// </summary>
         internal static IXSolid WrapSolid(NativeShapeHandle handle)
         {
@@ -82,13 +84,19 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                     throw new XbimGeometryServiceException(
                         "Failed to extract solids from compound shape.");
 
-                // Take the first solid; dispose any extras
-                var solidHandle = NativeShapeHandle.FromIntPtr(ptrs[0]);
-                for (int i = 1; i < capacity; i++)
-                    NativeShapeHandle.FromIntPtr(ptrs[i]).Dispose();
+                if (capacity == 1)
+                {
+                    var solidHandle = NativeShapeHandle.FromIntPtr(ptrs[0]);
+                    handle.Dispose();
+                    return new XbimSolid(solidHandle);
+                }
 
+                // Multiple solids — preserve all in a solid set
+                var solids = new IXbimSolid[capacity];
+                for (int i = 0; i < capacity; i++)
+                    solids[i] = new XbimSolid(NativeShapeHandle.FromIntPtr(ptrs[i]));
                 handle.Dispose();
-                return new XbimSolid(solidHandle);
+                return new XbimSolidSet(solids);
             }
 
             throw new XbimGeometryServiceException(

@@ -1,4 +1,9 @@
-﻿using Xbim.Geometry.Abstractions;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.Extensions.Logging;
+using Xbim.Common.Geometry;
+using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Handles;
 using Xbim.Geometry.Engine.Interop.Internal;
 using Xbim.Geometry.Exceptions;
@@ -6,10 +11,12 @@ using Xbim.Geometry.Exceptions;
 namespace Xbim.Geometry.Engine.Interop.Primitives
 {
     /// <summary>
-    /// Wraps a native 2D curve handle (Geom2d_Curve) as an <see cref="IXCurve"/>.
-    /// Point evaluation returns XY coordinates with Z=0.
+    /// Wraps a native 2D curve handle (Geom2d_Curve), implementing <see cref="IXCurve"/>
+    /// and <see cref="IXbimCurve"/> interfaces.
+    /// Point evaluation returns 2D XY coordinates; accessing Z on <see cref="IXCurve"/> results throws.
+    /// The <see cref="IXbimCurve"/> surface uses <see cref="XbimPoint3D"/> with Z=0.
     /// </summary>
-    internal class XbimCurve2d : NativeOwner<NativeCurve2dHandle>, IXCurve
+    internal class XbimCurve2d : NativeOwner<NativeCurve2dHandle>, IXCurve, IXbimCurve
     {
         private readonly XCurveType _curveType;
 
@@ -17,6 +24,8 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         {
             _curveType = curveType;
         }
+
+        #region IXCurve
 
         public XCurveType CurveType => _curveType;
 
@@ -65,7 +74,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             if (result != 0)
                 throw new XbimGeometryServiceException(
                     $"Failed to evaluate 2D curve at u={uParam}: {XbimGeometryNativeApi.GetLastError()}");
-            return new XPoint(x, y, 0);
+            return new XPoint(x, y);
         }
 
         public IXPoint GetFirstDerivative(double uParam, out IXDirection direction)
@@ -80,11 +89,11 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
 
             double mag = Math.Sqrt(dx * dx + dy * dy);
             if (mag > 1e-15)
-                direction = new XDirection(dx / mag, dy / mag, 0);
+                direction = new XDirection(dx, dy);
             else
-                direction = new XDirection(1, 0, 0);
+                direction = new XDirection(1, 0);
 
-            return new XPoint(px, py, 0);
+            return new XPoint(px, py);
         }
 
         public IXPoint GetSecondDerivative(double uParam, out IXDirection direction, out IXDirection normal)
@@ -100,17 +109,82 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
 
             double mag1 = Math.Sqrt(d1x * d1x + d1y * d1y);
             if (mag1 > 1e-15)
-                direction = new XDirection(d1x / mag1, d1y / mag1, 0);
+                direction = new XDirection(d1x, d1y);
             else
-                direction = new XDirection(1, 0, 0);
+                direction = new XDirection(1, 0);
 
             double mag2 = Math.Sqrt(d2x * d2x + d2y * d2y);
             if (mag2 > 1e-15)
-                normal = new XDirection(d2x / mag2, d2y / mag2, 0);
+                normal = new XDirection(d2x, d2y);
             else
-                normal = new XDirection(0, 1, 0);
+                normal = new XDirection(0, 0);
 
-            return new XPoint(px, py, 0);
+            return new XPoint(px, py);
         }
+
+        #endregion
+
+        #region IXbimCurve
+
+        XbimGeometryObjectType IXbimGeometryObject.GeometryType => XbimGeometryObjectType.XbimCurveType;
+
+        bool IXbimGeometryObject.IsValid => true;
+
+        bool IXbimGeometryObject.IsSet => false;
+
+        XbimRect3D IXbimGeometryObject.BoundingBox => XbimRect3D.Empty;
+
+        object IXbimGeometryObject.Tag { get; set; }
+
+        bool IXbimCurve.Is3D => false;
+
+        bool IXbimCurve.IsClosed
+        {
+            get
+            {
+                var s = GetPoint(FirstParameter);
+                var e = GetPoint(LastParameter);
+                double dx = s.X - e.X, dy = s.Y - e.Y;
+                return Math.Sqrt(dx * dx + dy * dy) < 1e-7;
+            }
+        }
+
+        string IXbimCurve.ToBRep => string.Empty;
+
+        XbimPoint3D IXbimCurve.Start
+        {
+            get
+            {
+                var pt = GetPoint(FirstParameter);
+                return new XbimPoint3D(pt.X, pt.Y, 0);
+            }
+        }
+
+        XbimPoint3D IXbimCurve.End
+        {
+            get
+            {
+                var pt = GetPoint(LastParameter);
+                return new XbimPoint3D(pt.X, pt.Y, 0);
+            }
+        }
+
+        double IXbimCurve.GetParameter(XbimPoint3D point, double tolerance)
+            => throw new NotSupportedException("GetParameter is not supported for 2D curves.");
+
+        XbimPoint3D IXbimCurve.GetPoint(double parameter)
+        {
+            var pt = GetPoint(parameter);
+            return new XbimPoint3D(pt.X, pt.Y, 0);
+        }
+
+        IEnumerable<XbimPoint3D> IXbimCurve.Intersections(IXbimCurve intersector, double tolerance, ILogger logger)
+            => Enumerable.Empty<XbimPoint3D>();
+
+        IXbimGeometryObject IXbimGeometryObject.Transform(XbimMatrix3D matrix3D) => this;
+
+        IXbimGeometryObject IXbimGeometryObject.TransformShallow(XbimMatrix3D matrix3D) => this;
+
+        #endregion
     }
 }

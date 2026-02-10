@@ -10,8 +10,8 @@ using Xbim.Geometry.Exceptions;
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
     /// <summary>
-    /// Represents a shell shape (TopoDS_Shell), implementing both the V6 <see cref="IXShell"/>
-    /// and the legacy <see cref="IXbimShell"/> interfaces.
+    /// Represents a shell shape (TopoDS_Shell), implementing <see cref="IXShell"/>
+    /// and <see cref="IXbimShell"/> interfaces.
     /// </summary>
     internal class XbimShell : XbimShape, IXShell, IXbimShell, IEquatable<IXbimShell>
     {

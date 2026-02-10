@@ -11,8 +11,8 @@ using Xbim.Geometry.Exceptions;
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
     /// <summary>
-    /// Represents a wire shape (TopoDS_Wire), implementing both the V6 <see cref="IXWire"/>
-    /// and the legacy <see cref="IXbimWire"/> interfaces.
+    /// Represents a wire shape (TopoDS_Wire), implementing <see cref="IXWire"/>
+    /// and <see cref="IXbimWire"/> interfaces.
     /// </summary>
     internal class XbimWire : XbimShape, IXWire, IXbimWire, IEquatable<IXbimWire>
     {
@@ -85,15 +85,18 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
             get
             {
-                var handles = GetSubShapeHandles(XShapeType.Vertex);
-                foreach (var h in handles)
-                {
-                    int result = XbimGeometryNativeApi.xbim_vertex_point(h, out double x, out double y, out double z);
-                    if (result != 0)
-                        throw new XbimGeometryServiceException(
-                            $"Failed to get vertex point: {XbimGeometryNativeApi.GetLastError()}");
-                    yield return new XbimPoint3D(x, y, z);
-                }
+                int count = 0;
+                int result = XbimGeometryNativeApi.xbim_wire_get_ordered_points(Handle, null, ref count);
+                if (result != 0 || count == 0)
+                    yield break;
+
+                var coords = new double[count * 3];
+                result = XbimGeometryNativeApi.xbim_wire_get_ordered_points(Handle, coords, ref count);
+                if (result != 0)
+                    yield break;
+
+                for (int i = 0; i < count; i++)
+                    yield return new XbimPoint3D(coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2]);
             }
         }
 
@@ -122,7 +125,14 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             }
         }
 
-        public bool IsPlanar => false;
+        public bool IsPlanar
+        {
+            get
+            {
+                int result = XbimGeometryNativeApi.xbim_wire_is_planar(Handle, 1e-7, out int isPlanar);
+                return result == 0 && isPlanar != 0;
+            }
+        }
 
         public XbimPoint3D Start
         {

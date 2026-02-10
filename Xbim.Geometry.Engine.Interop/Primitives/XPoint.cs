@@ -1,3 +1,4 @@
+using System;
 using Xbim.Geometry.Abstractions;
 
 namespace Xbim.Geometry.Engine.Interop.Primitives
@@ -6,14 +7,15 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
     {
         public double X { get; }
         public double Y { get; }
-        public double Z { get; }
+        private readonly double _z;
+        public double Z => Is3d ? _z : throw new InvalidOperationException("Z is not defined for a 2D point.");
         public bool Is3d { get; }
 
         public XPoint(double x, double y)
         {
             X = x;
             Y = y;
-            Z = 0;
+            _z = 0;
             Is3d = false;
         }
 
@@ -21,7 +23,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         {
             X = x;
             Y = y;
-            Z = z;
+            _z = z;
             Is3d = true;
         }
     }

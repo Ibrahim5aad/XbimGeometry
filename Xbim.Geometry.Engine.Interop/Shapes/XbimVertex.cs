@@ -9,8 +9,8 @@ using Xbim.Geometry.Exceptions;
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
     /// <summary>
-    /// Represents a vertex shape (TopoDS_Vertex), implementing both the V6 <see cref="IXVertex"/>
-    /// and the legacy <see cref="IXbimVertex"/> interfaces.
+    /// Represents a vertex shape (TopoDS_Vertex), implementing <see cref="IXVertex"/>
+    /// and <see cref="IXbimVertex"/> interfaces.
     /// </summary>
     internal class XbimVertex : XbimShape, IXVertex, IXbimVertex, IEquatable<IXbimVertex>
     {

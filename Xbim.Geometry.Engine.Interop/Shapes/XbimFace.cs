@@ -10,8 +10,8 @@ using Xbim.Geometry.Exceptions;
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
     /// <summary>
-    /// Represents a face shape (TopoDS_Face), implementing both the V6 <see cref="IXFace"/>
-    /// and the legacy <see cref="IXbimFace"/> interfaces.
+    /// Represents a face shape (TopoDS_Face), implementing <see cref="IXFace"/>
+    /// and <see cref="IXbimFace"/> interfaces.
     /// </summary>
     internal class XbimFace : XbimShape, IXFace, IXbimFace, IEquatable<IXbimFace>
     {
@@ -102,7 +102,63 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
                 if (result != 0)
                     throw new XbimGeometryServiceException(
                         $"Failed to get face surface: {XbimGeometryNativeApi.GetLastError()}");
-                return new Surface(surfHandle, (XSurfaceType)surfType);
+                var type = (XSurfaceType)surfType;
+
+                // Try to extract elementary surface properties (position + radius).
+                // Succeeds for Geom_ElementarySurface subtypes: plane, cylinder, cone, sphere, torus.
+                int propsResult = XbimGeometryNativeApi.xbim_surface_get_elementary_props(
+                    surfHandle,
+                    out double ox, out double oy, out double oz,
+                    out double zx, out double zy, out double zz,
+                    out double xx, out double xy, out double xz,
+                    out double radius);
+
+                if (propsResult == 0)
+                {
+                    switch (type)
+                    {
+                        case XSurfaceType.IfcCylindricalSurface:
+                            return new CylindricalSurface(surfHandle, radius)
+                            {
+                                Position = new XAxis2Placement3d(
+                                    new XPoint(ox, oy, oz),
+                                    new XDirection(zx, zy, zz),
+                                    new XDirection(xx, xy, xz))
+                            };
+                        case XSurfaceType.IfcSurfaceOfRevolution:
+                            // Geom_ConicalSurface is an elementary surface classified as revolution
+                            return new ConicalSurface(surfHandle, radius)
+                            {
+                                Position = new XAxis2Placement3d(
+                                    new XPoint(ox, oy, oz),
+                                    new XDirection(zx, zy, zz),
+                                    new XDirection(xx, xy, xz))
+                            };
+                        case XSurfaceType.IfcSphericalSurface:
+                            return new SphericalSurface(surfHandle, radius)
+                            {
+                                Position = new XAxis2Placement3d(
+                                    new XPoint(ox, oy, oz),
+                                    new XDirection(zx, zy, zz),
+                                    new XDirection(xx, xy, xz))
+                            };
+                        case XSurfaceType.IfcToroidalSurface:
+                            return new ToroidalSurface(surfHandle, radius)
+                            {
+                                Position = new XAxis2Placement3d(
+                                    new XPoint(ox, oy, oz),
+                                    new XDirection(zx, zy, zz),
+                                    new XDirection(xx, xy, xz))
+                            };
+                        case XSurfaceType.IfcPlane:
+                            return new Plane(surfHandle,
+                                new XPoint(ox, oy, oz),
+                                new XDirection(zx, zy, zz),
+                                new XDirection(xx, xy, xz));
+                    }
+                }
+
+                return new Surface(surfHandle, type);
             }
         }
 
