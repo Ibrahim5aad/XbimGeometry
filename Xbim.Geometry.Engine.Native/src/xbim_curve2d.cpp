@@ -34,6 +34,7 @@
 #include <Geom2dAPI_ProjectPointOnCurve.hxx>
 #include <Geom2dAPI_PointsToBSpline.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
+#include <Geom2dConvert.hxx>
 #include <Geom2dConvert_CompCurveToBSplineCurve.hxx>
 #include <TColgp_Array1OfPnt.hxx>
 #include <TColgp_Array1OfPnt2d.hxx>
@@ -231,15 +232,23 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_ellipse(
             return XBIM_INVALID_ARG;
         }
 
+        // OCCT requires majorRadius >= minorRadius.
+        // When SemiAxis1 < SemiAxis2, the IFC major axis is perpendicular to refDir,
+        // so we swap radii AND rotate refDir 90° to align the OCCT major axis correctly.
+        double maj = majorRadius, min = minorRadius;
+        double axX = refDirX, axY = refDirY;
+        if (min > maj)
+        {
+            std::swap(maj, min);
+            // Rotate 90° counter-clockwise: (x, y) → (-y, x)
+            axX = -refDirY;
+            axY =  refDirX;
+        }
+
         gp_Pnt2d center(cx, cy);
-        gp_Dir2d refDir(refDirX, refDirY);
+        gp_Dir2d refDir(axX, axY);
         gp_Ax2d mainAxis(center, refDir);
         gp_Ax22d ax22d(mainAxis, /* isSense */ true);
-
-        // OCCT requires majorRadius >= minorRadius; swap if needed
-        double maj = majorRadius, min = minorRadius;
-        if (min > maj)
-            std::swap(maj, min);
 
         Handle(Geom2d_Ellipse) ellipse = new Geom2d_Ellipse(ax22d, maj, min);
 

@@ -75,10 +75,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new XbimGeometryServiceException(
                     $"Failed to build line curve #{ifcLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
+            double ifcMag = ifcLine.Dir.Magnitude;
             return new XbimLine3d(nativeCurveHandle,
                 new XPoint(origin.X, origin.Y, origin.Z),
-                new XVector(dirX, dirY, dirZ),
-                ifcLine.Dir.Magnitude);
+                XVector.Create3d(dirX, dirY, dirZ, ifcMag),
+                ifcMag);
         }
 
         #endregion
@@ -134,18 +135,24 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 zx, zy, zz,
                 xx, xy, xz,
                 ifcEllipse.SemiAxis1, ifcEllipse.SemiAxis2,
-                out _,
+                out int rotated,
                 out var nativeCurveHandle);
 
             if (result != 0)
                 throw new XbimGeometryServiceException(
                     $"Failed to build ellipse curve #{ifcEllipse.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
+            double semi1 = ifcEllipse.SemiAxis1;
+            double semi2 = ifcEllipse.SemiAxis2;
+            bool swapped = rotated != 0;
+            double majorR = swapped ? semi2 : semi1;
+            double minorR = swapped ? semi1 : semi2;
+
             var position = new XAxis2Placement3d(
                 new XPoint(ox, oy, oz),
                 new XDirection(zx, zy, zz),
                 new XDirection(xx, xy, xz));
-            return new XbimEllipse3d(nativeCurveHandle, ifcEllipse.SemiAxis1, ifcEllipse.SemiAxis2, position);
+            return new XbimEllipse3d(nativeCurveHandle, majorR, minorR, position);
         }
 
         #endregion
@@ -330,7 +337,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         private XbimTrimmedCurve3d BuildTrimmedCurve3d(IIfcTrimmedCurve ifcTrimmed)
         {
-            CurveRules.Validate(ifcTrimmed);
+            CurveRules.WR41_TrimValuesNotEqual(ifcTrimmed);
+            // WR42 (NoTrimOfBoundedCurves): many real-world files violate this — warn and continue
+            if (ifcTrimmed.BasisCurve is IIfcBoundedCurve)
+                _logger.LogWarning("IIfcTrimmedCurve #{Label} violates WR42 (NoTrimOfBoundedCurves): " +
+                    "basis curve is already bounded. Processing continues.", ifcTrimmed.EntityLabel);
 
             // Build the basis curve — ownership transfers to XbimTrimmedCurve3d on success
             var basisCurve = (XbimCurve)BuildCurve3d(ifcTrimmed.BasisCurve);

@@ -96,10 +96,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new XbimGeometryServiceException(
                     $"Failed to build 2D line #{ifcLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
+            double ifcMag = ifcLine.Dir.Magnitude;
             return new XbimLine2d(nativeHandle,
                 new XPoint(ox, oy),
-                new XVector(dx, dy),
-                ifcLine.Dir.Magnitude);
+                XVector.Create2d(dx, dy, ifcMag),
+                ifcMag);
         }
 
         #endregion
@@ -189,10 +190,20 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new XbimGeometryServiceException(
                     $"Failed to build 2D ellipse #{ifcEllipse.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
 
+            double semi1 = ifcEllipse.SemiAxis1;
+            double semi2 = ifcEllipse.SemiAxis2;
+            bool swapped = semi1 < semi2;
+            double majorR = swapped ? semi2 : semi1;
+            double minorR = swapped ? semi1 : semi2;
+
+            // When axes are swapped, the major axis direction is rotated 90° from refDir
+            double posRefX = swapped ? -refDirY : refDirX;
+            double posRefY = swapped ? refDirX : refDirY;
+
             var position = new XAxis2Placement2d(
                 new XPoint(cx, cy),
-                new XDirection(refDirX, refDirY));
-            return new XbimEllipse2d(nativeHandle, ifcEllipse.SemiAxis1, ifcEllipse.SemiAxis2, position);
+                new XDirection(posRefX, posRefY));
+            return new XbimEllipse2d(nativeHandle, majorR, minorR, position);
         }
 
         #endregion
@@ -273,7 +284,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         private XbimTrimmedCurve2d BuildTrimmedCurve2d(IIfcTrimmedCurve ifcTrimmed)
         {
-            CurveRules.Validate(ifcTrimmed);
+            CurveRules.WR41_TrimValuesNotEqual(ifcTrimmed);
+            // WR42 (NoTrimOfBoundedCurves): many real-world files violate this — warn and continue
+            if (ifcTrimmed.BasisCurve is IIfcBoundedCurve)
+                _logger.LogWarning("IIfcTrimmedCurve #{Label} violates WR42 (NoTrimOfBoundedCurves): " +
+                    "basis curve is already bounded. Processing continues.", ifcTrimmed.EntityLabel);
 
             // Build the 2D basis curve — ownership transfers to XbimTrimmedCurve2d on success
             var basisCurve = (XbimCurve2d)BuildCurve2d(ifcTrimmed.BasisCurve);
@@ -315,6 +330,18 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                             $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: error converting trim points.");
 
                     HandleEqualTrimParams(ifcTrimmed, isConic, ref u1, ref u2, ref sense);
+                }
+
+                // When the basis ellipse has SemiAxis1 < SemiAxis2, the 2D native builder
+                // rotates the reference direction by +PI/2 to satisfy OCCT's major >= minor
+                // constraint. IFC parametric trim values must be shifted by -PI/2 to match
+                // the rotated OCCT parameterization.
+                if (!useCartesian && isEllipse &&
+                    ifcTrimmed.BasisCurve is IIfcEllipse basisEllipse &&
+                    basisEllipse.SemiAxis1 < basisEllipse.SemiAxis2)
+                {
+                    u1 -= Math.PI / 2.0;
+                    u2 -= Math.PI / 2.0;
                 }
 
                 // Build trimmed curve using specialized native functions based on basis type

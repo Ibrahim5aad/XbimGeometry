@@ -254,9 +254,56 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     if (segment.ParentCurve == null)
                         continue;
 
-                    var segCurve = (XbimCurve)Build(segment.ParentCurve);
+                    XbimCurve segCurve;
+                    try
+                    {
+                        segCurve = Build3d(segment.ParentCurve);
+                    }
+                    catch (IfcRuleViolationException ex)
+                    {
+                        _logger.LogWarning(
+                            "IIfcCompositeCurve #{Label}: skipping segment #{SegLabel} ({Rule}).",
+                            ifcComposite.EntityLabel, segment.EntityLabel, ex.Message);
+                        continue;
+                    }
 
-                    if (!segment.SameSense)
+                    bool shouldReverse = !segment.SameSense;
+
+                    // Verify connectivity: if reversing per SameSense creates a larger gap
+                    // than not reversing, the sense flag is wrong — override it.
+                    if (segmentCurves.Count > 0)
+                    {
+                        var prevCurve = segmentCurves[segmentCurves.Count - 1];
+                        XbimGeometryNativeApi.xbim_curve_parameters(prevCurve.Handle, out _, out double prevLast);
+                        XbimGeometryNativeApi.xbim_curve_value(prevCurve.Handle, prevLast,
+                            out double pex, out double pey, out double pez);
+
+                        XbimGeometryNativeApi.xbim_curve_parameters(segCurve.Handle, out double curFirst, out double curLast);
+                        XbimGeometryNativeApi.xbim_curve_value(segCurve.Handle, curFirst,
+                            out double csx, out double csy, out double csz);
+                        XbimGeometryNativeApi.xbim_curve_value(segCurve.Handle, curLast,
+                            out double cex, out double cey, out double cez);
+
+                        double gapForward = Math.Sqrt((csx - pex) * (csx - pex) + (csy - pey) * (csy - pey) + (csz - pez) * (csz - pez));
+                        double gapReversed = Math.Sqrt((cex - pex) * (cex - pex) + (cey - pey) * (cey - pey) + (cez - pez) * (cez - pez));
+
+                        if (shouldReverse && gapReversed > gapForward)
+                        {
+                            _logger.LogWarning(
+                                "IIfcCompositeCurve #{Label}: segment #{SegLabel} has incorrect SameSense, ignoring.",
+                                ifcComposite.EntityLabel, segment.EntityLabel);
+                            shouldReverse = false;
+                        }
+                        else if (!shouldReverse && gapForward > gapReversed)
+                        {
+                            _logger.LogWarning(
+                                "IIfcCompositeCurve #{Label}: segment #{SegLabel} has incorrect SameSense, reversing.",
+                                ifcComposite.EntityLabel, segment.EntityLabel);
+                            shouldReverse = true;
+                        }
+                    }
+
+                    if (shouldReverse)
                     {
                         int reverseResult = XbimGeometryNativeApi.xbim_curve_reverse(segCurve.Handle);
                         if (reverseResult != 0)
@@ -311,7 +358,18 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     if (segment.ParentCurve == null)
                         continue;
 
-                    var segCurve = (XbimCurve2d)BuildCurve2d(segment.ParentCurve);
+                    XbimCurve2d segCurve;
+                    try
+                    {
+                        segCurve = (XbimCurve2d)BuildCurve2d(segment.ParentCurve);
+                    }
+                    catch (IfcRuleViolationException ex)
+                    {
+                        _logger.LogWarning(
+                            "IIfcCompositeCurve #{Label}: skipping segment #{SegLabel} ({Rule}).",
+                            ifcComposite.EntityLabel, segment.EntityLabel, ex.Message);
+                        continue;
+                    }
 
                     if (!segment.SameSense)
                     {

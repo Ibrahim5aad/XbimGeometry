@@ -879,6 +879,116 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_project_point_3d(
     }
 }
 
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_get_elementary_props(
+    XbimCurveHandle handle,
+    int*    outCurveType,
+    double* outOriginX, double* outOriginY, double* outOriginZ,
+    double* outDirX,    double* outDirY,    double* outDirZ,
+    double* outXDirX,   double* outXDirY,   double* outXDirZ,
+    double* outRadius1, double* outRadius2)
+{
+    xbim_clear_error();
+
+    if (!handle || handle->curve.IsNull())
+    {
+        xbim_set_error("xbim_curve_get_elementary_props: handle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!outCurveType ||
+        !outOriginX || !outOriginY || !outOriginZ ||
+        !outDirX || !outDirY || !outDirZ ||
+        !outXDirX || !outXDirY || !outXDirZ ||
+        !outRadius1 || !outRadius2)
+    {
+        xbim_set_error("xbim_curve_get_elementary_props: output pointer is NULL");
+        return XBIM_INVALID_ARG;
+    }
+
+    /* Zero all outputs */
+    *outCurveType = 0; /* IfcCurve (unknown) */
+    *outOriginX = *outOriginY = *outOriginZ = 0.0;
+    *outDirX = *outDirY = *outDirZ = 0.0;
+    *outXDirX = *outXDirY = *outXDirZ = 0.0;
+    *outRadius1 = *outRadius2 = 0.0;
+
+    try
+    {
+        GeomAdaptor_Curve ga(handle->curve);
+        GeomAbs_CurveType curveType = ga.GetType();
+
+        switch (curveType)
+        {
+        case GeomAbs_Line:
+        {
+            *outCurveType = 7; /* IfcLine */
+            Handle(Geom_Line) line = Handle(Geom_Line)::DownCast(handle->curve);
+            if (!line.IsNull())
+            {
+                const gp_Pnt& loc = line->Lin().Location();
+                const gp_Dir& dir = line->Lin().Direction();
+                *outOriginX = loc.X(); *outOriginY = loc.Y(); *outOriginZ = loc.Z();
+                *outDirX = dir.X();    *outDirY = dir.Y();    *outDirZ = dir.Z();
+            }
+            break;
+        }
+        case GeomAbs_Circle:
+        {
+            *outCurveType = 2; /* IfcCircle */
+            Handle(Geom_Circle) circ = Handle(Geom_Circle)::DownCast(handle->curve);
+            if (!circ.IsNull())
+            {
+                const gp_Ax2& pos = circ->Position();
+                const gp_Pnt& loc = pos.Location();
+                const gp_Dir& zDir = pos.Direction();
+                const gp_Dir& xDir = pos.XDirection();
+                *outOriginX = loc.X();  *outOriginY = loc.Y();  *outOriginZ = loc.Z();
+                *outDirX = zDir.X();    *outDirY = zDir.Y();    *outDirZ = zDir.Z();
+                *outXDirX = xDir.X();   *outXDirY = xDir.Y();   *outXDirZ = xDir.Z();
+                *outRadius1 = circ->Radius();
+            }
+            break;
+        }
+        case GeomAbs_Ellipse:
+        {
+            *outCurveType = 5; /* IfcEllipse */
+            Handle(Geom_Ellipse) ell = Handle(Geom_Ellipse)::DownCast(handle->curve);
+            if (!ell.IsNull())
+            {
+                const gp_Ax2& pos = ell->Position();
+                const gp_Pnt& loc = pos.Location();
+                const gp_Dir& zDir = pos.Direction();
+                const gp_Dir& xDir = pos.XDirection();
+                *outOriginX = loc.X();  *outOriginY = loc.Y();  *outOriginZ = loc.Z();
+                *outDirX = zDir.X();    *outDirY = zDir.Y();    *outDirZ = zDir.Z();
+                *outXDirX = xDir.X();   *outXDirY = xDir.Y();   *outXDirZ = xDir.Z();
+                *outRadius1 = ell->MajorRadius();
+                *outRadius2 = ell->MinorRadius();
+            }
+            break;
+        }
+        case GeomAbs_BSplineCurve:
+            *outCurveType = 1; /* IfcBSplineCurveWithKnots */
+            break;
+        case GeomAbs_BezierCurve:
+        case GeomAbs_Hyperbola:
+        case GeomAbs_Parabola:
+        case GeomAbs_OffsetCurve:
+        case GeomAbs_OtherCurve:
+        default:
+            *outCurveType = 0; /* IfcCurve (unknown) */
+            break;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_curve_get_elementary_props: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
 #pragma endregion
 
 #pragma region Gradient Curve
@@ -1235,14 +1345,14 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_composite_bspline(
                     double gapLen = prevEnd.Distance(startPt);
                     Handle(Geom_TrimmedCurve) gapLine = new Geom_TrimmedCurve(
                         new Geom_Line(prevEnd, gapDir), 0.0, gapLen);
-                    converter.Add(gapLine, tolerance, Standard_False);
+                    converter.Add(gapLine, tolerance, Standard_True, Standard_False);
                 }
             }
 
             /* Try to add directly, approximate if needed */
             Handle(Geom_BSplineCurve) toAdd;
 
-            if (!converter.Add(bounded, tolerance, Standard_False))
+            if (!converter.Add(bounded, tolerance, Standard_True, Standard_False))
             {
                 int n = std::max(200, static_cast<int>(std::abs(last - first) * 10) + 1);
                 toAdd = ApproximateCurve3d(bounded, first, last, n);
@@ -1250,7 +1360,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_composite_bspline(
 
             if (!toAdd.IsNull())
             {
-                if (!converter.Add(toAdd, tolerance, Standard_False))
+                if (!converter.Add(toAdd, tolerance, Standard_True, Standard_False))
                 {
                     xbim_log_warning(ctx,
                         "xbim_curve_build_composite_bspline: failed to add curve %d after approximation", i);
