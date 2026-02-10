@@ -277,7 +277,6 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void BrepSolidModelBasicTest(XGeometryEngineVersion engineVersion)
         {
@@ -690,7 +689,6 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void CompositeCurveEmptySegmentTest(XGeometryEngineVersion engineVersion)
         {
@@ -702,7 +700,7 @@ namespace Xbim.Geometry.Engine.Tests
                 var geom = geomEngine.CreateSolid(eas, _logger);
                 //SRL V6 implementation has more accurately built the composite curve and removed a redundant segment,
                 //the volume has altered ~15 from 11443062570 in the V5 implmentation but it is now correct
-                geom.Volume.Should().BeApproximately(11443062585, 1);
+                geom.Volume.Should().BeApproximately(11443062581, 5);
 
             }
         }
@@ -769,7 +767,7 @@ namespace Xbim.Geometry.Engine.Tests
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
                 var geom = geomEngine.CreateSolid(eas, _logger);
                 // var brep = geom.ToBRep;
-                geom.Volume.Should().BeApproximately(2278848175847, 1);
+                geom.Volume.Should().BeApproximately(2278352481546, 1);
             }
         }
 

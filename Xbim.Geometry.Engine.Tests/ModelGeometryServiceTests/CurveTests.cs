@@ -24,7 +24,6 @@ namespace Xbim.Geometry.Engine.Tests
 
 
         [Fact]
-
         public void Can_Get_Derivatives()
         {
             IXGeometryEngineV6 geomSvc = factory.CreateGeometryEngineV6(_dummyModel, _loggerFactory);

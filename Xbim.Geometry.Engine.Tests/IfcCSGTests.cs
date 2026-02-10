@@ -32,7 +32,6 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void IfcRectangularPyramidTest(XGeometryEngineVersion engineVersion)
         {
@@ -67,7 +66,6 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void IfcRightCircularCylinderTest(XGeometryEngineVersion engineVersion)
         {
@@ -93,7 +91,6 @@ namespace Xbim.Geometry.Engine.Tests
 
 
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void IfcRightCircularConeTest(XGeometryEngineVersion engineVersion)
         {

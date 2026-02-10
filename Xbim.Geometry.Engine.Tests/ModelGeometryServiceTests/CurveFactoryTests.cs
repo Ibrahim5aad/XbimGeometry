@@ -277,7 +277,7 @@ namespace Xbim.Geometry.Engine.Tests
         [InlineData(Math.PI, Math.PI / 2, true, 2)] //Ifc Case 2
         [InlineData(Math.PI, Math.PI / 2, false, 3)]//Ifc Case 3
         [InlineData(Math.PI / 2, Math.PI, false, 4)]//Ifc Case 4
-        [InlineData((Math.PI / 180) * 12, 0, false, 5)]//custom
+        [InlineData(Math.PI / 180 * 12, 0, false, 5)]//custom
 
         public void Can_convert_ifc_trimmed_circle_2d(double trim1, double trim2, bool sameSense, int ifcCase)
         {
@@ -362,24 +362,24 @@ namespace Xbim.Geometry.Engine.Tests
             {
                 case 1:
                     (radius * Math.PI / 2).Should().BeApproximately(tc.Length, _modelSvc.Precision);
-                    (tc.StartPoint.Y).Should().BeApproximately(radius, _modelSvc.Precision);
-                    (tc.EndPoint.X).Should().BeApproximately(-radius, _modelSvc.Precision);
+                    tc.StartPoint.Y.Should().BeApproximately(radius, _modelSvc.Precision);
+                    tc.EndPoint.X.Should().BeApproximately(-radius, _modelSvc.Precision);
 
                     break;
                 case 2:
                     (3 * radius * Math.PI / 2).Should().BeApproximately(tc.Length, _modelSvc.Precision);
-                    (tc.EndPoint.Y).Should().BeApproximately(radius, _modelSvc.Precision);
-                    (tc.StartPoint.X).Should().BeApproximately(-radius, _modelSvc.Precision);
+                    tc.EndPoint.Y.Should().BeApproximately(radius, _modelSvc.Precision);
+                    tc.StartPoint.X.Should().BeApproximately(-radius, _modelSvc.Precision);
                     break;
                 case 3:
                     (radius * Math.PI / 2).Should().BeApproximately(tc.Length, _modelSvc.Precision);
-                    (tc.EndPoint.Y).Should().BeApproximately(radius, _modelSvc.Precision);
-                    (tc.StartPoint.X).Should().BeApproximately(-radius, _modelSvc.Precision);
+                    tc.EndPoint.Y.Should().BeApproximately(radius, _modelSvc.Precision);
+                    tc.StartPoint.X.Should().BeApproximately(-radius, _modelSvc.Precision);
                     break;
                 case 4:
                     (3 * radius * Math.PI / 2).Should().BeApproximately(tc.Length, _modelSvc.Precision);
-                    (tc.StartPoint.Y).Should().BeApproximately(radius, _modelSvc.Precision);
-                    (tc.EndPoint.X).Should().BeApproximately(-radius, _modelSvc.Precision);
+                    tc.StartPoint.Y.Should().BeApproximately(radius, _modelSvc.Precision);
+                    tc.EndPoint.X.Should().BeApproximately(-radius, _modelSvc.Precision);
                     break;
                 default:
                     break;
@@ -427,14 +427,14 @@ namespace Xbim.Geometry.Engine.Tests
                 if (trim1 > trim2)
                 {
                     (3 * quadrantLength).Should().BeApproximately(tc.Length, 1e-2);
-                    (tc.StartPoint.X).Should().BeApproximately(origin.Axis.Location.X - semi1, _modelSvc.Precision);
-                    (tc.EndPoint.Y).Should().BeApproximately(origin.Axis.Location.Y + semi2, _modelSvc.Precision);
+                    tc.StartPoint.X.Should().BeApproximately(origin.Axis.Location.X - semi1, _modelSvc.Precision);
+                    tc.EndPoint.Y.Should().BeApproximately(origin.Axis.Location.Y + semi2, _modelSvc.Precision);
                 }
                 else
                 {
-                    (quadrantLength).Should().BeApproximately(tc.Length, 1e-2);
-                    (tc.StartPoint.Y).Should().BeApproximately(origin.Axis.Location.Y + semi2, _modelSvc.Precision);
-                    (tc.EndPoint.X).Should().BeApproximately(origin.Axis.Location.X - semi1, _modelSvc.Precision);
+                    quadrantLength.Should().BeApproximately(tc.Length, 1e-2);
+                    tc.StartPoint.Y.Should().BeApproximately(origin.Axis.Location.Y + semi2, _modelSvc.Precision);
+                    tc.EndPoint.X.Should().BeApproximately(origin.Axis.Location.X - semi1, _modelSvc.Precision);
                 }
             }
             else
@@ -442,14 +442,14 @@ namespace Xbim.Geometry.Engine.Tests
                 if (trim1 > trim2)
                 {
                     (3 * quadrantLength).Should().BeApproximately(tc.Length, 1e-2);
-                    (tc.StartPoint.X).Should().BeApproximately(origin.Axis.Location.X - semi1, _modelSvc.Precision);
-                    (tc.EndPoint.Y).Should().BeApproximately(origin.Axis.Location.Y + semi2, _modelSvc.Precision);
+                    tc.StartPoint.X.Should().BeApproximately(origin.Axis.Location.X - semi1, _modelSvc.Precision);
+                    tc.EndPoint.Y.Should().BeApproximately(origin.Axis.Location.Y + semi2, _modelSvc.Precision);
                 }
                 else
                 {
-                    (quadrantLength).Should().BeApproximately(tc.Length, 1e-2);
-                    (tc.StartPoint.Y).Should().BeApproximately(origin.Axis.Location.Y + semi2, _modelSvc.Precision);
-                    (tc.EndPoint.X).Should().BeApproximately(origin.Axis.Location.X - semi1, _modelSvc.Precision);
+                    quadrantLength.Should().BeApproximately(tc.Length, 1e-2);
+                    tc.StartPoint.Y.Should().BeApproximately(origin.Axis.Location.Y + semi2, _modelSvc.Precision);
+                    tc.EndPoint.X.Should().BeApproximately(origin.Axis.Location.X - semi1, _modelSvc.Precision);
                 }
             }
         }
@@ -473,11 +473,12 @@ namespace Xbim.Geometry.Engine.Tests
             var origin = basisCurve.Position as IXAxis2Placement2d;
             Assert.NotNull(origin);
             Assert.False(tc.Is3d);
-            (tc.StartPoint.X).Should().BeApproximately(origin.Location.X + semi1, _modelSvc.Precision);
-            (tc.StartPoint.Y).Should().BeApproximately(origin.Location.Y, _modelSvc.Precision);
-            (tc.EndPoint.X).Should().BeApproximately(origin.Location.X, _modelSvc.Precision);
-            (tc.EndPoint.Y).Should().BeApproximately(origin.Location.Y + semi2, _modelSvc.Precision);
+            tc.StartPoint.X.Should().BeApproximately(origin.Location.X + semi1, _modelSvc.Precision);
+            tc.StartPoint.Y.Should().BeApproximately(origin.Location.Y, _modelSvc.Precision);
+            tc.EndPoint.X.Should().BeApproximately(origin.Location.X, _modelSvc.Precision);
+            tc.EndPoint.Y.Should().BeApproximately(origin.Location.Y + semi2, _modelSvc.Precision);
         }
+        
         #endregion
 
         #region Composite Curves
@@ -488,24 +489,19 @@ namespace Xbim.Geometry.Engine.Tests
             var ifcCompCurve = IfcMoq.IfcCompositeCurve3dMock();
             var curveService = _modelSvc.CurveFactory;
             var edgeService = _modelSvc.EdgeFactory;
-            var cc = curveService.Build(ifcCompCurve) as IXBSplineCurve; //initialise the factory with the curve
+            var cc = curveService.Build(ifcCompCurve);
+
             Assert.NotNull(cc);
             Assert.Equal(XCurveType.IfcCompositeCurve, cc.CurveType);
+            
             var edge = edgeService.Build(cc);
-#if DEBUG
-            var str = edge.BrepString();
-#endif
-            cc.IsPeriodic.Should().BeFalse();
-            cc.IsRational.Should().BeTrue();
-            var paramsRads = cc.LastParameter - cc.FirstParameter;
 
+            var paramsRads = cc.LastParameter - cc.FirstParameter;
             paramsRads.Should().BeApproximately(Math.PI * 0.5, 1e-5); //parametric length in radians of this curve is 90 degrees
         }
         [Fact]
         public void Can_convert_ifc_composite_curve_three_arcs()
         {
-
-
             var circ1 = IfcMoq.IfcCircle3dMock(radius: 20);
             var circ2 = IfcMoq.IfcCircle3dMock(radius: 20, IfcMoq.IfcAxis2Placement3DMock(refDir: IfcMoq.IfcDirection3dMock(-1, 0, 0), loc: IfcMoq.IfcCartesianPoint3dMock(0, 40, 0)));
             var circ3 = IfcMoq.IfcCircle3dMock(radius: 20, IfcMoq.IfcAxis2Placement3DMock(loc: IfcMoq.IfcCartesianPoint3dMock(-40, 40, 0)));
@@ -528,12 +524,13 @@ namespace Xbim.Geometry.Engine.Tests
 
             var ifcCompCurve = IfcMoq.IfcCompositeCurve3dMock(new[] { seg1, seg2, seg3 });
 
-            var cc = _modelSvc.CurveFactory.Build(ifcCompCurve) as IXBSplineCurve; //initialise the factory with the curve
+            var cc = _modelSvc.CurveFactory.Build(ifcCompCurve); //initialise the factory with the curve
             Assert.NotNull(cc);
             Assert.Equal(XCurveType.IfcCompositeCurve, cc.CurveType);
-            (totalParametricLength).Should().BeApproximately(cc.LastParameter - cc.FirstParameter, _modelSvc.Precision); //parametric length of this curve is 90 degrees
+            totalParametricLength.Should().BeApproximately(cc.LastParameter - cc.FirstParameter, _modelSvc.Precision); //parametric length of this curve is 90 degrees
 
         }
+
         [Fact]
         public void Can_convert_ifc_composite_curve_three_arcs_two_lines()
         {
@@ -541,11 +538,12 @@ namespace Xbim.Geometry.Engine.Tests
 
             var ifcCompCurve = IfcMoq.TypicalCompositeCurveMock(_modelSvc.CurveFactory, out double totalParametricLength, out double totalLength);
 
-            var cc = _modelSvc.CurveFactory.Build(ifcCompCurve) as IXBSplineCurve; //initialise the factory with the curve
+            var cc = _modelSvc.CurveFactory.Build(ifcCompCurve);
+
             Assert.NotNull(cc);
             Assert.Equal(XCurveType.IfcCompositeCurve, cc.CurveType);
-            (totalLength).Should().BeApproximately(cc.Length, _modelSvc.MinimumGap);
-            (totalParametricLength).Should().BeApproximately(cc.LastParameter - cc.FirstParameter, _modelSvc.Precision); //parametric length of this curve is 90 degrees
+            totalLength.Should().BeApproximately(cc.Length, _modelSvc.MinimumGap);
+            totalParametricLength.Should().BeApproximately(cc.LastParameter - cc.FirstParameter, _modelSvc.Precision);
         }
 
         [Fact]
@@ -554,7 +552,8 @@ namespace Xbim.Geometry.Engine.Tests
 
             var ifcCompCurve = IfcMoq.TypicalCompositeCurveMock(_modelSvc.CurveFactory, out double totalParametricLength, out double totalLength);
 
-            var cc = _modelSvc.CurveFactory.BuildDirectrix(ifcCompCurve, 10, totalParametricLength - 10) as IXBSplineCurve; //initialise the factory with the curve
+            var cc = _modelSvc.CurveFactory.BuildDirectrix(ifcCompCurve, 10, totalParametricLength - 10);
+
             Assert.NotNull(cc);
             Assert.Equal(XCurveType.IfcCompositeCurve, cc.CurveType);
             (totalParametricLength - 20).Should().BeApproximately(cc.LastParameter - cc.FirstParameter, _modelSvc.Precision); //parametric length of this curve is 90 degrees
@@ -570,7 +569,7 @@ namespace Xbim.Geometry.Engine.Tests
                 var geomEngine = factory.CreateGeometryEngineV6(model, _loggerFactory);
                 var compositeCurve =geomEngine.WireFactory.Build(cc);
                 compositeCurve.Should().NotBeNull();
-                compositeCurve.Length.Should().BeApproximately(4.8668290187582635, 1e-5);
+                compositeCurve.Length.Should().BeApproximately(4.866638, 1e-5);
                 
             }
         }

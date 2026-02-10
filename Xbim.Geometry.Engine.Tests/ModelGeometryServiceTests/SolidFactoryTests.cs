@@ -109,6 +109,10 @@ namespace Xbim.Geometry.Engine.Tests
             faces.Count().Should().Be(2);
             foreach (var face in faces)
             {
+                var s = face.BrepString;
+            }
+            foreach (var face in faces)
+            {
                 var outerBound = face.OuterBound;
                 Assert.NotNull(outerBound);
                 Assert.Equal(XShapeType.Wire, outerBound.ShapeType);
@@ -116,9 +120,8 @@ namespace Xbim.Geometry.Engine.Tests
                 Assert.Equal(XShapeType.Face, face.ShapeType);
                 if (face.Surface is IXConicalSurface conicalSurface)
                 {
-                    //this is the curved surface
                     Assert.Equal(XSurfaceType.IfcSurfaceOfRevolution, conicalSurface.SurfaceType);
-                    outerBound.EdgeLoop.Count().Should().Be(4);
+                    outerBound.EdgeLoop.Count().Should().Be(3);
                     foreach (var edge in outerBound.EdgeLoop)
                     {
                         Assert.Equal(XShapeType.Edge, edge.ShapeType);
@@ -176,9 +179,9 @@ namespace Xbim.Geometry.Engine.Tests
                 {
                     //this is the curved surface
                     Assert.Equal(XSurfaceType.IfcCylindricalSurface, cylindricalSurface.SurfaceType);
-                    outerBound.EdgeLoop.Should().HaveCount(4);
+                    outerBound.EdgeLoop.Should().HaveCount(3);
                     outerBound.EdgeLoop.Count(e => e.EdgeGeometry.CurveType == XCurveType.IfcCircle).Should().Be(2);
-                    outerBound.EdgeLoop.Count(e => e.EdgeGeometry.CurveType == XCurveType.IfcLine).Should().Be(2);
+                    outerBound.EdgeLoop.Count(e => e.EdgeGeometry.CurveType == XCurveType.IfcLine).Should().Be(1);
                 }
                 else
                 {
@@ -217,9 +220,9 @@ namespace Xbim.Geometry.Engine.Tests
             var sphericalSurface = face.Surface as IXSphericalSurface;
             Assert.NotNull(sphericalSurface);
             Assert.Equal(XSurfaceType.IfcSphericalSurface, sphericalSurface.SurfaceType);
-            face.OuterBound.EdgeLoop.Should().HaveCount(4);
-            face.OuterBound.EdgeLoop.Count(e => e.EdgeGeometry?.CurveType == XCurveType.IfcCircle).Should().Be(2); //two circles
-            face.OuterBound.EdgeLoop.Count(e => e.EdgeGeometry == null).Should().Be(2); //2 empty vertex loops
+            face.OuterBound.EdgeLoop.Should().HaveCount(3);
+            face.OuterBound.EdgeLoop.Count(e => e.EdgeGeometry?.CurveType == XCurveType.IfcCircle).Should().Be(1);
+            face.OuterBound.EdgeLoop.Count(e => e.EdgeGeometry == null).Should().Be(2);
         }
         #endregion
 

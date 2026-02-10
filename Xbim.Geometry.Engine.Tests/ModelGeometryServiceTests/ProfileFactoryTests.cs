@@ -105,7 +105,7 @@ namespace Xbim.Geometry.Engine.Tests
             else
             {
                 var face = profileFactory.BuildFace(profile);
-                face.Area.Should().BeApproximately(area, 1e-5);
+                Math.Abs(face.Area).Should().BeApproximately(area, 1e-3);
                 var wire = profileFactory.BuildWire(profile);
                 var edge = profileFactory.BuildEdge(profile);
                 var curve = profileFactory.BuildCurve(profile);

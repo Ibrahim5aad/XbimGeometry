@@ -26,6 +26,7 @@ namespace Xbim.Geometry.Engine.Tests
             _loggerFactory = loggerFactory;
             this.factory = factory;
         }
+
         [Fact]
         public void IfcAdvancedBrepTrimmedCurveTest()
         {
@@ -36,7 +37,6 @@ namespace Xbim.Geometry.Engine.Tests
                 var solid = geomEngine.CreateSolid(er.Entity);
                 solid.Faces.Count.Should().Be(14, "This solid should have 14 faces");
             }
-
         }
 
         [Fact]

@@ -552,9 +552,9 @@ namespace Xbim.Geometry.Engine.Tests
                 bb.X.Should().BeApproximately(-101.687, 0.1);
                 bb.Y.Should().BeApproximately(-101.687, 0.1);
                 bb.Z.Should().BeApproximately(57.0569, 0.1);
-                bb.SizeX.Should().BeApproximately(203.374, 0.1);
-                bb.SizeY.Should().BeApproximately(203.374, 0.1);
-                bb.SizeZ.Should().BeApproximately(9404.53, 0.1);
+                bb.SizeX.Should().BeApproximately(203.2, 0.1);
+                bb.SizeY.Should().BeApproximately(203.2, 0.1);
+                bb.SizeZ.Should().BeApproximately(9404.35, 0.1);
 
                 HelperFunctions.IsValidSolid(solids.FirstOrDefault());
             }

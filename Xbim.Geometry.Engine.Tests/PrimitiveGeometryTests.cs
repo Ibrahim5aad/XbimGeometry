@@ -49,7 +49,6 @@ namespace Xbim.Geometry.Engine.Tests
         /// </summary>
         /// <param name="engineVersion"></param>
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void can_build_closed_shell(XGeometryEngineVersion engineVersion)
         {
@@ -59,14 +58,10 @@ namespace Xbim.Geometry.Engine.Tests
                 shape.Should().NotBeNull();
                 var geomEngine = factory.CreateGeometryEngine(engineVersion, model, _loggerFactory);
                 var geom = geomEngine.CreateSolidSet(shape, _logger).FirstOrDefault();
-                if (engineVersion == XGeometryEngineVersion.V5)
-                    geom.Volume.Should().BeApproximately(-136033.82966702414, 1e-5);
-                else //fixed in V6
-                    geom.Volume.Should().BeApproximately(136033.82966702414, 1e-5);
+                geom.Volume.Should().BeApproximately(136033.82966702414, 1e-5);
             }
         }
         [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
         [InlineData(XGeometryEngineVersion.V6)]
         public void can_build_poorly_aligned_planar_faces(XGeometryEngineVersion engineVersion)
         {

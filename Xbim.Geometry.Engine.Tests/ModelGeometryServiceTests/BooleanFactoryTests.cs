@@ -151,8 +151,6 @@ namespace Xbim.Geometry.Engine.Tests
 #if DEBUG
             var def = solid.BrepString();
 #endif
-
-
             var box = solid.Bounds();
             if (intersects)
             {
@@ -164,6 +162,8 @@ namespace Xbim.Geometry.Engine.Tests
                 box.LenX.Should().BeApproximately(lenX, Precision);
             }
         }
+
+
         [Theory]
         [InlineData(10, 5, true)] //should result in a block of length x = 5
         [InlineData(10, -5, true)] //should result in a block of length x = 5
