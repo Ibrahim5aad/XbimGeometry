@@ -46,6 +46,9 @@
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepFilletAPI_MakeFillet2d.hxx>
 #include <TopTools_Array1OfShape.hxx>
+#include <Geom2d_OffsetCurve.hxx>
+#include <GCE2d_MakeSegment.hxx>
+#include <TopTools_ListOfShape.hxx>
 
 
 #pragma region Wire Construction
@@ -256,6 +259,11 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_curves(
 
                 if (gap > gapSize)
                 {
+                    if (gap > 1000.0 * gapSize)
+                    {
+                        xbim_set_error("xbim_wire_build_from_curves: segments are not contiguous");
+                        return XBIM_ERROR;
+                    }
                     xbim_log_warning(ctx,
                         "xbim_wire_build_from_curves: gap %.6g at edge %d exceeds gapSize %.6g, wire may be discontinuous",
                         gap, idx, gapSize);
@@ -770,6 +778,125 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_2d_curves(
     }
 }
 
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_centerline_profile(
+    XbimContextHandle   ctx,
+    XbimCurve2dHandle   centreLineHandle,
+    double              thickness,
+    double              tolerance,
+    XbimShapeHandle*    outWire)
+{
+    xbim_clear_error();
+
+    if (!outWire)
+    {
+        xbim_set_error("xbim_wire_build_centerline_profile: outWire is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outWire = nullptr;
+
+    if (!centreLineHandle || centreLineHandle->curve.IsNull())
+    {
+        xbim_set_error("xbim_wire_build_centerline_profile: centreLineHandle is NULL or invalid");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    if (thickness <= 0)
+    {
+        xbim_set_error("xbim_wire_build_centerline_profile: thickness must be positive");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        const Handle(Geom2d_Curve)& centreLine = centreLineHandle->curve;
+        double halfThickness = thickness / 2.0;
+
+        /* Build two offset curves at +/- halfThickness */
+        Handle(Geom2d_OffsetCurve) aCurve =
+            new Geom2d_OffsetCurve(centreLine, halfThickness);
+        Handle(Geom2d_OffsetCurve) bCurve =
+            new Geom2d_OffsetCurve(centreLine, -halfThickness);
+
+        /* Evaluate the four endpoints */
+        gp_Pnt2d aStart, aEnd, bStart, bEnd;
+        aCurve->D0(aCurve->FirstParameter(), aStart);
+        aCurve->D0(aCurve->LastParameter(), aEnd);
+        bCurve->D0(bCurve->FirstParameter(), bStart);
+        bCurve->D0(bCurve->LastParameter(), bEnd);
+
+        /* Build 4 edges in CCW order around the ribbon:
+           1. Outer arc forward:   aStart → aEnd
+           2. End cap:             aEnd   → bEnd
+           3. Inner arc reversed:  bEnd   → bStart
+           4. Start cap:           bStart → aStart */
+        BRepBuilderAPI_MakeEdge2d edgeA(aCurve);
+        if (!edgeA.IsDone())
+        {
+            xbim_set_error("xbim_wire_build_centerline_profile: failed to build edge from offset curve A");
+            return XBIM_ERROR;
+        }
+
+        GCE2d_MakeSegment lineEndCap(aEnd, bEnd);
+        if (!lineEndCap.IsDone())
+        {
+            xbim_set_error("xbim_wire_build_centerline_profile: failed to build end cap line");
+            return XBIM_ERROR;
+        }
+        BRepBuilderAPI_MakeEdge2d edgeEndCap(lineEndCap.Value());
+
+        BRepBuilderAPI_MakeEdge2d edgeB(bCurve);
+        if (!edgeB.IsDone())
+        {
+            xbim_set_error("xbim_wire_build_centerline_profile: failed to build edge from offset curve B");
+            return XBIM_ERROR;
+        }
+
+        GCE2d_MakeSegment lineStartCap(bStart, aStart);
+        if (!lineStartCap.IsDone())
+        {
+            xbim_set_error("xbim_wire_build_centerline_profile: failed to build start cap line");
+            return XBIM_ERROR;
+        }
+        BRepBuilderAPI_MakeEdge2d edgeStartCap(lineStartCap.Value());
+
+        /* Generate 3D curves for all edges */
+        BRepLib::BuildCurve3d(edgeA.Edge(), tolerance);
+        BRepLib::BuildCurve3d(edgeEndCap.Edge(), tolerance);
+        BRepLib::BuildCurve3d(edgeB.Edge(), tolerance);
+        BRepLib::BuildCurve3d(edgeStartCap.Edge(), tolerance);
+
+        /* Assemble wire: reverse inner arc edge orientation (not the curve)
+           so the edge traverses bEnd→bStart without modifying the offset curve */
+        BRepBuilderAPI_MakeWire wireMaker;
+        wireMaker.Add(edgeA.Edge());
+        wireMaker.Add(edgeEndCap.Edge());
+        wireMaker.Add(TopoDS::Edge(edgeB.Edge().Reversed()));
+        wireMaker.Add(edgeStartCap.Edge());
+
+        if (!wireMaker.IsDone())
+        {
+            xbim_set_error("xbim_wire_build_centerline_profile: failed to assemble wire");
+            return XBIM_ERROR;
+        }
+
+        TopoDS_Wire wire = wireMaker.Wire();
+        *outWire = xbim_shape_create_from(wire);
+        if (!*outWire)
+        {
+            xbim_set_error("xbim_wire_build_centerline_profile: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_wire_build_centerline_profile");
+        xbim_set_error("xbim_wire_build_centerline_profile: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
 #pragma endregion
 
 #pragma region Wire Queries
@@ -815,6 +942,125 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_is_closed(
     catch (const Standard_Failure&)
     {
         xbim_set_error("xbim_wire_is_closed: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_is_planar(
+    XbimShapeHandle wireHandle,
+    double          tolerance,
+    int*            outPlanar)
+{
+    xbim_clear_error();
+
+    if (!outPlanar)
+    {
+        xbim_set_error("xbim_wire_is_planar: outPlanar is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outPlanar = 0;
+
+    if (!wireHandle)
+    {
+        xbim_set_error("xbim_wire_is_planar: wireHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        const TopoDS_Shape& shape = wireHandle->shape;
+        if (shape.IsNull() || shape.ShapeType() != TopAbs_WIRE)
+        {
+            xbim_set_error("xbim_wire_is_planar: handle is not a wire");
+            return XBIM_INVALID_ARG;
+        }
+
+        const TopoDS_Wire& wire = TopoDS::Wire(shape);
+        BRepBuilderAPI_MakeFace faceMaker(wire, Standard_True);
+        *outPlanar = faceMaker.IsDone() ? XBIM_TRUE : XBIM_FALSE;
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        /* Exception means not planar */
+        *outPlanar = XBIM_FALSE;
+        return XBIM_OK;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_get_ordered_points(
+    XbimShapeHandle wireHandle,
+    double*         outCoords,
+    int*            outCount)
+{
+    xbim_clear_error();
+
+    if (!outCount)
+    {
+        xbim_set_error("xbim_wire_get_ordered_points: outCount is NULL");
+        return XBIM_INVALID_ARG;
+    }
+
+    if (!wireHandle)
+    {
+        xbim_set_error("xbim_wire_get_ordered_points: wireHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        const TopoDS_Shape& shape = wireHandle->shape;
+        if (shape.IsNull() || shape.ShapeType() != TopAbs_WIRE)
+        {
+            xbim_set_error("xbim_wire_get_ordered_points: handle is not a wire");
+            return XBIM_INVALID_ARG;
+        }
+
+        const TopoDS_Wire& wire = TopoDS::Wire(shape);
+
+        /* Collect ordered points: start vertex of each edge + end of last */
+        std::vector<gp_Pnt> pts;
+        TopoDS_Vertex lastVertex;
+        for (BRepTools_WireExplorer wEx(wire); wEx.More(); wEx.Next())
+        {
+            pts.push_back(BRep_Tool::Pnt(wEx.CurrentVertex()));
+            /* Track the end vertex of the current (last) edge */
+            TopoDS_Vertex v1, v2;
+            TopExp::Vertices(wEx.Current(), v1, v2);
+            if (!v1.IsNull() && !v2.IsNull())
+                lastVertex = v1.IsSame(wEx.CurrentVertex()) ? v2 : v1;
+            else if (!v2.IsNull())
+                lastVertex = v2;
+        }
+
+        /* Add the end vertex of the last edge */
+        if (!lastVertex.IsNull())
+            pts.push_back(BRep_Tool::Pnt(lastVertex));
+
+        if (!outCoords)
+        {
+            /* Count-only mode */
+            *outCount = (int)pts.size();
+            return XBIM_OK;
+        }
+
+        int n = std::min((int)pts.size(), *outCount);
+        for (int i = 0; i < n; i++)
+        {
+            outCoords[i * 3 + 0] = pts[i].X();
+            outCoords[i * 3 + 1] = pts[i].Y();
+            outCoords[i * 3 + 2] = pts[i].Z();
+        }
+        *outCount = n;
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_wire_get_ordered_points: OCCT exception");
         return XBIM_ERROR;
     }
 }

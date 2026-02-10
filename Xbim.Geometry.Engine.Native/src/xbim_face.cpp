@@ -20,6 +20,7 @@
 #include <Geom_Plane.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_SphericalSurface.hxx>
+#include <Geom_ConicalSurface.hxx>
 #include <Geom_ToroidalSurface.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <Geom_RectangularTrimmedSurface.hxx>
@@ -46,6 +47,14 @@
 #include <TopExp_Explorer.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <Standard_Failure.hxx>
+#include <Precision.hxx>
+#include <BRepTools_WireExplorer.hxx>
+#include <ShapeFix_ShapeTolerance.hxx>
+#include <ShapeAnalysis_Wire.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
+#include <TopExp.hxx>
+#include <vector>
+#include <cmath>
 
 #pragma region Face Helpers
 
@@ -392,21 +401,131 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_wire(
             return XBIM_INVALID_ARG;
         }
 
-        const TopoDS_Wire& wire = TopoDS::Wire(shape);
+        TopoDS_Wire wire = TopoDS::Wire(shape);
+        double tolerance = Precision::Confusion();
 
-        BRepBuilderAPI_MakeFace faceMaker(wire, true);
-        if (!faceMaker.IsDone())
+        /* Extract vertices in wire traversal order */
+        std::vector<gp_Pnt> pts;
+        for (BRepTools_WireExplorer wEx(wire); wEx.More(); wEx.Next())
+            pts.push_back(BRep_Tool::Pnt(wEx.CurrentVertex()));
+
+        int n = (int)pts.size();
+        if (n < 3)
         {
-            xbim_set_error("xbim_face_build_from_wire: could not build planar face from wire");
-            xbim_log_warning(ctx, "Could not build face from wire");
+            xbim_log_warning(ctx, "Polyloop with less than 3 points is an empty loop");
+            xbim_set_error("xbim_face_build_from_wire: wire has fewer than 3 vertices");
             return XBIM_NULL_SHAPE;
         }
 
-        TopoDS_Face face = faceMaker.Face();
-        if (face.IsNull())
+        /* Try OCCT auto-detection first — correctly handles wires with
+           pcurves from MakeEdge2d (offset curves, arcs, etc.) */
+        TopoDS_Face face;
+        gp_Pln thePlane;
+        bool havePlane = false;
+
         {
-            xbim_set_error("xbim_face_build_from_wire: resulting face is null");
-            return XBIM_NULL_SHAPE;
+            BRepBuilderAPI_MakeFace autoMaker(wire, Standard_True);
+            if (autoMaker.IsDone())
+            {
+                face = autoMaker.Face();
+                havePlane = true;
+            }
+        }
+
+        /* Fallback: Newell normal + barycentre plane for nearly-planar
+           polygon wires where OCCT's FindPlane fails */
+        if (!havePlane)
+        {
+            double nx = 0, ny = 0, nz = 0;
+            for (int i = 0; i < n; i++)
+            {
+                const gp_Pnt& cur = pts[i];
+                const gp_Pnt& nxt = pts[(i + 1) % n];
+                nx += (cur.Y() - nxt.Y()) * (cur.Z() + nxt.Z());
+                ny += (cur.Z() - nxt.Z()) * (cur.X() + nxt.X());
+                nz += (cur.X() - nxt.X()) * (cur.Y() + nxt.Y());
+            }
+            double mag = std::sqrt(nx * nx + ny * ny + nz * nz);
+            if (mag < gp::Resolution())
+            {
+                xbim_log_warning(ctx, "Polyloop is a line. Empty loop built");
+                xbim_set_error("xbim_face_build_from_wire: degenerate wire normal");
+                return XBIM_NULL_SHAPE;
+            }
+
+            gp_Dir normal(nx / mag, ny / mag, nz / mag);
+
+            double cx = 0, cy = 0, cz = 0;
+            for (const auto& p : pts)
+            {
+                cx += p.X();
+                cy += p.Y();
+                cz += p.Z();
+            }
+            gp_Pnt centre(cx / n, cy / n, cz / n);
+
+            thePlane = gp_Pln(centre, normal);
+            BRepBuilderAPI_MakeFace fallbackMaker(thePlane, wire, Standard_False);
+            if (!fallbackMaker.IsDone())
+            {
+                xbim_set_error("xbim_face_build_from_wire: could not build face from wire");
+                return XBIM_NULL_SHAPE;
+            }
+            face = fallbackMaker.Face();
+            havePlane = true;
+        }
+
+        /* Limit wire tolerances */
+        ShapeFix_ShapeTolerance tolFixer;
+        tolFixer.LimitTolerance(wire, tolerance);
+
+        /* Fix vertex tolerances for polygons with more than 3 points
+         * (triangles always fit a plane exactly) */
+        if (n > 3)
+        {
+            TopTools_IndexedMapOfShape map;
+            TopExp::MapShapes(wire, TopAbs_EDGE, map);
+            ShapeFix_Edge ef;
+            bool fixed = false;
+            for (int i = 1; i <= map.Extent(); i++)
+            {
+                const TopoDS_Edge edge = TopoDS::Edge(map(i));
+                if (ef.FixVertexTolerance(edge, face)) fixed = true;
+            }
+            if (fixed)
+                xbim_log_info(ctx, "Polyloop is slightly mis-aligned to a plane. It has been adjusted");
+        }
+
+        /* Self-intersection check */
+        double maxTol = BRep_Tool::MaxTolerance(wire, TopAbs_VERTEX);
+        Handle(ShapeAnalysis_Wire) wa = new ShapeAnalysis_Wire(wire, face, maxTol);
+        if (wa->CheckSelfIntersection())
+        {
+            ShapeFix_Wire wf;
+            wf.Init(wa);
+            wf.SetPrecision(tolerance);
+            wf.SetMinTolerance(tolerance);
+            wf.SetMaxTolerance(maxTol);
+            if (wf.Perform())
+            {
+                wire = wf.Wire();
+                BRepBuilderAPI_MakeFace reMaker(wire, Standard_True);
+                if (!reMaker.IsDone())
+                {
+                    /* Retry with Newell plane if auto-detect fails after fix */
+                    BRepBuilderAPI_MakeFace reMaker2(thePlane, wire, Standard_False);
+                    if (reMaker2.IsDone())
+                        face = reMaker2.Face();
+                }
+                else
+                {
+                    face = reMaker.Face();
+                }
+            }
+            else
+            {
+                xbim_log_warning(ctx, "Failed to fix self-intersecting wire edges");
+            }
         }
 
         face.Closed(true);
@@ -1048,6 +1167,7 @@ static int classify_surface(const Handle(Geom_Surface)& surf)
     if (surf->IsKind(STANDARD_TYPE(Geom_Plane)))                   return 8;  // IfcPlane
     if (surf->IsKind(STANDARD_TYPE(Geom_CylindricalSurface)))     return 7;  // IfcCylindricalSurface
     if (surf->IsKind(STANDARD_TYPE(Geom_SphericalSurface)))       return 9;  // IfcSphericalSurface
+    if (surf->IsKind(STANDARD_TYPE(Geom_ConicalSurface)))          return 6;  // IfcSurfaceOfRevolution (cone)
     if (surf->IsKind(STANDARD_TYPE(Geom_ToroidalSurface)))        return 10; // IfcToroidalSurface
     if (surf->IsKind(STANDARD_TYPE(Geom_SurfaceOfLinearExtrusion))) return 5; // IfcSurfaceOfLinearExtrusion
     if (surf->IsKind(STANDARD_TYPE(Geom_SurfaceOfRevolution)))    return 6;  // IfcSurfaceOfRevolution

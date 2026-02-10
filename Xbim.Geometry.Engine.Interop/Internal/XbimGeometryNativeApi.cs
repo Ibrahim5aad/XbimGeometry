@@ -561,6 +561,39 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double tolerance,
             out NativeShapeHandle outHandle);
 
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_boolean_union_multi(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] bodyHandles,
+            int bodyCount,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] toolHandles,
+            int toolCount,
+            double fuzzyTolerance,
+            out int outHasWarnings,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_boolean_cut_multi(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] bodyHandles,
+            int bodyCount,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] toolHandles,
+            int toolCount,
+            double fuzzyTolerance,
+            out int outHasWarnings,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_boolean_intersect_multi(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] bodyHandles,
+            int bodyCount,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] toolHandles,
+            int toolCount,
+            double fuzzyTolerance,
+            out int outHasWarnings,
+            out NativeShapeHandle outHandle);
+
         #endregion
 
         #region Half-Space Operations
@@ -793,6 +826,18 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeShapeHandle wireHandle,
             double tolerance,
             out int outClosed);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_is_planar(
+            NativeShapeHandle wireHandle,
+            double tolerance,
+            out int outPlanar);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_get_ordered_points(
+            NativeShapeHandle wireHandle,
+            [In, Out] double[] outCoords,
+            ref int outCount);
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_wire_length(
@@ -1177,6 +1222,15 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         internal static extern int xbim_curve_reverse(NativeCurveHandle handle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_get_elementary_props(
+            NativeCurveHandle handle,
+            out int outCurveType,
+            out double outOriginX, out double outOriginY, out double outOriginZ,
+            out double outDirX, out double outDirY, out double outDirZ,
+            out double outXDirX, out double outXDirY, out double outXDirZ,
+            out double outRadius1, out double outRadius2);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_curve_build_composite_bspline(
             NativeContextHandle ctx,
             [In] IntPtr[] curves,
@@ -1385,6 +1439,14 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             int numInnerWires,
             double tolerance,
             out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_surface_get_elementary_props(
+            NativeSurfaceHandle handle,
+            out double outOriginX, out double outOriginY, out double outOriginZ,
+            out double outZDirX, out double outZDirY, out double outZDirZ,
+            out double outXDirX, out double outXDirY, out double outXDirZ,
+            out double outRadius);
 
         #endregion
 
@@ -1685,6 +1747,14 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             int numCurves,
             double tolerance,
             double gapSize,
+            out NativeShapeHandle outWire);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_wire_build_centerline_profile(
+            NativeContextHandle ctx,
+            NativeCurve2dHandle centreLineHandle,
+            double thickness,
+            double tolerance,
             out NativeShapeHandle outWire);
 
         #endregion

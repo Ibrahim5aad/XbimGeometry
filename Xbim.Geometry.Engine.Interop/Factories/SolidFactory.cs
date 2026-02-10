@@ -619,6 +619,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         #region Faceted BRep
 
+        public IXShape Build(IIfcConnectedFaceSet faceSet)
+        {
+            var solidHandle = BuildClosedShellAsSolid(faceSet);
+            return NativeShapeWrapper.WrapShape(solidHandle);
+        }
+
         public IXShape Build(IIfcFacetedBrep ifcBrep)
         {
             var solidHandle = BuildClosedShellAsSolid(ifcBrep.Outer);
@@ -1398,22 +1404,43 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new XbimGeometryServiceException(
                     $"Polygonal bounded half-space #{polyBounded.EntityLabel}: base surface must be planar.");
 
-            var polyline = polyBounded.PolygonalBoundary as IIfcPolyline;
-            if (polyline == null)
-                throw new NotSupportedException(
-                    $"Polygonal bounded half-space #{polyBounded.EntityLabel}: only polyline boundaries are supported.");
+            double[] xCoords;
+            double[] yCoords;
+            int pointCount;
 
-            int pointCount = polyline.Points.Count;
-            if (pointCount < 3)
-                throw new XbimGeometryServiceException(
-                    $"Polygonal bounded half-space #{polyBounded.EntityLabel}: boundary needs at least 3 points.");
-
-            var xCoords = new double[pointCount];
-            var yCoords = new double[pointCount];
-            for (int i = 0; i < pointCount; i++)
+            if (polyBounded.PolygonalBoundary is IIfcPolyline polyline)
             {
-                xCoords[i] = polyline.Points[i].Coordinates[0];
-                yCoords[i] = polyline.Points[i].Coordinates[1];
+                pointCount = polyline.Points.Count;
+                if (pointCount < 3)
+                    throw new XbimGeometryServiceException(
+                        $"Polygonal bounded half-space #{polyBounded.EntityLabel}: boundary needs at least 3 points.");
+
+                xCoords = new double[pointCount];
+                yCoords = new double[pointCount];
+                for (int i = 0; i < pointCount; i++)
+                {
+                    xCoords[i] = polyline.Points[i].Coordinates[0];
+                    yCoords[i] = polyline.Points[i].Coordinates[1];
+                }
+            }
+            else
+            {
+                // Non-polyline boundary (composite curve, etc.) — build as a wire to extract points.
+                // WireFactory.Build will throw if the curve is invalid (e.g. non-contiguous segments).
+                var wire = (XbimWire)_modelService.WireFactory.Build(polyBounded.PolygonalBoundary);
+                var pts = wire.Points.ToList();
+                pointCount = pts.Count;
+                if (pointCount < 3)
+                    throw new XbimGeometryServiceException(
+                        $"Polygonal bounded half-space #{polyBounded.EntityLabel}: boundary needs at least 3 points.");
+
+                xCoords = new double[pointCount];
+                yCoords = new double[pointCount];
+                for (int i = 0; i < pointCount; i++)
+                {
+                    xCoords[i] = pts[i].X;
+                    yCoords[i] = pts[i].Y;
+                }
             }
 
             double bOx = 0, bOy = 0, bOz = 0;

@@ -372,10 +372,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
             => WrapShapeAsSolidSet(_service.SolidFactory.Build((IIfcSolidModel)ifcSolid));
 
         public IXbimSolidSet CreateSolidSet(IIfcClosedShell ifcSolid, ILogger logger)
-        {
-            var shape = Build((IIfcGeometricRepresentationItem)ifcSolid);
-            return WrapShapeAsSolidSet(shape);
-        }
+            => WrapShapeAsSolidSet(_service.SolidFactory.Build(ifcSolid));
 
         public IXbimSolidSet CreateSolidSet(IIfcSweptAreaSolid ifcSolid, ILogger logger)
             => WrapShapeAsSolidSet(_service.SolidFactory.Build(ifcSolid));
@@ -987,17 +984,22 @@ namespace Xbim.Geometry.Engine.Interop.Services
         /// <summary>
         /// Returns an IXShape result as IXbimSolid.
         /// If the result is already a solid, casts directly.
-        /// If it's a compound of solids, wraps the full compound so that Volume
-        /// and Faces aggregate across all sub-solids rather than truncating to the first.
+        /// If it's a compound of solids, extracts them into an <see cref="XbimSolidSet"/>
+        /// which implements both IXbimSolid and IXbimSolidSet.
         /// </summary>
         private static IXbimSolid WrapShapeAsSolid(IXShape shape)
         {
             if (shape is XbimSolid solid)
                 return solid;
+            if (shape is XbimSolidSet solidSet)
+                return solidSet;
 
             var s = (XbimShape)shape;
-            if (s.GetSubShapeHandles(XShapeType.Solid).Length > 0)
-                return new XbimSolid(s.Handle);
+            var handles = s.GetSubShapeHandles(XShapeType.Solid);
+            if (handles.Length == 1)
+                return new XbimSolid(handles[0]);
+            if (handles.Length > 1)
+                return new XbimSolidSet(handles.Select(h => (IXbimSolid)new XbimSolid(h)));
 
             throw new XbimGeometryServiceException("Build result is not a solid.");
         }
@@ -1007,6 +1009,9 @@ namespace Xbim.Geometry.Engine.Interop.Services
         /// </summary>
         private static IXbimSolidSet WrapShapeAsSolidSet(IXShape shape)
         {
+            if (shape is XbimSolidSet solidSet)
+                return solidSet;
+
             if (shape is XbimSolid solid)
                 return new XbimSolidSet(new IXbimSolid[] { solid });
 

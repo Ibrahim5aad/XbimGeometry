@@ -64,6 +64,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 XProfileDefType.IfcCShapeProfileDef => BuildCShapeFace((IIfcCShapeProfileDef)profileDef),
                 XProfileDefType.IfcTrapeziumProfileDef => BuildTrapeziumFace((IIfcTrapeziumProfileDef)profileDef),
                 // Arbitrary profiles
+                XProfileDefType.IfcCenterLineProfileDef => BuildArbitraryOpenFace((IIfcArbitraryOpenProfileDef)profileDef),
+                XProfileDefType.IfcArbitraryOpenProfileDef => BuildArbitraryOpenFace((IIfcArbitraryOpenProfileDef)profileDef),
                 XProfileDefType.IfcArbitraryClosedProfileDef => BuildArbitraryClosedFace((IIfcArbitraryClosedProfileDef)profileDef),
                 XProfileDefType.IfcArbitraryProfileDefWithVoids => BuildArbitraryWithVoidsFace((IIfcArbitraryProfileDefWithVoids)profileDef),
                 // Composite / derived / mirrored profiles
@@ -71,12 +73,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 XProfileDefType.IfcDerivedProfileDef => BuildDerivedFace((IIfcDerivedProfileDef)profileDef),
                 XProfileDefType.IfcMirroredProfileDef => BuildMirroredFace((IIfcMirroredProfileDef)profileDef),
                 _ => throw new NotSupportedException(
-                    $"Profile type {profileType} is not yet supported. " +
-                    $"CenterLine/OpenCross profiles require curve factory (TOPO-006).")
+                    $"Profile type {profileType} is not yet supported.")
             };
         }
 
-        #endregion
+
 
         #region BuildWire / BuildEdge / BuildCurve
 
@@ -149,10 +150,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             // Build center line as 2D curve
             var centre = (XbimCurve2d)curveFactory.BuildCurve2d(centerLine.Curve);
-            NativeCurve2dHandle aCurveHandle = null;
-            NativeCurve2dHandle bCurveHandle = null;
-            NativeCurve2dHandle lineAEndToBEnd = null;
-            NativeCurve2dHandle lineBStartToAStart = null;
 
             try
             {
@@ -167,73 +164,21 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new XbimGeometryServiceException(
                         $"IfcCenterLineProfileDef #{centerLine.EntityLabel} must have an open curve for the centre line.");
 
-                // Build two offset curves at +/-thickness/2
-                double halfThickness = centerLine.Thickness / 2.0;
+                // Build the ribbon wire natively: offset curves + cap lines assembled via MakeWire
+                int result = XbimGeometryNativeApi.xbim_wire_build_centerline_profile(
+                    ContextHandle, centre.Handle, centerLine.Thickness,
+                    _modelService.Precision, out var wireHandle);
 
-                int rA = XbimGeometryNativeApi.xbim_curve2d_build_offset(
-                    ContextHandle, centre.Handle, halfThickness, out aCurveHandle);
-                if (rA != 0)
+                if (result != 0)
                     throw new XbimGeometryServiceException(
-                        $"Failed to build offset curve A for IfcCenterLineProfileDef #{centerLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
-
-                int rB = XbimGeometryNativeApi.xbim_curve2d_build_offset(
-                    ContextHandle, centre.Handle, -halfThickness, out bCurveHandle);
-                if (rB != 0)
-                    throw new XbimGeometryServiceException(
-                        $"Failed to build offset curve B for IfcCenterLineProfileDef #{centerLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
-
-                // Evaluate endpoints of both offset curves
-                int rAParams = XbimGeometryNativeApi.xbim_curve2d_parameters(aCurveHandle, out double aFirst, out double aLast);
-                if (rAParams != 0) throw new XbimGeometryServiceException($"Failed to get offset curve A parameters: {XbimGeometryNativeApi.GetLastError()}");
-
-                int rBParams = XbimGeometryNativeApi.xbim_curve2d_parameters(bCurveHandle, out double bFirst, out double bLast);
-                if (rBParams != 0) throw new XbimGeometryServiceException($"Failed to get offset curve B parameters: {XbimGeometryNativeApi.GetLastError()}");
-
-                XbimGeometryNativeApi.xbim_curve2d_value(aCurveHandle, aFirst, out double aStartX, out double aStartY);
-                XbimGeometryNativeApi.xbim_curve2d_value(aCurveHandle, aLast, out double aEndX, out double aEndY);
-                XbimGeometryNativeApi.xbim_curve2d_value(bCurveHandle, bFirst, out double bStartX, out double bStartY);
-                XbimGeometryNativeApi.xbim_curve2d_value(bCurveHandle, bLast, out double bEndX, out double bEndY);
-
-                // Build connecting lines
-                int rLine1 = XbimGeometryNativeApi.xbim_curve2d_build_line(
-                    ContextHandle, aEndX, aEndY, bEndX, bEndY, out lineAEndToBEnd);
-                if (rLine1 != 0)
-                    throw new XbimGeometryServiceException(
-                        $"Failed to build connecting line for IfcCenterLineProfileDef #{centerLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
-
-                int rLine2 = XbimGeometryNativeApi.xbim_curve2d_build_line(
-                    ContextHandle, bStartX, bStartY, aStartX, aStartY, out lineBStartToAStart);
-                if (rLine2 != 0)
-                    throw new XbimGeometryServiceException(
-                        $"Failed to build connecting line for IfcCenterLineProfileDef #{centerLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
-
-                // Reverse bCurve so it goes bEnd->bStart (completing the closed loop)
-                XbimGeometryNativeApi.xbim_curve2d_reverse(bCurveHandle);
-
-                // Assemble closed wire: aCurve -> line(aEnd->bEnd) -> bCurve(reversed) -> line(bStart->aStart)
-                var allCurves = new SafeHandle[] { aCurveHandle, lineAEndToBEnd, bCurveHandle, lineBStartToAStart };
-                using var nativeCurves = new NativeHandleArray(allCurves);
-
-                int rWire = XbimGeometryNativeApi.xbim_wire_build_from_2d_curves(
-                    ContextHandle,
-                    nativeCurves.Ptrs, 4,
-                    _modelService.Precision,
-                    _modelService.MinimumGap,
-                    out var wireHandle);
-
-                if (rWire != 0)
-                    throw new XbimGeometryServiceException(
-                        $"Failed to build wire for IfcCenterLineProfileDef #{centerLine.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+                        $"Failed to build wire for IfcCenterLineProfileDef #{centerLine.EntityLabel}: " +
+                        XbimGeometryNativeApi.GetLastError());
 
                 return new XbimWire(wireHandle);
             }
             finally
             {
                 centre.Dispose();
-                aCurveHandle?.Dispose();
-                bCurveHandle?.Dispose();
-                lineAEndToBEnd?.Dispose();
-                lineBStartToAStart?.Dispose();
             }
         }
 
@@ -702,6 +647,33 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         #region Arbitrary Profiles
 
+        private IXFace BuildArbitraryOpenFace(IIfcArbitraryOpenProfileDef profileDef)
+        {
+            if (profileDef is IIfcCenterLineProfileDef centerLineProfileDef)
+            {
+                var wire = (XbimWire)BuildCenterLineProfileWire(centerLineProfileDef);
+                try
+                {
+                    int result = XbimGeometryNativeApi.xbim_face_build_from_wire(
+                        ContextHandle, wire.Handle, out var faceHandle);
+                    if (result != 0)
+                        throw new XbimGeometryServiceException(
+                            $"Failed to build face from centerline profile #{profileDef.EntityLabel}: " +
+                            XbimGeometryNativeApi.GetLastError());
+                    return NativeShapeWrapper.WrapFace(faceHandle);
+                }
+                finally
+                {
+                    wire.Dispose();
+                }
+            }
+
+            throw new NotSupportedException(
+                $"Arbitrary open profile #{profileDef.EntityLabel} is not supported.");
+        }
+
+        #endregion
+
         private IXFace BuildArbitraryClosedFace(IIfcArbitraryClosedProfileDef arbitraryProfile)
         {
             var outerCurve = arbitraryProfile.OuterCurve ?? throw new XbimGeometryServiceException(
@@ -1169,24 +1141,13 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             if (curve is IIfcCompositeCurve compositeCurve)
             {
-                var curveFactory = (CurveFactory)_modelService.CurveFactory;
-                var segmentCurves = curveFactory.BuildCompositeCurveSegments2d(compositeCurve);
-                var curves = new List<NativeCurve2dHandle>();
+                var curves = BuildCompositeSegmentCurves2d(compositeCurve, entityLabel);
                 try
                 {
-                    foreach (var seg in segmentCurves)
-                        curves.Add(seg.DetachHandle());
-
-                    if (curves.Count == 0)
-                        throw new XbimGeometryServiceException(
-                            $"CompositeCurve for profile #{entityLabel} produced no valid 2D curves.");
-
                     return BuildWireFrom2dCurves(curves, entityLabel);
                 }
                 finally
                 {
-                    foreach (var seg in segmentCurves)
-                        seg.Dispose();
                     foreach (var c in curves)
                         c.Dispose();
                 }
@@ -1225,29 +1186,117 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// <summary>
         /// Builds a planar face from a composite curve by constructing 2D curves
         /// for each segment, assembling them into a wire with shared vertices.
+        /// Multi-point polyline segments are decomposed into individual line edges
+        /// to preserve edge topology needed for correct swept solid face counts.
         /// </summary>
         private IXFace BuildFaceFromCompositeCurve(IIfcCompositeCurve compositeCurve, int entityLabel)
         {
+            var curves = BuildCompositeSegmentCurves2d(compositeCurve, entityLabel);
+            try
+            {
+                return BuildFaceFrom2dCurves(curves, entityLabel);
+            }
+            finally
+            {
+                foreach (var c in curves)
+                    c.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Builds 2D curves from a composite curve's segments, decomposing multi-point polyline
+        /// segments into individual line edges. The pipe sweep creates one face per profile edge
+        /// per spine segment; merging polyline edges into a single B-spline would change the
+        /// face topology and break corner transitions.
+        /// </summary>
+        private List<NativeCurve2dHandle> BuildCompositeSegmentCurves2d(
+            IIfcCompositeCurve compositeCurve, int entityLabel)
+        {
+            CurveRules.Validate(compositeCurve);
+
             var curveFactory = (CurveFactory)_modelService.CurveFactory;
-            var segmentCurves = curveFactory.BuildCompositeCurveSegments2d(compositeCurve);
             var curves = new List<NativeCurve2dHandle>();
             try
             {
-                foreach (var seg in segmentCurves)
-                    curves.Add(seg.DetachHandle());
+                int lastLabel = -1;
+                foreach (var segment in compositeCurve.Segments)
+                {
+                    // ArchiCAD bug workaround: skip consecutive duplicate segments
+                    if (segment.EntityLabel == lastLabel)
+                        continue;
+                    lastLabel = segment.EntityLabel;
+
+                    if (segment is IIfcReparametrisedCompositeCurveSegment reparam
+                        && (double)reparam.ParamLength != 1.0)
+                        throw new XbimGeometryServiceException(
+                            $"IIfcReparametrisedCompositeCurveSegment #{segment.EntityLabel} is currently unsupported (ParamLength != 1).");
+
+                    var parentCurve = segment.ParentCurve;
+                    if (parentCurve == null) continue;
+
+                    // Multi-point polylines: decompose into individual line edges
+                    var segCurves = new List<NativeCurve2dHandle>();
+                    if (parentCurve is IIfcPolyline polyline && polyline.Points.Count > 2)
+                    {
+                        for (int i = 0; i < polyline.Points.Count - 1; i++)
+                        {
+                            var p1 = polyline.Points[i];
+                            var p2 = polyline.Points[i + 1];
+                            double sx = p1.Coordinates[0], sy = p1.Coordinates[1];
+                            double ex = p2.Coordinates[0], ey = p2.Coordinates[1];
+
+                            double dist = Math.Sqrt((ex - sx) * (ex - sx) + (ey - sy) * (ey - sy));
+                            if (dist < _modelService.Precision) continue;
+
+                            int result = XbimGeometryNativeApi.xbim_curve2d_build_line(
+                                ContextHandle, sx, sy, ex, ey, out var lineHandle);
+
+                            if (result != 0)
+                                throw new XbimGeometryServiceException(
+                                    $"Failed to build line segment for polyline #{parentCurve.EntityLabel}: " +
+                                    XbimGeometryNativeApi.GetLastError());
+
+                            segCurves.Add(lineHandle);
+                        }
+                    }
+                    else
+                    {
+                        XbimCurve2d built;
+                        try
+                        {
+                            built = (XbimCurve2d)curveFactory.BuildCurve2d(parentCurve);
+                        }
+                        catch (IfcRuleViolationException ex)
+                        {
+                            _logger.LogWarning(
+                                "CompositeCurve for profile #{Label}: skipping segment #{SegLabel} ({Rule}).",
+                                entityLabel, segment.EntityLabel, ex.Message);
+                            continue;
+                        }
+                        segCurves.Add(built.DetachHandle());
+                    }
+
+                    if (!segment.SameSense)
+                    {
+                        segCurves.Reverse();
+                        foreach (var c in segCurves)
+                            XbimGeometryNativeApi.xbim_curve2d_reverse(c);
+                    }
+
+                    curves.AddRange(segCurves);
+                }
 
                 if (curves.Count == 0)
                     throw new XbimGeometryServiceException(
                         $"CompositeCurve for profile #{entityLabel} produced no valid 2D curves.");
 
-                return BuildFaceFrom2dCurves(curves, entityLabel);
+                return curves;
             }
-            finally
+            catch
             {
-                foreach (var seg in segmentCurves)
-                    seg.Dispose();
                 foreach (var c in curves)
                     c.Dispose();
+                throw;
             }
         }
 

@@ -1391,6 +1391,82 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_section(
     double              tolerance,
     XbimShapeHandle*    outHandle);
 
+/*
+ * Perform a boolean union (fuse) of multiple argument shapes with
+ * multiple tool shapes in a single OCCT operation.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   bodyHandles      – array of argument shape handles
+ *   bodyCount        – number of argument shapes
+ *   toolHandles      – array of tool shape handles
+ *   toolCount        – number of tool shapes
+ *   fuzzyTolerance   – tolerance for the boolean operation (use model precision)
+ *   outHasWarnings   – receives 1 if warnings were generated, 0 otherwise
+ *   outHandle        – receives the resulting shape handle on success
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_union_multi(
+    XbimContextHandle        ctx,
+    const XbimShapeHandle*   bodyHandles,
+    int                      bodyCount,
+    const XbimShapeHandle*   toolHandles,
+    int                      toolCount,
+    double                   fuzzyTolerance,
+    int*                     outHasWarnings,
+    XbimShapeHandle*         outHandle);
+
+/*
+ * Perform a boolean cut (difference) of multiple argument shapes with
+ * multiple tool shapes in a single OCCT operation.
+ * Subtracts all tool shapes from all argument shapes.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   bodyHandles      – array of argument shape handles
+ *   bodyCount        – number of argument shapes
+ *   toolHandles      – array of tool shape handles
+ *   toolCount        – number of tool shapes
+ *   fuzzyTolerance   – tolerance for the boolean operation (use model precision)
+ *   outHasWarnings   – receives 1 if warnings were generated, 0 otherwise
+ *   outHandle        – receives the resulting shape handle on success
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_cut_multi(
+    XbimContextHandle        ctx,
+    const XbimShapeHandle*   bodyHandles,
+    int                      bodyCount,
+    const XbimShapeHandle*   toolHandles,
+    int                      toolCount,
+    double                   fuzzyTolerance,
+    int*                     outHasWarnings,
+    XbimShapeHandle*         outHandle);
+
+/*
+ * Perform a boolean intersection (common) of multiple argument shapes
+ * with multiple tool shapes in a single OCCT operation.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   bodyHandles      – array of argument shape handles
+ *   bodyCount        – number of argument shapes
+ *   toolHandles      – array of tool shape handles
+ *   toolCount        – number of tool shapes
+ *   fuzzyTolerance   – tolerance for the boolean operation (use model precision)
+ *   outHasWarnings   – receives 1 if warnings were generated, 0 otherwise
+ *   outHandle        – receives the resulting shape handle on success
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_intersect_multi(
+    XbimContextHandle        ctx,
+    const XbimShapeHandle*   bodyHandles,
+    int                      bodyCount,
+    const XbimShapeHandle*   toolHandles,
+    int                      toolCount,
+    double                   fuzzyTolerance,
+    int*                     outHasWarnings,
+    XbimShapeHandle*         outHandle);
+
 #pragma endregion
 
 #pragma region Half-Space Operations
@@ -2057,9 +2133,38 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_is_closed(
     int*            outClosed);
 
 /*
+ * Check whether all edges of a wire lie in a single plane.
+ *
+ *   wireHandle – a valid shape handle containing a TopoDS_Wire
+ *   tolerance  – planarity tolerance
+ *   outPlanar  – receives 1 if the wire is planar, 0 otherwise
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_is_planar(
+    XbimShapeHandle wireHandle,
+    double          tolerance,
+    int*            outPlanar);
+
+/*
+ * Return wire vertex coordinates in edge-traversal order.
+ *
+ * Uses BRepTools_WireExplorer to walk edges in order, yielding the start
+ * vertex of each edge plus the end vertex of the last edge.  For a closed
+ * wire this gives N+1 points (first == last).
+ *
+ * If outCoords is NULL, only writes the point count to outCount (use this
+ * to learn the required buffer size).  Otherwise outCoords must hold at
+ * least 3 * (*outCount) doubles.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_get_ordered_points(
+    XbimShapeHandle wireHandle,
+    double*         outCoords,
+    int*            outCount);
+
+/*
  * Project a 3D point onto a wire and return the parametric position.
- * The parameter is accumulated arc-length across the wire's edges,
- * matching the legacy NWireFactory::GetParameter behavior.
+ * The parameter is accumulated arc-length across the wire's edges
  *
  *   wireHandle – a valid shape handle containing a TopoDS_Wire
  *   pointX/Y/Z – the 3D point to project
@@ -2835,6 +2940,29 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_project_point_3d(
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_reverse(XbimCurveHandle handle);
 
 /*
+ * Classify a 3D curve and extract its geometric properties.
+ *
+ * Uses GeomAdaptor_Curve to identify the curve type and extracts
+ * type-specific properties:
+ *   - Line:    origin + direction
+ *   - Circle:  origin + axis (Z/X dirs) + radius1
+ *   - Ellipse: origin + axis (Z/X dirs) + radius1 (major) + radius2 (minor)
+ *   - BSpline: type only (no geometric properties extracted)
+ *
+ * outCurveType values match XCurveType enum:
+ *   0 = IfcCurve (unknown), 1 = BSpline, 2 = Circle, 5 = Ellipse, 7 = Line
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_get_elementary_props(
+    XbimCurveHandle handle,
+    int*    outCurveType,
+    double* outOriginX, double* outOriginY, double* outOriginZ,
+    double* outDirX,    double* outDirY,    double* outDirZ,
+    double* outXDirX,   double* outXDirY,   double* outXDirZ,
+    double* outRadius1, double* outRadius2);
+
+/*
  * Join multiple bounded 3D curves into a single B-spline curve.
  * Curves that cannot be added directly are approximated via point sampling.
  * Gaps between non-contiguous segments are filled with linear segments.
@@ -3116,6 +3244,27 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_curve_bounded_plane(
     int                      numInnerWires,
     double                   tolerance,
     XbimShapeHandle*         outHandle);
+
+/*
+ * Query the axis placement and radius of an elementary surface
+ * (cylindrical, spherical, conical, toroidal).
+ *
+ *   handle       – a valid surface handle whose underlying Geom_Surface
+ *                  is a Geom_ElementarySurface subclass
+ *   outOriginX/Y/Z – receives the placement origin
+ *   outZDirX/Y/Z   – receives the placement Z direction (axis)
+ *   outXDirX/Y/Z   – receives the placement X direction (reference)
+ *   outRadius      – receives the radius (0 for planes)
+ *
+ * Returns XBIM_OK on success, XBIM_INVALID_ARG if the surface is not
+ * an elementary surface.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_get_elementary_props(
+    XbimSurfaceHandle handle,
+    double* outOriginX, double* outOriginY, double* outOriginZ,
+    double* outZDirX,   double* outZDirY,   double* outZDirZ,
+    double* outXDirX,   double* outXDirY,   double* outXDirZ,
+    double* outRadius);
 
 /*
  * Destroy a surface handle and free its resources.
@@ -3955,6 +4104,20 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_2d_curves(
     int                 numCurves,
     double              tolerance,
     double              gapSize,
+    XbimShapeHandle*    outWire);
+
+/*
+ * Build a closed wire for an IfcCenterLineProfileDef.
+ *
+ * Creates two offset curves at +/- thickness/2 from the centre line,
+ * connects their endpoints with line segments, and assembles the four
+ * edges into a closed planar wire.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_centerline_profile(
+    XbimContextHandle   ctx,
+    XbimCurve2dHandle   centreLineHandle,
+    double              thickness,
+    double              tolerance,
     XbimShapeHandle*    outWire);
 
 #pragma endregion

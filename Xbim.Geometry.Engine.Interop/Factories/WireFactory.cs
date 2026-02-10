@@ -274,7 +274,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                 if (buildResult != 0)
                     throw new XbimGeometryServiceException(
-                        $"Failed to build wire from composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+                        "IfcCompositeCurve could not be built as a wire");
 
                 return new XbimWire(wireHandle);
             }

@@ -347,6 +347,155 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_intersect(
     return *outHandle ? XBIM_OK : XBIM_ERROR;
 }
 
+/*
+ * Shared implementation for multi-shape boolean operations.
+ * Collects shapes from handle arrays into TopTools_ListOfShape,
+ * then delegates to perform_boolean().
+ */
+static XbimResult xbim_boolean_multi_impl(
+    XbimContextHandle        ctx,
+    const XbimShapeHandle*   bodyHandles,
+    int                      bodyCount,
+    const XbimShapeHandle*   toolHandles,
+    int                      toolCount,
+    double                   fuzzyTolerance,
+    BOPAlgo_Operation        operation,
+    int*                     outHasWarnings,
+    XbimShapeHandle*         outHandle)
+{
+    xbim_clear_error();
+    if (!outHandle) { xbim_set_error("outHandle is NULL"); return XBIM_INVALID_ARG; }
+    *outHandle = nullptr;
+    if (!outHasWarnings) { xbim_set_error("outHasWarnings is NULL"); return XBIM_INVALID_ARG; }
+    *outHasWarnings = 0;
+    if (!bodyHandles || bodyCount <= 0) { xbim_set_error("bodyHandles is NULL or empty"); return XBIM_INVALID_ARG; }
+    if (!toolHandles || toolCount <= 0) { xbim_set_error("toolHandles is NULL or empty"); return XBIM_INVALID_ARG; }
+
+    TopTools_ListOfShape arguments;
+    TopTools_ListOfShape tools;
+
+    for (int i = 0; i < bodyCount; i++)
+    {
+        if (!bodyHandles[i]) continue;
+        const auto& shape = bodyHandles[i]->shape;
+        if (!shape.IsNull())
+            arguments.Append(shape);
+    }
+
+    for (int i = 0; i < toolCount; i++)
+    {
+        if (!toolHandles[i]) continue;
+        const auto& shape = toolHandles[i]->shape;
+        if (!shape.IsNull())
+            tools.Append(shape);
+    }
+
+    if (arguments.IsEmpty() && tools.IsEmpty())
+    {
+        xbim_log_warning(ctx, "Multi boolean: all shapes are empty");
+        *outHasWarnings = 1;
+        return XBIM_NULL_SHAPE;
+    }
+    if (arguments.IsEmpty())
+    {
+        if (operation == BOPAlgo_CUT || operation == BOPAlgo_COMMON)
+        {
+            xbim_log_warning(ctx, "Multi boolean: body list is empty");
+            *outHasWarnings = 1;
+            return XBIM_NULL_SHAPE;
+        }
+        // For union with empty arguments, swap tools into arguments
+        std::swap(arguments, tools);
+        // Return the tools as-is if only one
+        if (arguments.Size() == 1 && tools.IsEmpty())
+        {
+            *outHandle = xbim_shape_create_from(arguments.First());
+            return *outHandle ? XBIM_OK : XBIM_ERROR;
+        }
+    }
+    if (tools.IsEmpty())
+    {
+        if (operation == BOPAlgo_COMMON)
+        {
+            xbim_log_warning(ctx, "Multi boolean: tool list is empty, no intersection possible");
+            *outHasWarnings = 1;
+            return XBIM_NULL_SHAPE;
+        }
+        // For cut/union with empty tools, return the arguments compound
+        *outHasWarnings = 1;
+        if (arguments.Size() == 1)
+        {
+            *outHandle = xbim_shape_create_from(arguments.First());
+        }
+        else
+        {
+            BRep_Builder builder;
+            TopoDS_Compound compound;
+            builder.MakeCompound(compound);
+            for (auto it = arguments.cbegin(); it != arguments.cend(); ++it)
+                builder.Add(compound, *it);
+            *outHandle = xbim_shape_create_from(compound);
+        }
+        return *outHandle ? XBIM_OK : XBIM_ERROR;
+    }
+
+    int hasWarnings = 0;
+    TopoDS_Shape result = perform_boolean(ctx, arguments, tools,
+                                           fuzzyTolerance, operation, hasWarnings, false);
+    *outHasWarnings = hasWarnings;
+
+    if (result.IsNull())
+    {
+        xbim_set_error("Multi boolean operation produced a null shape");
+        return XBIM_NULL_SHAPE;
+    }
+
+    *outHandle = xbim_shape_create_from(result);
+    return *outHandle ? XBIM_OK : XBIM_ERROR;
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_union_multi(
+    XbimContextHandle        ctx,
+    const XbimShapeHandle*   bodyHandles,
+    int                      bodyCount,
+    const XbimShapeHandle*   toolHandles,
+    int                      toolCount,
+    double                   fuzzyTolerance,
+    int*                     outHasWarnings,
+    XbimShapeHandle*         outHandle)
+{
+    return xbim_boolean_multi_impl(ctx, bodyHandles, bodyCount,
+        toolHandles, toolCount, fuzzyTolerance, BOPAlgo_FUSE, outHasWarnings, outHandle);
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_cut_multi(
+    XbimContextHandle        ctx,
+    const XbimShapeHandle*   bodyHandles,
+    int                      bodyCount,
+    const XbimShapeHandle*   toolHandles,
+    int                      toolCount,
+    double                   fuzzyTolerance,
+    int*                     outHasWarnings,
+    XbimShapeHandle*         outHandle)
+{
+    return xbim_boolean_multi_impl(ctx, bodyHandles, bodyCount,
+        toolHandles, toolCount, fuzzyTolerance, BOPAlgo_CUT, outHasWarnings, outHandle);
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_intersect_multi(
+    XbimContextHandle        ctx,
+    const XbimShapeHandle*   bodyHandles,
+    int                      bodyCount,
+    const XbimShapeHandle*   toolHandles,
+    int                      toolCount,
+    double                   fuzzyTolerance,
+    int*                     outHasWarnings,
+    XbimShapeHandle*         outHandle)
+{
+    return xbim_boolean_multi_impl(ctx, bodyHandles, bodyCount,
+        toolHandles, toolCount, fuzzyTolerance, BOPAlgo_COMMON, outHasWarnings, outHandle);
+}
+
 XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_section(
     XbimContextHandle   ctx,
     XbimShapeHandle     bodyHandle,

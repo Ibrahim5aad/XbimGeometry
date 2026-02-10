@@ -47,7 +47,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             {
                 secondHandle = BuildOperand(boolResult.SecondOperand);
             }
-            catch (Exception ex)
+            catch (NotSupportedException ex)
             {
                 _logger.LogWarning(ex,
                     "Boolean result #{Label}: second operand failed, returning first operand unchanged.",
