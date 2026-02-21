@@ -404,21 +404,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_wire(
         TopoDS_Wire wire = TopoDS::Wire(shape);
         double tolerance = Precision::Confusion();
 
-        /* Extract vertices in wire traversal order */
-        std::vector<gp_Pnt> pts;
-        for (BRepTools_WireExplorer wEx(wire); wEx.More(); wEx.Next())
-            pts.push_back(BRep_Tool::Pnt(wEx.CurrentVertex()));
-
-        int n = (int)pts.size();
-        if (n < 3)
-        {
-            xbim_log_warning(ctx, "Polyloop with less than 3 points is an empty loop");
-            xbim_set_error("xbim_face_build_from_wire: wire has fewer than 3 vertices");
-            return XBIM_NULL_SHAPE;
-        }
-
         /* Try OCCT auto-detection first — correctly handles wires with
-           pcurves from MakeEdge2d (offset curves, arcs, etc.) */
+           curved edges (circles, arcs, etc.) and pcurves from MakeEdge2d */
         TopoDS_Face face;
         gp_Pln thePlane;
         bool havePlane = false;
@@ -436,6 +423,19 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_wire(
            polygon wires where OCCT's FindPlane fails */
         if (!havePlane)
         {
+            /* Extract vertices in wire traversal order */
+            std::vector<gp_Pnt> pts;
+            for (BRepTools_WireExplorer wEx(wire); wEx.More(); wEx.Next())
+                pts.push_back(BRep_Tool::Pnt(wEx.CurrentVertex()));
+
+            int n = (int)pts.size();
+            if (n < 3)
+            {
+                xbim_log_warning(ctx, "Polyloop with less than 3 points is an empty loop");
+                xbim_set_error("xbim_face_build_from_wire: wire has fewer than 3 vertices");
+                return XBIM_NULL_SHAPE;
+            }
+
             double nx = 0, ny = 0, nz = 0;
             for (int i = 0; i < n; i++)
             {
@@ -474,6 +474,12 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_wire(
             face = fallbackMaker.Face();
             havePlane = true;
         }
+
+        /* Extract vertices for self-intersection and tolerance fixes below */
+        std::vector<gp_Pnt> pts;
+        for (BRepTools_WireExplorer wEx(wire); wEx.More(); wEx.Next())
+            pts.push_back(BRep_Tool::Pnt(wEx.CurrentVertex()));
+        int n = (int)pts.size();
 
         /* Limit wire tolerances */
         ShapeFix_ShapeTolerance tolFixer;
