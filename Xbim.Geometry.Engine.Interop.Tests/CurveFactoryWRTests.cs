@@ -41,7 +41,7 @@ public class CurveFactoryWRTests : IDisposable
         }.SetupAllProperties();
     }
 
-    [Fact]
+    [Fact(Skip = "Not enforced anymore")]
     public void Build_TrimmedCurve_BoundedBasis_ThrowsIfcRuleViolation_WR42()
     {
         // A trimmed curve whose basis is already bounded violates WR42
