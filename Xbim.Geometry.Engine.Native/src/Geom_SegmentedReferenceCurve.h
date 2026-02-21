@@ -17,6 +17,7 @@
 #include "Geom_GradientCurve.h"
 #include "Geom2d_Spiral.h"
 #include "Geom2d_PolynomialSpiral.h"
+#include "Geom2d_Polynomial.h"
 
 #include <Geom2d_Curve.hxx>
 #include <Geom2dAdaptor_Curve.hxx>
@@ -223,6 +224,59 @@ public:
 
     const Handle(Geom_GradientCurve)& BaseCurve() const { return _baseCurve; }
 
+    std::string DumpSegmentInfo() const
+    {
+        std::ostringstream os;
+        os << "SegmentedReferenceCurve segment dump:\n";
+        os << "  totalLength: " << _totalLength << "\n";
+        os << "  numSegments: " << _superElevationFunction.size() << "\n";
+        os << "  cumulativeSpans: [";
+        for (size_t i = 0; i < _cumulativeSpans.size(); ++i)
+            os << (i ? ", " : "") << _cumulativeSpans[i];
+        os << "]\n\n";
+
+        for (size_t i = 0; i < _superElevationFunction.size(); ++i)
+        {
+            const auto& loc = _superElevationFunction[i].second;
+            const auto& curve2d = _superElevationFunction[i].first;
+            auto trans = loc.Transformation().TranslationPart();
+            auto tilt = GetRotationAroundX(loc);
+
+            os << "  Segment " << i << ":\n";
+            os << "    Location Y (superElev): " << trans.Y() << "\n";
+            os << "    Location X: " << trans.X() << ", Z: " << trans.Z() << "\n";
+            os << "    Tilt (rotation around X): " << tilt << "\n";
+            os << "    cumulativeSpan: " << (i < _cumulativeSpans.size() ? _cumulativeSpans[i] : -1) << "\n";
+
+            if (!curve2d.IsNull())
+            {
+                os << "    2D curve type: " << curve2d->DynamicType()->Name() << "\n";
+                os << "    2D firstParam: " << curve2d->FirstParameter() << "\n";
+                os << "    2D lastParam: " << curve2d->LastParameter() << "\n";
+                auto startPt2d = curve2d->Value(curve2d->FirstParameter());
+                os << "    2D startPt: (" << startPt2d.X() << ", " << startPt2d.Y() << ")\n";
+                auto endPt = curve2d->Value(curve2d->LastParameter());
+                os << "    2D endPt: (" << endPt.X() << ", " << endPt.Y() << ")\n";
+
+                // Test DownCasts
+                auto asSpiral = Handle(Geom2d_Spiral)::DownCast(curve2d);
+                auto asPoly = Handle(Geom2d_PolynomialSpiral)::DownCast(curve2d);
+                os << "    DownCast Spiral: " << (!asSpiral.IsNull() ? "YES" : "NO") << "\n";
+                os << "    DownCast PolynomialSpiral: " << (!asPoly.IsNull() ? "YES" : "NO") << "\n";
+
+                if (!asSpiral.IsNull())
+                {
+                    auto plcLoc = asSpiral->Placement().Location();
+                    os << "    Spiral Placement Origin: (" << plcLoc.X() << ", " << plcLoc.Y() << ")\n";
+                    os << "    Spiral curvature@first: " << asSpiral->GetCurvatureAt(asSpiral->FirstParameter()) << "\n";
+                    os << "    Spiral curvature@last: " << asSpiral->GetCurvatureAt(asSpiral->LastParameter()) << "\n";
+                }
+            }
+            os << "\n";
+        }
+        return os.str();
+    }
+
     /*
      * Compute superelevation and cant tilt angle at the given distance-along
      * parameter. Interpolates between superelevation segments using the
@@ -261,12 +315,16 @@ public:
 
         Handle(Geom2d_Spiral) spiral =
             Handle(Geom2d_Spiral)::DownCast(rateOfChange);
-        Handle(Geom2d_PolynomialSpiral) polynomial =
-            Handle(Geom2d_PolynomialSpiral)::DownCast(rateOfChange);
+        Handle(Geom2d_Polynomial) polynomial =
+            Handle(Geom2d_Polynomial)::DownCast(rateOfChange);
 
         Standard_Real startTilt = GetRotationAroundX(currentLoc);
         Standard_Real startSuperElev =
             currentLoc.Transformation().TranslationPart().Y();
+
+        /* Local parameter within this segment */
+        double prevSpan = (segIdx > 0) ? _cumulativeSpans[segIdx - 1] : 0.0;
+        double localParam = x_value - prevSpan;
 
         Standard_Real delta1 = 0.0, delta2 = 0.0, deltaCurrent = 0.0;
 
@@ -274,15 +332,13 @@ public:
         {
             delta1 = spiral->GetCurvatureAt(spiral->FirstParameter());
             delta2 = spiral->GetCurvatureAt(spiral->LastParameter());
-            deltaCurrent = spiral->GetCurvatureAt(
-                x_value - spiral->Placement().Location().X());
+            deltaCurrent = spiral->GetCurvatureAt(localParam);
         }
         else if (!polynomial.IsNull())
         {
             delta1 = polynomial->GetCurvatureAt(polynomial->FirstParameter());
             delta2 = polynomial->GetCurvatureAt(polynomial->LastParameter());
-            deltaCurrent = polynomial->GetCurvatureAt(
-                x_value - polynomial->Placement().Location().X());
+            deltaCurrent = polynomial->GetCurvatureAt(localParam);
         }
 
         const Standard_Real epsilon = 1e-9;

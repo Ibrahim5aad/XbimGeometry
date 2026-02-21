@@ -172,7 +172,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             // Build a location from the matrix (extracting rotation + translation)
             double ox = matrix.OffsetX, oy = matrix.OffsetY, oz = matrix.OffsetZ;
             double m11 = matrix.M11, m12 = matrix.M12, m13 = matrix.M13;
-            double m21 = matrix.M21, m22 = matrix.M22, m23 = matrix.M23;
             double m31 = matrix.M31, m32 = matrix.M32, m33 = matrix.M33;
 
             // Extract Z direction and X direction from the matrix columns

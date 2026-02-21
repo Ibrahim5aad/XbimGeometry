@@ -186,6 +186,14 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeShapeHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_shape_moved_by_axis2(
+            NativeShapeHandle shapeHandle,
+            double originX, double originY, double originZ,
+            double zDirX, double zDirY, double zDirZ,
+            double xDirX, double xDirY, double xDirZ,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_shape_gtransform(
             NativeShapeHandle shapeHandle,
             double m11, double m12, double m13, double offsetX,
@@ -313,6 +321,14 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         internal static extern int xbim_solid_build_sectioned_spine(
             NativeContextHandle ctx,
             NativeShapeHandle spineHandle,
+            [In] IntPtr[] sectionHandles,
+            int numSections,
+            double precision,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_solid_build_thru_sections(
+            NativeContextHandle ctx,
             [In] IntPtr[] sectionHandles,
             int numSections,
             double precision,
@@ -1735,6 +1751,30 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             double parameter,
             out double outSuperElevation,
             out double outCantTilt);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_dump_superelevation_segments(
+            NativeCurveHandle curveHandle,
+            byte[] outBuffer,
+            int bufferSize,
+            out int outLength);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_to_bspline_wire(
+            NativeContextHandle ctx,
+            NativeCurveHandle curveHandle,
+            double startParam,
+            double endParam,
+            int numPoints,
+            out NativeShapeHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_to_trimmed_wire(
+            NativeContextHandle ctx,
+            NativeCurveHandle curveHandle,
+            double startParam,
+            double endParam,
+            out NativeShapeHandle outHandle);
 
         #endregion
 

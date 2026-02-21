@@ -12,6 +12,9 @@ using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4.MeasureResource;
+using Xbim.Ifc4x3.GeometricConstraintResource;
+using Xbim.Ifc4x3.GeometricModelResource;
+using Xbim.Ifc4x3.GeometryResource;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
 {
@@ -196,6 +199,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 XSolidModelType.IfcSweptDiskSolidPolygonal => BuildSweptDiskSolid((IIfcSweptDiskSolid)ifcSolid),
                 XSolidModelType.IfcFixedReferenceSweptAreaSolid => BuildFixedReferenceSweptAreaSolid((IIfcFixedReferenceSweptAreaSolid)ifcSolid),
                 XSolidModelType.IfcSurfaceCurveSweptAreaSolid => BuildSurfaceCurveSweptAreaSolid((IIfcSurfaceCurveSweptAreaSolid)ifcSolid),
+                XSolidModelType.IfcSectionedSolidHorizontal => BuildSectionedSolidHorizontal((IfcSectionedSolidHorizontal)ifcSolid),
+                XSolidModelType.IfcDirectrixDerivedReferenceSweptAreaSolid => BuildDirectrixDerivedReferenceSweptAreaSolid((IfcDirectrixDerivedReferenceSweptAreaSolid)ifcSolid),
                 XSolidModelType.IfcFacetedBrep => Build((IIfcFacetedBrep)ifcSolid),
                 XSolidModelType.IfcFacetedBrepWithVoids => BuildFacetedBrepWithVoids((IIfcFacetedBrepWithVoids)ifcSolid),
                 XSolidModelType.IfcAdvancedBrep => BuildAdvancedBrep((IIfcAdvancedBrep)ifcSolid),
@@ -1765,6 +1770,376 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             return NativeShapeWrapper.WrapShape(sewedHandle);
         }
 
+        #region IFC4x3 Swept Solids
+
+        private IXShape BuildSectionedSolidHorizontal(IfcSectionedSolidHorizontal sectionedSolid)
+        {
+            var crossSections = sectionedSolid.CrossSections.ToList();
+            var positions = sectionedSolid.CrossSectionPositions.ToList();
+
+            if (crossSections.Count < 2)
+                throw new XbimGeometryServiceException(
+                    $"IfcSectionedSolidHorizontal #{sectionedSolid.EntityLabel} requires at least 2 cross-sections but has {crossSections.Count}.");
+
+            if (crossSections.Count != positions.Count)
+                throw new XbimGeometryServiceException(
+                    $"IfcSectionedSolidHorizontal #{sectionedSolid.EntityLabel}: cross-section count ({crossSections.Count}) does not match position count ({positions.Count}).");
+
+            // Build directrix as a 3D curve (handles GradientCurve, SegmentedReferenceCurve etc.)
+            using var curve = (XbimCurve)_modelService.CurveFactory.Build(sectionedSolid.Directrix)
+                ?? throw new XbimGeometryServiceException(
+                    $"IfcSectionedSolidHorizontal #{sectionedSolid.EntityLabel}: failed to build directrix curve.");
+
+            // Get curve parameter range
+            int paramRes = XbimGeometryNativeApi.xbim_curve_parameters(
+                curve.Handle, out double firstParam, out double lastParam);
+            if (paramRes != 0)
+                throw new XbimGeometryServiceException(
+                    $"IfcSectionedSolidHorizontal #{sectionedSolid.EntityLabel}: " +
+                    $"failed to get curve parameters: {XbimGeometryNativeApi.GetLastError()}");
+
+            // Trim directrix to the range covered by cross-section positions (DistanceAlong → curve param)
+            double? startDist = ExtractDistanceAlong(positions[0]);
+            double? endDist = ExtractDistanceAlong(positions[positions.Count - 1]);
+
+            double wireStart = firstParam;
+            double wireEnd = lastParam;
+            if (startDist.HasValue)
+            {
+                if (XbimGeometryNativeApi.xbim_curve_parameter_at_length(
+                        curve.Handle, startDist.Value, _modelService.Precision, out double sp) == 0)
+                    wireStart = sp;
+            }
+            if (endDist.HasValue)
+            {
+                if (XbimGeometryNativeApi.xbim_curve_parameter_at_length(
+                        curve.Handle, endDist.Value, _modelService.Precision, out double ep) == 0)
+                    wireEnd = ep;
+            }
+
+            // Convert curve to B-spline wire for MakePipeShell
+            int wireRes = XbimGeometryNativeApi.xbim_curve_to_bspline_wire(
+                ContextHandle, curve.Handle, wireStart, wireEnd, 100, out var wireHandle);
+            if (wireRes != 0)
+                throw new XbimGeometryServiceException(
+                    $"IfcSectionedSolidHorizontal #{sectionedSolid.EntityLabel}: " +
+                    $"failed to build directrix wire: {XbimGeometryNativeApi.GetLastError()}");
+
+            var geometryFactory = (GeometryFactory)_modelService.GeometryFactory;
+            var movedFaceHandles = new List<NativeShapeHandle>();
+
+            try
+            {
+                for (int i = 0; i < crossSections.Count; i++)
+                {
+                    var face = (XbimFace)_modelService.ProfileFactory.BuildFace(crossSections[i]);
+                    var placement = positions[i];
+
+                    // Evaluate point, tangent, and axis from the basis curve at DistanceAlong
+                    // (handles IfcLengthMeasure/IfcParameterValue, cant tilt, offsets)
+                    var pointExpr = (IfcPointByDistanceExpression)placement.Location;
+                    var loc = geometryFactory.EvaluatePointByDistanceExpression(pointExpr,
+                        out double tangentX, out double tangentY, out double tangentZ,
+                        out double axisX, out double axisY, out double axisZ);
+
+                    double sectionNormalX, sectionNormalY, sectionNormalZ;
+                    double refVecX, refVecY, refVecZ;
+
+                    bool hasAxis = placement.Axis != null;
+                    bool hasRef = placement.RefDirection != null;
+
+                    if (hasAxis && hasRef)
+                    {
+                        // Explicit Axis + RefDirection: section normal = refVec × up
+                        GeometryFactory.BuildDirection3d(placement.Axis,
+                            out double upX, out double upY, out double upZ);
+                        double upMag = Math.Sqrt(upX * upX + upY * upY + upZ * upZ);
+                        if (upMag > 1e-15) { upX /= upMag; upY /= upMag; upZ /= upMag; }
+
+                        GeometryFactory.BuildDirection3d(placement.RefDirection,
+                            out refVecX, out refVecY, out refVecZ);
+                        double rvMag = Math.Sqrt(refVecX * refVecX + refVecY * refVecY + refVecZ * refVecZ);
+                        if (rvMag > 1e-15) { refVecX /= rvMag; refVecY /= rvMag; refVecZ /= rvMag; }
+
+                        sectionNormalX = refVecY * upZ - refVecZ * upY;
+                        sectionNormalY = refVecZ * upX - refVecX * upZ;
+                        sectionNormalZ = refVecX * upY - refVecY * upX;
+                        double snMag = Math.Sqrt(sectionNormalX * sectionNormalX +
+                            sectionNormalY * sectionNormalY + sectionNormalZ * sectionNormalZ);
+                        if (snMag > 1e-15) { sectionNormalX /= snMag; sectionNormalY /= snMag; sectionNormalZ /= snMag; }
+                    }
+                    else
+                    {
+                        // Derived from curve: sectionNormal = tangent, refVec = axis × tangent
+                        sectionNormalX = tangentX;
+                        sectionNormalY = tangentY;
+                        sectionNormalZ = tangentZ;
+
+                        refVecX = axisY * tangentZ - axisZ * tangentY;
+                        refVecY = axisZ * tangentX - axisX * tangentZ;
+                        refVecZ = axisX * tangentY - axisY * tangentX;
+                        double rvMag = Math.Sqrt(refVecX * refVecX + refVecY * refVecY + refVecZ * refVecZ);
+                        if (rvMag > 1e-15) { refVecX /= rvMag; refVecY /= rvMag; refVecZ /= rvMag; }
+                    }
+
+                    // Move profile face to axis placement: Z = sectionNormal, X = refVec
+                    int moveResult = XbimGeometryNativeApi.xbim_shape_moved_by_axis2(
+                        face.Handle,
+                        loc.X, loc.Y, loc.Z,
+                        sectionNormalX, sectionNormalY, sectionNormalZ,
+                        refVecX, refVecY, refVecZ,
+                        out var movedHandle);
+                    face.Handle.Dispose();
+
+                    if (moveResult != 0)
+                        throw new XbimGeometryServiceException(
+                            $"IfcSectionedSolidHorizontal #{sectionedSolid.EntityLabel}: " +
+                            $"failed to position cross-section {i}: {XbimGeometryNativeApi.GetLastError()}");
+
+                    movedFaceHandles.Add(movedHandle);
+                }
+
+                using var nativeSections = new NativeHandleArray(movedFaceHandles.ToArray());
+
+                int result = XbimGeometryNativeApi.xbim_solid_build_sectioned_spine(
+                    ContextHandle,
+                    wireHandle,
+                    nativeSections.Ptrs,
+                    nativeSections.Length,
+                    _modelService.Precision,
+                    out var solidHandle);
+
+                wireHandle.Dispose();
+
+                if (result != 0)
+                    throw new XbimGeometryServiceException(
+                        $"Failed to build IfcSectionedSolidHorizontal #{sectionedSolid.EntityLabel}: " +
+                        XbimGeometryNativeApi.GetLastError());
+
+                return NativeShapeWrapper.WrapSolid(solidHandle);
+            }
+            finally
+            {
+                foreach (var h in movedFaceHandles)
+                    h.Dispose();
+            }
+        }
+
+        private IXShape BuildDirectrixDerivedReferenceSweptAreaSolid(
+            IfcDirectrixDerivedReferenceSweptAreaSolid derivedSwept)
+        {
+            // Composite profiles: build a solid per sub-profile, combine into compound
+            if (derivedSwept.SweptArea is IIfcCompositeProfileDef compositeProfile)
+            {
+                var solidHandles = new List<NativeShapeHandle>();
+                try
+                {
+                    foreach (var profileDef in compositeProfile.Profiles)
+                        solidHandles.Add(BuildDirectrixDerivedCore(derivedSwept, profileDef));
+
+                    using var nativeHandles = new NativeHandleArray(solidHandles.ToArray());
+
+                    int result = XbimGeometryNativeApi.xbim_compound_make(
+                        ContextHandle,
+                        nativeHandles.Ptrs,
+                        nativeHandles.Length,
+                        out var compoundHandle);
+
+                    if (result != 0)
+                        throw new XbimGeometryServiceException(
+                            $"Failed to build compound for DirectrixDerivedReferenceSweptAreaSolid " +
+                            $"#{derivedSwept.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                    return NativeShapeWrapper.WrapShape(compoundHandle);
+                }
+                finally
+                {
+                    foreach (var h in solidHandles)
+                        h.Dispose();
+                }
+            }
+
+            var solidResult = BuildDirectrixDerivedCore(derivedSwept, derivedSwept.SweptArea);
+            return NativeShapeWrapper.WrapSolid(solidResult);
+        }
+
+        private NativeShapeHandle BuildDirectrixDerivedCore(
+            IfcDirectrixDerivedReferenceSweptAreaSolid derivedSwept, IIfcProfileDef profileDef)
+        {
+            if (profileDef.ProfileType != IfcProfileTypeEnum.AREA)
+                throw new XbimGeometryServiceException(
+                    $"DirectrixDerivedReferenceSweptAreaSolid #{derivedSwept.EntityLabel}: " +
+                    "profile must be AREA type.");
+
+            using var profileFace = (XbimFace)_modelService.ProfileFactory.BuildFace(profileDef);
+
+            // Access FixedReference via concrete type (IIfcDirection is cross-schema safe)
+            if (!GeometryFactory.BuildDirection3d(derivedSwept.FixedReference,
+                    out double refDirX, out double refDirY, out double refDirZ))
+                throw new XbimGeometryServiceException(
+                    $"DirectrixDerivedReferenceSweptAreaSolid #{derivedSwept.EntityLabel}: " +
+                    "FixedReference direction has zero magnitude.");
+
+            // Build directrix as 3D curve for evaluation
+            using var curve = (XbimCurve)_modelService.CurveFactory.Build(derivedSwept.Directrix);
+            var curveHandle = curve.Handle;
+
+            // Get curve parameter range
+            int cpRes = XbimGeometryNativeApi.xbim_curve_parameters(
+                curveHandle, out double firstParam, out double lastParam);
+            if (cpRes != 0)
+                throw new XbimGeometryServiceException(
+                    $"DirectrixDerivedReferenceSweptAreaSolid #{derivedSwept.EntityLabel}: " +
+                    $"failed to get curve parameters: {XbimGeometryNativeApi.GetLastError()}");
+
+            double paramRange = lastParam - firstParam;
+
+            // Determine trim range — type-check IfcLengthMeasure vs IfcParameterValue
+            double trimStart = firstParam;
+            double trimEnd = lastParam;
+
+            if (derivedSwept.StartParam is IIfcLengthMeasure startLen)
+                trimStart = startLen.Value;
+            else if (derivedSwept.StartParam is Ifc4x3.MeasureResource.IfcParameterValue startPV)
+                trimStart = (double)startPV.Value * paramRange;
+
+            if (derivedSwept.EndParam is IIfcLengthMeasure endLen)
+                trimEnd = endLen.Value;
+            else if (derivedSwept.EndParam is Ifc4x3.MeasureResource.IfcParameterValue endPV)
+                trimEnd = (double)endPV.Value * paramRange;
+
+            double totalArcLength = trimEnd - trimStart;
+            double step = 100 * _modelService.OneMillimeter;
+            int numSamples = Math.Max(10, (int)(totalArcLength / step));
+
+            var movedFaceHandles = new List<NativeShapeHandle>();
+
+            try
+            {
+
+                for (int i = 0; i <= numSamples; i++)
+                {
+                    double param = trimStart + (i * step);
+                    if (param > trimEnd) param = trimEnd;
+
+                    // Evaluate point + tangent
+                    int d1Result = XbimGeometryNativeApi.xbim_curve_d1(curveHandle, param,
+                        out double px, out double py, out double pz,
+                        out double tx, out double ty, out double tz);
+                    if (d1Result != 0)
+                        throw new XbimGeometryServiceException(
+                            $"DirectrixDerivedReferenceSweptAreaSolid #{derivedSwept.EntityLabel}: " +
+                            $"failed to evaluate curve at u={param}: " +
+                            XbimGeometryNativeApi.GetLastError());
+
+                    // Use raw tangent as Z direction (gp_Ax3 normalizes internally)
+                    // Use raw FixedReference as X direction — gp_Ax3 orthogonalizes it
+                    double xDirX = refDirX;
+                    double xDirY = refDirY;
+                    double xDirZ = refDirZ;
+
+                    // Apply cant tilt from SegmentedReferenceCurve (if present)
+                    // Rotate xDir around tangent by cantTilt (same order as old engine:
+                    // rotate raw refDir first, let gp_Ax3 orthogonalize after)
+                    int tiltResult = XbimGeometryNativeApi.xbim_curve_get_superelevation_and_tilt(
+                        curveHandle, param, out _, out double cantTilt);
+                    if (tiltResult == 0 && Math.Abs(cantTilt) > 1e-15)
+                    {
+                        // Normalize tangent for rotation axis
+                        double tMag = Math.Sqrt(tx * tx + ty * ty + tz * tz);
+                        double ntx = tx, nty = ty, ntz = tz;
+                        if (tMag > 1e-15) { ntx /= tMag; nty /= tMag; ntz /= tMag; }
+
+                        // Rodrigues' rotation: rotate xDir around normalized tangent by cantTilt
+                        double cosA = Math.Cos(cantTilt);
+                        double sinA = Math.Sin(cantTilt);
+                        double crossX = nty * xDirZ - ntz * xDirY;
+                        double crossY = ntz * xDirX - ntx * xDirZ;
+                        double crossZ = ntx * xDirY - nty * xDirX;
+                        double kDotV = ntx * xDirX + nty * xDirY + ntz * xDirZ;
+                        xDirX = xDirX * cosA + crossX * sinA + ntx * kDotV * (1.0 - cosA);
+                        xDirY = xDirY * cosA + crossY * sinA + nty * kDotV * (1.0 - cosA);
+                        xDirZ = xDirZ * cosA + crossZ * sinA + ntz * kDotV * (1.0 - cosA);
+                    }
+
+                    // Move profile to axis placement: Z = tangent, X = (rotated) reference direction
+                    int moveResult = XbimGeometryNativeApi.xbim_shape_moved_by_axis2(
+                        profileFace.Handle,
+                        px, py, pz,
+                        tx, ty, tz,
+                        xDirX, xDirY, xDirZ,
+                        out var movedHandle);
+
+                    if (moveResult != 0)
+                        throw new XbimGeometryServiceException(
+                            $"DirectrixDerivedReferenceSweptAreaSolid #{derivedSwept.EntityLabel}: " +
+                            $"failed to position cross-section at sample {i}: " +
+                            XbimGeometryNativeApi.GetLastError());
+
+                    movedFaceHandles.Add(movedHandle);
+                }
+
+                using var nativeSections = new NativeHandleArray(movedFaceHandles.ToArray());
+
+                int result = XbimGeometryNativeApi.xbim_solid_build_thru_sections(
+                    ContextHandle,
+                    nativeSections.Ptrs,
+                    nativeSections.Length,
+                    _modelService.Precision,
+                    out var solidHandle);
+
+                if (result != 0)
+                    throw new XbimGeometryServiceException(
+                        $"Failed to build DirectrixDerivedReferenceSweptAreaSolid " +
+                        $"#{derivedSwept.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                // Apply optional Position transform
+                if (derivedSwept.Position != null)
+                {
+                    var posLocation = ((GeometryFactory)_modelService.GeometryFactory)
+                        .BuildLocationFromAxis3D(derivedSwept.Position);
+                    int posResult = XbimGeometryNativeApi.xbim_shape_moved(
+                        solidHandle, posLocation.Handle, out var positionedHandle);
+                    posLocation.Handle.Dispose();
+                    solidHandle.Dispose();
+
+                    if (posResult != 0)
+                        throw new XbimGeometryServiceException(
+                            $"DirectrixDerivedReferenceSweptAreaSolid #{derivedSwept.EntityLabel}: " +
+                            $"failed to apply Position: {XbimGeometryNativeApi.GetLastError()}");
+
+                    return positionedHandle;
+                }
+
+                return solidHandle;
+            }
+            finally
+            {
+                foreach (var h in movedFaceHandles)
+                    h.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Extracts the raw DistanceAlong value from a linear placement's location.
+        /// </summary>
+        private static double? ExtractDistanceAlong(IfcAxis2PlacementLinear placement)
+        {
+            if (placement.Location is not IfcPointByDistanceExpression pointExpr)
+                return null;
+
+            var distanceAlong = pointExpr.DistanceAlong;
+            if (distanceAlong is IIfcLengthMeasure lengthMeasure)
+                return lengthMeasure.Value;
+            if (distanceAlong is Xbim.Ifc4x3.MeasureResource.IfcParameterValue parameterValue)
+                return (double)parameterValue.Value;
+            return null;
+        }
+
+        #endregion
+
+        #region Sectioned Spine
+
         public IXShape Build(IIfcSectionedSpine ifcSectionedSpine)
         {
             var crossSections = ifcSectionedSpine.CrossSections.ToList();
@@ -1830,6 +2205,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     h.Dispose();
             }
         }
- 
+
+        #endregion
+
     }
 }

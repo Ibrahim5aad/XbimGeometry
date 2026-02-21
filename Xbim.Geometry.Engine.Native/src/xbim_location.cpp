@@ -18,6 +18,7 @@
 #include <gp_Dir.hxx>
 #include <gp_Trsf.hxx>
 #include <TopLoc_Location.hxx>
+#include <BRepBuilderAPI_Transform.hxx>
 #include <Standard_Failure.hxx>
 
 #pragma region Location Helpers
@@ -477,6 +478,66 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_moved(
     {
         xbim_set_error(e.GetMessageString() ? e.GetMessageString()
                        : "xbim_shape_moved: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_moved_by_axis2(
+    XbimShapeHandle shapeHandle,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    XbimShapeHandle* outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_shape_moved_by_axis2: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+
+    *outHandle = nullptr;
+
+    if (!shapeHandle)
+    {
+        xbim_set_error("xbim_shape_moved_by_axis2: shapeHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (shapeHandle->shape.IsNull())
+    {
+        xbim_set_error("xbim_shape_moved_by_axis2: shape is null");
+        return XBIM_NULL_SHAPE;
+    }
+
+    try
+    {
+        gp_Pnt origin(originX, originY, originZ);
+        gp_Dir zDir(zDirX, zDirY, zDirZ);
+        gp_Dir xDir(xDirX, xDirY, xDirZ);
+
+        gp_Ax3 targetFrame(origin, zDir, xDir);
+        gp_Trsf trsf;
+        trsf.SetTransformation(targetFrame, gp_Ax3());
+
+        BRepBuilderAPI_Transform transformer(shapeHandle->shape, trsf, Standard_True);
+        transformer.Build();
+        TopoDS_Shape moved = transformer.Shape();
+
+        *outHandle = xbim_shape_create_from(moved);
+
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_shape_moved_by_axis2: allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_shape_moved_by_axis2: OCCT exception");
         return XBIM_ERROR;
     }
 }

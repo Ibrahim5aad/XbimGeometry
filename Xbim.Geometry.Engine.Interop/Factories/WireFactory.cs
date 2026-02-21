@@ -13,6 +13,7 @@ using Xbim.Common;
 using Xbim.Common.Geometry;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4.MeasureResource;
+using Xbim.Ifc4x3.GeometryResource;
 using Xbim.Geometry.Engine.Interop.Rules;
 using Xbim.Geometry.Exceptions;
 
@@ -471,11 +472,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 end = double.NaN;
             }
 
-            // Composite and indexed poly curves need IFC-to-arclength parameterization mapping
-            if (ifcCurve is IIfcCompositeCurve ifcCompositeDirectrix)
+            if(ifcCurve is IfcGradientCurve ifcGradient)
+            {
+                throw new NotSupportedException($"IfcGradientCurve #{ifcGradient.EntityLabel} is not supported as a directrix curve.");
+            }
+            else if (ifcCurve is IIfcCompositeCurve ifcCompositeDirectrix)
                 return BuildDirectrixCompositeCurve(ifcCompositeDirectrix, start, end);
 
-            if (ifcCurve is IIfcIndexedPolyCurve ifcIndexedDirectrix)
+            else if (ifcCurve is IIfcIndexedPolyCurve ifcIndexedDirectrix)
                 return BuildDirectrixIndexedPolyCurve(ifcIndexedDirectrix, start, end);
 
             // Unbounded curves (IIfcLine) can't be built into a wire directly.

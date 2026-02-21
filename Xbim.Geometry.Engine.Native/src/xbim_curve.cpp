@@ -6,6 +6,7 @@
 
 #include "xbim_curve.h"
 #include "xbim_curve2d.h"
+#include "xbim_shape.h"
 #include "xbim_location.h"
 #include "xbim_context.h"
 #include "xbim_error.h"
@@ -33,6 +34,8 @@
 #include <GCPnts_AbscissaPoint.hxx>
 #include <GeomConvert_CompCurveToBSplineCurve.hxx>
 #include <GeomAPI_PointsToBSpline.hxx>
+#include <GeomAPI_Interpolate.hxx>
+#include <TColgp_HArray1OfPnt.hxx>
 #include <Geom_BoundedCurve.hxx>
 #include <Geom_TrimmedCurve.hxx>
 #include <GC_MakeArcOfCircle.hxx>
@@ -42,6 +45,9 @@
 #include <Standard_Failure.hxx>
 #include <GeomLib_Tool.hxx>
 #include <Geom_OffsetCurve.hxx>
+#include <BRepBuilderAPI_MakeEdge.hxx>
+#include <BRepBuilderAPI_MakeWire.hxx>
+#include <TopoDS_Wire.hxx>
 
 #pragma region Curve Helpers
 
@@ -1177,6 +1183,32 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_get_superelevation_and_tilt(
     }
 }
 
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_dump_superelevation_segments(
+    XbimCurveHandle curveHandle,
+    char*           outBuffer,
+    int             bufferSize,
+    int*            outLength)
+{
+    xbim_clear_error();
+    if (!curveHandle || curveHandle->curve.IsNull())
+        return XBIM_INVALID_HANDLE;
+
+    Handle(Geom_SegmentedReferenceCurve) segRef =
+        Handle(Geom_SegmentedReferenceCurve)::DownCast(curveHandle->curve);
+    if (segRef.IsNull())
+        return XBIM_INVALID_ARG;
+
+    std::string info = segRef->DumpSegmentInfo();
+    if (outLength) *outLength = (int)info.size();
+    if (outBuffer && bufferSize > 0)
+    {
+        int copyLen = std::min((int)info.size(), bufferSize - 1);
+        memcpy(outBuffer, info.c_str(), copyLen);
+        outBuffer[copyLen] = '\0';
+    }
+    return XBIM_OK;
+}
+
 #pragma endregion
 
 #pragma region Composite Curve
@@ -1386,6 +1418,195 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_composite_bspline(
     {
         xbim_log_occt_failure(ctx, e, "xbim_curve_build_composite_bspline");
         xbim_set_error("xbim_curve_build_composite_bspline: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+/* ── Convert curve to B-spline wire ─────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_to_bspline_wire(
+    XbimContextHandle   ctx,
+    XbimCurveHandle     curveHandle,
+    double              startParam,
+    double              endParam,
+    int                 numPoints,
+    XbimShapeHandle*    outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve_to_bspline_wire: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!curveHandle)
+    {
+        xbim_set_error("xbim_curve_to_bspline_wire: curveHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    if (numPoints < 2)
+    {
+        xbim_set_error("xbim_curve_to_bspline_wire: numPoints must be >= 2");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        Handle(Geom_Curve) baseCurve = curveHandle->curve;
+        if (baseCurve.IsNull())
+        {
+            xbim_set_error("xbim_curve_to_bspline_wire: curve is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        Handle(Geom_Curve) wireCurve;
+
+        /* Try ConvertibleToBSpline first (GradientCurve, SegmentedReferenceCurve) */
+        Handle(Geom_ConvertibleToBSpline) convertible =
+            Handle(Geom_ConvertibleToBSpline)::DownCast(baseCurve);
+
+        if (!convertible.IsNull())
+        {
+            /* Sample points from the original curve and use interpolation
+             * (not approximation) to guarantee the B-spline passes exactly
+             * through endpoints — critical for MakePipeShell section alignment */
+            Handle(TColgp_HArray1OfPnt) pts =
+                new TColgp_HArray1OfPnt(1, numPoints);
+            double delta = (endParam - startParam) / (numPoints - 1);
+            for (int i = 1; i <= numPoints; ++i)
+            {
+                double u = (i == numPoints) ? endParam
+                         : startParam + (i - 1) * delta;
+                gp_Pnt P;
+                baseCurve->D0(u, P);
+                pts->SetValue(i, P);
+            }
+
+            GeomAPI_Interpolate interp(pts, Standard_False,
+                                       Precision::Confusion());
+            interp.Perform();
+            if (!interp.IsDone())
+            {
+                xbim_set_error(
+                    "xbim_curve_to_bspline_wire: B-spline interpolation failed");
+                return XBIM_ERROR;
+            }
+            wireCurve = interp.Curve();
+        }
+        else
+        {
+            /* Standard curve: trim to the requested range */
+            wireCurve = new Geom_TrimmedCurve(baseCurve, startParam, endParam);
+        }
+
+        if (wireCurve.IsNull())
+        {
+            xbim_set_error("xbim_curve_to_bspline_wire: failed to convert/trim curve");
+            return XBIM_ERROR;
+        }
+
+        /* Build edge -> wire from the curve */
+        BRepBuilderAPI_MakeEdge edgeMaker(wireCurve);
+        if (!edgeMaker.IsDone())
+        {
+            xbim_set_error("xbim_curve_to_bspline_wire: failed to make edge from curve");
+            return XBIM_ERROR;
+        }
+
+        BRepBuilderAPI_MakeWire wireMaker(edgeMaker.Edge());
+        if (!wireMaker.IsDone())
+        {
+            xbim_set_error("xbim_curve_to_bspline_wire: failed to make wire from edge");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_shape_create_from(static_cast<const TopoDS_Shape&>(wireMaker.Wire()));
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_curve_to_bspline_wire: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve_to_bspline_wire");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_curve_to_bspline_wire: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+/* ── Trim curve and build wire ─────────────────────────────────────────────── */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_to_trimmed_wire(
+    XbimContextHandle   ctx,
+    XbimCurveHandle     curveHandle,
+    double              startParam,
+    double              endParam,
+    XbimShapeHandle*    outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve_to_trimmed_wire: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!curveHandle)
+    {
+        xbim_set_error("xbim_curve_to_trimmed_wire: curveHandle is NULL");
+        return XBIM_INVALID_HANDLE;
+    }
+
+    try
+    {
+        Handle(Geom_Curve) baseCurve = curveHandle->curve;
+        if (baseCurve.IsNull())
+        {
+            xbim_set_error("xbim_curve_to_trimmed_wire: curve is null");
+            return XBIM_NULL_SHAPE;
+        }
+
+        Handle(Geom_Curve) trimmed =
+            new Geom_TrimmedCurve(baseCurve, startParam, endParam);
+
+        BRepBuilderAPI_MakeEdge edgeMaker(trimmed);
+        if (!edgeMaker.IsDone())
+        {
+            xbim_set_error("xbim_curve_to_trimmed_wire: failed to make edge");
+            return XBIM_ERROR;
+        }
+
+        BRepBuilderAPI_MakeWire wireMaker(edgeMaker.Edge());
+        if (!wireMaker.IsDone())
+        {
+            xbim_set_error("xbim_curve_to_trimmed_wire: failed to make wire");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_shape_create_from(
+            static_cast<const TopoDS_Shape&>(wireMaker.Wire()));
+        if (!*outHandle)
+        {
+            xbim_set_error("xbim_curve_to_trimmed_wire: memory allocation failed");
+            return XBIM_ERROR;
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve_to_trimmed_wire");
+        const char* msg = e.GetMessageString();
+        xbim_set_error(msg ? msg : "xbim_curve_to_trimmed_wire: OCCT exception");
         return XBIM_ERROR;
     }
 }

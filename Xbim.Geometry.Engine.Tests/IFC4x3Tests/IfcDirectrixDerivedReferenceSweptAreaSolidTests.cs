@@ -1,13 +1,8 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
-using Xbim.Ifc;
-using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4x3.GeometricModelResource;
-using Xbim.Ifc4x3.GeometryResource;
-using Xbim.Ifc4x3.SharedInfrastructureElements;
 using Xbim.IO.Memory;
-using Xbim.ModelGeometry.Scene;
 using Xunit;
 using ILoggerFactory = Microsoft.Extensions.Logging.ILoggerFactory;
 
@@ -19,7 +14,6 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
     {
         private readonly IXbimGeometryServicesFactory _factory;
         private readonly ILoggerFactory _loggerFactory;
-        private const double Tolerance = 1e-5;
 
 
         public IfcDirectrixDerivedReferenceSweptAreaSolidTests(IXbimGeometryServicesFactory factory, ILoggerFactory loggerFactory)
@@ -29,24 +23,64 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
         }
 
 
-
-
-        [Theory]
-        [InlineData(@"TestFiles\IFC4x3\ACCA_sleepers-linear-placement-cant-implicit.ifc", 2778)]
-        [InlineData(@"TestFiles\IFC4x3\DirectrixDerivedReferenceSweptAreaSolid-2.ifc", 119)]
-        public void CanBuildIfcDirectrixDerivedReferenceSweptAreaSolid(string ifcFile, int solidId)
+        [Fact]
+        public void Can_build_sleeper_with_cant_2778()
         {
-            // Arrange
-            using var model = MemoryModel.OpenRead(ifcFile);
-            var solid = model.Instances[solidId] as IfcDirectrixDerivedReferenceSweptAreaSolid;
+            // ACCA sleeper with cant/superelevation — directrix spans ~50m along X
+            using var model = MemoryModel.OpenRead(
+                @"TestFiles\IFC4x3\ACCA_sleepers-linear-placement-cant-implicit.ifc");
+            var solid = model.Instances[2778] as IfcDirectrixDerivedReferenceSweptAreaSolid;
             var modelSvc = _factory.CreateModelGeometryService(model, _loggerFactory);
 
-            // Act
-            var xSolid = modelSvc.SolidFactory.Build(solid);
+            var xShape = modelSvc.SolidFactory.Build(solid);
 
-            // Assert
-            xSolid.Should().NotBeNull();
+            xShape.Should().NotBeNull();
+            var xSolid = xShape.Should().BeAssignableTo<IXSolid>().Subject;
+            xSolid.IsValidShape().Should().BeTrue();
+            xSolid.Shells.Should().HaveCount(1);
+            xSolid.Shells[0].Faces.Length.Should().BeGreaterThanOrEqualTo(3);
+
+            // Volume ~0.388 m³ (small railway sleeper cross-section swept over 50m)
+            xSolid.Volume.Should().BeApproximately(0.388, 0.05);
+
+            var bb = xSolid.Bounds();
+            bb.IsVoid.Should().BeFalse();
+            // Directrix runs along X from ~400 to ~450
+            bb.LenX.Should().BeApproximately(50.0, 1.0);
+            // Cross-section is narrow in Y and Z
+            bb.LenY.Should().BeApproximately(0.37, 0.1);
+            bb.LenZ.Should().BeApproximately(0.24, 0.1);
         }
+
+        [Fact]
+        public void Can_build_directrix_derived_solid_119()
+        {
+            // DirectrixDerived solid — directrix spans ~100m, 3m×3m cross-section
+            using var model = MemoryModel.OpenRead(
+                @"TestFiles\IFC4x3\DirectrixDerivedReferenceSweptAreaSolid-2.ifc");
+            var solid = model.Instances[119] as IfcDirectrixDerivedReferenceSweptAreaSolid;
+            var modelSvc = _factory.CreateModelGeometryService(model, _loggerFactory);
+
+            var xShape = modelSvc.SolidFactory.Build(solid);
+
+            xShape.Should().NotBeNull();
+            var xSolid = xShape.Should().BeAssignableTo<IXSolid>().Subject;
+            xSolid.IsValidShape().Should().BeTrue();
+            xSolid.Shells.Should().HaveCount(1);
+            xSolid.Shells[0].Faces.Length.Should().BeGreaterThanOrEqualTo(3);
+
+            // Volume ~900 m³ (3m×3m cross-section swept over 100m)
+            xSolid.Volume.Should().BeApproximately(900.0, 5.0);
+
+            var bb = xSolid.Bounds();
+            bb.IsVoid.Should().BeFalse();
+            // Directrix runs ~100m along X
+            bb.LenX.Should().BeApproximately(100.0, 1.0);
+            // Cross-section bounds (because of the cant tilt) spans ~5.6m in Y and ~8.6m in Z
+            bb.LenY.Should().BeApproximately(5.6, 0.5);
+            bb.LenZ.Should().BeApproximately(8.6, 0.5);
+        }
+
     }
 
 }

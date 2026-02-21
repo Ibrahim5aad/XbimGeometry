@@ -440,6 +440,27 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_moved(
     XbimShapeHandle*    outHandle);
 
 /*
+ * Move a shape to a position defined by an axis-2 placement (origin + Z + X
+ * directions), producing a new shape. Combines location creation and shape
+ * move into a single call.
+ *
+ *   shapeHandle             – source shape
+ *   originX/Y/Z             – placement origin
+ *   zDirX/Y/Z               – Z (normal) direction
+ *   xDirX/Y/Z               – X (reference) direction
+ *   outHandle               – receives the new positioned shape handle
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_HANDLE if shapeHandle is NULL;
+ * XBIM_NULL_SHAPE if the source shape is null.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_moved_by_axis2(
+    XbimShapeHandle shapeHandle,
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ,
+    XbimShapeHandle* outHandle);
+
+/*
  * Apply a general affine transformation (gp_GTrsf) to a shape, producing a
  * new transformed shape. Supports non-uniform scaling via ScaleX/Y/Z.
  *
@@ -753,6 +774,29 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_fixed_reference_swept(
 XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_sectioned_spine(
     XbimContextHandle        ctx,
     XbimShapeHandle          spineHandle,
+    const XbimShapeHandle*   sectionHandles,
+    int                      numSections,
+    double                   precision,
+    XbimShapeHandle*         outHandle);
+
+/*
+ * Build a solid by lofting through a series of pre-positioned cross-section
+ * faces using BRepOffsetAPI_ThruSections. No spine wire is required — the
+ * shape is interpolated directly between the sections.
+ *
+ * Each face's outer wire defines the outer shell; inner wires (voids) are
+ * lofted separately and boolean-cut from the outer body.
+ *
+ *   ctx              – a valid context handle (used for logging; may be NULL)
+ *   sectionHandles   – array of shape handles, each containing a positioned TopoDS_Face
+ *   numSections      – number of elements in sectionHandles (must be >= 2)
+ *   precision        – model precision tolerance (> 0)
+ *   outHandle        – receives the new solid shape handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_thru_sections(
+    XbimContextHandle        ctx,
     const XbimShapeHandle*   sectionHandles,
     int                      numSections,
     double                   precision,
@@ -3935,6 +3979,48 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_get_superelevation_and_tilt(
     double          parameter,
     double*         outSuperElevation,
     double*         outCantTilt);
+
+/*
+ * Dump superelevation segment info from a SegmentedReferenceCurve.
+ * Writes a human-readable string into outBuffer (up to bufferSize-1 chars).
+ * outLength receives the actual string length.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_dump_superelevation_segments(
+    XbimCurveHandle curveHandle,
+    char*           outBuffer,
+    int             bufferSize,
+    int*            outLength);
+
+/*
+ * Convert a curve to a B-spline wire (edge -> wire).
+ * For custom curves (GradientCurve, SegmentedReferenceCurve), approximates
+ * via ToBSpline().  For standard curves, trims to the requested range.
+ *
+ *   ctx         - context handle (used for logging)
+ *   curveHandle - source 3D curve
+ *   startParam  - curve parameter for start of wire
+ *   endParam    - curve parameter for end of wire
+ *   numPoints   - approximation point count (for ConvertibleToBSpline curves)
+ *   outHandle   - receives the resulting wire shape
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_to_bspline_wire(
+    XbimContextHandle   ctx,
+    XbimCurveHandle     curveHandle,
+    double              startParam,
+    double              endParam,
+    int                 numPoints,
+    XbimShapeHandle*    outHandle);
+
+/*
+ * Trim a curve to [startParam, endParam] and build a wire.
+ * Uses Geom_TrimmedCurve — preserves exact curve geometry.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_to_trimmed_wire(
+    XbimContextHandle   ctx,
+    XbimCurveHandle     curveHandle,
+    double              startParam,
+    double              endParam,
+    XbimShapeHandle*    outHandle);
 
 #pragma endregion
 
