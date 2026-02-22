@@ -372,11 +372,8 @@ namespace Xbim.Geometry.Engine.Tests
             }
         }
 
-#if DEBUG
-        [Fact(Skip = "This takes nearly a minute and rarely fails, skipping in debug only to improve test performance")]
-#else
+
 [Fact]
-#endif
         public void CompoundBooleanUnionTest()
         {
             using (var er = new EntityRepository<IIfcBooleanResult>(nameof(CompoundBooleanUnionTest)))
