@@ -273,10 +273,20 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         public object Tag { get; set; }
 
         public IXbimGeometryObject Transform(XbimMatrix3D matrix3D)
-            => throw new NotSupportedException("Solid set transform not supported.");
+        {
+            var transformed = _solids
+                .Select(s => (IXbimSolid)((XbimShape)s).Transform(matrix3D))
+                .ToArray();
+            return new XbimSolidSet(transformed);
+        }
 
         public IXbimGeometryObject TransformShallow(XbimMatrix3D matrix3D)
-            => throw new NotSupportedException("Solid set transform not supported.");
+        {
+            var transformed = _solids
+                .Select(s => (IXbimSolid)((XbimShape)s).TransformShallow(matrix3D))
+                .ToArray();
+            return new XbimSolidSet(transformed);
+        }
 
         public void Dispose() { }
 

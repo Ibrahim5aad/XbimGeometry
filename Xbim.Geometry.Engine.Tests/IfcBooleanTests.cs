@@ -373,7 +373,7 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
 
-[Fact]
+        [Fact]
         public void CompoundBooleanUnionTest()
         {
             using (var er = new EntityRepository<IIfcBooleanResult>(nameof(CompoundBooleanUnionTest)))

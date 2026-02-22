@@ -51,6 +51,7 @@
 #include <BRepTools_WireExplorer.hxx>
 #include <ShapeFix_ShapeTolerance.hxx>
 #include <ShapeAnalysis_Wire.hxx>
+#include <GeomLib_IsPlanarSurface.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
 #include <TopExp.hxx>
 #include <vector>
@@ -1159,6 +1160,39 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_tolerance(
     catch (const Standard_Failure&)
     {
         xbim_set_error("xbim_face_tolerance: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_is_planar(
+    XbimShapeHandle faceHandle,
+    int*            outIsPlanar)
+{
+    xbim_clear_error();
+    if (!outIsPlanar) { xbim_set_error("xbim_face_is_planar: outIsPlanar is NULL"); return XBIM_INVALID_ARG; }
+    *outIsPlanar = 0;
+    if (!faceHandle) { xbim_set_error("xbim_face_is_planar: faceHandle is NULL"); return XBIM_INVALID_HANDLE; }
+
+    try
+    {
+        const TopoDS_Shape& shape = faceHandle->shape;
+        if (shape.IsNull() || shape.ShapeType() != TopAbs_FACE)
+        {
+            xbim_set_error("xbim_face_is_planar: handle is not a face");
+            return XBIM_INVALID_ARG;
+        }
+
+        const TopoDS_Face& face = TopoDS::Face(shape);
+        Handle(Geom_Surface) surf = BRep_Tool::Surface(face);
+        Standard_Real tol = BRep_Tool::Tolerance(face);
+        GeomLib_IsPlanarSurface ps(surf, tol);
+        *outIsPlanar = ps.IsPlanar() ? 1 : 0;
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure&)
+    {
+        xbim_set_error("xbim_face_is_planar: OCCT exception");
         return XBIM_ERROR;
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.Logging;
 using Xbim.Common.Geometry;
 
@@ -45,10 +46,18 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         public object Tag { get; set; }
 
         public IXbimGeometryObject Transform(XbimMatrix3D matrix3D)
-            => throw new NotSupportedException("Shell set transform not supported.");
+        {
+            var transformed = _shells
+                .Select(s => (IXbimShell)s.Transform(matrix3D)).ToArray();
+            return new XbimShellSet(transformed);
+        }
 
         public IXbimGeometryObject TransformShallow(XbimMatrix3D matrix3D)
-            => throw new NotSupportedException("Shell set transform not supported.");
+        {
+            var transformed = _shells
+                .Select(s => (IXbimShell)((XbimShape)s).TransformShallow(matrix3D)).ToArray();
+            return new XbimShellSet(transformed);
+        }
 
         public void Add(IXbimGeometryObject shape)
             => throw new NotSupportedException("Shell set modification not supported.");

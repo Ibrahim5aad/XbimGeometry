@@ -2026,6 +2026,19 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_tolerance(
     double*         outTolerance);
 
 /*
+ * Test whether a face lies on a planar surface.
+ * Uses GeomLib_IsPlanarSurface with the face's own tolerance.
+ *
+ *   faceHandle   – a valid shape handle containing a TopoDS_Face
+ *   outIsPlanar  – receives 1 if planar, 0 if not
+ *
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if not a face.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_face_is_planar(
+    XbimShapeHandle faceHandle,
+    int*            outIsPlanar);
+
+/*
  * Extract the underlying Geom_Surface from a face.
  * Returns both a surface handle and an integer surface type code
  * matching the Xbim.Geometry.Abstractions.XSurfaceType enum.

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Xbim.Common.Geometry;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes
@@ -42,10 +43,18 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         public object Tag { get; set; }
 
         public IXbimGeometryObject Transform(XbimMatrix3D matrix3D)
-            => throw new NotSupportedException("Wire set transform not supported.");
+        {
+            var transformed = _wires
+                .Select(w => (IXbimWire)w.Transform(matrix3D)).ToArray();
+            return new XbimWireSet(transformed);
+        }
 
         public IXbimGeometryObject TransformShallow(XbimMatrix3D matrix3D)
-            => throw new NotSupportedException("Wire set transform not supported.");
+        {
+            var transformed = _wires
+                .Select(w => (IXbimWire)((XbimShape)w).TransformShallow(matrix3D)).ToArray();
+            return new XbimWireSet(transformed);
+        }
 
         public IEnumerator<IXbimWire> GetEnumerator() => ((IEnumerable<IXbimWire>)_wires).GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => _wires.GetEnumerator();

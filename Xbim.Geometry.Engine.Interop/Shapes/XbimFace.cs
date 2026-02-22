@@ -180,7 +180,14 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             }
         }
 
-        public bool IsPlanar => false;
+        public bool IsPlanar
+        {
+            get
+            {
+                int result = XbimGeometryNativeApi.xbim_face_is_planar(Handle, out int isPlanar);
+                return result == 0 && isPlanar != 0;
+            }
+        }
 
         XbimPoint3D IXbimFace.Location
         {

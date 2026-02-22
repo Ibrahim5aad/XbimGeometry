@@ -18,7 +18,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         {
         }
 
-        private IXShape[] GetDirectChildren()
+        internal IXShape[] GetDirectChildren()
         {
             if (_children != null)
                 return _children;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Xbim.Common.Geometry;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes
@@ -42,10 +43,18 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         public object Tag { get; set; }
 
         public IXbimGeometryObject Transform(XbimMatrix3D matrix3D)
-            => throw new NotSupportedException("Face set transform not supported.");
+        {
+            var transformed = _faces
+                .Select(f => (IXbimFace)f.Transform(matrix3D)).ToArray();
+            return new XbimFaceSet(transformed);
+        }
 
         public IXbimGeometryObject TransformShallow(XbimMatrix3D matrix3D)
-            => throw new NotSupportedException("Face set transform not supported.");
+        {
+            var transformed = _faces
+                .Select(f => (IXbimFace)((XbimShape)f).TransformShallow(matrix3D)).ToArray();
+            return new XbimFaceSet(transformed);
+        }
 
         public IEnumerator<IXbimFace> GetEnumerator() => ((IEnumerable<IXbimFace>)_faces).GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => _faces.GetEnumerator();

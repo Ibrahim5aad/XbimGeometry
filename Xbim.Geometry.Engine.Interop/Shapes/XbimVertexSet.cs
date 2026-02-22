@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Xbim.Common.Geometry;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes
@@ -42,10 +43,18 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         public object Tag { get; set; }
 
         public IXbimGeometryObject Transform(XbimMatrix3D matrix3D)
-            => throw new NotSupportedException("Vertex set transform not supported.");
+        {
+            var transformed = _vertices
+                .Select(v => (IXbimVertex)v.Transform(matrix3D)).ToArray();
+            return new XbimVertexSet(transformed);
+        }
 
         public IXbimGeometryObject TransformShallow(XbimMatrix3D matrix3D)
-            => throw new NotSupportedException("Vertex set transform not supported.");
+        {
+            var transformed = _vertices
+                .Select(v => (IXbimVertex)((XbimShape)v).TransformShallow(matrix3D)).ToArray();
+            return new XbimVertexSet(transformed);
+        }
 
         public IEnumerator<IXbimVertex> GetEnumerator() => ((IEnumerable<IXbimVertex>)_vertices).GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => _vertices.GetEnumerator();

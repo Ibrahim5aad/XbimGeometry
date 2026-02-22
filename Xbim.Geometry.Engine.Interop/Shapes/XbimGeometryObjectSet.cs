@@ -2,8 +2,12 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Xbim.Common.Geometry;
+using Xbim.Geometry.Engine.Interop.Handles;
+using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Interop.Shapes
 {
@@ -108,28 +112,116 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         public object Tag { get; set; }
 
         public IXbimGeometryObject Transform(XbimMatrix3D matrix3D)
-            => throw new NotSupportedException("Geometry object set transform not supported.");
+        {
+            var transformed = _items.Select(i => i.Transform(matrix3D)).ToList();
+            return new XbimGeometryObjectSet(transformed);
+        }
 
         public IXbimGeometryObject TransformShallow(XbimMatrix3D matrix3D)
-            => throw new NotSupportedException("Geometry object set transform not supported.");
+        {
+            var transformed = _items.Select(i => i.TransformShallow(matrix3D)).ToList();
+            return new XbimGeometryObjectSet(transformed);
+        }
 
         public IXbimGeometryObjectSet Cut(IXbimSolidSet toCut, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use BooleanFactory for boolean operations.");
+            => PerformBoolean(XbimGeometryNativeApi.xbim_boolean_cut_multi, toCut, tolerance);
 
         public IXbimGeometryObjectSet Cut(IXbimSolid toCut, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use BooleanFactory for boolean operations.");
+            => PerformBoolean(XbimGeometryNativeApi.xbim_boolean_cut_multi,
+                new[] { toCut }, tolerance);
 
         public IXbimGeometryObjectSet Union(IXbimSolidSet toUnion, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use BooleanFactory for boolean operations.");
+            => PerformBoolean(XbimGeometryNativeApi.xbim_boolean_union_multi, toUnion, tolerance);
 
         public IXbimGeometryObjectSet Union(IXbimSolid toUnion, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use BooleanFactory for boolean operations.");
+            => PerformBoolean(XbimGeometryNativeApi.xbim_boolean_union_multi,
+                new[] { toUnion }, tolerance);
 
         public IXbimGeometryObjectSet Intersection(IXbimSolidSet toIntersect, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use BooleanFactory for boolean operations.");
+            => PerformBoolean(XbimGeometryNativeApi.xbim_boolean_intersect_multi,
+                toIntersect, tolerance);
 
         public IXbimGeometryObjectSet Intersection(IXbimSolid toIntersect, double tolerance, ILogger logger = null)
-            => throw new NotSupportedException("Use BooleanFactory for boolean operations.");
+            => PerformBoolean(XbimGeometryNativeApi.xbim_boolean_intersect_multi,
+                new[] { toIntersect }, tolerance);
+
+        private delegate int MultiBooleanOp(
+            NativeContextHandle ctx,
+            IntPtr[] bodyHandles, int bodyCount,
+            IntPtr[] toolHandles, int toolCount,
+            double fuzzyTolerance,
+            out int outHasWarnings,
+            out NativeShapeHandle outHandle);
+
+        private XbimGeometryObjectSet PerformBoolean(
+            MultiBooleanOp op, IEnumerable<IXbimGeometryObject> tools, double tolerance)
+        {
+            var bodyHandleList = new List<SafeHandle>();
+            foreach (var item in _items)
+                CollectHandles(item, bodyHandleList);
+
+            var toolHandleList = new List<SafeHandle>();
+            foreach (var tool in tools)
+                CollectHandles(tool, toolHandleList);
+
+            if (bodyHandleList.Count == 0)
+                return new XbimGeometryObjectSet();
+
+            using var bodies = new NativeHandleArray(bodyHandleList.ToArray());
+            using var toolsArr = new NativeHandleArray(toolHandleList.ToArray());
+
+            int result = op(
+                NativeContextHandle.NullHandle,
+                bodies.Ptrs, bodies.Length,
+                toolsArr.Ptrs, toolsArr.Length,
+                tolerance,
+                out _, out var outHandle);
+
+            if (result != 0)
+                throw new XbimGeometryServiceException(
+                    $"Boolean operation failed: {XbimGeometryNativeApi.GetLastError()}");
+
+            return DecomposeResult(outHandle);
+        }
+
+        private static void CollectHandles(IXbimGeometryObject obj, List<SafeHandle> handles)
+        {
+            if (obj is XbimShape shape)
+            {
+                handles.Add(shape.Handle);
+            }
+            else if (obj is IXbimSolidSet solidSet)
+            {
+                foreach (var solid in solidSet)
+                    CollectHandles(solid, handles);
+            }
+            else if (obj is IEnumerable<IXbimGeometryObject> set)
+            {
+                foreach (var item in set)
+                    CollectHandles(item, handles);
+            }
+        }
+
+        private static XbimGeometryObjectSet DecomposeResult(NativeShapeHandle handle)
+        {
+            var shape = NativeShapeWrapper.WrapShape(handle);
+            var resultSet = new XbimGeometryObjectSet();
+
+            if (shape is XbimCompound compound)
+            {
+                foreach (var child in compound.GetDirectChildren())
+                {
+                    if (child is IXbimGeometryObject geo)
+                        resultSet.Add(geo);
+                }
+            }
+            else if (shape is IXbimGeometryObject singleShape)
+            {
+                resultSet.Add(singleShape);
+            }
+
+            return resultSet;
+        }
 
         public IEnumerator<IXbimGeometryObject> GetEnumerator() => _items.GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
