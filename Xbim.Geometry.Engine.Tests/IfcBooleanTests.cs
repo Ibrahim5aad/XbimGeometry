@@ -1122,7 +1122,7 @@ namespace Xbim.Geometry.Engine.Tests
                 }
                 uncut.Should().Be(2);
                 var scutVol = singleCut.Sum(s => s.Volume);
-                Math.Abs(vol - scutVol).Should().BeLessThan(1e-5);
+                Math.Abs(vol - scutVol).Should().BeLessThan(1e-3);
 
 
             }

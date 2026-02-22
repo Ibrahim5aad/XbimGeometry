@@ -88,10 +88,76 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         }
 
         public bool Sew()
-            => throw new NotSupportedException("Sewing not yet supported.");
+        {
+            if (_items.Count == 0) return false;
+
+            var handleList = new List<SafeHandle>();
+            foreach (var item in _items)
+                CollectHandles(item, handleList);
+            if (handleList.Count == 0) return false;
+
+            using var handles = new NativeHandleArray(handleList.ToArray());
+            int result = XbimGeometryNativeApi.xbim_compound_sew(
+                NativeContextHandle.NullHandle,
+                handles.Ptrs, handles.Length,
+                1e-6,
+                out var outHandle);
+
+            if (result != 0) return false;
+
+            _items.Clear();
+            var shape = NativeShapeWrapper.WrapShape(outHandle);
+            if (shape is XbimCompound compound)
+            {
+                foreach (var child in compound.GetDirectChildren())
+                {
+                    if (child is IXbimGeometryObject geo)
+                        _items.Add(geo);
+                }
+            }
+            else if (shape is IXbimGeometryObject singleShape)
+            {
+                _items.Add(singleShape);
+            }
+            return true;
+        }
 
         public string ToBRep
-            => throw new NotSupportedException("BRep serialization of geometry object sets not yet supported.");
+        {
+            get
+            {
+                if (_items.Count == 0) return string.Empty;
+
+                var handleList = new List<SafeHandle>();
+                foreach (var item in _items)
+                    CollectHandles(item, handleList);
+                if (handleList.Count == 0) return string.Empty;
+
+                if (handleList.Count == 1 && _items[0] is XbimShape xs)
+                    return xs.BrepString();
+
+                using var handles = new NativeHandleArray(handleList.ToArray());
+                int result = XbimGeometryNativeApi.xbim_compound_make(
+                    NativeContextHandle.NullHandle,
+                    handles.Ptrs, handles.Length,
+                    out var compoundHandle);
+
+                if (result != 0)
+                    throw new XbimGeometryServiceException(
+                        $"Failed to create compound: {XbimGeometryNativeApi.GetLastError()}");
+
+                using (compoundHandle)
+                {
+                    result = XbimGeometryNativeApi.xbim_shape_to_brep_string(
+                        compoundHandle, out IntPtr strPtr, out int strLen);
+                    if (result != 0 || strPtr == IntPtr.Zero)
+                        throw new XbimGeometryServiceException(
+                            $"Failed to serialize to BRep: {XbimGeometryNativeApi.GetLastError()}");
+                    try { return Marshal.PtrToStringAnsi(strPtr, strLen)!; }
+                    finally { XbimGeometryNativeApi.xbim_string_free(strPtr); }
+                }
+            }
+        }
 
         public XbimGeometryObjectType GeometryType => XbimGeometryObjectType.XbimGeometryObjectSetType;
         public bool IsValid => _items.Count > 0;

@@ -127,11 +127,13 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         public void SaveAsBrep(string fileName)
         {
-            if (_solids.Count == 1)
-                _solids[0].SaveAsBrep(fileName);
-            else
-                throw new NotSupportedException(
-                    "BRep serialization of multi-solid sets is not supported.");
+            if (_solids.Count == 0) return;
+            if (_solids.Count == 1) { _solids[0].SaveAsBrep(fileName); return; }
+            using var compound = MakeCompound();
+            int result = XbimGeometryNativeApi.xbim_shape_write_brep(compound, fileName);
+            if (result != 0)
+                throw new XbimGeometryServiceException(
+                    $"Failed to write BRep file: {XbimGeometryNativeApi.GetLastError()}");
         }
 
         public string ToBRep
@@ -140,8 +142,8 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             {
                 if (_solids.Count == 0) return string.Empty;
                 if (_solids.Count == 1) return _solids[0].ToBRep;
-                throw new NotSupportedException(
-                    "BRep serialization of multi-solid sets is not supported.");
+                using var compound = MakeCompound();
+                return BrepStringFromHandle(compound);
             }
         }
 
@@ -212,24 +214,33 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         public string BrepString()
         {
-            if (_solids.Count == 1)
-                return ((XbimShape)_solids[0]).BrepString();
-            throw new NotSupportedException(
-                "BRep serialization of multi-solid sets is not supported.");
+            if (_solids.Count == 0) return string.Empty;
+            if (_solids.Count == 1) return ((XbimShape)_solids[0]).BrepString();
+            using var compound = MakeCompound();
+            return BrepStringFromHandle(compound);
         }
 
         public void WriteBrep(string filePath)
         {
-            if (_solids.Count == 1)
-                ((XbimShape)_solids[0]).WriteBrep(filePath);
-            else
-                throw new NotSupportedException(
-                    "BRep serialization of multi-solid sets is not supported.");
+            if (_solids.Count == 0) return;
+            if (_solids.Count == 1) { ((XbimShape)_solids[0]).WriteBrep(filePath); return; }
+            using var compound = MakeCompound();
+            int result = XbimGeometryNativeApi.xbim_shape_write_brep(compound, filePath);
+            if (result != 0)
+                throw new XbimGeometryServiceException(
+                    $"Failed to write BRep file '{filePath}': {XbimGeometryNativeApi.GetLastError()}");
         }
 
         public void WriteStl(string filePath)
-            => throw new NotSupportedException(
-                "STL export is not available on a managed solid set.");
+        {
+            if (_solids.Count == 0) return;
+            if (_solids.Count == 1) { ((XbimShape)_solids[0]).WriteStl(filePath); return; }
+            using var compound = MakeCompound();
+            int result = XbimGeometryNativeApi.xbim_shape_write_stl(compound, filePath, 0.1);
+            if (result != 0)
+                throw new XbimGeometryServiceException(
+                    $"Failed to write STL file '{filePath}': {XbimGeometryNativeApi.GetLastError()}");
+        }
 
         public bool IsValidShape()
             => _solids.Count > 0
@@ -238,8 +249,15 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         public bool IsEmptyShape() => _solids.Count == 0;
 
         public bool Triangulate(IXMeshFactors meshFactors)
-            => throw new NotSupportedException(
-                "Triangulation is not available on a managed solid set.");
+        {
+            bool allOk = true;
+            foreach (var solid in _solids)
+            {
+                if (solid is XbimShape xs)
+                    allOk &= xs.Triangulate(meshFactors);
+            }
+            return allOk;
+        }
 
         public IEnumerable<IXFace> AllFaces()
             => _solids.OfType<XbimShape>().SelectMany(s => s.AllFaces());
@@ -293,6 +311,32 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
         #endregion
 
         #region Helpers
+
+        private NativeShapeHandle MakeCompound()
+        {
+            var handleArr = _solids.Cast<XbimShape>()
+                .Select(s => (SafeHandle)s.Handle).ToArray();
+            using var handles = new NativeHandleArray(handleArr);
+            int result = XbimGeometryNativeApi.xbim_compound_make(
+                NativeContextHandle.NullHandle,
+                handles.Ptrs, handles.Length,
+                out var outHandle);
+            if (result != 0)
+                throw new XbimGeometryServiceException(
+                    $"Failed to create compound: {XbimGeometryNativeApi.GetLastError()}");
+            return outHandle;
+        }
+
+        private static string BrepStringFromHandle(NativeShapeHandle handle)
+        {
+            int result = XbimGeometryNativeApi.xbim_shape_to_brep_string(
+                handle, out IntPtr strPtr, out int strLen);
+            if (result != 0 || strPtr == IntPtr.Zero)
+                throw new XbimGeometryServiceException(
+                    $"Failed to serialize to BRep: {XbimGeometryNativeApi.GetLastError()}");
+            try { return Marshal.PtrToStringAnsi(strPtr, strLen)!; }
+            finally { XbimGeometryNativeApi.xbim_string_free(strPtr); }
+        }
 
         private delegate int MultiBooleanOp(
             NativeContextHandle ctx,
