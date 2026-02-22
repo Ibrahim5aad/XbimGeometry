@@ -1029,6 +1029,11 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out double outTolerance);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_face_is_planar(
+            NativeShapeHandle faceHandle,
+            out int outIsPlanar);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_face_get_surface(
             NativeShapeHandle faceHandle,
             out NativeSurfaceHandle outSurface,
