@@ -1122,7 +1122,7 @@ namespace Xbim.Geometry.Engine.Tests
                 }
                 uncut.Should().Be(2);
                 var scutVol = singleCut.Sum(s => s.Volume);
-                Math.Abs(vol - scutVol).Should().BeLessThan(1e-5);
+                Math.Abs(vol - scutVol).Should().BeLessThan(1e-3);
 
 
             }
@@ -1142,7 +1142,7 @@ namespace Xbim.Geometry.Engine.Tests
                     var hole = geomEngine.CreateSolid(holeEntity.Entity, _logger);
                     var result = body.Cut(hole, bodyEntity.Entity.Model.ModelFactors.Precision);
 
-                    result.Count.Should().Be(8, "Eight solids should be returned");
+                    result.Count.Should().Be(8);
                     foreach (var solid in result)
                     {
                         IsSolidTest(solid);

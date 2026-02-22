@@ -310,22 +310,162 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_make_solid(
             return XBIM_INVALID_ARG;
         }
 
-        BRepBuilderAPI_MakeSolid solidMaker(shell);
-        if (!solidMaker.IsDone())
+        ShapeFix_Solid sfs;
+        double tol = Precision::Confusion();
+        sfs.SetPrecision(tol);
+        sfs.SetMinTolerance(tol);
+        sfs.SetMaxTolerance(tol * 10);
+
+        /* Check if shell topology is valid */
+        BRepCheck_Analyzer topologyChecker(shell, false, false, false);
+        if (topologyChecker.IsValid())
         {
-            xbim_set_error("xbim_shell_make_solid: could not create solid from shell");
-            xbim_log_warning(ctx, "Failed to convert shell to solid");
-            return XBIM_NULL_SHAPE;
+            /* Valid shell — simple upgrade */
+            TopoDS_Solid solid = sfs.SolidFromShell(shell);
+            if (!solid.IsNull())
+            {
+                BRepClass3d_SolidClassifier class3d(solid);
+                class3d.PerformInfinitePoint(Precision::Confusion());
+                if (class3d.State() == TopAbs_IN)
+                    solid.Reverse();
+                *outHandle = xbim_shape_create_from(solid);
+            }
+            else
+            {
+                /* Fallback to BRepBuilderAPI_MakeSolid */
+                BRepBuilderAPI_MakeSolid solidMaker(shell);
+                if (!solidMaker.IsDone())
+                {
+                    xbim_set_error("xbim_shell_make_solid: could not create solid from shell");
+                    return XBIM_NULL_SHAPE;
+                }
+                TopoDS_Solid fallback = solidMaker.Solid();
+                BRepClass3d_SolidClassifier class3d(fallback);
+                class3d.PerformInfinitePoint(Precision::Confusion());
+                if (class3d.State() == TopAbs_IN)
+                    fallback.Reverse();
+                *outHandle = xbim_shape_create_from(fallback);
+            }
+        }
+        else
+        {
+            /* Invalid topology — may contain disjoint regions.
+               Use ShapeFix_Shape to split and upgrade each piece. */
+            ShapeFix_Shape shapeFixer(shell);
+            if (shapeFixer.Perform())
+            {
+                TopoDS_Shape fixResult = shapeFixer.Shape();
+                if (!fixResult.IsNull() && fixResult.ShapeType() == TopAbs_SHELL)
+                {
+                    /* Single shell result — upgrade directly */
+                    TopoDS_Solid solid = sfs.SolidFromShell(TopoDS::Shell(fixResult));
+                    if (!solid.IsNull())
+                    {
+                        BRepClass3d_SolidClassifier class3d(solid);
+                        class3d.PerformInfinitePoint(Precision::Confusion());
+                        if (class3d.State() == TopAbs_IN)
+                            solid.Reverse();
+                        *outHandle = xbim_shape_create_from(solid);
+                    }
+                    else
+                    {
+                        xbim_set_error("xbim_shell_make_solid: SolidFromShell failed on fixed shell");
+                        return XBIM_NULL_SHAPE;
+                    }
+                }
+                else
+                {
+                    /* Compound or other — iterate sub-shells and make solids */
+                    BRep_Builder b;
+                    TopoDS_Compound solidCompound;
+                    b.MakeCompound(solidCompound);
+                    int solidCount = 0;
+
+                    for (TopoDS_Iterator it(fixResult); it.More(); it.Next())
+                    {
+                        if (it.Value().ShapeType() == TopAbs_SHELL)
+                        {
+                            const TopoDS_Shell& subShell = TopoDS::Shell(it.Value());
+                            if (subShell.NbChildren() >= 4)
+                            {
+                                TopoDS_Solid subSolid = sfs.SolidFromShell(subShell);
+                                if (!subSolid.IsNull())
+                                {
+                                    BRepClass3d_SolidClassifier class3d(subSolid);
+                                    class3d.PerformInfinitePoint(Precision::Confusion());
+                                    if (class3d.State() == TopAbs_IN)
+                                        subSolid.Reverse();
+                                    b.Add(solidCompound, subSolid);
+                                    solidCount++;
+                                }
+                            }
+                        }
+                        else if (it.Value().ShapeType() == TopAbs_SOLID)
+                        {
+                            b.Add(solidCompound, it.Value());
+                            solidCount++;
+                        }
+                    }
+
+                    if (solidCount == 1)
+                    {
+                        TopoDS_Iterator single(solidCompound);
+                        *outHandle = xbim_shape_create_from(single.Value());
+                    }
+                    else if (solidCount > 1)
+                    {
+                        *outHandle = xbim_shape_create_from(solidCompound);
+                    }
+                    else
+                    {
+                        /* No solids from splitting — try simple upgrade as fallback */
+                        TopoDS_Solid solid = sfs.SolidFromShell(shell);
+                        if (!solid.IsNull())
+                        {
+                            BRepClass3d_SolidClassifier class3d(solid);
+                            class3d.PerformInfinitePoint(Precision::Confusion());
+                            if (class3d.State() == TopAbs_IN)
+                                solid.Reverse();
+                            *outHandle = xbim_shape_create_from(solid);
+                        }
+                        else
+                        {
+                            xbim_set_error("xbim_shell_make_solid: cannot create solid from shell");
+                            return XBIM_NULL_SHAPE;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                /* ShapeFix_Shape didn't fix — try simple upgrade */
+                TopoDS_Solid solid = sfs.SolidFromShell(shell);
+                if (!solid.IsNull())
+                {
+                    BRepClass3d_SolidClassifier class3d(solid);
+                    class3d.PerformInfinitePoint(Precision::Confusion());
+                    if (class3d.State() == TopAbs_IN)
+                        solid.Reverse();
+                    *outHandle = xbim_shape_create_from(solid);
+                }
+                else
+                {
+                    BRepBuilderAPI_MakeSolid solidMaker(shell);
+                    if (!solidMaker.IsDone())
+                    {
+                        xbim_set_error("xbim_shell_make_solid: could not create solid from shell");
+                        return XBIM_NULL_SHAPE;
+                    }
+                    TopoDS_Solid fallback = solidMaker.Solid();
+                    BRepClass3d_SolidClassifier class3d(fallback);
+                    class3d.PerformInfinitePoint(Precision::Confusion());
+                    if (class3d.State() == TopAbs_IN)
+                        fallback.Reverse();
+                    *outHandle = xbim_shape_create_from(fallback);
+                }
+            }
         }
 
-        TopoDS_Solid solid = solidMaker.Solid();
-        if (solid.IsNull())
-        {
-            xbim_set_error("xbim_shell_make_solid: resulting solid is null");
-            return XBIM_NULL_SHAPE;
-        }
-
-        *outHandle = xbim_shape_create_from(solid);
         if (!*outHandle)
         {
             xbim_set_error("xbim_shell_make_solid: memory allocation failed");

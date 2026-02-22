@@ -188,7 +188,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         public virtual XbimGeometryObjectType GeometryType => MapShapeType(ShapeType);
 
-        public bool IsValid => IsValidShape();
+        public bool IsValid => Handle != null && !Handle.IsInvalid && !Handle.IsClosed;
 
         public virtual bool IsSet => false;
 

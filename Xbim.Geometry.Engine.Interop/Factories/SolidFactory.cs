@@ -1126,9 +1126,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             {
                 foreach (var faceSet in ifcSurfaceModel.FbsmFaces)
                 {
-                    var shellHandle = BuildShellFromConnectedFaceSet(faceSet, tolerance);
-                    if (shellHandle != null && !shellHandle.IsInvalid)
-                        shellHandles.Add(shellHandle);
+                    var handle = BuildShellFromConnectedFaceSet(faceSet, tolerance);
+                    if (handle != null && !handle.IsInvalid)
+                        shellHandles.Add(handle);
                 }
 
                 if (shellHandles.Count == 0)
@@ -1168,7 +1168,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// Routes to the advanced BRep path when faces are IIfcAdvancedFace.
         /// </summary>
         private NativeShapeHandle? BuildShellFromConnectedFaceSet(
-            IIfcConnectedFaceSet faceSet, double tolerance)
+            IIfcConnectedFaceSet faceSet, double tolerance, bool makeSolid = false,
+            bool upgradeFaceSets = false)
         {
             // Check for advanced faces — delegate to existing advanced BRep path
             var firstFace = faceSet.CfsFaces.FirstOrDefault();
@@ -1191,7 +1192,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             int result = XbimGeometryNativeApi.xbim_shell_build_connected_face_set(
                 ContextHandle, pointsXYZ, numPoints, faceData, faceData.Length,
-                numFaces, tolerance, 0 /* shell only */, 0, out var shellHandle);
+                numFaces, tolerance, makeSolid ? 1 : 0, upgradeFaceSets ? 1 : 0,
+                out var shellHandle);
 
             if (result != 0)
             {

@@ -184,7 +184,15 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         public IXbimWire Trim(double start, double end, double tolerance, ILogger logger = null)
         {
-            throw new NotSupportedException("Wire trimming not yet supported.");
+            int result = XbimGeometryNativeApi.xbim_wire_build_trimmed_by_length(
+                NativeContextHandle.NullHandle,
+                Handle,
+                start, end, tolerance,
+                out var trimmedHandle);
+            if (result != 0)
+                throw new XbimGeometryServiceException(
+                    $"Failed to trim wire: {XbimGeometryNativeApi.GetLastError()}");
+            return new XbimWire(trimmedHandle);
         }
 
         public string ToBRep => BrepString();
