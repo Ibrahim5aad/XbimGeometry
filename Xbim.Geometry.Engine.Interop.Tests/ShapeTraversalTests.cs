@@ -145,7 +145,7 @@ public class ShapeTraversalTests : IDisposable
             0, // plane
             0, 0, 0, 0, 0, 1, 1, 0, 0, 0, // surface placement
             outerWire, innerPtrs, 1,
-            1e-6, 1,
+            1,
             out var faceHandle);
 
         outerWire.Dispose();

@@ -167,7 +167,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 // Build the ribbon wire natively: offset curves + cap lines assembled via MakeWire
                 int result = XbimGeometryNativeApi.xbim_wire_build_centerline_profile(
                     ContextHandle, centre.Handle, centerLine.Thickness,
-                    _modelService.Precision, out var wireHandle);
+                    out var wireHandle);
 
                 if (result != 0)
                     throw new XbimGeometryServiceException(
@@ -1308,7 +1308,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             using var nativeCurves = new NativeHandleArray(curves.ToArray());
             int wireResult = XbimGeometryNativeApi.xbim_wire_build_from_2d_curves(
                 ContextHandle, nativeCurves.Ptrs, nativeCurves.Length,
-                _modelService.Precision, _modelService.MinimumGap,
                 out var wireHandle);
 
             if (wireResult != 0)

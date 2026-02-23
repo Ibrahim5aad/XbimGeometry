@@ -831,7 +831,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_project_point(
     XbimContextHandle ctx,
     XbimCurve2dHandle curveHandle,
     double px, double py,
-    double tolerance,
     double* outParam)
 {
     xbim_clear_error();
@@ -1195,7 +1194,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_composite_bspline(
     XbimContextHandle   ctx,
     XbimCurve2dHandle*  curves,
     int                 numCurves,
-    double              tolerance,
     XbimCurve2dHandle*  outHandle)
 {
     xbim_clear_error();
@@ -1244,13 +1242,13 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_composite_bspline(
             {
                 gp_Pnt2d startPt;
                 bounded->D0(first, startPt);
-                if (!prevEnd.IsEqual(startPt, tolerance))
+                if (!prevEnd.IsEqual(startPt, ctx->minimumGap))
                 {
                     gp_Dir2d gapDir(gp_Vec2d(prevEnd, startPt));
                     double gapLen = prevEnd.Distance(startPt);
                     Handle(Geom2d_TrimmedCurve) gapLine = new Geom2d_TrimmedCurve(
                         new Geom2d_Line(prevEnd, gapDir), 0.0, gapLen);
-                    converter.Add(gapLine, tolerance, false);
+                    converter.Add(gapLine, ctx->minimumGap, false);
                 }
             }
 
@@ -1275,7 +1273,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_composite_bspline(
                 int n = std::max(200, static_cast<int>(std::abs(last - first) * 10) + 1);
                 toAdd = ApproximateCurve2d(bounded, first, last, n);
             }
-            else if (!converter.Add(bounded, tolerance, false))
+            else if (!converter.Add(bounded, ctx->minimumGap, false))
             {
                 int n = std::max(200, static_cast<int>(std::abs(last - first) * 10) + 1);
                 toAdd = ApproximateCurve2d(bounded, first, last, n);
@@ -1283,7 +1281,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_composite_bspline(
 
             if (!toAdd.IsNull())
             {
-                if (!converter.Add(toAdd, tolerance, false))
+                if (!converter.Add(toAdd, ctx->minimumGap, false))
                 {
                     xbim_log_warning(ctx,
                         "xbim_curve2d_build_composite_bspline: failed to add curve %d after approximation", i);

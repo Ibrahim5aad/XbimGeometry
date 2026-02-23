@@ -1,19 +1,16 @@
 /*
  * xbim_geometry_api.h
  *
- * Public C API for Xbim.Geometry.Engine.Native.
+ * Public API for Xbim.Geometry.Engine.Native.
  * Defines opaque handle types, error handling, calling conventions,
  * and shared enumerations used across all native API functions.
  *
- * This header is valid in both C and C++ translation units.
  */
 
-#ifndef XBIM_GEOMETRY_API_H
-#define XBIM_GEOMETRY_API_H
+#pragma once
 
-#ifdef __cplusplus
+
 extern "C" {
-#endif
 
 #pragma region Export And Calling Convention Macros
 
@@ -33,13 +30,13 @@ extern "C" {
 
 #pragma region Opaque Handle Types
 
-typedef struct XbimContext_*        XbimContextHandle;
-typedef struct XbimShape_*          XbimShapeHandle;
-typedef struct XbimLocation_*       XbimLocationHandle;
-typedef struct XbimCurve_*          XbimCurveHandle;
-typedef struct XbimCurve2d_*        XbimCurve2dHandle;
-typedef struct XbimSurface_*        XbimSurfaceHandle;
-typedef struct XbimAdvancedBrepBuilder_* XbimAdvancedBrepBuilderHandle;
+typedef struct XbimContext_*                XbimContextHandle;
+typedef struct XbimShape_*                  XbimShapeHandle;
+typedef struct XbimLocation_*               XbimLocationHandle;
+typedef struct XbimCurve_*                  XbimCurveHandle;
+typedef struct XbimCurve2d_*                XbimCurve2dHandle;
+typedef struct XbimSurface_*                XbimSurfaceHandle;
+typedef struct XbimAdvancedBrepBuilder_*    XbimAdvancedBrepBuilderHandle;
 
 #pragma endregion
 
@@ -136,6 +133,15 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_context_destroy(XbimContextHandle handle);
 XBIM_EXPORT XbimResult XBIM_CALL xbim_context_set_logger(
     XbimContextHandle  handle,
     XbimLogCallback    logCallback);
+
+/*
+ * Update the minimum gap tolerance on an existing context.
+ *
+ * Returns XBIM_INVALID_HANDLE if handle is NULL.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_context_set_minimum_gap(
+    XbimContextHandle  handle,
+    double             minimumGap);
 
 /*
  * Send a log message through the context's callback.
@@ -629,7 +635,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_extruded(
  *   endFaceHandle    – end profile face handle (may differ from start)
  *   dirX/Y/Z         – extrusion direction (unit vector)
  *   depth            – extrusion distance (must be > 0)
- *   precision        – surface generation tolerance (from model precision)
  *   locationHandle   – optional location transform (may be NULL for identity)
  *   outHandle        – receives the new shape handle
  *
@@ -641,7 +646,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_extruded_tapered(
     XbimShapeHandle     endFaceHandle,
     double dirX, double dirY, double dirZ,
     double depth,
-    double precision,
     XbimLocationHandle  locationHandle,
     XbimShapeHandle*    outHandle);
 
@@ -683,7 +687,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_revolved(
  *   axisOriginX/Y/Z    – revolution axis origin point
  *   axisDirX/Y/Z       – revolution axis direction (unit vector)
  *   angle              – revolution angle in radians (must be > 0; clamped to 2*PI)
- *   precision          – surface generation tolerance (from model precision)
  *   locationHandle     – optional location transform (may be NULL for identity)
  *   outHandle          – receives the new shape handle
  *
@@ -696,7 +699,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_revolved_tapered(
     double axisOriginX, double axisOriginY, double axisOriginZ,
     double axisDirX,    double axisDirY,    double axisDirZ,
     double angle,
-    double precision,
     XbimLocationHandle  locationHandle,
     XbimShapeHandle*    outHandle);
 
@@ -737,7 +739,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_swept_disk(
  *   refSurfaceOriginX/Y/Z    – reference surface plane origin point
  *   refSurfaceNormalX/Y/Z    – reference surface plane normal direction
  *   isPlanarReferenceSurface  – 1 if reference surface is planar, 0 otherwise
- *   precision                 – model precision tolerance (> 0)
  *   locationHandle            – optional location transform (may be NULL for identity)
  *   outHandle                 – receives the new solid shape handle
  *
@@ -750,7 +751,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_fixed_reference_swept(
     double refSurfaceOriginX, double refSurfaceOriginY, double refSurfaceOriginZ,
     double refSurfaceNormalX, double refSurfaceNormalY, double refSurfaceNormalZ,
     int    isPlanarReferenceSurface,
-    double precision,
     XbimLocationHandle  locationHandle,
     XbimShapeHandle*    outHandle);
 
@@ -766,7 +766,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_fixed_reference_swept(
  *   spineHandle      – a shape handle containing a TopoDS_Wire (the spine curve)
  *   sectionHandles   – array of shape handles, each containing a positioned TopoDS_Face
  *   numSections      – number of elements in sectionHandles (must be >= 2)
- *   precision        – model precision tolerance (> 0)
  *   outHandle        – receives the new solid shape handle
  *
  * Returns XBIM_OK on success.
@@ -776,7 +775,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_sectioned_spine(
     XbimShapeHandle          spineHandle,
     const XbimShapeHandle*   sectionHandles,
     int                      numSections,
-    double                   precision,
     XbimShapeHandle*         outHandle);
 
 /*
@@ -790,7 +788,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_sectioned_spine(
  *   ctx              – a valid context handle (used for logging; may be NULL)
  *   sectionHandles   – array of shape handles, each containing a positioned TopoDS_Face
  *   numSections      – number of elements in sectionHandles (must be >= 2)
- *   precision        – model precision tolerance (> 0)
  *   outHandle        – receives the new solid shape handle
  *
  * Returns XBIM_OK on success.
@@ -799,7 +796,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_thru_sections(
     XbimContextHandle        ctx,
     const XbimShapeHandle*   sectionHandles,
     int                      numSections,
-    double                   precision,
     XbimShapeHandle*         outHandle);
 
 /*
@@ -814,7 +810,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_thru_sections(
  *   directrixHandle           – directrix wire (TopoDS_Wire)
  *   surfaceHandle             – reference surface (Geom_Surface, may be non-planar)
  *   isPlanarReferenceSurface  – non-zero if the reference surface is a plane
- *   precision                 – model precision tolerance (> 0)
  *   locationHandle            – optional location transform (may be NULL for identity)
  *   outHandle                 – receives the new solid shape handle
  *
@@ -826,7 +821,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_surface_curve_swept(
     XbimShapeHandle     directrixHandle,
     XbimSurfaceHandle   surfaceHandle,
     int                 isPlanarReferenceSurface,
-    double              precision,
     XbimLocationHandle  locationHandle,
     XbimShapeHandle*    outHandle);
 
@@ -1545,8 +1539,6 @@ typedef enum XbimSurfaceType
  *   xDirX/Y/Z        – surface placement X direction (reference)
  *   radius           – radius for cylindrical/spherical surfaces (ignored for plane)
  *   agreementFlag    – IFC agreement flag (0 = false, non-zero = true)
- *   oneMeter         – model unit conversion for "one meter" (used for point-in-material offset)
- *   precision        – model precision tolerance
  *   outHandle        – receives the new solid shape handle
  *
  * Returns XBIM_OK on success.
@@ -1559,8 +1551,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build(
     double xDirX,   double xDirY,   double xDirZ,
     double radius,
     int    agreementFlag,
-    double oneMeter,
-    double precision,
     XbimShapeHandle*  outHandle);
 
 /*
@@ -1583,8 +1573,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build(
  *   boundaryOriginX/Y/Z – position of the boundary coordinate system
  *   boundaryZDirX/Y/Z   – Z direction of the boundary coordinate system
  *   boundaryXDirX/Y/Z   – X direction of the boundary coordinate system
- *   oneMeter         – model unit conversion for "one meter"
- *   precision        – model precision tolerance
  *   outHandle        – receives the new solid shape handle
  *
  * Returns XBIM_OK on success; XBIM_NULL_SHAPE if the boundary is empty
@@ -1602,8 +1590,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_polygonal_bounded(
     double boundaryOriginX, double boundaryOriginY, double boundaryOriginZ,
     double boundaryZDirX,   double boundaryZDirY,   double boundaryZDirZ,
     double boundaryXDirX,   double boundaryXDirY,   double boundaryXDirZ,
-    double oneMeter,
-    double precision,
     XbimShapeHandle*  outHandle);
 
 #pragma endregion
@@ -1728,16 +1714,13 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_compound_get_children(
  *
  *   ctx         – a valid context handle (used for logging; may be NULL)
  *   x, y, z     – 3D coordinates of the vertex point
- *   tolerance   – geometric tolerance for the vertex (must be positive)
  *   outHandle   – receives the new vertex shape handle
  *
- * Returns XBIM_OK on success; XBIM_INVALID_ARG if tolerance <= 0 or
- * outHandle is NULL.
+ * Returns XBIM_OK on success; XBIM_INVALID_ARG if outHandle is NULL.
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_build(
     XbimContextHandle ctx,
     double x, double y, double z,
-    double tolerance,
     XbimShapeHandle* outHandle);
 
 /*
@@ -1886,7 +1869,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_wire(
  *   outerWireHandle    – shape handle for the outer boundary wire (or face to extract wire from)
  *   innerWireHandles   – array of shape handles for inner boundary wires/faces (may be NULL)
  *   numInnerWires      – number of inner wire handles (0 if no holes)
- *   tolerance          – geometric tolerance for face and pcurve construction
  *   sameSense          – if non-zero, face normal agrees with surface normal; if zero, reversed
  *   outHandle          – receives the new face shape handle
  *
@@ -1902,7 +1884,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced(
     XbimShapeHandle          outerWireHandle,
     const XbimShapeHandle*   innerWireHandles,
     int                      numInnerWires,
-    double                   tolerance,
     int                      sameSense,
     XbimShapeHandle*         outHandle);
 
@@ -1916,7 +1897,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced(
  *   outerWireHandle  – the outer boundary wire
  *   innerWireHandles – optional array of inner boundary wires (holes)
  *   numInnerWires    – number of inner wires (0 if none)
- *   tolerance        – precision tolerance for pcurve fitting
  *   sameSense        – 1 if face normal matches surface normal, 0 to reverse
  *   outHandle        – receives the new face shape handle
  *
@@ -1928,7 +1908,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced_with_surface(
     XbimShapeHandle          outerWireHandle,
     const XbimShapeHandle*   innerWireHandles,
     int                      numInnerWires,
-    double                   tolerance,
     int                      sameSense,
     XbimShapeHandle*         outHandle);
 
@@ -1984,19 +1963,16 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_normal(
  *
  *   faceHandle         – a valid shape handle containing a TopoDS_Face
  *   pointX/Y/Z         – the 3D point to project
- *   precision           – tolerance for the UV projection
- *   tolerance           – tolerance for the surface property evaluation
  *   outNormalX/Y/Z     – receives the normal vector components
  *
  * Returns XBIM_OK on success; XBIM_INVALID_ARG if not a face.
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_face_normal_at_point(
+    XbimContextHandle ctx,
     XbimShapeHandle faceHandle,
     double          pointX,
     double          pointY,
     double          pointZ,
-    double          precision,
-    double          tolerance,
     double*         outNormalX,
     double*         outNormalY,
     double*         outNormalZ);
@@ -2117,8 +2093,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_edges(
  *   ctx           – a valid context handle (used for logging; may be NULL)
  *   curveHandles  – array of XbimCurveHandle (Geom_Curve) in wire order
  *   numCurves     – number of elements in curveHandles (must be > 0)
- *   tolerance     – minimum vertex tolerance (typically model precision)
- *   gapSize       – maximum allowed gap between adjacent segment endpoints
  *   outHandle     – receives the new wire shape handle
  *
  * Returns XBIM_OK on success.
@@ -2127,8 +2101,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_curves(
     XbimContextHandle         ctx,
     const XbimCurveHandle*    curveHandles,
     int                       numCurves,
-    double                    tolerance,
-    double                    gapSize,
     XbimShapeHandle*          outHandle);
 
 /*
@@ -2139,7 +2111,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_curves(
  *   ctx         – a valid context handle (used for logging; may be NULL)
  *   pointsXYZ   – flat array of [x0,y0,z0, x1,y1,z1, ...] coordinates
  *   numPoints   – number of 3D points (array length / 3; must be >= 2)
- *   tolerance   – minimum segment length; shorter segments are merged
  *   outHandle   – receives the new wire shape handle
  *
  * Returns XBIM_OK on success.
@@ -2148,7 +2119,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polyline(
     XbimContextHandle ctx,
     const double*     pointsXYZ,
     int               numPoints,
-    double            tolerance,
     XbimShapeHandle*  outHandle);
 
 /*
@@ -2250,8 +2220,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_get_parameter(
  *   u1           – start parameter
  *   u2           – end parameter
  *   sameSense    – 1 for same sense, 0 for opposite
- *   tolerance    – geometric tolerance
- *   radianFactor – angle-to-radians conversion factor (from context)
  *   outHandle    – receives the trimmed wire
  *
  * Returns XBIM_OK on success.
@@ -2262,8 +2230,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed(
     double            u1,
     double            u2,
     int               sameSense,
-    double            tolerance,
-    double            radianFactor,
     XbimShapeHandle*  outHandle);
 
 /*
@@ -2287,7 +2253,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed_by_length(
     XbimShapeHandle   wireHandle,
     double            arcStart,
     double            arcEnd,
-    double            tolerance,
     XbimShapeHandle*  outHandle);
 
 /*
@@ -2305,8 +2270,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed_by_length(
  *   u2              – second parametric value (fallback)
  *   preferCartesian – 1 to project points, 0 to use parametric values
  *   sameSense       – 1 for same sense, 0 for opposite
- *   tolerance       – geometric tolerance
- *   radianFactor    – angle-to-radians conversion factor
  *   outHandle       – receives the trimmed wire
  *
  * Returns XBIM_OK on success.
@@ -2324,8 +2287,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed_by_points(
     double            u2,
     int               preferCartesian,
     int               sameSense,
-    double            tolerance,
-    double            radianFactor,
     XbimShapeHandle*  outHandle);
 
 /*
@@ -2340,7 +2301,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed_by_points(
  *   ctx              – a valid context handle (used for logging; may be NULL)
  *   wireHandle       – a shape handle containing a TopoDS_Wire to fillet
  *   filletRadius     – radius of the fillet arcs (must be > 0)
- *   tolerance        – model precision tolerance for closed-wire detection
  *   outHandle        – receives the new filleted wire shape handle
  *
  * Returns XBIM_OK on success, XBIM_ERROR on failure.
@@ -2349,7 +2309,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_fillet(
     XbimContextHandle ctx,
     XbimShapeHandle   wireHandle,
     double            filletRadius,
-    double            tolerance,
     XbimShapeHandle*  outHandle);
 
 #pragma endregion
@@ -2449,7 +2408,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_circle_arc_3pt(
  *   startX/Y/Z       – coordinates of the start vertex
  *   endX/Y/Z         – coordinates of the end vertex
  *   sameSense        – 1 if edge direction matches curve parametric direction
- *   tolerance        – vertex proximity tolerance
  *   outHandle        – receives the new edge shape handle
  *
  * Returns XBIM_OK on success.
@@ -2460,7 +2418,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve_handle(
     double startX, double startY, double startZ,
     double endX,   double endY,   double endZ,
     int              sameSense,
-    double           tolerance,
     XbimShapeHandle* outHandle);
 
 /*
@@ -2473,7 +2430,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve_handle(
  *   startX/Y         – coordinates of the start point (2D)
  *   endX/Y           – coordinates of the end point (2D)
  *   sameSense        – 1 if edge direction matches curve parametric direction
- *   tolerance        – point proximity tolerance
  *   outHandle        – receives the new edge shape handle
  *
  * Returns XBIM_OK on success.
@@ -2484,7 +2440,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve2d_handle(
     double startX, double startY,
     double endX,   double endY,
     int                sameSense,
-    double             tolerance,
     XbimShapeHandle*   outHandle);
 
 /*
@@ -2691,7 +2646,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_closed_shell(
  *   faceData       - packed face topology (see encoding above)
  *   faceDataLength - total number of ints in faceData
  *   numFaces       - number of faces encoded in faceData
- *   tolerance        - precision for vertex merging (typically MinimumGap)
  *   makeSolid        - if non-zero, convert the shell to a solid with orientation fix
  *   upgradeFaceSets  - if non-zero and makeSolid is set, detect multi-solid shells
  *                      and split them into individual solids (returns compound).
@@ -2707,7 +2661,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_connected_face_set(
     const int*         faceData,
     int                faceDataLength,
     int                numFaces,
-    double             tolerance,
     int                makeSolid,
     int                upgradeFaceSets,
     XbimShapeHandle*   outHandle);
@@ -2915,15 +2868,14 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_length(
  *
  *   handle       – a valid curve handle
  *   arcLength    – target arc length from curve start
- *   tolerance    – computation tolerance (e.g. model precision)
  *   outParameter – receives the curve parameter at the requested arc length
  *
  * Returns XBIM_OK on success.
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_parameter_at_length(
+    XbimContextHandle ctx,
     XbimCurveHandle handle,
     double          arcLength,
-    double          tolerance,
     double*         outParameter);
 
 /*
@@ -2984,7 +2936,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_project_point_3d(
     XbimContextHandle   ctx,
     XbimCurveHandle     curveHandle,
     double px, double py, double pz,
-    double tolerance,
     double* outParam);
 
 /*
@@ -3027,7 +2978,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_get_elementary_props(
  *   ctx       – a valid context handle (used for logging; may be NULL)
  *   curves    – array of curve handles (must wrap bounded curves)
  *   numCurves – number of curves in the array (>= 1)
- *   tolerance – gap tolerance for joining segments
  *   outHandle – receives the composite B-spline curve handle
  *
  * Returns XBIM_OK on success.
@@ -3036,7 +2986,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_composite_bspline(
     XbimContextHandle   ctx,
     XbimCurveHandle*    curves,
     int                 numCurves,
-    double              tolerance,
     XbimCurveHandle*    outHandle);
 
 /*
@@ -3286,7 +3235,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_rectangular_trimmed(
  *   outerWire        – shape handle for the outer boundary wire (at z = 0)
  *   innerWires       – array of shape handles for inner holes (may be NULL)
  *   numInnerWires    – number of inner wire handles (0 if no holes)
- *   tolerance        – geometric tolerance for face construction
  *   outHandle        – receives the new face shape handle
  *
  * Returns XBIM_OK on success.
@@ -3299,7 +3247,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_curve_bounded_plane(
     XbimShapeHandle          outerWire,
     const XbimShapeHandle*   innerWires,
     int                      numInnerWires,
-    double                   tolerance,
     XbimShapeHandle*         outHandle);
 
 /*
@@ -3826,7 +3773,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_project_point(
     XbimContextHandle   ctx,
     XbimCurve2dHandle   curveHandle,
     double px, double py,
-    double tolerance,
     double* outParam);
 
 #pragma endregion
@@ -3912,13 +3858,11 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_bspline(
  *
  * curves     – array of XbimCurve2dHandle (each must be a bounded curve)
  * numCurves  – number of curves in the array
- * tolerance  – gap-filling tolerance
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_composite_bspline(
     XbimContextHandle   ctx,
     XbimCurve2dHandle*  curves,
     int                 numCurves,
-    double              tolerance,
     XbimCurve2dHandle*  outHandle);
 
 /*
@@ -4201,8 +4145,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_2d_curves(
     XbimContextHandle   ctx,
     XbimCurve2dHandle*  curves,
     int                 numCurves,
-    double              tolerance,
-    double              gapSize,
     XbimShapeHandle*    outWire);
 
 /*
@@ -4216,7 +4158,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_centerline_profile(
     XbimContextHandle   ctx,
     XbimCurve2dHandle   centreLineHandle,
     double              thickness,
-    double              tolerance,
     XbimShapeHandle*    outWire);
 
 #pragma endregion
@@ -4229,7 +4170,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_centerline_profile(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_create(
     XbimContextHandle ctx,
-    double tolerance,
     XbimAdvancedBrepBuilderHandle* outBuilder);
 
 /*
@@ -4345,14 +4285,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_grid_create(
     const XbimCurve2dHandle* uCurves, int uCount,
     const XbimCurve2dHandle* vCurves, int vCount,
     const XbimCurve2dHandle* wCurves, int wCount,
-    double                   precision,
-    double                   oneMillimeter,
     XbimShapeHandle*         outHandle);
 
 #pragma endregion
 
-#ifdef __cplusplus
 }
-#endif
-
-#endif /* XBIM_GEOMETRY_API_H */

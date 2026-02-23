@@ -1,4 +1,5 @@
 #include "xbim_advanced_brep_builder.h"
+#include "xbim_context.h"
 #include "xbim_error.h"
 #include "xbim_logging.h"
 
@@ -723,7 +724,6 @@ TopoDS_Shape xbim_brep_build_shell(
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_create(
     XbimContextHandle ctx,
-    double tolerance,
     XbimAdvancedBrepBuilderHandle* outBuilder)
 {
     xbim_clear_error();
@@ -743,7 +743,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_create(
     }
 
     builder->ctx = ctx;
-    builder->tolerance = tolerance;
+    builder->tolerance = ctx->minimumGap;
     *outBuilder = builder;
     return XBIM_OK;
 }

@@ -8,6 +8,7 @@
 #include "xbim_geometry_api.h"
 #include "xbim_shape.h"
 #include "xbim_curve2d.h"
+#include "xbim_context.h"
 #include "xbim_error.h"
 #include "xbim_logging.h"
 
@@ -171,8 +172,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_grid_create(
     const XbimCurve2dHandle* uCurves, int uCount,
     const XbimCurve2dHandle* vCurves, int vCount,
     const XbimCurve2dHandle* wCurves, int wCount,
-    double                  precision,
-    double                  oneMillimeter,
     XbimShapeHandle*        outHandle)
 {
     xbim_clear_error();
@@ -186,7 +185,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_grid_create(
 
     try
     {
-        double mm = oneMillimeter;
+        double precision = ctx->precision;
+        double mm = std::max(ctx->oneMillimeter, ctx->precision * 10.0);
 
         /* ── 1. Collect curves ── */
         std::vector<Handle(Geom2d_Curve)> uVec, vVec, wVec;

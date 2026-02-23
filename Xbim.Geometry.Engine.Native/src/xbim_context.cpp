@@ -83,6 +83,15 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_context_destroy(XbimContextHandle handle)
     return XBIM_OK;
 }
 
+XBIM_EXPORT XbimResult XBIM_CALL xbim_context_set_minimum_gap(
+    XbimContextHandle handle,
+    double            minimumGap)
+{
+    if (!handle) return XBIM_INVALID_HANDLE;
+    handle->minimumGap = minimumGap;
+    return XBIM_OK;
+}
+
 /* Logging helpers are now in xbim_logging.h / xbim_logging.cpp */
 
 #pragma endregion

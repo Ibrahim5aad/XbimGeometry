@@ -507,7 +507,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 var owningHandle = built.DetachHandle();
                 _curveCache[entityLabel] = (owningHandle, curveType);
                 if (curveType is XCurveType.IfcGradientCurve)
-                    return new XbimGradientCurve(NativeCurveHandle.Borrowed(owningHandle), ContextHandle, _modelService.Precision);
+                    return new XbimGradientCurve(NativeCurveHandle.Borrowed(owningHandle), ContextHandle);
                 else
                     return new XbimCurve(NativeCurveHandle.Borrowed(owningHandle), curveType);
             }

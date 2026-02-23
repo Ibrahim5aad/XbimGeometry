@@ -31,6 +31,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         public IXModelGeometryService ModelGeometryService => _modelService;
         public IXLoggingService LoggingService => _modelService.LoggingService;
 
+        private NativeContextHandle ContextHandle => ((Services.ModelGeometryService)_modelService).ContextHandle;
+
         #region Point Building
 
         public IXPoint BuildPoint2d(double x, double y) => new XPoint(x, y);
@@ -74,7 +76,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 // IfcLengthMeasure is an arc length — convert to the curve parameter
                 // using GCPnts_AbscissaPoint on the native side.
                 int paramResult = XbimGeometryNativeApi.xbim_curve_parameter_at_length(
-                    curveHandle, lengthMeasure.Value, _modelService.Precision, out len);
+                    ContextHandle, curveHandle, lengthMeasure.Value, out len);
                 if (paramResult != 0)
                     throw new XbimGeometryServiceException(
                         $"IfcPointByDistanceExpression #{pointExpr.EntityLabel}: " +
@@ -999,10 +1001,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             var nativeFace = (Shapes.XbimFace)face;
             int result = XbimGeometryNativeApi.xbim_face_normal_at_point(
+                ContextHandle,
                 nativeFace.Handle,
                 position.X, position.Y, position.Z,
-                _modelService.Precision,
-                tolerance,
                 out double nx, out double ny, out double nz);
 
             if (result != 0)

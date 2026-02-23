@@ -90,7 +90,12 @@ namespace Xbim.Geometry.Engine.Interop.Services
         public double MinimumGap
         {
             get => _minimumGap;
-            set => _minimumGap = value;
+            set
+            {
+                _minimumGap = value;
+                if (_contextHandle != null && !_contextHandle.IsInvalid)
+                    XbimGeometryNativeApi.xbim_context_set_minimum_gap(_contextHandle, value);
+            }
         }
 
         public double Timeout

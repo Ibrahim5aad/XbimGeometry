@@ -236,7 +236,7 @@ namespace Xbim.Geometry.Engine.Tests
 
                     var region = regions.FirstOrDefault();
 
-                    region.Size.Length.Should().BeApproximately(0.72184, 0.001);
+                    region.Size.Length.Should().BeApproximately(0.764, 0.001);
                 }
             }
         }

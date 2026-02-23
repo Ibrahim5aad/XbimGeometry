@@ -12,13 +12,11 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
     internal class XbimGradientCurve : XbimCurve, IXGradientCurve
     {
         private readonly NativeContextHandle _contextHandle;
-        private readonly double _tolerance;
 
-        internal XbimGradientCurve(NativeCurveHandle handle, NativeContextHandle contextHandle, double tolerance)
+        internal XbimGradientCurve(NativeCurveHandle handle, NativeContextHandle contextHandle)
             : base(handle, XCurveType.IfcGradientCurve)
         {
             _contextHandle = contextHandle;
-            _tolerance = tolerance;
         }
 
         public IXWire ToWire()
@@ -42,7 +40,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
             }
 
             int result = XbimGeometryNativeApi.xbim_wire_build_polyline(
-                _contextHandle, pointsXYZ, numPoints, _tolerance,
+                _contextHandle, pointsXYZ, numPoints,
                 out var wireHandle);
 
             if (result != 0)

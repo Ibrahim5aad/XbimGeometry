@@ -82,7 +82,7 @@ public class SpiralTests : IDisposable
                 Ctx, curveHandle,
                 sx, sy, sz,
                 ex, ey, ez,
-                1, 1e-6,
+                1,
                 out var edgeHandle).Should().Be(0);
             using (edgeHandle)
             {
@@ -167,7 +167,7 @@ public class SpiralTests : IDisposable
             XbimGeometryNativeApi.xbim_edge_build_from_curve_handle(
                 Ctx, curveHandle,
                 sx, sy, sz, ex, ey, ez,
-                1, 1e-6, out var edge).Should().Be(0);
+                1, out var edge).Should().Be(0);
             using (edge)
             {
                 var ptrs = new[] { edge.DangerousGetHandle() };

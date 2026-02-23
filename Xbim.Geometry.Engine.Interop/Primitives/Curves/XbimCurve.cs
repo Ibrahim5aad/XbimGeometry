@@ -124,9 +124,10 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
 
         #region IXbimCurve
 
-        XbimGeometryObjectType IXbimGeometryObject.GeometryType => XbimGeometryObjectType.XbimCurveType;
+        XbimGeometryObjectType IXbimGeometryObject.GeometryType
+                                => XbimGeometryObjectType.XbimCurveType;
 
-        bool IXbimGeometryObject.IsValid => true;
+        bool IXbimGeometryObject.IsValid => Handle != null && !Handle.IsInvalid && !Handle.IsClosed;
 
         bool IXbimGeometryObject.IsSet => false;
 
@@ -162,7 +163,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
         {
             int result = XbimGeometryNativeApi.xbim_curve_project_point_3d(
                 NativeContextHandle.NullHandle, Handle,
-                point.X, point.Y, point.Z, tolerance, out double param);
+                point.X, point.Y, point.Z, out double param);
             if (result != 0)
                 return 0;
             return param;

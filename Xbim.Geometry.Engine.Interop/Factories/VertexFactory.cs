@@ -30,7 +30,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             int result = XbimGeometryNativeApi.xbim_vertex_build(
                 ContextHandle, x, y, z,
-                _modelService.Precision,
                 out var NativeShapeHandle);
 
             if (result != 0)

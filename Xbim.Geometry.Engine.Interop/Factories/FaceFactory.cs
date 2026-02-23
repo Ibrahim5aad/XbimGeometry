@@ -105,7 +105,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 outerWire.Handle,
                 innerWireHandles.Ptrs,
                 innerWireHandles.Length,
-                _modelService.Precision,
                 1, // sameSense = true
                 out var faceHandle);
 

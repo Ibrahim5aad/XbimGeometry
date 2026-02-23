@@ -128,7 +128,7 @@ namespace Xbim.Geometry.Engine.Interop.Primitives
 
         XbimGeometryObjectType IXbimGeometryObject.GeometryType => XbimGeometryObjectType.XbimCurveType;
 
-        bool IXbimGeometryObject.IsValid => true;
+        bool IXbimGeometryObject.IsValid => Handle != null && !Handle.IsInvalid && !Handle.IsClosed;
 
         bool IXbimGeometryObject.IsSet => false;
 

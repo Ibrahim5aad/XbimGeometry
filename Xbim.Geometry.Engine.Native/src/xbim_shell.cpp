@@ -713,7 +713,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_connected_face_set(
     const int*         faceData,
     int                faceDataLength,
     int                numFaces,
-    double             tolerance,
     int                makeSolid,
     int                upgradeFaceSets,
     XbimShapeHandle*   outHandle)
@@ -740,7 +739,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_connected_face_set(
 
     try
     {
-        double tol = tolerance > 0 ? tolerance : Precision::Confusion();
+        double tol = ctx->minimumGap > 0 ? ctx->minimumGap : Precision::Confusion();
 
         /* ---- Phase 1: Vertex deduplication ---- */
         BRepBuilderAPI_VertexInspector inspector(tol);

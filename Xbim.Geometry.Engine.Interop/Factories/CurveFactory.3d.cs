@@ -310,7 +310,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     segments.Select(s => (SafeHandle)s).ToArray());
                 int result = XbimGeometryNativeApi.xbim_curve_build_composite_bspline(
                     ContextHandle, nativeSegments.Ptrs, nativeSegments.Length,
-                    _modelService.MinimumGap,
                     out var compositeHandle);
 
                 if (result != 0)
@@ -361,14 +360,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                     int r1 = XbimGeometryNativeApi.xbim_curve_project_point_3d(
                         ContextHandle, basisCurve.Handle,
-                        p1.X, p1.Y, p1.Z, _modelService.MinimumGap, out u1);
+                        p1.X, p1.Y, p1.Z, out u1);
                     if (r1 != 0)
                         throw new XbimGeometryServiceException(
                             $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Trim Point1 is not on the basis curve.");
 
                     int r2 = XbimGeometryNativeApi.xbim_curve_project_point_3d(
                         ContextHandle, basisCurve.Handle,
-                        p2.X, p2.Y, p2.Z, _modelService.MinimumGap, out u2);
+                        p2.X, p2.Y, p2.Z, out u2);
                     if (r2 != 0)
                         throw new XbimGeometryServiceException(
                             $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Trim Point2 is not on the basis curve.");
@@ -415,7 +414,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     segmentCurves.Select(c => c.Handle).ToArray());
                 int result = XbimGeometryNativeApi.xbim_curve_build_composite_bspline(
                     ContextHandle, nativeSegments.Ptrs, nativeSegments.Length,
-                    _modelService.MinimumGap,
                     out var compositeHandle);
 
                 if (result != 0)
@@ -467,9 +465,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                             {
                                 // Project start and end points onto the circle to get trim parameters
                                 int r1 = XbimGeometryNativeApi.xbim_curve_project_point_3d(
-                                    ContextHandle, circleHandle, sx, sy, sz, _modelService.MinimumGap, out double u1);
+                                    ContextHandle, circleHandle, sx, sy, sz, out double u1);
                                 int r2 = XbimGeometryNativeApi.xbim_curve_project_point_3d(
-                                    ContextHandle, circleHandle, ex, ey, ez, _modelService.MinimumGap, out double u2);
+                                    ContextHandle, circleHandle, ex, ey, ez, out double u2);
 
                                 if (r1 != 0 || r2 != 0)
                                 {
@@ -569,7 +567,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     segments.Select(s => (SafeHandle)s).ToArray());
                 int result = XbimGeometryNativeApi.xbim_curve_build_composite_bspline(
                     ContextHandle, nativeSegments.Ptrs, nativeSegments.Length,
-                    _modelService.MinimumGap,
                     out var compositeHandle);
 
                 if (result != 0)

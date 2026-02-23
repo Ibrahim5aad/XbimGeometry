@@ -64,7 +64,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 using var nativeHeightSegs = new NativeHandleArray(heightSegmentHandles.ToArray());
                 int compositeResult = XbimGeometryNativeApi.xbim_curve2d_build_composite_bspline(
                     ContextHandle, nativeHeightSegs.Ptrs, nativeHeightSegs.Length,
-                    _modelService.MinimumGap,
                     out var heightFunctionHandle);
 
                 if (compositeResult != 0)
@@ -87,7 +86,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     throw new XbimGeometryServiceException(
                         $"IfcGradientCurve #{ifcGradient.EntityLabel}: failed to build gradient curve: {XbimGeometryNativeApi.GetLastError()}");
 
-                return new XbimGradientCurve(curveHandle, ContextHandle, _modelService.Precision);
+                return new XbimGradientCurve(curveHandle, ContextHandle);
             }
             finally
             {
@@ -183,7 +182,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 using var nativeSegs = new NativeHandleArray(segHandles.ToArray());
                 int result = XbimGeometryNativeApi.xbim_curve2d_build_composite_bspline(
                     ContextHandle, nativeSegs.Ptrs, nativeSegs.Length,
-                    _modelService.MinimumGap,
                     out var compositeHandle);
 
                 if (result != 0)

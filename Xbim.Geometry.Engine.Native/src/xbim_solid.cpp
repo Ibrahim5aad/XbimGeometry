@@ -609,7 +609,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_extruded_tapered(
     XbimShapeHandle     endFaceHandle,
     double dirX, double dirY, double dirZ,
     double depth,
-    double precision,
     XbimLocationHandle  locationHandle,
     XbimShapeHandle*    outHandle)
 {
@@ -662,7 +661,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_extruded_tapered(
         TopoDS_Face placedEndFace = TopoDS::Face(endFace.Moved(TopLoc_Location(t)));
 
         /* Build the outer body by lofting between start and end outer wires */
-        BRepOffsetAPI_ThruSections pipeMaker(Standard_True, Standard_True, precision);
+        BRepOffsetAPI_ThruSections pipeMaker(Standard_True, Standard_True, ctx->precision);
         TopoDS_Wire outerBoundStart = BRepTools::OuterWire(startFace);
         TopoDS_Wire outerBoundEnd = BRepTools::OuterWire(placedEndFace);
         pipeMaker.AddWire(outerBoundStart);
@@ -689,7 +688,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_extruded_tapered(
         {
             if (!startExplorer.Current().IsEqual(outerBoundStart))
             {
-                BRepOffsetAPI_ThruSections voidPipeMaker(Standard_True, Standard_True, precision);
+                BRepOffsetAPI_ThruSections voidPipeMaker(Standard_True, Standard_True, ctx->precision);
                 voidPipeMaker.AddWire(TopoDS::Wire(startExplorer.Current().Reversed()));
                 voidPipeMaker.AddWire(TopoDS::Wire(endExplorer.Current().Reversed()));
                 voidPipeMaker.Build();
@@ -837,7 +836,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_revolved_tapered(
     double axisOriginX, double axisOriginY, double axisOriginZ,
     double axisDirX,    double axisDirY,    double axisDirZ,
     double angle,
-    double precision,
     XbimLocationHandle  locationHandle,
     XbimShapeHandle*    outHandle)
 {
@@ -1026,7 +1024,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_revolved_tapered(
 
         /* Apply tolerance fixing */
         ShapeFix_ShapeTolerance tolFixer;
-        tolFixer.LimitTolerance(solid, precision > 0.0 ? precision : ctx->precision);
+        tolFixer.LimitTolerance(solid, ctx->precision);
 
         *outHandle = xbim_shape_create_from(solid);
         if (!*outHandle)
@@ -1250,7 +1248,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_fixed_reference_swept(
     double refSurfaceOriginX, double refSurfaceOriginY, double refSurfaceOriginZ,
     double refSurfaceNormalX, double refSurfaceNormalY, double refSurfaceNormalZ,
     int    isPlanarReferenceSurface,
-    double precision,
     XbimLocationHandle  locationHandle,
     XbimShapeHandle*    outHandle)
 {
@@ -1294,7 +1291,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_fixed_reference_swept(
 
         TopoDS_Face sweptArea = TopoDS::Face(faceShape);
         TopoDS_Wire directrixWire = TopoDS::Wire(directrixShape);
-        double prec = (precision > 0.0) ? precision : ctx->precision;
+        double prec = ctx->precision;
 
         /* Build the reference surface (a plane through the given origin with given normal) */
         gp_Pnt refOrigin(refSurfaceOriginX, refSurfaceOriginY, refSurfaceOriginZ);
@@ -1438,7 +1435,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_surface_curve_swept(
     XbimShapeHandle     directrixHandle,
     XbimSurfaceHandle   surfaceHandle,
     int                 isPlanarReferenceSurface,
-    double              precision,
     XbimLocationHandle  locationHandle,
     XbimShapeHandle*    outHandle)
 {
@@ -1495,7 +1491,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_surface_curve_swept(
 
         TopoDS_Face sweptArea = TopoDS::Face(faceShape);
         TopoDS_Wire directrixWire = TopoDS::Wire(directrixShape);
-        double prec = (precision > 0.0) ? precision : ctx->precision;
+        double prec = ctx->precision;
 
         /* Analyse directrix wire continuity */
         BRepAdaptor_CompCurve cc(directrixWire, Standard_True);
@@ -1630,7 +1626,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_sectioned_spine(
     XbimShapeHandle          spineHandle,
     const XbimShapeHandle*   sectionHandles,
     int                      numSections,
-    double                   precision,
     XbimShapeHandle*         outHandle)
 {
     xbim_clear_error();
@@ -1811,9 +1806,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_sectioned_spine(
         }
 
         /* Apply tolerance fix */
-        double prec = (precision > 0.0) ? precision : Precision::Confusion();
         ShapeFix_ShapeTolerance tolFixer;
-        tolFixer.LimitTolerance(outerSolid, prec);
+        tolFixer.LimitTolerance(outerSolid, ctx->precision);
         outerSolid.Closed(Standard_True);
 
         *outHandle = xbim_shape_create_from(outerSolid);
@@ -1838,7 +1832,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_thru_sections(
     XbimContextHandle        ctx,
     const XbimShapeHandle*   sectionHandles,
     int                      numSections,
-    double                   precision,
     XbimShapeHandle*         outHandle)
 {
     xbim_clear_error();
@@ -1876,7 +1869,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_solid_build_thru_sections(
             sections[i] = TopoDS::Face(s);
         }
 
-        double prec = (precision > 0.0) ? precision : Precision::Confusion();
+        double prec = ctx->precision;
 
         /* Build outer body: loft through outer wires */
         BRepOffsetAPI_ThruSections outerLoft(Standard_True, Standard_False, prec);

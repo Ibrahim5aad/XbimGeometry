@@ -22,7 +22,6 @@
 XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_build(
     XbimContextHandle ctx,
     double x, double y, double z,
-    double tolerance,
     XbimShapeHandle* outHandle)
 {
     xbim_clear_error();
@@ -34,20 +33,13 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_vertex_build(
     }
     *outHandle = nullptr;
 
-    if (tolerance <= 0.0)
-    {
-        xbim_set_error("xbim_vertex_build: tolerance must be positive");
-        xbim_log_warning(ctx, "Cannot build vertex: non-positive tolerance %g", tolerance);
-        return XBIM_INVALID_ARG;
-    }
-
     try
     {
         gp_Pnt pnt(x, y, z);
 
         BRep_Builder builder;
         TopoDS_Vertex vertex;
-        builder.MakeVertex(vertex, pnt, tolerance);
+        builder.MakeVertex(vertex, pnt, ctx->precision);
 
         if (vertex.IsNull())
         {

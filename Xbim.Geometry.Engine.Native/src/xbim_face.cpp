@@ -564,7 +564,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced(
     XbimShapeHandle          outerWireHandle,
     const XbimShapeHandle*   innerWireHandles,
     int                      numInnerWires,
-    double                   tolerance,
     int                      sameSense,
     XbimShapeHandle*         outHandle)
 {
@@ -624,7 +623,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced(
         }
 
         /* Add parametric curves and determine orientation */
-        bool outerLoopIsCCW = add_parametric_curves(surface, outerWire, tolerance);
+        bool outerLoopIsCCW = add_parametric_curves(surface, outerWire, ctx->precision);
 
         /* Build face with outer wire in correct orientation */
         BRepBuilderAPI_MakeFace faceMaker(
@@ -657,7 +656,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced(
                 if (innerWire.IsNull())
                     continue;
 
-                bool innerLoopIsCCW = add_parametric_curves(surface, innerWire, tolerance);
+                bool innerLoopIsCCW = add_parametric_curves(surface, innerWire, ctx->precision);
                 /* Inner wires must be CW (clockwise) for proper hole definition */
                 if (innerLoopIsCCW)
                     innerWire.Reverse();
@@ -708,7 +707,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced_with_surface(
     XbimShapeHandle          outerWireHandle,
     const XbimShapeHandle*   innerWireHandles,
     int                      numInnerWires,
-    double                   tolerance,
     int                      sameSense,
     XbimShapeHandle*         outHandle)
 {
@@ -765,7 +763,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced_with_surface(
             return XBIM_INVALID_ARG;
         }
 
-        bool outerLoopIsCCW = add_parametric_curves(surface, outerWire, tolerance);
+        bool outerLoopIsCCW = add_parametric_curves(surface, outerWire, ctx->precision);
 
         BRepBuilderAPI_MakeFace faceMaker(
             surface,
@@ -796,7 +794,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_advanced_with_surface(
                 if (innerWire.IsNull())
                     continue;
 
-                bool innerLoopIsCCW = add_parametric_curves(surface, innerWire, tolerance);
+                bool innerLoopIsCCW = add_parametric_curves(surface, innerWire, ctx->precision);
                 if (innerLoopIsCCW)
                     innerWire.Reverse();
 
@@ -848,7 +846,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_curve_bounded_plane(
     XbimShapeHandle          outerWireHandle,
     const XbimShapeHandle*   innerWireHandles,
     int                      numInnerWires,
-    double                   tolerance,
     XbimShapeHandle*         outHandle)
 {
     xbim_clear_error();
@@ -899,7 +896,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_curve_bounded_plane(
 
         /* Determine orientation; for planar surfaces add_parametric_curves
          * skips ShapeFix_Wire but computes the area-based CCW check. */
-        bool outerIsCCW = add_parametric_curves(localSurface, outerWire, tolerance);
+        bool outerIsCCW = add_parametric_curves(localSurface, outerWire, ctx->precision);
 
         BRepBuilderAPI_MakeFace faceMaker(
             localPlane,
@@ -931,7 +928,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_curve_bounded_plane(
                 if (innerWire.IsNull())
                     continue;
 
-                bool innerIsCCW = add_parametric_curves(localSurface, innerWire, tolerance);
+                bool innerIsCCW = add_parametric_curves(localSurface, innerWire, ctx->precision);
                 if (innerIsCCW)
                     innerWire.Reverse();
 
@@ -1259,12 +1256,11 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_get_surface(
 }
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_face_normal_at_point(
+    XbimContextHandle ctx,
     XbimShapeHandle faceHandle,
     double          pointX,
     double          pointY,
     double          pointZ,
-    double          precision,
-    double          tolerance,
     double*         outNormalX,
     double*         outNormalY,
     double*         outNormalZ)
@@ -1304,9 +1300,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_normal_at_point(
         }
 
         ShapeAnalysis_Surface sas(surf);
-        gp_Pnt2d uv = sas.ValueOfUV(gp_Pnt(pointX, pointY, pointZ), precision);
+        gp_Pnt2d uv = sas.ValueOfUV(gp_Pnt(pointX, pointY, pointZ), ctx->precision);
 
-        GeomLProp_SLProps props(surf, uv.X(), uv.Y(), 1, tolerance);
+        GeomLProp_SLProps props(surf, uv.X(), uv.Y(), 1, ctx->precision);
         if (!props.IsNormalDefined())
         {
             xbim_set_error("xbim_face_normal_at_point: normal is undefined at the given point");

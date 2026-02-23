@@ -187,7 +187,7 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
             int result = XbimGeometryNativeApi.xbim_wire_build_trimmed_by_length(
                 NativeContextHandle.NullHandle,
                 Handle,
-                start, end, tolerance,
+                start, end,
                 out var trimmedHandle);
             if (result != 0)
                 throw new XbimGeometryServiceException(

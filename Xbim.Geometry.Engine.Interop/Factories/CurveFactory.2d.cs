@@ -312,14 +312,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                     int r1 = XbimGeometryNativeApi.xbim_curve2d_project_point(
                         ContextHandle, basisCurve.Handle,
-                        px1, py1, _modelService.MinimumGap, out u1);
+                        px1, py1, out u1);
                     if (r1 != 0)
                         throw new XbimGeometryServiceException(
                             $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Trim Point1 is not on the 2D basis curve.");
 
                     int r2 = XbimGeometryNativeApi.xbim_curve2d_project_point(
                         ContextHandle, basisCurve.Handle,
-                        px2, py2, _modelService.MinimumGap, out u2);
+                        px2, py2, out u2);
                     if (r2 != 0)
                         throw new XbimGeometryServiceException(
                             $"IIfcTrimmedCurve #{ifcTrimmed.EntityLabel}: Trim Point2 is not on the 2D basis curve.");
@@ -462,7 +462,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     segments.Select(s => (SafeHandle)s).ToArray());
                 int result = XbimGeometryNativeApi.xbim_curve2d_build_composite_bspline(
                     ContextHandle, nativeSegments.Ptrs, nativeSegments.Length,
-                    _modelService.MinimumGap,
                     out var compositeHandle);
 
                 if (result != 0)
@@ -500,7 +499,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     segmentCurves.Select(c => (SafeHandle)c.Handle).ToArray());
                 int result = XbimGeometryNativeApi.xbim_curve2d_build_composite_bspline(
                     ContextHandle, nativeSegments.Ptrs, nativeSegments.Length,
-                    _modelService.MinimumGap,
                     out var compositeHandle);
 
                 if (result != 0)
@@ -548,7 +546,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     segments.Select(s => (SafeHandle)s).ToArray());
                 int result = XbimGeometryNativeApi.xbim_curve2d_build_composite_bspline(
                     ContextHandle, nativeSegments.Ptrs, nativeSegments.Length,
-                    _modelService.MinimumGap,
                     out var compositeHandle);
 
                 if (result != 0)

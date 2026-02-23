@@ -330,7 +330,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve_handle(
     double startX, double startY, double startZ,
     double endX,   double endY,   double endZ,
     int              sameSense,
-    double           tolerance,
     XbimShapeHandle* outHandle)
 {
     xbim_clear_error();
@@ -369,7 +368,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve_handle(
         TopoDS_Edge edge;
 
         /* If start and end are coincident, build a closed edge (seam) */
-        if (pStart.Distance(pEnd) < tolerance)
+        if (pStart.Distance(pEnd) < ctx->precision)
         {
             BRepBuilderAPI_MakeEdge edgeMaker(curve);
             if (!edgeMaker.IsDone())
@@ -392,13 +391,13 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve_handle(
             double paramStart, paramEnd;
             double distStart, distEnd;
 
-            if (!locate_vertex_on_curve(curve, pStart, tolerance, paramStart, distStart))
+            if (!locate_vertex_on_curve(curve, pStart, ctx->precision, paramStart, distStart))
             {
                 xbim_set_error("xbim_edge_build_from_curve_handle: start vertex not on curve within tolerance");
                 xbim_log_warning(ctx, "Start vertex is not located on the curve within the required tolerance");
                 return XBIM_INVALID_ARG;
             }
-            if (!locate_vertex_on_curve(curve, pEnd, tolerance, paramEnd, distEnd))
+            if (!locate_vertex_on_curve(curve, pEnd, ctx->precision, paramEnd, distEnd))
             {
                 xbim_set_error("xbim_edge_build_from_curve_handle: end vertex not on curve within tolerance");
                 xbim_log_warning(ctx, "End vertex is not located on the curve within the required tolerance");
@@ -461,7 +460,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve2d_handle(
     double             startX, double startY,
     double             endX,   double endY,
     int                sameSense,
-    double             tolerance,
     XbimShapeHandle*   outHandle)
 {
     xbim_clear_error();
@@ -498,7 +496,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_from_curve2d_handle(
         gp_Pnt2d pEnd(endX, endY);
 
         TopoDS_Edge edge;
-        bool isClosed = pStart.Distance(pEnd) < tolerance;
+        bool isClosed = pStart.Distance(pEnd) < ctx->precision;
 
         if (isClosed)
         {

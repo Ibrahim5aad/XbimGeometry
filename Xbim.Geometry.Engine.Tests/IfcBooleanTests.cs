@@ -364,9 +364,13 @@ namespace Xbim.Geometry.Engine.Tests
                         face.OuterBound.IsPlanar.Should().BeFalse();
                     foreach (var edge in face.OuterBound.Edges)
                     {
-                        edge.EdgeGeometry.IsValid.Should().BeTrue();
-                        edge.EdgeStart.IsValid.Should().BeTrue();
-                        edge.EdgeEnd.IsValid.Should().BeTrue();
+                        // Degenerate edges (e.g. vertex loops at sphere poles) have no 3D curve
+                        if (edge.EdgeGeometry != null)
+                            edge.EdgeGeometry.IsValid.Should().BeTrue();
+                        if (edge.EdgeStart != null)
+                            edge.EdgeStart.IsValid.Should().BeTrue();
+                        if (edge.EdgeEnd != null)
+                            edge.EdgeEnd.IsValid.Should().BeTrue();
                     }
                 }
             }

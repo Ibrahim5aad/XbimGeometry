@@ -55,7 +55,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             int result = XbimGeometryNativeApi.xbim_wire_build_polyline(
                 ContextHandle,
                 pointsXYZ, points.Length,
-                _modelService.Precision,
                 out var wireHandle);
 
             if (result != 0)
@@ -122,7 +121,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             int result = XbimGeometryNativeApi.xbim_wire_build_polyline(
                 ContextHandle,
                 pointsXYZ, x.Length,
-                _modelService.Precision,
                 out var wireHandle);
 
             if (result != 0)
@@ -147,7 +145,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 int result = XbimGeometryNativeApi.xbim_wire_build_polyline(
                     ContextHandle,
                     allPointsXYZ.ToArray(), numPoints,
-                    _modelService.Precision,
                     out var wireHandle);
 
                 if (result != 0)
@@ -269,8 +266,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 int buildResult = XbimGeometryNativeApi.xbim_wire_build_from_curves(
                     ContextHandle,
                     nativeCurves.Ptrs, nativeCurves.Length,
-                    _modelService.Precision,
-                    _modelService.MinimumGap,
                     out var wireHandle);
 
                 if (buildResult != 0)
@@ -322,7 +317,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         curve3d.Handle,
                         startPt.X, startPt.Y, startPt.Z,
                         endPt.X, endPt.Y, endPt.Z,
-                        1, _modelService.Precision,
+                        1,
                         out var edgeHandle);
 
                     if (r != 0)
@@ -347,8 +342,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     int r = XbimGeometryNativeApi.xbim_wire_build_from_2d_curves(
                         ContextHandle,
                         curveArray.Ptrs, 1,
-                        _modelService.Precision,
-                        _modelService.MinimumGap,
                         out var wireHandle);
 
                     if (r != 0)
@@ -405,7 +398,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         curve3d.Handle,
                         startPt.X, startPt.Y, startPt.Z,
                         endPt.X, endPt.Y, endPt.Z,
-                        1, _modelService.Precision,
+                        1,
                         out var edgeHandle);
 
                     if (r != 0)
@@ -430,8 +423,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     int r = XbimGeometryNativeApi.xbim_wire_build_from_2d_curves(
                         ContextHandle,
                         curveArray.Ptrs, 1,
-                        _modelService.Precision,
-                        _modelService.MinimumGap,
                         out var wireHandle);
 
                     if (r != 0)
@@ -503,8 +494,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     double.IsNaN(start) ? 0.0 : start,
                     double.IsNaN(end) ? double.MaxValue : end,
                     1, // sameSense
-                    _modelService.Precision,
-                    _modelService.RadianFactor,
                     out var trimmedHandle);
 
                 if (result != 0)
@@ -543,7 +532,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         curve3d.Handle,
                         startPt.X, startPt.Y, startPt.Z,
                         endPt.X, endPt.Y, endPt.Z,
-                        1, _modelService.Precision,
+                        1,
                         out var edgeHandle);
 
                     if (r != 0)
@@ -568,8 +557,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     int r = XbimGeometryNativeApi.xbim_wire_build_from_2d_curves(
                         ContextHandle,
                         curveArray.Ptrs, 1,
-                        _modelService.Precision,
-                        _modelService.MinimumGap,
                         out var wireHandle);
 
                     if (r != 0)
@@ -705,8 +692,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 int buildResult = XbimGeometryNativeApi.xbim_wire_build_from_curves(
                     ContextHandle,
                     nativeCurves.Ptrs, nativeCurves.Length,
-                    _modelService.Precision,
-                    _modelService.MinimumGap,
                     out var wireHandle);
 
                 if (buildResult != 0)
@@ -727,7 +712,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         ContextHandle,
                         wire.Handle,
                         occStart, occEnd,
-                        _modelService.Precision,
                         out var trimmedHandle);
 
                     if (trimResult != 0)
@@ -898,7 +882,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     ContextHandle,
                     wire.Handle,
                     occStart, occEnd,
-                    _modelService.Precision,
                     out var trimmedHandle);
 
                 if (trimResult != 0)

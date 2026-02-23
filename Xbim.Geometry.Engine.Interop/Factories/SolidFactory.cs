@@ -276,7 +276,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 endFace.Handle,
                 dirX, dirY, dirZ,
                 extrudedTapered.Depth,
-                _modelService.Precision,
                 locationHandle,
                 out var NativeShapeHandle);
 
@@ -368,7 +367,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 axisOriginX, axisOriginY, axisOriginZ,
                 axisDirX, axisDirY, axisDirZ,
                 angleRadians,
-                _modelService.Precision,
                 locationHandle,
                 out var NativeShapeHandle);
 
@@ -402,7 +400,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             var sweepWire = filletedWire ?? directrixWire;
 
             int result = XbimGeometryNativeApi.xbim_solid_build_swept_disk(
-                _modelService.ContextHandle,
+                ContextHandle,
                 sweepWire.Handle,
                 sweptDisk.Radius,
                 innerRadius,
@@ -422,10 +420,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 return null;
 
             int filletResult = XbimGeometryNativeApi.xbim_wire_fillet(
-                _modelService.ContextHandle,
+                ContextHandle,
                 directrixWire.Handle,
                 polygonal.FilletRadius.Value,
-                _modelService.Precision,
                 out NativeShapeHandle filletedHandle);
 
             if (filletResult == 0)
@@ -510,7 +507,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 0.0, 0.0, 0.0,
                 refDirX, refDirY, refDirZ,
                 1, // isPlanarReferenceSurface — always planar for fixed reference
-                _modelService.Precision,
                 locationHandle,
                 out var solidHandle);
 
@@ -591,7 +587,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 directrixWire.Handle,
                 refSurface.Handle,
                 isPlanar ? 1 : 0,
-                _modelService.Precision,
                 locationHandle,
                 out var solidHandle);
 
@@ -682,13 +677,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         private NativeShapeHandle BuildClosedShellAsSolid(IIfcConnectedFaceSet faceSet)
         {
-            double tolerance = _modelService.MinimumGap;
             var (pointsXYZ, numPoints, faceData, numFaces) = MarshalFaceSet(faceSet);
 
             int upgrade = _modelService.UpgradeFaceSets ? 1 : 0;
             int result = XbimGeometryNativeApi.xbim_shell_build_connected_face_set(
                 ContextHandle, pointsXYZ, numPoints, faceData, faceData.Length,
-                numFaces, tolerance, 1 /* makeSolid */, upgrade, out var solidHandle);
+                numFaces, 1 /* makeSolid */, upgrade, out var solidHandle);
 
             if (result != 0)
                 throw new XbimGeometryServiceException(
@@ -775,7 +769,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         outerWireHandle,
                         nativeInnerWires.Ptrs,
                         nativeInnerWires.Length,
-                        tolerance,
                         1, // sameSense
                         out faceHandle);
 
@@ -898,11 +891,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         private NativeShapeHandle BuildAdvancedShellAsSolid(IIfcClosedShell closedShell)
         {
-            double tolerance = _modelService.MinimumGap;
             var curveCache = new Dictionary<int, NativeCurveHandle>();
 
             int result = XbimGeometryNativeApi.xbim_advanced_brep_create(
-                ContextHandle, tolerance, out var builder);
+                ContextHandle, out var builder);
 
             if (result != 0)
                 throw new XbimGeometryServiceException(
@@ -1119,14 +1111,13 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         public IXShape Build(IIfcFaceBasedSurfaceModel ifcSurfaceModel)
         {
-            double tolerance = _modelService.MinimumGap;
             var shellHandles = new List<NativeShapeHandle>();
 
             try
             {
                 foreach (var faceSet in ifcSurfaceModel.FbsmFaces)
                 {
-                    var handle = BuildShellFromConnectedFaceSet(faceSet, tolerance);
+                    var handle = BuildShellFromConnectedFaceSet(faceSet);
                     if (handle != null && !handle.IsInvalid)
                         shellHandles.Add(handle);
                 }
@@ -1168,7 +1159,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// Routes to the advanced BRep path when faces are IIfcAdvancedFace.
         /// </summary>
         private NativeShapeHandle? BuildShellFromConnectedFaceSet(
-            IIfcConnectedFaceSet faceSet, double tolerance, bool makeSolid = false,
+            IIfcConnectedFaceSet faceSet, bool makeSolid = false,
             bool upgradeFaceSets = false)
         {
             // Check for advanced faces — delegate to existing advanced BRep path
@@ -1192,7 +1183,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
             int result = XbimGeometryNativeApi.xbim_shell_build_connected_face_set(
                 ContextHandle, pointsXYZ, numPoints, faceData, faceData.Length,
-                numFaces, tolerance, makeSolid ? 1 : 0, upgradeFaceSets ? 1 : 0,
+                numFaces, makeSolid ? 1 : 0, upgradeFaceSets ? 1 : 0,
                 out var shellHandle);
 
             if (result != 0)
@@ -1378,19 +1369,17 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 out double xx, out double xy, out double xz);
 
             int agreementFlag = halfSpace.AgreementFlag ? 1 : 0;
-            double oneMeter = _modelService.OneMeter;
-            double precision = _modelService.Precision;
 
             if (halfSpace is IIfcPolygonalBoundedHalfSpace polyBounded)
                 return BuildPolygonalBoundedHalfSpace(polyBounded,
                     ox, oy, oz, zx, zy, zz, xx, xy, xz,
-                    agreementFlag, oneMeter, precision);
+                    agreementFlag);
 
             // Basic half-space or IfcBoxedHalfSpace (treated identically per IFC spec)
             int result = XbimGeometryNativeApi.xbim_halfspace_build(
                 ContextHandle, surfaceType,
                 ox, oy, oz, zx, zy, zz, xx, xy, xz,
-                radius, agreementFlag, oneMeter, precision,
+                radius, agreementFlag,
                 out NativeShapeHandle outHandle);
 
             if (result != 0)
@@ -1405,7 +1394,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             double surfOx, double surfOy, double surfOz,
             double surfZx, double surfZy, double surfZz,
             double surfXx, double surfXy, double surfXz,
-            int agreementFlag, double oneMeter, double precision)
+            int agreementFlag)
         {
             if (!(polyBounded.BaseSurface is IIfcPlane))
                 throw new XbimGeometryServiceException(
@@ -1467,7 +1456,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 agreementFlag,
                 xCoords, yCoords, pointCount,
                 bOx, bOy, bOz, bZx, bZy, bZz, bXx, bXy, bXz,
-                oneMeter, precision,
                 out var outHandle);
 
             if (result != 0)
@@ -1483,7 +1471,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         public IXShape Build(IIfcShellBasedSurfaceModel ifcSurfaceModel)
         {
-            double tolerance = _modelService.MinimumGap;
             var shellHandles = new List<NativeShapeHandle>();
 
             try
@@ -1502,7 +1489,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                         continue;
                     }
 
-                    var shellHandle = BuildShellFromConnectedFaceSet(faceSet, tolerance);
+                    var shellHandle = BuildShellFromConnectedFaceSet(faceSet);
                     if (shellHandle != null && !shellHandle.IsInvalid)
                         shellHandles.Add(shellHandle);
                 }
@@ -1686,7 +1673,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             int upgrade = _modelService.UpgradeFaceSets ? 1 : 0;
             int result = XbimGeometryNativeApi.xbim_shell_build_connected_face_set(
                 ContextHandle, pointsXYZ, numPoints, faceData, faceData.Length,
-                numFaces, tolerance, isClosed ? 1 : 0, upgrade, out var handle);
+                numFaces, isClosed ? 1 : 0, upgrade, out var handle);
 
             if (result != 0)
                 throw new XbimGeometryServiceException(
@@ -1809,13 +1796,13 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             if (startDist.HasValue)
             {
                 if (XbimGeometryNativeApi.xbim_curve_parameter_at_length(
-                        curve.Handle, startDist.Value, _modelService.Precision, out double sp) == 0)
+                        ContextHandle, curve.Handle, startDist.Value, out double sp) == 0)
                     wireStart = sp;
             }
             if (endDist.HasValue)
             {
                 if (XbimGeometryNativeApi.xbim_curve_parameter_at_length(
-                        curve.Handle, endDist.Value, _modelService.Precision, out double ep) == 0)
+                       ContextHandle, curve.Handle, endDist.Value, out double ep) == 0)
                     wireEnd = ep;
             }
 
@@ -1908,7 +1895,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     wireHandle,
                     nativeSections.Ptrs,
                     nativeSections.Length,
-                    _modelService.Precision,
                     out var solidHandle);
 
                 wireHandle.Dispose();
@@ -2087,7 +2073,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     ContextHandle,
                     nativeSections.Ptrs,
                     nativeSections.Length,
-                    _modelService.Precision,
                     out var solidHandle);
 
                 if (result != 0)
@@ -2192,7 +2177,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     spineWire.Handle,
                     nativeSections.Ptrs,
                     nativeSections.Length,
-                    _modelService.Precision,
                     out var solidHandle);
 
                 if (result != 0)

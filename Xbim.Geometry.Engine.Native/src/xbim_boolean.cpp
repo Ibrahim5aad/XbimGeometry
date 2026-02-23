@@ -728,8 +728,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build(
     double xDirX,   double xDirY,   double xDirZ,
     double radius,
     int    agreementFlag,
-    double oneMeter,
-    double precision,
     XbimShapeHandle*  outHandle)
 {
     xbim_clear_error();
@@ -742,7 +740,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build(
             originX, originY, originZ,
             zDirX, zDirY, zDirZ,
             xDirX, xDirY, xDirZ,
-            radius, agreementFlag, oneMeter, precision,
+            radius, agreementFlag, ctx->oneMeter, ctx->precision,
             face, pointInMaterial))
     {
         return XBIM_ERROR;
@@ -780,8 +778,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_polygonal_bounded(
     double boundaryOriginX, double boundaryOriginY, double boundaryOriginZ,
     double boundaryZDirX,   double boundaryZDirY,   double boundaryZDirZ,
     double boundaryXDirX,   double boundaryXDirY,   double boundaryXDirZ,
-    double oneMeter,
-    double precision,
     XbimShapeHandle*  outHandle)
 {
     xbim_clear_error();
@@ -805,7 +801,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_polygonal_bounded(
             surfaceOriginX, surfaceOriginY, surfaceOriginZ,
             surfaceZDirX, surfaceZDirY, surfaceZDirZ,
             surfaceXDirX, surfaceXDirY, surfaceXDirZ,
-            0.0, agreementFlag, oneMeter, precision,
+            0.0, agreementFlag, ctx->oneMeter, ctx->precision,
             baseFace, pointInMaterial))
     {
         return XBIM_ERROR;
@@ -828,7 +824,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_polygonal_bounded(
             int next = (i + 1) % boundaryPointCount;
             gp_Pnt p1(boundaryPointsX[i], boundaryPointsY[i], 0.0);
             gp_Pnt p2(boundaryPointsX[next], boundaryPointsY[next], 0.0);
-            if (p1.Distance(p2) < precision)
+            if (p1.Distance(p2) < ctx->precision)
                 continue; // skip degenerate edges
             BRepBuilderAPI_MakeEdge edgeMaker(p1, p2);
             if (edgeMaker.IsDone())
@@ -865,7 +861,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_polygonal_bounded(
         TopoDS_Face boundaryFace = faceMaker.Face();
 
         // Step 3: Extrude the boundary face into a prism along Z
-        double shiftDistance = 200.0 * oneMeter;
+        double shiftDistance = 200.0 * ctx->oneMeter;
         BRepPrimAPI_MakePrism prismMaker(boundaryFace, gp_Vec(0, 0, shiftDistance));
         if (!prismMaker.IsDone())
         {
@@ -903,7 +899,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_polygonal_bounded(
 
         int hasWarnings = 0;
         TopoDS_Shape result = perform_boolean(ctx, arguments, tools,
-                                               precision, BOPAlgo_COMMON, hasWarnings, false);
+                                               ctx->precision, BOPAlgo_COMMON, hasWarnings, false);
 
         if (result.IsNull())
         {

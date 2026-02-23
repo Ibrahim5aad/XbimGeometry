@@ -217,7 +217,6 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         public IXbimGeometryObject TransformShallow(XbimMatrix3D matrix3D)
         {
-            // OCCT shapes share underlying geometry, so moved == shallow transform
             return ApplyMatrix(matrix3D);
         }
 
@@ -242,12 +241,13 @@ namespace Xbim.Geometry.Engine.Interop.Shapes
 
         private XbimShape ApplyMatrix(XbimMatrix3D m)
         {
+            // scale is baked into the rotation part
             int result = XbimGeometryNativeApi.xbim_shape_gtransform(
                 Handle,
                 m.M11, m.M21, m.M31, m.OffsetX,
                 m.M12, m.M22, m.M32, m.OffsetY,
                 m.M13, m.M23, m.M33, m.OffsetZ,
-                m.M44, m.M44, m.M44,
+                1, 1, 1,
                 out var transformedHandle);
 
             if (result != 0)

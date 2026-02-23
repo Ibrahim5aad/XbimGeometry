@@ -169,8 +169,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_curves(
     XbimContextHandle         ctx,
     const XbimCurveHandle*    curveHandles,
     int                       numCurves,
-    double                    tolerance,
-    double                    gapSize,
     XbimShapeHandle*          outHandle)
 {
     xbim_clear_error();
@@ -257,16 +255,16 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_curves(
 
                 double gap = segStartPoint.Distance(lastEdgeEndPoint);
 
-                if (gap > gapSize)
+                if (gap > ctx->minimumGap)
                 {
-                    if (gap > 1000.0 * gapSize)
+                    if (gap > 1000.0 * ctx->minimumGap)
                     {
                         xbim_set_error("xbim_wire_build_from_curves: segments are not contiguous");
                         return XBIM_ERROR;
                     }
                     xbim_log_warning(ctx,
-                        "xbim_wire_build_from_curves: gap %.6g at edge %d exceeds gapSize %.6g, wire may be discontinuous",
-                        gap, idx, gapSize);
+                        "xbim_wire_build_from_curves: gap %.6g at edge %d exceeds minimumGap %.6g, wire may be discontinuous",
+                        gap, idx, ctx->minimumGap);
                 }
 
                 /* Periodic/non-periodic transition handling:
@@ -285,7 +283,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_curves(
                             gp_Lin newLine(lastSegStartPoint, dir);
                             Handle(Geom_Line) hLine = new Geom_Line(newLine);
                             Handle(Geom_TrimmedCurve) newSegment = new Geom_TrimmedCurve(hLine, 0, dirMag);
-                            builder.UpdateVertex(TopExp::LastVertex(TopoDS::Edge(edges.Last())), segStartPoint, tolerance);
+                            builder.UpdateVertex(TopExp::LastVertex(TopoDS::Edge(edges.Last())), segStartPoint, ctx->precision);
                             BRepBuilderAPI_MakeEdge edgeMaker(newSegment,
                                 TopExp::FirstVertex(TopoDS::Edge(edges.Last())),
                                 TopExp::LastVertex(TopoDS::Edge(edges.Last())));
@@ -325,7 +323,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_curves(
 
                 /* Check for wire closure */
                 TopoDS_Vertex segEndVertex;
-                if (idx == numCurves - 1 && theFirstPoint.Distance(segEndPoint) < gapSize)
+                if (idx == numCurves - 1 && theFirstPoint.Distance(segEndPoint) < ctx->minimumGap)
                 {
                     isClosed = true;
                     double closingGap = segEndPoint.Distance(theFirstPoint);
@@ -334,7 +332,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_curves(
                 }
                 else
                 {
-                    builder.MakeVertex(segEndVertex, segEndPoint, tolerance);
+                    builder.MakeVertex(segEndVertex, segEndPoint, ctx->precision);
                 }
 
                 /* Build edge with shared vertices */
@@ -401,7 +399,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polyline(
     XbimContextHandle ctx,
     const double*     pointsXYZ,
     int               numPoints,
-    double            tolerance,
     XbimShapeHandle*  outHandle)
 {
     xbim_clear_error();
@@ -440,7 +437,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polyline(
                 gp_Vec edgeVec(lastPt, pt);
                 double segLen = edgeVec.Magnitude();
 
-                if (segLen < tolerance + vtxTol)
+                if (segLen < ctx->precision + vtxTol)
                 {
                     /* Merge into the previous vertex */
                     gp_Pnt midPt = lastPt.Translated(edgeVec.Divided(2));
@@ -464,7 +461,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polyline(
         /* Check if the polyline is closed (first/last points within tolerance) */
         gp_Pnt firstPt = BRep_Tool::Pnt(TopoDS::Vertex(vertices.First()));
         gp_Pnt lastPt = BRep_Tool::Pnt(TopoDS::Vertex(vertices.Last()));
-        bool closed = (vertices.Length() > 2) && (firstPt.Distance(lastPt) <= tolerance);
+        bool closed = (vertices.Length() > 2) && (firstPt.Distance(lastPt) <= ctx->precision);
 
         /* If closed, drop the duplicate last vertex — the closing edge
          * will reuse the first vertex to produce proper shared topology. */
@@ -610,8 +607,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_2d_curves(
     XbimContextHandle   ctx,
     XbimCurve2dHandle*  curves,
     int                 numCurves,
-    double              tolerance,
-    double              gapSize,
     XbimShapeHandle*    outWire)
 {
     xbim_clear_error();
@@ -676,11 +671,11 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_2d_curves(
                 gp_Pnt segEndPoint(segEnd2d.X(), segEnd2d.Y(), 0);
 
                 double gap = segStartPoint.Distance(lastEdgeEndPoint);
-                if (gap > gapSize)
+                if (gap > ctx->minimumGap)
                 {
                     xbim_log_warning(ctx,
-                        "xbim_wire_build_from_2d_curves: segment %d gap %.6f exceeds gapSize %.6f",
-                        i, gap, gapSize);
+                        "xbim_wire_build_from_2d_curves: segment %d gap %.6f exceeds minimumGap %.6f",
+                        i, gap, ctx->minimumGap);
                 }
 
                 /* Adjust vertex tolerance to bridge the gap */
@@ -694,7 +689,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_2d_curves(
 
                 /* Check if this is the last segment and closes the wire */
                 TopoDS_Vertex segEndVertex;
-                if (i == numCurves - 1 && theFirstPoint.Distance(segEndPoint) < gapSize)
+                if (i == numCurves - 1 && theFirstPoint.Distance(segEndPoint) < ctx->minimumGap)
                 {
                     isClosed = true;
                     double closingGap = segEndPoint.Distance(theFirstPoint);
@@ -708,7 +703,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_2d_curves(
                 }
                 else
                 {
-                    builder.MakeVertex(segEndVertex, segEndPoint, tolerance);
+                    builder.MakeVertex(segEndVertex, segEndPoint, ctx->precision);
                 }
 
                 BRepBuilderAPI_MakeEdge2d edgeMaker(
@@ -737,7 +732,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_2d_curves(
             }
 
             /* Generate 3D curve from the 2D edge */
-            bool ok = BRepLib::BuildCurve3d(anEdge, tolerance);
+            bool ok = BRepLib::BuildCurve3d(anEdge, ctx->precision);
             if (ok)
                 edges.Append(anEdge);
             else
@@ -782,7 +777,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_centerline_profile(
     XbimContextHandle   ctx,
     XbimCurve2dHandle   centreLineHandle,
     double              thickness,
-    double              tolerance,
     XbimShapeHandle*    outWire)
 {
     xbim_clear_error();
@@ -860,10 +854,10 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_centerline_profile(
         BRepBuilderAPI_MakeEdge2d edgeStartCap(lineStartCap.Value());
 
         /* Generate 3D curves for all edges */
-        BRepLib::BuildCurve3d(edgeA.Edge(), tolerance);
-        BRepLib::BuildCurve3d(edgeEndCap.Edge(), tolerance);
-        BRepLib::BuildCurve3d(edgeB.Edge(), tolerance);
-        BRepLib::BuildCurve3d(edgeStartCap.Edge(), tolerance);
+        BRepLib::BuildCurve3d(edgeA.Edge(), ctx->precision);
+        BRepLib::BuildCurve3d(edgeEndCap.Edge(), ctx->precision);
+        BRepLib::BuildCurve3d(edgeB.Edge(), ctx->precision);
+        BRepLib::BuildCurve3d(edgeStartCap.Edge(), ctx->precision);
 
         /* Assemble wire: reverse inner arc edge orientation (not the curve)
            so the edge traverses bEnd→bStart without modifying the offset curve */
@@ -1244,8 +1238,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed(
     double            u1,
     double            u2,
     int               sameSense,
-    double            tolerance,
-    double            radianFactor,
     XbimShapeHandle*  outHandle)
 {
     xbim_clear_error();
@@ -1312,8 +1304,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed(
             if (isAngularConic)
             {
                 /* Convert IFC angle parameters to radians */
-                Standard_Real a1 = u1 * radianFactor;
-                Standard_Real a2 = u2 * radianFactor;
+                Standard_Real a1 = u1 * ctx->radianFactor;
+                Standard_Real a2 = u2 * ctx->radianFactor;
 
                 /* Normalize to 0..2π */
                 const Standard_Real per = 2.0 * M_PI;
@@ -1472,7 +1464,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed(
  *   wireHandle – the basis wire to trim
  *   arcStart  – start position in arc-length units from wire start
  *   arcEnd    – end position in arc-length units from wire start
- *   tolerance – geometric tolerance for edge construction
  *   outHandle – receives the trimmed wire
  *
  * Returns XBIM_OK on success.
@@ -1482,7 +1473,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed_by_length(
     XbimShapeHandle   wireHandle,
     double            arcStart,
     double            arcEnd,
-    double            tolerance,
     XbimShapeHandle*  outHandle)
 {
     xbim_clear_error();
@@ -1640,8 +1630,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed_by_points(
     double            u2,
     int               preferCartesian,
     int               sameSense,
-    double            tolerance,
-    double            radianFactor,
     XbimShapeHandle*  outHandle)
 {
     xbim_clear_error();
@@ -1667,8 +1655,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed_by_points(
         if (preferCartesian)
         {
             double param1, param2;
-            XbimResult r1 = xbim_wire_get_parameter(wireHandle, p1X, p1Y, p1Z, tolerance, &param1);
-            XbimResult r2 = xbim_wire_get_parameter(wireHandle, p2X, p2Y, p2Z, tolerance, &param2);
+            XbimResult r1 = xbim_wire_get_parameter(wireHandle, p1X, p1Y, p1Z, ctx->precision, &param1);
+            XbimResult r2 = xbim_wire_get_parameter(wireHandle, p2X, p2Y, p2Z, ctx->precision, &param2);
 
             if (r1 == XBIM_OK && r2 == XBIM_OK)
             {
@@ -1681,7 +1669,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_trimmed_by_points(
             }
         }
 
-        return xbim_wire_build_trimmed(ctx, wireHandle, first, last, sameSense, tolerance, radianFactor, outHandle);
+        return xbim_wire_build_trimmed(ctx, wireHandle, first, last, sameSense, outHandle);
     }
     catch (const Standard_Failure& e)
     {
@@ -1696,7 +1684,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_fillet(
     XbimContextHandle ctx,
     XbimShapeHandle   wireHandle,
     double            filletRadius,
-    double            tolerance,
     XbimShapeHandle*  outHandle)
 {
     xbim_clear_error();

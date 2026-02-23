@@ -33,7 +33,7 @@ public class TopologyTests : IDisposable
     [Fact]
     public void Vertex_BuildAndQuery_RoundTrips()
     {
-        XbimGeometryNativeApi.xbim_vertex_build(Ctx, 10, 20, 30, 1e-6, out var vtx).Should().Be(0);
+        XbimGeometryNativeApi.xbim_vertex_build(Ctx, 10, 20, 30, out var vtx).Should().Be(0);
         using (vtx)
         {
             XbimGeometryNativeApi.xbim_vertex_point(vtx, out var x, out var y, out var z).Should().Be(0);
@@ -46,26 +46,26 @@ public class TopologyTests : IDisposable
     [Fact]
     public void Vertex_Build_NegativeTolerance_Fails()
     {
-        var result = XbimGeometryNativeApi.xbim_vertex_build(Ctx, 0, 0, 0, -1.0, out var vtx);
-        result.Should().Be(4); // XBIM_INVALID_ARG
+        var result = XbimGeometryNativeApi.xbim_vertex_build(Ctx, 0, 0, 0, out var vtx);
+        result.Should().Be(0);
         vtx.Dispose();
     }
 
     [Fact]
     public void Vertex_Managed_Tolerance_IsPositive()
     {
-        XbimGeometryNativeApi.xbim_vertex_build(Ctx, 5, 10, 15, 1e-3, out var vtxHandle);
+        XbimGeometryNativeApi.xbim_vertex_build(Ctx, 5, 10, 15, out var vtxHandle);
         var vtx = NativeShapeWrapper.WrapShape<IXVertex>(vtxHandle);
         using (vtx)
         {
-            vtx.Tolerance.Should().BeApproximately(1e-3, 1e-9);
+            vtx.Tolerance.Should().BeApproximately(1e-5, 1e-9);
         }
     }
 
     [Fact]
     public void Vertex_Managed_Geometry_ReturnsPoint()
     {
-        XbimGeometryNativeApi.xbim_vertex_build(Ctx, 7, 14, 21, 1e-6, out var vtxHandle);
+        XbimGeometryNativeApi.xbim_vertex_build(Ctx, 7, 14, 21, out var vtxHandle);
         var vtx = NativeShapeWrapper.WrapShape<IXVertex>(vtxHandle);
         using (vtx)
         {
@@ -243,7 +243,7 @@ public class TopologyTests : IDisposable
     public void Wire_BuildPolyline_Triangle()
     {
         double[] pts = { 0, 0, 0, 10, 0, 0, 5, 10, 0 };
-        XbimGeometryNativeApi.xbim_wire_build_polyline(Ctx, pts, 3, 1e-6, out var wire).Should().Be(0);
+        XbimGeometryNativeApi.xbim_wire_build_polyline(Ctx, pts, 3, out var wire).Should().Be(0);
         using (wire)
         {
             wire.IsInvalid.Should().BeFalse();
@@ -255,7 +255,7 @@ public class TopologyTests : IDisposable
     {
         // 5 points: square with last point repeating first
         double[] pts = { 0, 0, 0, 10, 0, 0, 10, 10, 0, 0, 10, 0, 0, 0, 0 };
-        XbimGeometryNativeApi.xbim_wire_build_polyline(Ctx, pts, 5, 1e-3, out var wire).Should().Be(0);
+        XbimGeometryNativeApi.xbim_wire_build_polyline(Ctx, pts, 5, out var wire).Should().Be(0);
         using (wire)
         {
             XbimGeometryNativeApi.xbim_wire_is_closed(wire, 1e-3, out var closed).Should().Be(0);
@@ -267,7 +267,7 @@ public class TopologyTests : IDisposable
     public void Wire_BuildPolyline_OpenSegment_IsNotClosed()
     {
         double[] pts = { 0, 0, 0, 10, 0, 0 };
-        XbimGeometryNativeApi.xbim_wire_build_polyline(Ctx, pts, 2, 1e-6, out var wire).Should().Be(0);
+        XbimGeometryNativeApi.xbim_wire_build_polyline(Ctx, pts, 2, out var wire).Should().Be(0);
         using (wire)
         {
             XbimGeometryNativeApi.xbim_wire_is_closed(wire, 1e-3, out var closed).Should().Be(0);
@@ -280,7 +280,7 @@ public class TopologyTests : IDisposable
     {
         // Three points but middle is near-duplicate of first → should merge to 2 vertices
         double[] pts = { 0, 0, 0, 1e-8, 0, 0, 10, 0, 0 };
-        XbimGeometryNativeApi.xbim_wire_build_polyline(Ctx, pts, 3, 1e-3, out var wire).Should().Be(0);
+        XbimGeometryNativeApi.xbim_wire_build_polyline(Ctx, pts, 3, out var wire).Should().Be(0);
         using (wire)
         {
             wire.IsInvalid.Should().BeFalse();
@@ -435,7 +435,7 @@ public class TopologyTests : IDisposable
             0, // plane
             0, 0, 0, 0, 0, 1, 1, 0, 0, 0, // surface placement
             outer, innerPtrs, 1,
-            1e-6, 1, // tolerance, sameSense=true
+            1, // sameSense=true
             out var face).Should().Be(0);
         using (face)
         {

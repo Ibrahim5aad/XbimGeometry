@@ -550,9 +550,6 @@ namespace Xbim.Geometry.Engine.Interop.Services
 
         public IXbimSolidSet CreateGrid(IIfcGrid grid, ILogger logger)
         {
-            double precision = grid.Model.ModelFactors.Precision;
-            double mm = Math.Max(grid.Model.ModelFactors.OneMilliMeter, precision * 10);
-
             var curveFactory = (CurveFactory)_service.CurveFactory;
 
             var uHandles = BuildGridAxisCurves(grid.UAxes, curveFactory, logger);
@@ -573,7 +570,6 @@ namespace Xbim.Geometry.Engine.Interop.Services
                     uArray.Ptrs, uArray.Length,
                     vArray.Ptrs, vArray.Length,
                     wArray.Ptrs, wArray.Length,
-                    precision, mm,
                     out var shapeHandle);
 
                 if (result != 0)
@@ -698,7 +694,7 @@ namespace Xbim.Geometry.Engine.Interop.Services
         public IXbimVertex CreateVertexPoint(XbimPoint3D point, double precision)
         {
             int result = XbimGeometryNativeApi.xbim_vertex_build(
-                _service.ContextHandle, point.X, point.Y, point.Z, precision, out var handle);
+                _service.ContextHandle, point.X, point.Y, point.Z, out var handle);
             if (result != 0)
                 throw new XbimGeometryServiceException(
                     $"Failed to create vertex: {XbimGeometryNativeApi.GetLastError()}");

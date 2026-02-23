@@ -292,7 +292,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     outerWire.Handle,
                     innerWireArray.Ptrs,
                     innerWireArray.Length,
-                    _modelService.Precision,
                     out var faceHandle);
 
                 if (result != 0)

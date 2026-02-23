@@ -625,9 +625,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_length(
 
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_parameter_at_length(
+    XbimContextHandle ctx,
     XbimCurveHandle handle,
     double          arcLength,
-    double          tolerance,
     double*         outParameter)
 {
     xbim_clear_error();
@@ -666,13 +666,13 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_parameter_at_length(
             startParam = 0.0;
         }
 
-        if (std::abs(arcLength) < tolerance)
+        if (std::abs(arcLength) < ctx->precision)
         {
             *outParameter = startParam;
             return XBIM_OK;
         }
 
-        GCPnts_AbscissaPoint abscissa(adaptor, arcLength, startParam, tolerance);
+        GCPnts_AbscissaPoint abscissa(adaptor, arcLength, startParam, ctx->precision);
         if (!abscissa.IsDone())
         {
             xbim_set_error("xbim_curve_parameter_at_length: "
@@ -845,7 +845,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_project_point_3d(
     XbimContextHandle ctx,
     XbimCurveHandle   curveHandle,
     double px, double py, double pz,
-    double tolerance,
     double* outParam)
 {
     xbim_clear_error();
@@ -868,7 +867,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_project_point_3d(
         gp_Pnt pnt(px, py, pz);
         double param = 0.0;
 
-        if (!GeomLib_Tool::Parameter(curveHandle->curve, pnt, tolerance, param))
+        if (!GeomLib_Tool::Parameter(curveHandle->curve, pnt, ctx->minimumGap, param))
         {
             xbim_set_error("xbim_curve_project_point_3d: point projection found no solution");
             return XBIM_ERROR;
@@ -1323,7 +1322,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_composite_bspline(
     XbimContextHandle   ctx,
     XbimCurveHandle*    curves,
     int                 numCurves,
-    double              tolerance,
     XbimCurveHandle*    outHandle)
 {
     xbim_clear_error();
@@ -1371,20 +1369,20 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_composite_bspline(
             if (hasPrev)
             {
                 gp_Pnt startPt = bounded->Value(first);
-                if (!prevEnd.IsEqual(startPt, tolerance))
+                if (!prevEnd.IsEqual(startPt, ctx->minimumGap))
                 {
                     gp_Dir gapDir(gp_Vec(prevEnd, startPt));
                     double gapLen = prevEnd.Distance(startPt);
                     Handle(Geom_TrimmedCurve) gapLine = new Geom_TrimmedCurve(
                         new Geom_Line(prevEnd, gapDir), 0.0, gapLen);
-                    converter.Add(gapLine, tolerance, Standard_True, Standard_False);
+                    converter.Add(gapLine, ctx->minimumGap, Standard_True, Standard_False);
                 }
             }
 
             /* Try to add directly, approximate if needed */
             Handle(Geom_BSplineCurve) toAdd;
 
-            if (!converter.Add(bounded, tolerance, Standard_True, Standard_False))
+            if (!converter.Add(bounded, ctx->minimumGap, Standard_True, Standard_False))
             {
                 int n = std::max(200, static_cast<int>(std::abs(last - first) * 10) + 1);
                 toAdd = ApproximateCurve3d(bounded, first, last, n);
@@ -1392,7 +1390,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_composite_bspline(
 
             if (!toAdd.IsNull())
             {
-                if (!converter.Add(toAdd, tolerance, Standard_True, Standard_False))
+                if (!converter.Add(toAdd, ctx->minimumGap, Standard_True, Standard_False))
                 {
                     xbim_log_warning(ctx,
                         "xbim_curve_build_composite_bspline: failed to add curve %d after approximation", i);
