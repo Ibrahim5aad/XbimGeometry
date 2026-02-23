@@ -96,11 +96,13 @@ TopoDS_Edge xbim_brep_build_orient_edge(
     int endVertexLabel,
     int sameSense);
 
-/* Build a wire loop from edge data, populating outerLoop or innerLoops */
+/* Build a wire loop from edge data, populating outerLoop or innerLoops.
+ * buildRuledSurface: skip pcurve addition when the surface will be rebuilt. */
 void xbim_brep_build_loop_wire(
     XbimAdvancedBrepBuilder_& b,
     const XbimBrepBoundData& boundData,
     const TopoDS_Face& face,
+    bool buildRuledSurface,
     TopoDS_Wire& outerLoop,
     std::vector<TopoDS_Wire>& innerLoops);
 

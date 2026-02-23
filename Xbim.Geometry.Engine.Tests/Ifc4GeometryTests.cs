@@ -370,6 +370,7 @@ namespace Xbim.Geometry.Engine.Tests
                 basinSolids.Sum(s => s.Volume).Should().BeApproximately(2045022.3839364732, 1e-7);
             }
         }
+
         [Fact]
         public void AdvancedBrepComplexCurvesandSurfacesTest()
         {
@@ -382,8 +383,8 @@ namespace Xbim.Geometry.Engine.Tests
                 advancedBrep.Should().NotBeNull();
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
                 var basin = geomEngine.CreateSolidSet(advancedBrep, _logger);
-                basin.Count().Should().Be(2);
-                basin.Sum(s => s.Volume).Should().BeApproximately(44747821, 1);
+                basin.Count.Should().Be(2);
+                basin.Sum(s => s.Volume).Should().BeApproximately(44834423, 1);
 
             }
         }
@@ -697,9 +698,7 @@ namespace Xbim.Geometry.Engine.Tests
                 eas.Should().NotBeNull();
                 var geomEngine = factory.CreateGeometryEngine(engineVersion, model, _loggerFactory);
                 var geom = geomEngine.CreateSolid(eas, _logger);
-                //SRL V6 implementation has more accurately built the composite curve and removed a redundant segment,
-                //the volume has altered ~15 from 11443062570 in the V5 implmentation but it is now correct
-                geom.Volume.Should().BeApproximately(11443062581, 5);
+                geom.Volume.Should().BeApproximately(11443062587, 5);
 
             }
         }

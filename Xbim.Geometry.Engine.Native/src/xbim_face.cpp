@@ -214,8 +214,13 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_unbounded_from_surface(
             return XBIM_NULL_SHAPE;
         }
 
+        /* For planes, use the gp_Pln constructor directly — no tolerance needed. */
         BRepBuilderAPI_MakeFace faceMaker;
-        faceMaker.Init(surface, Standard_False, tolerance);
+        Handle(Geom_Plane) geomPlane = Handle(Geom_Plane)::DownCast(surface);
+        if (!geomPlane.IsNull())
+            faceMaker = BRepBuilderAPI_MakeFace(geomPlane->Pln());
+        else
+            faceMaker.Init(surface, Standard_False, tolerance);
 
         if (!faceMaker.IsDone())
         {

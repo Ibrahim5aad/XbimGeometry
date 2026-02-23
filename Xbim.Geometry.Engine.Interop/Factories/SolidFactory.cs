@@ -2027,8 +2027,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     double xDirZ = refDirZ;
 
                     // Apply cant tilt from SegmentedReferenceCurve (if present)
-                    // Rotate xDir around tangent by cantTilt (same order as old engine:
-                    // rotate raw refDir first, let gp_Ax3 orthogonalize after)
+                    // Rotate xDir around tangent by cantTilt 
                     int tiltResult = XbimGeometryNativeApi.xbim_curve_get_superelevation_and_tilt(
                         curveHandle, param, out _, out double cantTilt);
                     if (tiltResult == 0 && Math.Abs(cantTilt) > 1e-15)

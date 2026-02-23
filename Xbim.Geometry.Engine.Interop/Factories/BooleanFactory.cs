@@ -53,15 +53,17 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 return BuildFlattenedBooleanChain(boolResult, chainOp, leftOperand, rightOperands);
             }
 
-            // Single-level boolean: build operands and perform pairwise operation
+            // Single-level boolean: build operands and perform pairwise operation.
+            // secondHandle is always consumed; exactly one of firstHandle/outHandle
+            // is returned to the caller, the other is disposed.
             var firstHandle = BuildOperand(boolResult.FirstOperand);
-            NativeShapeHandle secondHandle;
+            NativeShapeHandle secondHandle = null;
 
             try
             {
                 secondHandle = BuildOperand(boolResult.SecondOperand);
             }
-            catch (NotSupportedException ex)
+            catch (Exception ex)
             {
                 _logger.LogWarning(ex,
                     "Boolean result #{Label}: second operand failed, returning first operand unchanged.",
@@ -72,13 +74,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             // Null or invalid second operand → return first operand unchanged
             // (common in IFC models with degenerate half-spaces)
             if (secondHandle == null || secondHandle.IsInvalid)
-            {
-                secondHandle?.Dispose();
                 return firstHandle;
-            }
 
             double fuzzyTolerance = _modelService.Model.ModelFactors.PrecisionBoolean;
-            NativeShapeHandle outHandle;
             int hasWarnings;
             int result;
 
@@ -87,40 +85,49 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 case IfcBooleanOperator.UNION:
                     result = XbimGeometryNativeApi.xbim_boolean_union(
                         ContextHandle, firstHandle, secondHandle,
-                        fuzzyTolerance, out hasWarnings, out outHandle);
-                    break;
+                        fuzzyTolerance, out hasWarnings, out var outUnion);
+                    return FinishBoolean(boolResult, result, hasWarnings, firstHandle, outUnion);
                 case IfcBooleanOperator.DIFFERENCE:
                     result = XbimGeometryNativeApi.xbim_boolean_cut(
                         ContextHandle, firstHandle, secondHandle,
-                        fuzzyTolerance, out hasWarnings, out outHandle);
-                    break;
+                        fuzzyTolerance, out hasWarnings, out var outCut);
+                    return FinishBoolean(boolResult, result, hasWarnings, firstHandle, outCut);
                 case IfcBooleanOperator.INTERSECTION:
                     result = XbimGeometryNativeApi.xbim_boolean_intersect(
                         ContextHandle, firstHandle, secondHandle,
-                        fuzzyTolerance, out hasWarnings, out outHandle);
-                    break;
+                        fuzzyTolerance, out hasWarnings, out var outIntersect);
+                    return FinishBoolean(boolResult, result, hasWarnings, firstHandle, outIntersect);
                 default:
                     firstHandle.Dispose();
-                    secondHandle?.Dispose();
                     throw new NotSupportedException(
                         $"Boolean operator {boolResult.Operator} is not supported.");
             }
+        }
 
-            firstHandle.Dispose();
-            secondHandle?.Dispose();
-
+        /// <summary>
+        /// Evaluates the result of a pairwise boolean operation. On success returns
+        /// outHandle and disposes firstHandle. On failure returns firstHandle as
+        /// fallback and disposes outHandle.
+        /// </summary>
+        private NativeShapeHandle FinishBoolean(
+            IIfcBooleanResult boolResult, int result, int hasWarnings,
+            NativeShapeHandle firstHandle, NativeShapeHandle outHandle)
+        {
             if (hasWarnings != 0)
                 _logger.LogDebug("Boolean {Operator} #{Label} issued warnings.",
                     boolResult.Operator, boolResult.EntityLabel);
 
-            if (result != 0)
-                throw new XbimGeometryServiceException(
-                    $"Boolean {boolResult.Operator} #{boolResult.EntityLabel} failed: {XbimGeometryNativeApi.GetLastError()}");
+            if (result != 0 || outHandle == null || outHandle.IsInvalid)
+            {
+                _logger.LogWarning(
+                    "Boolean {Operator} #{Label} failed ({Error}), returning first operand.",
+                    boolResult.Operator, boolResult.EntityLabel,
+                    result != 0 ? XbimGeometryNativeApi.GetLastError() : "empty result");
+                outHandle?.Dispose();
+                return firstHandle;
+            }
 
-            if (outHandle == null || outHandle.IsInvalid)
-                throw new XbimGeometryServiceException(
-                    $"Boolean {boolResult.Operator} #{boolResult.EntityLabel} returned an empty shape.");
-
+            firstHandle.Dispose();
             return outHandle;
         }
 
@@ -262,6 +269,10 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     };
                 }
 
+                // Capture error message BEFORE disposing handles, because
+                // xbim_shape_destroy calls xbim_clear_error() which would wipe it.
+                string nativeError = result != 0 ? XbimGeometryNativeApi.GetLastError() : null;
+
                 // Dispose input handles (NativeHandleArray refs already released)
                 leftHandle.Dispose();
                 leftHandle = null;
@@ -274,7 +285,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                 if (result != 0)
                     throw new XbimGeometryServiceException(
-                        $"Boolean {op} chain #{rootResult.EntityLabel} failed: {XbimGeometryNativeApi.GetLastError()}");
+                        $"Boolean {op} chain #{rootResult.EntityLabel} failed: {nativeError}");
 
                 if (outHandle == null || outHandle.IsInvalid)
                     throw new XbimGeometryServiceException(

@@ -111,18 +111,22 @@ TopoDS_Shape perform_boolean(
         {
             TopoDS_Shape result = bop.Shape();
             BRepCheck_Analyzer analyzer(result);
-            if (!analyzer.IsValid())
+            bool isValid = analyzer.IsValid();
+
+            if (!isValid)
             {
                 xbim_log_warning(ctx, "Boolean resulting shape is invalid, skipping SimplifyResult().");
-            }
-            else
-            {
-                bop.SimplifyResult(true, true, Precision::Angular());
+                // Return the invalid result as-is. In OCCT 7.9.3, accessing
+                // DSFiller() after an invalid result can throw Standard_TypeMismatch.
+                // The managed layer's graceful fallback handles this downstream.
+                return trim_topology(result);
             }
 
+            bop.SimplifyResult(true, true, Precision::Angular());
+
             // Detect self-intersection acquired during boolean — fix shapes and retry once
-            if (bop.DSFiller()->HasWarning(STANDARD_TYPE(BOPAlgo_AlertAcquiredSelfIntersection))
-                && !attemptingFix)
+            if (!attemptingFix
+                && bop.DSFiller()->HasWarning(STANDARD_TYPE(BOPAlgo_AlertAcquiredSelfIntersection)))
             {
                 TopTools_ListOfShape fixedArguments;
                 TopTools_ListOfShape fixedTools;

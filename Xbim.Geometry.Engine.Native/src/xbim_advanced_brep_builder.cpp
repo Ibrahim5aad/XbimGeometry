@@ -31,8 +31,6 @@
 #include <TopoDS.hxx>
 #include <Geom_TrimmedCurve.hxx>
 #include <Geom_Plane.hxx>
-#include <GProp_GProps.hxx>
-#include <BRepGProp.hxx>
 
 
 /* ──────────────────────────── helpers ──────────────────────────── */
@@ -109,12 +107,16 @@ static bool within_tolerance(
 {
     try
     {
+        /* Use tolerance * 10 matching old NativeAdvancedFacesBuilder::WithinTolerance */
+        double tol10 = tolerance * 10;
+        BRepExtrema_DistShapeShape measure;
+        measure.LoadS1(face);
         for (TopExp_Explorer edgeExp(wire, TopAbs_EDGE); edgeExp.More(); edgeExp.Next())
         {
-            BRepExtrema_DistShapeShape distCalc(edgeExp.Current(), face);
-            if (!distCalc.IsDone())
+            measure.LoadS2(edgeExp.Current());
+            if (!measure.Perform() || !measure.IsDone())
                 return false;
-            if (distCalc.Value() > tolerance)
+            if (measure.Value() > tol10)
                 return false;
         }
         return true;
@@ -162,15 +164,12 @@ static bool rebuild_ruled_surface(
             outerWire = wf.Wire();
     };
 
-    /* Try BRepFill::Face for 4-edge loops with exactly 2 non-line edges.
+    /* Try BRepFill::Face for 4-edge loops with at least 2 non-line edges.
      *
-     * In a 4-edge wire (curve → line → curve → line) explored in wire order,
-     * the two curve edges are ALWAYS anti-parallel relative to the ruling:
-     * curve1 goes A→B while curve2 goes C→D in wire order, but for a correct
-     * ruled surface we need them oriented the same way (D→C in this example).
-     * This is a topological fact, so we always reverse the second curve —
-     * matching the old NativeAdvancedFacesBuilder::BuildFace behaviour. */
-    if (allEdges.size() == 4 && curveEdges.size() == 2)
+     * The old engine iterates edges and picks the first 2 non-line curves,
+     * reversing the second one, then breaks. This works even when the loop
+     * has 3 non-line edges (e.g. BSpline + Circle + BSpline + Line). */
+    if (allEdges.size() == 4 && curveEdges.size() >= 2)
     {
         try
         {
@@ -178,8 +177,11 @@ static bool rebuild_ruled_surface(
             TopoDS_Face ruledFace = BRepFill::Face(curveEdges[0], e2);
             if (!ruledFace.IsNull())
             {
-                fix_wire_for_surface(ruledFace);
-                outFace = ruledFace;
+                /* Use EmptyCopied to strip BRepFill's wires, keeping just the
+                   surface */
+                TopoDS_Face emptyFace = TopoDS::Face(ruledFace.EmptyCopied());
+                fix_wire_for_surface(emptyFace);
+                outFace = emptyFace;
                 return true;
             }
         }
@@ -386,14 +388,12 @@ void xbim_brep_build_loop_wire(
     XbimAdvancedBrepBuilder_& b,
     const XbimBrepBoundData& boundData,
     const TopoDS_Face& face,
+    bool buildRuledSurface,
     TopoDS_Wire& outerLoop,
     std::vector<TopoDS_Wire>& innerLoops)
 {
     TopoDS_Wire loopWire;
     b.builder.MakeWire(loopWire);
-
-    Handle(Geom_Surface) surface = BRep_Tool::Surface(face);
-    bool isPlanar = !Handle(Geom_Plane)::DownCast(surface).IsNull();
 
     std::vector<TopoDS_Edge> loopEdges;
 
@@ -411,9 +411,9 @@ void xbim_brep_build_loop_wire(
         loopEdges.push_back(topoEdge);
     }
 
-    /* Add per-edge pcurves for non-planar surfaces (matching old V5 approach:
-       ShapeFix_Edge::FixAddPCurve per-edge before building the wire) */
-    if (!isPlanar)
+    /* Add per-edge pcurves, but skip for ruled surfaces whose IFC-defined
+       surface may be wrong and will be rebuilt later in BuildFace. */
+    if (!buildRuledSurface)
     {
         ShapeFix_Edge edgeFixer;
         for (auto& edge : loopEdges)
@@ -492,7 +492,8 @@ TopoDS_Face xbim_brep_build_face(
 
     for (const auto& boundData : faceData.bounds)
     {
-        xbim_brep_build_loop_wire(b, boundData, baseFace, outerLoop, innerLoops);
+        xbim_brep_build_loop_wire(b, boundData, baseFace,
+            faceData.buildRuledSurface != 0, outerLoop, innerLoops);
     }
 
     /* If no outer loop was designated, pick the largest area wire */
@@ -528,8 +529,9 @@ TopoDS_Face xbim_brep_build_face(
     if (faceData.buildRuledSurface)
     {
         bool needRebuild = true;
+        bool withinTol = within_tolerance(outerLoop, baseFace, b.tolerance);
 
-        if (within_tolerance(outerLoop, baseFace, b.tolerance))
+        if (withinTol)
         {
             ShapeFix_Wire wfIfc(outerLoop, baseFace, b.tolerance);
             if (wfIfc.FixEdgeCurves())
@@ -553,26 +555,15 @@ TopoDS_Face xbim_brep_build_face(
                 if (faceSurface.IsNull())
                     faceSurface = faceData.surface;
             }
+            else
+            {
+                xbim_log_warning(b.ctx,
+                    "Ruled surface rebuild failed, using original IFC surface");
+            }
         }
     }
 
-    /* Check outer-loop winding on the surface: the outer wire must be CCW
-       relative to the surface normal for BRepBuilderAPI_MakeFace to work
-       correctly.  Skip this for ruled-surface faces where the IFC surface
-       may be wrong (the rebuilt surface already has correct orientation). */
-    if (!faceData.buildRuledSurface)
-    {
-        BRep_Builder bb;
-        TopoDS_Face tempFace;
-        bb.MakeFace(tempFace, faceSurface, b.tolerance);
-        bb.Add(tempFace, outerLoop);
-        GProp_GProps gProps;
-        BRepGProp::SurfaceProperties(tempFace, gProps, b.tolerance);
-        if (gProps.Mass() < 0)
-            outerLoop = TopoDS::Wire(outerLoop.Reversed());
-    }
-
-    /* Build the face from the (possibly rebuilt) surface and oriented outer wire */
+    /* Build the face from the (possibly rebuilt) surface and outer wire. */
     BRepBuilderAPI_MakeFace faceMaker(faceSurface, outerLoop, false);
     if (!faceMaker.IsDone())
     {
