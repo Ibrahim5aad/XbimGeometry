@@ -617,16 +617,16 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj" />
-		<ProjectReference Include="..\Xbim.ModelGeometry.Scene\Xbim.ModelGeometry.Scene.csproj">
+		<ProjectReference Include="..\..\src\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj" />
+		<ProjectReference Include="..\..\src\Xbim.ModelGeometry.Scene\Xbim.ModelGeometry.Scene.csproj">
 			<Private>True</Private>
 		</ProjectReference>
-		<ProjectReference Include="..\Xbim.Tessellator\Xbim.Tessellator.csproj" />
+		<ProjectReference Include="..\..\src\Xbim.Tessellator\Xbim.Tessellator.csproj" />
 	</ItemGroup>
 
 	<!-- Copy native DLLs from CMake build output to runtimes/win-x64/native/ after build -->
 	<PropertyGroup>
-		<NativeBuildDir>$(MSBuildThisFileDirectory)..\Xbim.Geometry.Engine.Native\build\Debug\</NativeBuildDir>
+		<NativeBuildDir>$(MSBuildThisFileDirectory)..\..\src\Xbim.Geometry.Engine.Native\build\Debug\</NativeBuildDir>
 	</PropertyGroup>
 
 	<Target Name="CopyNativeDlls" AfterTargets="Build" Condition="Exists('$(NativeBuildDir)xbim_geometry_native.dll')">

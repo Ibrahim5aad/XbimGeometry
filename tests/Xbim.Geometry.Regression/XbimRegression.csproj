@@ -3,7 +3,7 @@
 		<OutputType>Exe</OutputType>
 		<TargetFrameworks>net8.0</TargetFrameworks>
 		<SignAssembly>False</SignAssembly>
-		<AssemblyOriginatorKeyFile>..\XbimOpenSourceKeyFile.snk</AssemblyOriginatorKeyFile>
+		<AssemblyOriginatorKeyFile>..\..\XbimOpenSourceKeyFile.snk</AssemblyOriginatorKeyFile>
 		<LangVersion>8.0</LangVersion>
 		<Platforms>AnyCPU;x64;x86</Platforms>
 	</PropertyGroup>
@@ -22,10 +22,10 @@
 		<PackageReference Include="NReco.Logging.File" Version="1.2.2" />	
 	</ItemGroup>
 	<ItemGroup>
-		<ProjectReference Include="..\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj">
+		<ProjectReference Include="..\..\src\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj">
 		  <Private>True</Private>
 		</ProjectReference>
-		<ProjectReference Include="..\Xbim.ModelGeometry.Scene\Xbim.ModelGeometry.Scene.csproj" />
+		<ProjectReference Include="..\..\src\Xbim.ModelGeometry.Scene\Xbim.ModelGeometry.Scene.csproj" />
 	</ItemGroup>
 
 </Project>

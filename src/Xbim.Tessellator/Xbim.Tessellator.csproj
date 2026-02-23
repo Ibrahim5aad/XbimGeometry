@@ -11,7 +11,7 @@
     <PackageReadmeFile>Readme.md</PackageReadmeFile>
   </PropertyGroup>
 	<ItemGroup>
-		<None Include="..\xbim-toolkit-icon.png" Pack="True" PackagePath="\" />
+		<None Include="..\..\xbim-toolkit-icon.png" Pack="True" PackagePath="\" />
 		<None Include="Readme.md">
 		  <Pack>True</Pack>
 		  <PackagePath>\</PackagePath>

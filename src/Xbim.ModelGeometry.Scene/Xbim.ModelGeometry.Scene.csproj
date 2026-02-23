@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Title>Xbim ModelGeometry Scene</Title>
+		<Description>Provides support for the Geometry Scene creation.</Description>
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+		<EnableUnmanagedDebugging>true</EnableUnmanagedDebugging>
+    <NoWarn>CS1591</NoWarn>
+    <PackageReadmeFile>Readme.md</PackageReadmeFile>
+	</PropertyGroup>
+
+	
+	<ItemGroup>
+		<None Include="..\..\xbim-toolkit-icon.png" Pack="True" PackagePath="\" />
+	</ItemGroup>
+	<ItemGroup>
+	  <PackageReference Include="System.Configuration.ConfigurationManager" Version="6.0.1" />
+	</ItemGroup>
+	<ItemGroup>
+	  <ProjectReference Include="..\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj" />
+	  <ProjectReference Include="..\Xbim.Tessellator\Xbim.Tessellator.csproj" />
+	</ItemGroup>
+	<ItemGroup>
+	  <None Include="Readme.md">
+	    <PackagePath>\</PackagePath>
+	    <Pack>True</Pack>
+	  </None>
+	</ItemGroup>
+
+</Project>

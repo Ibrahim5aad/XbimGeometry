@@ -1,0 +1,81 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Title>Xbim Geometry Engine (P/Invoke Interop)</Title>
+    <Description>Cross-platform P/Invoke interop layer for the Xbim Geometry Engine native library.</Description>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PackageId>Xbim.Geometry.Engine.Interop</PackageId>
+    <RootNamespace>Xbim.Geometry.Engine.Interop</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PackageReadmeFile>Readme.md</PackageReadmeFile>
+    <NoWarn>$(NoWarn);NU1900;CS8600;CS8602;CS8603;CS8604;CS8618;CS8625;CS8714;CS8767</NoWarn>
+  </PropertyGroup>
+
+  <!-- Native library build output directories (set via CMake build) -->
+  <PropertyGroup>
+    <NativeBuildRoot>$(MSBuildThisFileDirectory)..\Xbim.Geometry.Engine.Native\</NativeBuildRoot>
+    <WinX64NativeDir>$(NativeBuildRoot)build\Release\</WinX64NativeDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Xbim.Geometry.Engine.Interop.Tests, PublicKey=002400000480000094000000060200000024000052534131000400000100010029a3c6da60efcb3ebe48c3ce14a169b5fa08ffbf5f276392ffb2006a9a2d596f5929cf0e68568d14ac7cbe334440ca0b182be7fa6896d2a73036f24bca081b2427a8dec5689a97f3d62547acd5d471ee9f379540f338bbb0ae6a165b44b1ae34405624baa4388404bce6d3e30de128cec379147af363ce9c5845f4f92d405ed0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\xbim-toolkit-icon.png" Pack="True" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Xbim.Geometry.Abstractions\Xbim.Geometry.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Readme.md">
+      <PackagePath>\</PackagePath>
+      <Pack>True</Pack>
+    </None>
+  </ItemGroup>
+
+  <!--
+    Native library packaging: include pre-built native binaries in the NuGet package
+    under runtimes/{rid}/native/. The .NET SDK automatically copies these to the output
+    directory of consuming projects during build/publish.
+  -->
+
+  <!-- Windows x64 native libraries -->
+  <ItemGroup Condition="Exists('$(WinX64NativeDir)xbim_geometry_native.dll')">
+    <None Include="$(WinX64NativeDir)*.dll" Exclude="$(WinX64NativeDir)test_*.exe">
+      <Pack>true</Pack>
+      <PackagePath>runtimes/win-x64/native/</PackagePath>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+
+  <!-- Linux x64 native libraries (when built on Linux) -->
+  <ItemGroup Condition="Exists('$(NativeBuildRoot)build/Release/libxbim_geometry_native.so')">
+    <None Include="$(NativeBuildRoot)build/Release/*.so*">
+      <Pack>true</Pack>
+      <PackagePath>runtimes/linux-x64/native/</PackagePath>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+
+  <!--
+    Include buildTransitive .targets so consuming projects automatically get
+    native libraries copied to their output directories.
+  -->
+  <ItemGroup>
+    <None Include="buildTransitive\Xbim.Geometry.Engine.Interop.targets" Pack="true" PackagePath="buildTransitive\" Condition="Exists('buildTransitive\Xbim.Geometry.Engine.Interop.targets')" />
+  </ItemGroup>
+
+</Project>
