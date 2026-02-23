@@ -112,14 +112,28 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         public IXEdge BuildEdge(IIfcProfileDef profileDef)
         {
-            throw new NotImplementedException(
-                "BuildEdge requires edge factory and topology support (TOPO-003).");
+            var curve = BuildCurve(profileDef);
+            return _modelService.EdgeFactory.Build(curve);
         }
 
         public IXCurve BuildCurve(IIfcProfileDef profileDef)
         {
-            throw new NotImplementedException(
-                "BuildCurve requires curve factory and topology support (TOPO-006).");
+            if (profileDef is IIfcArbitraryOpenProfileDef openProfile)
+            {
+                var curve = openProfile.Curve ?? throw new XbimGeometryServiceException(
+                    $"ArbitraryOpenProfileDef #{profileDef.EntityLabel} has no Curve.");
+                return _modelService.CurveFactory.Build(curve);
+            }
+
+            if (profileDef is IIfcArbitraryClosedProfileDef closedProfile)
+            {
+                var outerCurve = closedProfile.OuterCurve ?? throw new XbimGeometryServiceException(
+                    $"ArbitraryClosedProfileDef #{profileDef.EntityLabel} has no OuterCurve.");
+                return _modelService.CurveFactory.Build(outerCurve);
+            }
+
+            throw new XbimGeometryServiceException(
+                $"BuildCurve is only supported for arbitrary profile types, not {profileDef.ExpressType.ExpressName}.");
         }
 
         #endregion

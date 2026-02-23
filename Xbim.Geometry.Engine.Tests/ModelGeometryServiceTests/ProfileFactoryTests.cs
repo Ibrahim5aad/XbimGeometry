@@ -67,6 +67,7 @@ namespace Xbim.Geometry.Engine.Tests
             var profileFace = profileFactory.BuildFace(circleProfileDef);
             profileFace.Area.Should().BeApproximately((Math.PI * Math.Pow(outerRadius, 2)), 1e-9);
         }
+
         [Theory]
         [InlineData(200, 10)]
         [InlineData(200, 0)] //should not fail
