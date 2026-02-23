@@ -1020,55 +1020,42 @@ namespace Xbim.ModelGeometry.Scene
                     // make the finished shape
                     if (behaviour.HasFlag(MeshingBehaviourResult.PerformAdditions) && openingAndProjectionOp.ProjectGeometries.Any())
                     {
-                        var bodyShape = ExtractV6Shape(elementGeom);
-                        var additions = ExtractV6Shapes(openingAndProjectionOp.ProjectGeometries);
-                        if (bodyShape != null && additions.Any())
+                        var nextGeom = elementGeom.Union(openingAndProjectionOp.ProjectGeometries, _modelServices.MinimumGap, _logger);
+                        if (nextGeom.IsValid)
                         {
-                            var result = _modelServices.ShapeFactory.Union(bodyShape, additions);
-                            if (result != null)
-                            {
-                                var nextGeom = WrapAsGeometryObjectSet(result);
-                                if (nextGeom.IsValid && nextGeom.First != null && nextGeom.First.IsValid)
-                                    elementGeom = nextGeom;
-                                else
-                                    LogWarning(_model.Instances[elementLabel], "Projections are an empty shape");
-                            }
+                            if (nextGeom.First != null && nextGeom.First.IsValid)
+                                elementGeom = nextGeom;
                             else
-                                LogWarning(_model.Instances[elementLabel], "Joining of projections has failed. Projections have been ignored");
+                                LogWarning(_model.Instances[elementLabel], "Projections are an empty shape");
                         }
+                        else
+                            LogWarning(_model.Instances[elementLabel], "Joining of projections has failed. Projections have been ignored");
                     }
 
 
                     if (behaviour.HasFlag(MeshingBehaviourResult.PerformSubtractions) && openingAndProjectionOp.CutGeometries.Any())
                     {
+                        IXbimGeometryObjectSet nextGeom;
                         try
                         {
-                            var bodyShape = ExtractV6Shape(elementGeom);
-                            var subtractions = ExtractV6Shapes(openingAndProjectionOp.CutGeometries);
-                            if (bodyShape != null && subtractions.Any())
+                            nextGeom = elementGeom.Cut(openingAndProjectionOp.CutGeometries, _modelServices.MinimumGap, _logger);
+                            if (nextGeom.IsValid)
                             {
-                                var result = _modelServices.ShapeFactory.Cut(bodyShape, subtractions);
-                                if (result != null)
-                                {
-                                    var nextGeom = WrapAsGeometryObjectSet(result);
-                                    if (nextGeom.IsValid && nextGeom.First != null && nextGeom.First.IsValid)
-                                        elementGeom = nextGeom;
-                                    else
-                                        LogWarning(_model.Instances[elementLabel],
-                                            "Cutting openings has resulted in an empty shape");
-                                }
+                                if (nextGeom.First != null && nextGeom.First.IsValid)
+                                    elementGeom = nextGeom;
                                 else
                                     LogWarning(_model.Instances[elementLabel],
-                                        "Cutting openings has failed. Openings have been ignored");
+                                        "Cutting openings has resulted in an empty shape");
                             }
+                            else
+                                LogWarning(_model.Instances[elementLabel],
+                                    "Cutting openings has failed. Openings have been ignored");
                         }
                         catch (TimeoutException)
                         {
                             LogWarning(_model.Instances[elementLabel], "Cutting openings has failed. Openings have been ignored. Operation timed out after {0} seconds", BooleanTimeOutMilliSeconds / 1000);
 
                         }
-
-
                     }
 
                     // now add to the DB     
