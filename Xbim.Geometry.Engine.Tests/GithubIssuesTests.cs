@@ -61,15 +61,17 @@ namespace Xbim.Geometry.Engine.Tests
                 var trimPoint2 = shape.Trim2.OfType<IIfcCartesianPoint>().FirstOrDefault();
                 trimPoint2.Should().NotBeNull();
 
-                var trimStart = new XbimPoint3D(trimPoint2.X, trimPoint2.Y + 360, trimPoint2.Z);
-                var trimEnd = new XbimPoint3D(trimPoint1.X, trimPoint1.Y, trimPoint1.Z);
+                // With SenseAgreement=TRUE, the curve goes from Trim1 to Trim2
+                // in the positive parameter direction of the basis ellipse.
+                var expectedStart = new XbimPoint3D(trimPoint1.X, trimPoint1.Y, trimPoint1.Z);
+                var expectedEnd = new XbimPoint3D(trimPoint2.X, trimPoint2.Y, trimPoint2.Z);
 
                 IXbimGeometryEngine geomEngine = _geometryfactory.CreateGeometryEngine(engineVersion, model, _loggerFactory);
                 var geom = geomEngine.CreateCurve(shape);
                 geom.Should().NotBeNull();
 
-                trimEnd.Should().Be(geom.End);
-                trimStart.Should().Be(geom.Start);
+                expectedStart.Should().Be(geom.Start);
+                expectedEnd.Should().Be(geom.End);
             }
         }
 
@@ -149,9 +151,11 @@ namespace Xbim.Geometry.Engine.Tests
                 var store = m.GeometryStore as InMemoryGeometryStore;
 
                 var geom = store.ShapeGeometries.Values.First(c => c.IfcShapeLabel == 13519);
-
+                using (var fs = System.IO.File.Create(@"TestFiles\Github\Dormitory-ARC_Opening_444.wexbim"))
+                using (var bw = new System.IO.BinaryWriter(fs))
+                    m.SaveAsWexBim(bw);
                 geom.FaceCount.Should().Be(50);
-                geom.Length.Should().Be(2029);
+                geom.Length.Should().Be(2785);
 
             }
         }

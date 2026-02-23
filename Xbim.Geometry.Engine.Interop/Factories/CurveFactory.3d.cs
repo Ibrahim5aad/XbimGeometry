@@ -380,9 +380,11 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     HandleEqualTrimParams(ifcTrimmed, isConic, ref u1, ref u2, ref sense);
                 }
 
-                // Build trimmed curve
+                // Build trimmed curve — convert IFC params only for parametric trim values,
+                // not for Cartesian-projected values which are already in OCCT space
                 int trimResult = XbimGeometryNativeApi.xbim_curve_build_trimmed_3d(
-                    ContextHandle, basisCurve.Handle, u1, u2, sense ? 1 : 0, out var trimHandle);
+                    ContextHandle, basisCurve.Handle, u1, u2, sense ? 1 : 0,
+                    useCartesian ? 0 : 1, out var trimHandle);
 
                 if (trimResult != 0)
                     throw new XbimGeometryServiceException(
@@ -477,7 +479,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                                 }
 
                                 int trimResult = XbimGeometryNativeApi.xbim_curve_build_trimmed_3d(
-                                    ContextHandle, circleHandle, u1, u2, 1, out var arcHandle);
+                                    ContextHandle, circleHandle, u1, u2, 1,
+                                    0, // params from point projection, already OCCT space
+                                    out var arcHandle);
 
                                 circleHandle.Dispose();
 

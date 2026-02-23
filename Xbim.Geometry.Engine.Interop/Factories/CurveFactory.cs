@@ -94,6 +94,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                     builtCurve.Handle,
                     u1, u2,
                     1, // sense agreement
+                    0, // params already in OCCT space
                     out var trimmedHandle);
 
                 if (result != 0)

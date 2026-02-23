@@ -2768,8 +2768,12 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_bspline(
  *   ctx         – a valid context handle (used for logging; may be NULL)
  *   basisHandle – the unbounded or periodic basis curve to trim
  *   u1/u2       – trim parameter values
- *   sense       – nonzero for same-sense, zero for reversed
- *   outHandle   – receives the trimmed curve handle
+ *   sense              – nonzero for same-sense, zero for reversed
+ *   convertIfcParams   – nonzero to convert IFC ellipse trim parameters to OCCT
+ *                         parameterization (add PI/2 for rotated EllipseWithSemiAxes).
+ *                         Pass 0 when parameters already come from OCCT (e.g. point
+ *                         projection), nonzero when they come from IFC parametric values.
+ *   outHandle          – receives the trimmed curve handle
  *
  * Returns XBIM_OK on success.
  */
@@ -2778,6 +2782,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_trimmed_3d(
     XbimCurveHandle     basisHandle,
     double u1, double u2,
     int sense,
+    int convertIfcParams,
     XbimCurveHandle*    outHandle);
 
 /*

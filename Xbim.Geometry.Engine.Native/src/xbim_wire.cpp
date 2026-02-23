@@ -257,7 +257,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_curves(
 
                 if (gap > ctx->minimumGap)
                 {
-                    if (gap > 1000.0 * ctx->minimumGap)
+                    if (gap > 100.0 * ctx->minimumGap)
                     {
                         xbim_set_error("xbim_wire_build_from_curves: segments are not contiguous");
                         return XBIM_ERROR;

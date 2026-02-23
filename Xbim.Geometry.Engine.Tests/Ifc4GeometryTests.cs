@@ -352,7 +352,6 @@ namespace Xbim.Geometry.Engine.Tests
                 var cc = model.Instances.OfType<IIfcCompositeCurve>().FirstOrDefault();
                 cc.Should().NotBeNull();
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
-
                 var exception = Assert.Throws<XbimGeometryServiceException>(() => geomEngine.CreateWire(cc, _logger));
                 exception.Message.Should().Be("IfcCompositeCurve could not be built as a wire");
             }

@@ -1141,6 +1141,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeCurveHandle basisHandle,
             double u1, double u2,
             int sense,
+            int convertIfcParams,
             out NativeCurveHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]

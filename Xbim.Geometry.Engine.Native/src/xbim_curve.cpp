@@ -317,6 +317,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_trimmed_3d(
     XbimCurveHandle   basisHandle,
     double u1, double u2,
     int sense,
+    int convertIfcParams,
     XbimCurveHandle* outHandle)
 {
     xbim_clear_error();
@@ -359,13 +360,16 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_trimmed_3d(
             return (*outHandle) ? XBIM_OK : XBIM_ERROR;
         }
 
-        /* Ellipse with semi-axes: convert IFC trim parameters, then arc */
+        /* Ellipse with semi-axes: optionally convert IFC trim parameters, then arc */
         Handle(Geom_EllipseWithSemiAxes) ellipse =
             Handle(Geom_EllipseWithSemiAxes)::DownCast(basis);
         if (!ellipse.IsNull())
         {
-            u1 = ellipse->ConvertIfcTrimParameter(u1);
-            u2 = ellipse->ConvertIfcTrimParameter(u2);
+            if (convertIfcParams)
+            {
+                u1 = ellipse->ConvertIfcTrimParameter(u1);
+                u2 = ellipse->ConvertIfcTrimParameter(u2);
+            }
             GC_MakeArcOfEllipse arcMaker(ellipse->Elips(), u1, u2, sameSense);
             if (!arcMaker.IsDone())
             {
