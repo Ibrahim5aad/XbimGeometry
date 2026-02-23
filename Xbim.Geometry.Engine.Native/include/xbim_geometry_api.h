@@ -4294,4 +4294,64 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_grid_create(
 
 #pragma endregion
 
+#pragma region Projection / Footprint Operations
+
+/*
+ * Create a 2D footprint of a 3D shape by projecting it onto the XY plane
+ * using Hidden Line Removal (HLR).
+ *
+ * The result is a flat double buffer containing polygon boundary data.
+ * Buffer format:
+ *   [0] minZ          - minimum Z extent of the shape
+ *   [1] maxZ          - maximum Z extent of the shape
+ *   [2] isClose       - 1.0 if footprint is accurate, 0.0 if bounding box fallback
+ *   [3] numBounds     - number of polygon boundaries
+ *   For each bound:
+ *     [n] numRings    - number of rings (1 = simple polygon, >1 = polygon with holes)
+ *     For each ring:
+ *       [n] numPoints - number of vertices
+ *       numPoints * 2 doubles (x, y coordinate pairs)
+ *
+ *   ctx               - context handle for logging (may be NULL)
+ *   shapeHandle       - the 3D shape to project
+ *   linearDeflection  - max deviation of line segments from curves (model units)
+ *   angularDeflection - max angular deflection in radians (default ~30 deg)
+ *   tolerance         - vertex merge tolerance
+ *   useHlrPolyAlgo    - 0 for exact HLR, non-zero for polyhedral approximation
+ *   outBuffer         - receives allocated double array (caller frees with xbim_projection_free_buffer)
+ *   outBufferLen      - receives the number of doubles in the buffer
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_projection_create_footprint(
+    XbimContextHandle   ctx,
+    XbimShapeHandle     shapeHandle,
+    double              linearDeflection,
+    double              angularDeflection,
+    double              tolerance,
+    int                 useHlrPolyAlgo,
+    double**            outBuffer,
+    int*                outBufferLen);
+
+/*
+ * Get the visible outline of a shape projected onto the XY plane.
+ * Returns a compound of edges representing sharp and outline edges.
+ *
+ *   shapeHandle - the 3D shape to project
+ *   outCompound - receives a compound shape handle containing the outline edges
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_projection_get_outline(
+    XbimShapeHandle     shapeHandle,
+    XbimShapeHandle*    outCompound);
+
+/*
+ * Free a double buffer allocated by xbim_projection_create_footprint.
+ * Passing NULL is a safe no-op.
+ */
+XBIM_EXPORT void XBIM_CALL xbim_projection_free_buffer(double* buffer);
+
+#pragma endregion
+
 }

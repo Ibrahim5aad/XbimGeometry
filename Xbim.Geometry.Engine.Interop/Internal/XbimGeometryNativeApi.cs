@@ -1842,6 +1842,29 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeShapeHandle outHandle);
 
         #endregion
+
+        #region Projection / Footprint Operations
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_projection_create_footprint(
+            NativeContextHandle ctx,
+            NativeShapeHandle shapeHandle,
+            double linearDeflection,
+            double angularDeflection,
+            double tolerance,
+            int useHlrPolyAlgo,
+            out IntPtr outBuffer,
+            out int outBufferLen);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_projection_get_outline(
+            NativeShapeHandle shapeHandle,
+            out NativeShapeHandle outCompound);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern void xbim_projection_free_buffer(IntPtr buffer);
+
+        #endregion
     }
 
     /// <summary>

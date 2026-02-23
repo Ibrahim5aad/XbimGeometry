@@ -39,6 +39,7 @@ set(XBIM_OCCT_LIBS
     TKMesh
     TKOffset
     TKFillet
+    TKHLR
     # Data Exchange
     TKXSBase
     TKDESTEP
