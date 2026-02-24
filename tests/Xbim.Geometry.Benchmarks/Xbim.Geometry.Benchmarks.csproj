@@ -21,9 +21,10 @@
     <PackageReference Include="Xbim.Essentials" Version="6.0.568" />
   </ItemGroup>
 
-  <!-- New engine: local project reference -->
+  <!-- New engine: local project references -->
   <ItemGroup Condition="'$(EngineMode)' != 'Old'">
     <ProjectReference Include="..\..\src\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj" />
+    <ProjectReference Include="..\..\src\Xbim.ModelGeometry.Scene\Xbim.ModelGeometry.Scene.csproj" />
   </ItemGroup>
 
   <!-- Old engine: NuGet package -->

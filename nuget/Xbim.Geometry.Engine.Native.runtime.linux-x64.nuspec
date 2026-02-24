@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>Xbim.Geometry.Engine.Native.runtime.linux-x64</id>
+    <version>$version$</version>
+    <title>Xbim Geometry Engine Native Runtime (Linux x64)</title>
+    <description>Linux x64 native binaries (OpenCASCADE 7.9 + xbim geometry engine) for Xbim.Geometry.Engine.Interop. This package is not intended to be referenced directly — it is a dependency of Xbim.Geometry.Engine.Interop.</description>
+    <authors>Steve Lockley, Martin Cerny and XBIMTeam Contributors</authors>
+    <license type="expression">CDDL-1.0</license>
+    <projectUrl>https://github.com/xBimTeam/XbimGeometry</projectUrl>
+    <repository type="git" url="https://github.com/xBimTeam/XbimGeometry" />
+    <icon>xbim-toolkit-icon.png</icon>
+    <tags>BIM IFC Geometry native linux-x64</tags>
+    <copyright>Copyright © xbim Ltd</copyright>
+  </metadata>
+  <files>
+    <file src="xbim-toolkit-icon.png" target="" />
+    <file src="runtimes/linux-x64/native/**" target="runtimes/linux-x64/native" />
+  </files>
+</package>

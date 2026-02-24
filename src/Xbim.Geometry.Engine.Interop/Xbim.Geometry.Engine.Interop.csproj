@@ -47,13 +47,24 @@
   </ItemGroup>
 
   <!--
-    Native library packaging: include pre-built native binaries in the NuGet package
-    under runtimes/{rid}/native/. The .NET SDK automatically copies these to the output
-    directory of consuming projects during build/publish.
+    Native library packaging: two modes controlled by IncludeNativeRuntimeDependencies.
+
+    CI pack (IncludeNativeRuntimeDependencies=true):
+      Natives live in separate runtime NuGet packages. The Interop package declares
+      dependencies on them so NuGet resolves the correct runtimes/{rid}/native/ at build time.
+
+    Local dev pack (default):
+      Embeds native binaries directly from the CMake build output (single platform).
   -->
 
-  <!-- Windows x64 native libraries -->
-  <ItemGroup Condition="Exists('$(WinX64NativeDir)xbim_geometry_native.dll')">
+  <!-- CI pack: depend on per-platform native runtime packages -->
+  <ItemGroup Condition="'$(IncludeNativeRuntimeDependencies)' == 'true'">
+    <PackageReference Include="Xbim.Geometry.Engine.Native.runtime.win-x64" Version="$(Version)" PrivateAssets="none" />
+    <PackageReference Include="Xbim.Geometry.Engine.Native.runtime.linux-x64" Version="$(Version)" PrivateAssets="none" />
+  </ItemGroup>
+
+  <!-- Local dev pack: embed Windows x64 native libraries from CMake build output -->
+  <ItemGroup Condition="'$(IncludeNativeRuntimeDependencies)' != 'true' And Exists('$(WinX64NativeDir)xbim_geometry_native.dll')">
     <None Include="$(WinX64NativeDir)*.dll" Exclude="$(WinX64NativeDir)test_*.exe">
       <Pack>true</Pack>
       <PackagePath>runtimes/win-x64/native/</PackagePath>
@@ -62,8 +73,8 @@
     </None>
   </ItemGroup>
 
-  <!-- Linux x64 native libraries (when built on Linux) -->
-  <ItemGroup Condition="Exists('$(NativeBuildRoot)build/Release/libxbim_geometry_native.so')">
+  <!-- Local dev pack: embed Linux x64 native libraries from CMake build output -->
+  <ItemGroup Condition="'$(IncludeNativeRuntimeDependencies)' != 'true' And Exists('$(NativeBuildRoot)build/Release/libxbim_geometry_native.so')">
     <None Include="$(NativeBuildRoot)build/Release/*.so*">
       <Pack>true</Pack>
       <PackagePath>runtimes/linux-x64/native/</PackagePath>
