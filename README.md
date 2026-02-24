@@ -35,48 +35,46 @@ Before using this library you should register the Geometry Engine with the xbim 
 
 ## Compilation
 
-**Visual Studio 2022 is recommended.**
-Prior versions of Visual Studio are unlikely to work on this solution.
+### Prerequisites
 
-The [free VS 2022 Community Edition](https://visualstudio.microsoft.com/downloads/) will be fine.
+| Tool | Version | Notes |
+|------|---------|-------|
+| [Visual Studio 2022](https://visualstudio.microsoft.com/downloads/) | 17.x | Community Edition is fine. Install the **Desktop development with C++** workload. |
+| [.NET SDK](https://dotnet.microsoft.com/download) | 8.0+ | For the managed projects. |
+| [CMake](https://cmake.org/download/) | 3.20+ | For the native library. Included with VS 2022 C++ workload. |
+| [vcpkg](https://github.com/microsoft/vcpkg) | latest | C++ package manager for OpenCASCADE and other native dependencies. |
+| [Git](https://git-scm.com/) | any | Required by vcpkg internally. |
 
-The managed solution (`.sln`) requires .NET 8.0 SDK. No C++ toolchain is needed to build the managed
-projects — they use P/Invoke to call the pre-built native library.
+### Setting up vcpkg
 
-The XBIM toolkit [uses the NuGet](https://www.nuget.org/packages/Xbim.Geometry/) for the management of our published packages.
-We have custom MyGet feeds for the *master* and *develop* branches of the solution which are automatically
-updated during our CI builds. The [nuget.config](nuget.config) file should automatically add these feeds for you.
+```bash
+git clone https://github.com/microsoft/vcpkg.git
+cd vcpkg && bootstrap-vcpkg.bat   # Windows
+cd vcpkg && ./bootstrap-vcpkg.sh  # Linux
+```
 
-### Building the Native Library (cross-platform)
+Set the `VCPKG_ROOT` environment variable to your vcpkg installation directory. The CMake presets
+reference this variable to locate the vcpkg toolchain file.
 
-The `Xbim.Geometry.Engine.Native` project is a standalone CMake-based C/C++ shared library that uses
-[vcpkg](https://github.com/microsoft/vcpkg) for dependency management (OpenCASCADE, FreeType, etc.).
+### Building the Native Library
 
-**Prerequisites:**
-
-1. Install [vcpkg](https://github.com/microsoft/vcpkg):
-   ```bash
-   git clone https://github.com/microsoft/vcpkg.git
-   cd vcpkg && bootstrap-vcpkg.bat   # Windows
-   cd vcpkg && ./bootstrap-vcpkg.sh  # Linux
-   ```
-2. Set the `VCPKG_ROOT` environment variable to your vcpkg installation directory.
-3. CMake 3.20+ and a C++17 compiler (MSVC 2022 on Windows, GCC/Clang on Linux).
+The `Xbim.Geometry.Engine.Native` project is a CMake-based C/C++ shared library that uses vcpkg
+for dependency management (OpenCASCADE 7.9.3, FreeType, etc.).
 
 **Windows (x64):**
 
 ```bash
-cd Xbim.Geometry.Engine.Native
+cd src/Xbim.Geometry.Engine.Native
 cmake --preset win-x64-release
-cmake --build build-vcpkg --config Release
+cmake --build build --config Release
 ```
 
 **Linux (x64):**
 
 ```bash
-cd Xbim.Geometry.Engine.Native
+cd src/Xbim.Geometry.Engine.Native
 cmake --preset linux-x64-release
-cmake --build build-vcpkg --config Release
+cmake --build build --config Release
 ```
 
 On Linux, you can also use system-installed OCCT packages (e.g. `apt install libocct-*-dev` on Ubuntu)
@@ -84,6 +82,22 @@ instead of vcpkg. The `find_package(OpenCASCADE)` call works with both vcpkg and
 
 On first configure, vcpkg will automatically download and build OpenCASCADE and its dependencies. This
 can take 30+ minutes on the first run but is cached for subsequent builds.
+
+### Building the Managed Solution
+
+```bash
+dotnet build Xbim.Geometry.Engine.sln
+```
+
+No C++ toolchain is needed to build the managed projects — they use P/Invoke to call the native library.
+NuGet packages are restored automatically. The [nuget.config](nuget.config) file adds the xbim MyGet
+feeds for *master* and *develop* builds.
+
+### Running Tests
+
+```bash
+dotnet test Xbim.Geometry.Engine.sln
+```
 
 
 ## Acknowledgements

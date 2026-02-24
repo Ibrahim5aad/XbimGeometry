@@ -23,9 +23,11 @@ build-*/
 bld/
 [Bb]in/
 [Oo]bj/
+BenchmarkDotNet.Artifacts/
 
 # vcpkg
 vcpkg_installed/
+vcpkg/
 CMakeUserPresets.json
 
 # Staged native libraries (created by cmake --install for NuGet packaging)
