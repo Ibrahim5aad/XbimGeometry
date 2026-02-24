@@ -768,7 +768,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_connected_face_set(
             else
             {
                 TopoDS_Vertex vertex;
-                builder.MakeVertex(vertex, coord, Precision::Confusion());
+                builder.MakeVertex(vertex, coord, tol);
                 inspector.Add(coord);
                 vertices.Append(vertex);
                 vertexCellFilter.Add(vertices.Size(), coord);

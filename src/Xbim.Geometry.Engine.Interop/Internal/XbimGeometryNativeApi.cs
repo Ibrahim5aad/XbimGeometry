@@ -25,6 +25,12 @@ namespace Xbim.Geometry.Engine.Interop.Internal
         internal const int FaceSetSkipWinding = 0x04;
         internal const int FaceSetSkipWireFix = 0x08;
 
+        // Segment type codes for xbim_curve_build_composite
+        internal const int CSegLine       = 0;
+        internal const int CSegCircleTrim = 1;
+        internal const int CSegHandle     = 2;
+        internal const int CSegPolyline   = 3;
+
         #region Error Handling
 
         [DllImport(Lib, CallingConvention = CC)]
@@ -1243,6 +1249,18 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             out NativeCurveHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve_build_composite(
+            NativeContextHandle ctx,
+            int numSegments,
+            [MarshalAs(UnmanagedType.LPArray)] int[] segTypes,
+            [MarshalAs(UnmanagedType.LPArray)] int[] segSameSense,
+            [MarshalAs(UnmanagedType.LPArray)] double[] segData,
+            [MarshalAs(UnmanagedType.LPArray)] int[] segDataOffsets,
+            [In] IntPtr[]? prebuiltCurves,
+            int numPrebuilt,
+            out NativeCurveHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_curve_build_offset_3d(
             NativeContextHandle ctx,
             NativeCurveHandle basisHandle,
@@ -1704,6 +1722,13 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeContextHandle ctx,
             [MarshalAs(UnmanagedType.LPArray)] IntPtr[] curves,
             int numCurves,
+            out NativeCurve2dHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_polyline_bspline(
+            NativeContextHandle ctx,
+            [MarshalAs(UnmanagedType.LPArray)] double[] points,
+            int numPoints,
             out NativeCurve2dHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]

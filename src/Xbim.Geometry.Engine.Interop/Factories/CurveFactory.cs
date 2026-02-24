@@ -226,7 +226,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// validation, builds each segment as a 3D curve, and reverses if !SameSense.
         /// The caller is responsible for disposing the returned curve wrappers.
         /// </summary>
-        internal List<XbimCurve> BuildCompositeCurveSegments3d(IIfcCompositeCurve ifcComposite)
+        internal List<XbimCurve> BuildCompositeCurveSegments3d(IIfcCompositeCurve ifcComposite, bool verifyConnectivity = true)
         {
             CurveRules.Validate(ifcComposite);
 
@@ -272,7 +272,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                     // Verify connectivity: if reversing per SameSense creates a larger gap
                     // than not reversing, the sense flag is wrong — override it.
-                    if (segmentCurves.Count > 0)
+                    if (segmentCurves.Count > 0 && verifyConnectivity)
                     {
                         var prevCurve = segmentCurves[segmentCurves.Count - 1];
                         XbimGeometryNativeApi.xbim_curve_parameters(prevCurve.Handle, out _, out double prevLast);
@@ -391,6 +391,365 @@ namespace Xbim.Geometry.Engine.Interop.Factories
             }
 
             return segmentCurves;
+        }
+
+        /// <summary>
+        /// Pre-marshalled composite curve data for split timing benchmarks.
+        /// </summary>
+        internal struct CompositeCurveMarshalledData
+        {
+            public int[] Types;
+            public int[] SameSense;
+            public double[] Data;
+            public int[] Offsets;
+        }
+
+        /// <summary>
+        /// Marshals an IFC composite curve into flat arrays without calling the native builder.
+        /// Used by benchmarks to measure marshalling and native call timings separately.
+        /// </summary>
+        internal CompositeCurveMarshalledData MarshalCompositeCurve(IIfcCompositeCurve ifcComposite)
+        {
+            CurveRules.Validate(ifcComposite);
+
+            var types = new List<int>();
+            var sameSense = new List<int>();
+            var dataList = new List<double>();
+            var offsets = new List<int>();
+            var prebuiltHandles = new List<XbimCurve>();
+
+            try
+            {
+                int lastLabel = -1;
+                foreach (var segment in ifcComposite.Segments)
+                {
+                    if (segment.EntityLabel == lastLabel) continue;
+                    lastLabel = segment.EntityLabel;
+
+                    if (segment is IIfcReparametrisedCompositeCurveSegment reparam
+                        && (double)reparam.ParamLength != 1.0)
+                        continue;
+
+                    if (segment.ParentCurve == null) continue;
+                    int sense = segment.SameSense ? 1 : 0;
+                    MarshalSegment(segment.ParentCurve, sense,
+                        types, sameSense, offsets, dataList, prebuiltHandles);
+                }
+                offsets.Add(dataList.Count);
+            }
+            finally
+            {
+                foreach (var c in prebuiltHandles) c.Dispose();
+            }
+
+            return new CompositeCurveMarshalledData
+            {
+                Types = types.ToArray(),
+                SameSense = sameSense.ToArray(),
+                Data = dataList.ToArray(),
+                Offsets = offsets.ToArray(),
+            };
+        }
+
+        /// <summary>
+        /// Calls only the native composite curve builder with pre-marshalled arrays.
+        /// Used by benchmarks to measure native-only timing.
+        /// </summary>
+        internal NativeCurveHandle BuildCompositeFromArrays(CompositeCurveMarshalledData d)
+        {
+            int result = XbimGeometryNativeApi.xbim_curve_build_composite(
+                ContextHandle,
+                d.Types.Length,
+                d.Types,
+                d.SameSense,
+                d.Data,
+                d.Offsets,
+                null, 0,
+                out var compositeHandle);
+
+            if (result != 0)
+                throw new XbimGeometryServiceException(
+                    $"Failed to build composite curve: {XbimGeometryNativeApi.GetLastError()}");
+
+            return compositeHandle;
+        }
+
+        /// <summary>
+        /// Builds a composite B-spline from an IFC composite curve in a single native call.
+        /// Marshals segment geometry (lines, trimmed circles) into flat arrays and calls
+        /// <c>xbim_curve_build_composite</c>. Falls back to pre-built handles for segment
+        /// types that cannot be expressed as flat data (B-splines, nested composites, etc.).
+        /// </summary>
+        internal XbimBoundedCurve3d BuildCompositeCurveBatch3d(IIfcCompositeCurve ifcComposite)
+        {
+            CurveRules.Validate(ifcComposite);
+
+            var types = new List<int>();
+            var sameSense = new List<int>();
+            var dataList = new List<double>();
+            var offsets = new List<int>();
+            var prebuiltHandles = new List<XbimCurve>();
+
+            try
+            {
+                int lastLabel = -1;
+                foreach (var segment in ifcComposite.Segments)
+                {
+                    if (segment.EntityLabel == lastLabel)
+                    {
+                        _logger.LogInformation(
+                            "IIfcCompositeCurve #{Label}: skipping duplicate segment #{SegLabel} (ArchiCAD bug).",
+                            ifcComposite.EntityLabel, segment.EntityLabel);
+                        continue;
+                    }
+                    lastLabel = segment.EntityLabel;
+
+                    if (segment is IIfcReparametrisedCompositeCurveSegment reparam
+                        && (double)reparam.ParamLength != 1.0)
+                        throw new XbimGeometryServiceException(
+                            $"IIfcReparametrisedCompositeCurveSegment #{segment.EntityLabel} is currently unsupported (ParamLength != 1).");
+
+                    if (segment.ParentCurve == null)
+                        continue;
+
+                    int sense = segment.SameSense ? 1 : 0;
+
+                    try
+                    {
+                        MarshalSegment(segment.ParentCurve, sense,
+                            types, sameSense, offsets, dataList, prebuiltHandles);
+                    }
+                    catch (IfcRuleViolationException ex)
+                    {
+                        _logger.LogWarning(
+                            "IIfcCompositeCurve #{Label}: skipping segment #{SegLabel} ({Rule}).",
+                            ifcComposite.EntityLabel, segment.EntityLabel, ex.Message);
+                        continue;
+                    }
+                }
+                offsets.Add(dataList.Count); // sentinel
+
+                if (types.Count == 0)
+                    throw new XbimGeometryServiceException(
+                        $"IIfcCompositeCurve #{ifcComposite.EntityLabel} has no valid segments.");
+
+                IntPtr[]? prebuiltPtrs = null;
+                NativeHandleArray nativePrebuilt = default;
+                try
+                {
+                    if (prebuiltHandles.Count > 0)
+                    {
+                        nativePrebuilt = new NativeHandleArray(
+                            prebuiltHandles.Select(c => c.Handle).ToArray());
+                        prebuiltPtrs = nativePrebuilt.Ptrs;
+                    }
+
+                    int result = XbimGeometryNativeApi.xbim_curve_build_composite(
+                        ContextHandle,
+                        types.Count,
+                        types.ToArray(),
+                        sameSense.ToArray(),
+                        dataList.ToArray(),
+                        offsets.ToArray(),
+                        prebuiltPtrs,
+                        prebuiltHandles.Count,
+                        out var compositeHandle);
+
+                    if (result != 0)
+                        throw new XbimGeometryServiceException(
+                            $"Failed to build composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                    return new XbimBoundedCurve3d(compositeHandle, XCurveType.IfcCompositeCurve);
+                }
+                finally
+                {
+                    if (prebuiltHandles.Count > 0)
+                        nativePrebuilt.Dispose();
+                }
+            }
+            finally
+            {
+                foreach (var c in prebuiltHandles)
+                    c.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Classifies and marshals a composite curve segment into the batch arrays.
+        /// Trimmed lines, polylines, and trimmed circles are marshalled as flat data;
+        /// everything else falls back to a pre-built native handle.
+        /// Multi-point polylines emit one LINE entry per consecutive point pair.
+        /// </summary>
+        private void MarshalSegment(
+            IIfcCurve parentCurve, int sense,
+            List<int> types, List<int> sameSenseList,
+            List<int> offsets, List<double> data,
+            List<XbimCurve> prebuiltHandles)
+        {
+            // Trimmed line → single LINE
+            if (parentCurve is IIfcTrimmedCurve trimmed && trimmed.BasisCurve is IIfcLine ifcLine)
+            {
+                bool trimSense = trimmed.SenseAgreement;
+                ExtractTrimParameters(trimmed, false,
+                    out double u1, out double u2, ref trimSense,
+                    out bool useCartesian, out var cp1, out var cp2);
+
+                double sx, sy, sz, ex, ey, ez;
+                bool canMarshal = true;
+                if (useCartesian && cp1 != null && cp2 != null)
+                {
+                    var p1 = GeometryFactory.BuildPoint3d(cp1);
+                    var p2 = GeometryFactory.BuildPoint3d(cp2);
+                    sx = p1.X; sy = p1.Y; sz = p1.Z;
+                    ex = p2.X; ey = p2.Y; ez = p2.Z;
+                }
+                else if (GeometryFactory.BuildDirection3d(ifcLine.Dir.Orientation,
+                             out double dx, out double dy, out double dz))
+                {
+                    var origin = GeometryFactory.BuildPoint3d(ifcLine.Pnt);
+                    sx = origin.X + u1 * dx; sy = origin.Y + u1 * dy; sz = origin.Z + u1 * dz;
+                    ex = origin.X + u2 * dx; ey = origin.Y + u2 * dy; ez = origin.Z + u2 * dz;
+                }
+                else
+                {
+                    sx = sy = sz = ex = ey = ez = 0;
+                    canMarshal = false;
+                }
+
+                if (canMarshal)
+                {
+                    if (!trimmed.SenseAgreement)
+                    {
+                        (sx, ex) = (ex, sx);
+                        (sy, ey) = (ey, sy);
+                        (sz, ez) = (ez, sz);
+                    }
+
+                    offsets.Add(data.Count);
+                    sameSenseList.Add(sense);
+                    types.Add(XbimGeometryNativeApi.CSegLine);
+                    data.AddRange(new[] { sx, sy, sz, ex, ey, ez });
+                    return;
+                }
+                // Fall through to HANDLE if direction is degenerate
+            }
+
+            // Polyline → single POLYLINE segment (native builds local B-spline)
+            if (parentCurve is IIfcPolyline polyline && polyline.Points.Count >= 2)
+            {
+                var (px, py, pz) = ExtractPolylinePoints3d(polyline);
+                offsets.Add(data.Count);
+                sameSenseList.Add(sense);
+                types.Add(XbimGeometryNativeApi.CSegPolyline);
+                for (int i = 0; i < px.Length; i++)
+                {
+                    data.Add(px[i]);
+                    data.Add(py[i]);
+                    data.Add(pz[i]);
+                }
+                return;
+            }
+
+            // Trimmed circle → CIRCLE_TRIM
+            if (MarshalCircleArc(parentCurve, sense, types, sameSenseList, offsets, data))
+                return;
+
+            // Fallback: build individually via P/Invoke
+            offsets.Add(data.Count);
+            sameSenseList.Add(sense);
+            types.Add(XbimGeometryNativeApi.CSegHandle);
+            var curve = Build3d(parentCurve);
+            prebuiltHandles.Add(curve);
+        }
+
+        /// <summary>
+        /// Tries to marshal a trimmed circle arc as flat placement + trim data.
+        /// Returns true and appends 13 doubles on success.
+        /// </summary>
+        private bool MarshalCircleArc(
+            IIfcCurve parentCurve, int segSense,
+            List<int> types, List<int> sameSenseList,
+            List<int> offsets, List<double> data)
+        {
+            if (!(parentCurve is IIfcTrimmedCurve trimmed && trimmed.BasisCurve is IIfcCircle circle))
+                return false;
+
+            if (circle.Radius <= 0)
+                return false;
+
+            GeometryFactory.BuildAxis2PlacementAs3d(circle.Position,
+                out double ox, out double oy, out double oz,
+                out double zx, out double zy, out double zz,
+                out double xx, out double xy, out double xz);
+
+            bool trimSense = trimmed.SenseAgreement;
+            ExtractTrimParameters(trimmed, true,
+                out double u1, out double u2, ref trimSense,
+                out bool useCartesian, out var cp1, out var cp2);
+
+            if (useCartesian && cp1 != null && cp2 != null)
+            {
+                u1 = ProjectPointOnCircle(cp1, ox, oy, oz, zx, zy, zz, xx, xy, xz);
+                u2 = ProjectPointOnCircle(cp2, ox, oy, oz, zx, zy, zz, xx, xy, xz);
+                HandleEqualTrimParams(trimmed, true, ref u1, ref u2, ref trimSense);
+            }
+
+            offsets.Add(data.Count);
+            sameSenseList.Add(segSense);
+            types.Add(XbimGeometryNativeApi.CSegCircleTrim);
+            data.AddRange(new double[]
+            {
+                ox, oy, oz,
+                zx, zy, zz,
+                xx, xy, xz,
+                (double)circle.Radius,
+                u1, u2,
+                trimSense ? 1.0 : 0.0
+            });
+            return true;
+        }
+
+        /// <summary>
+        /// Projects a Cartesian point onto a circle defined by its axis placement,
+        /// returning the OCCT parameter (angle in radians from the reference direction).
+        /// Replicates the gp_Ax2 orthogonalization of the reference direction.
+        /// </summary>
+        private static double ProjectPointOnCircle(
+            IIfcCartesianPoint cp,
+            double ox, double oy, double oz,
+            double zx, double zy, double zz,
+            double xx, double xy, double xz)
+        {
+            var pt = GeometryFactory.BuildPoint3d(cp);
+
+            // Orthogonalize refDir against axis (same as gp_Ax2 constructor)
+            double dot = xx * zx + xy * zy + xz * zz;
+            double rxo = xx - dot * zx;
+            double ryo = xy - dot * zy;
+            double rzo = xz - dot * zz;
+            double rmag = Math.Sqrt(rxo * rxo + ryo * ryo + rzo * rzo);
+            if (rmag < 1e-15)
+            {
+                rxo = 1; ryo = 0; rzo = 0;
+                rmag = 1;
+            }
+            rxo /= rmag; ryo /= rmag; rzo /= rmag;
+
+            // Y direction = axis × orthogonalized refDir
+            double yx = zy * rzo - zz * ryo;
+            double yy = zz * rxo - zx * rzo;
+            double yz = zx * ryo - zy * rxo;
+
+            // Project point into circle's local frame
+            double dx = pt.X - ox;
+            double dy = pt.Y - oy;
+            double dz = pt.Z - oz;
+            double localX = dx * rxo + dy * ryo + dz * rzo;
+            double localY = dx * yx + dy * yy + dz * yz;
+
+            double angle = Math.Atan2(localY, localX);
+            if (angle < 0) angle += 2.0 * Math.PI;
+            return angle;
         }
 
         #endregion

@@ -101,7 +101,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_line(
         gp_Pnt2d p1(x1, y1);
         gp_Pnt2d p2(x2, y2);
 
-        if (p1.Distance(p2) < Precision::Confusion())
+        double tol = ctx ? ctx->minimumGap : Precision::Confusion();
+        if (p1.Distance(p2) < tol)
         {
             xbim_set_error("xbim_curve2d_build_line: degenerate segment (zero length)");
             return XBIM_NULL_SHAPE;
@@ -445,9 +446,10 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_arc_3pt(
         gp_Pnt2d p3(x3, y3);
 
         // Check for coincident points
-        if (p1.Distance(p2) < Precision::Confusion() ||
-            p2.Distance(p3) < Precision::Confusion() ||
-            p1.Distance(p3) < Precision::Confusion())
+        double tol = ctx ? ctx->minimumGap : Precision::Confusion();
+        if (p1.Distance(p2) < tol ||
+            p2.Distance(p3) < tol ||
+            p1.Distance(p3) < tol)
         {
             xbim_set_error("xbim_curve2d_build_arc_3pt: two or more points are coincident");
             return XBIM_INVALID_ARG;
@@ -1307,6 +1309,74 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_composite_bspline(
     {
         xbim_log_occt_failure(ctx, e, "xbim_curve2d_build_composite_bspline");
         xbim_set_error("xbim_curve2d_build_composite_bspline: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_polyline_bspline(
+    XbimContextHandle   ctx,
+    const double*       points,
+    int                 numPoints,
+    XbimCurve2dHandle*  outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve2d_build_polyline_bspline: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (!points || numPoints < 2)
+    {
+        xbim_set_error("xbim_curve2d_build_polyline_bspline: need at least 2 points");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        /* Filter consecutive duplicates */
+        std::vector<gp_Pnt2d> filtered;
+        filtered.reserve(numPoints);
+        double tol = ctx ? ctx->minimumGap : Precision::Confusion();
+
+        for (int i = 0; i < numPoints; ++i)
+        {
+            gp_Pnt2d pt(points[i * 2], points[i * 2 + 1]);
+            if (filtered.empty() || !pt.IsEqual(filtered.back(), tol))
+                filtered.push_back(pt);
+        }
+
+        int N = (int)filtered.size();
+        if (N < 2)
+        {
+            xbim_set_error("xbim_curve2d_build_polyline_bspline: all points are coincident");
+            return XBIM_ERROR;
+        }
+
+        TColgp_Array1OfPnt2d poles(1, N);
+        TColStd_Array1OfReal knots(1, N);
+        TColStd_Array1OfInteger mults(1, N);
+
+        double cumDist = 0.0;
+        for (int i = 0; i < N; ++i)
+        {
+            poles(i + 1) = filtered[i];
+            if (i > 0)
+                cumDist += filtered[i].Distance(filtered[i - 1]);
+            knots(i + 1) = cumDist;
+            mults(i + 1) = (i == 0 || i == N - 1) ? 2 : 1;
+        }
+
+        Handle(Geom2d_BSplineCurve) result = new Geom2d_BSplineCurve(poles, knots, mults, 1);
+        *outHandle = xbim_curve2d_create_from(result);
+        return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve2d_build_polyline_bspline");
+        xbim_set_error("xbim_curve2d_build_polyline_bspline: OCCT exception");
         return XBIM_ERROR;
     }
 }

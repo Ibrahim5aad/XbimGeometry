@@ -3000,6 +3000,43 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_composite_bspline(
     XbimCurveHandle*    outHandle);
 
 /*
+ * Build a composite B-spline from marshalled segment data in a single call.
+ * Segments are described by type arrays and a flat parameter data array.
+ *
+ * Segment types:
+ *   XBIM_CSEG_LINE        (0) – 6 doubles: start(xyz), end(xyz)
+ *   XBIM_CSEG_CIRCLE_TRIM (1) – 13 doubles: center(3), axis(3), refDir(3),
+ *                                 radius, u1, u2, senseAgreement (0 or 1)
+ *   XBIM_CSEG_HANDLE      (2) – 0 doubles: uses next handle from prebuiltCurves
+ *
+ *   segTypes       – [numSegments] segment type codes
+ *   segSameSense   – [numSegments] 1 = same sense, 0 = reverse
+ *   segData        – flat array of curve parameters
+ *   segDataOffsets  – [numSegments+1] index offsets into segData per segment
+ *   prebuiltCurves – array of pre-built curve handles for HANDLE-type segments
+ *   numPrebuilt    – number of pre-built handles
+ *   outHandle      – receives the composite B-spline curve handle
+ *
+ * Returns XBIM_OK on success.
+ */
+
+#define XBIM_CSEG_LINE        0
+#define XBIM_CSEG_CIRCLE_TRIM 1
+#define XBIM_CSEG_HANDLE      2
+#define XBIM_CSEG_POLYLINE    3  /* N*3 doubles: p0(xyz), p1(xyz), ..., pN-1(xyz) */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_composite(
+    XbimContextHandle   ctx,
+    int                 numSegments,
+    const int*          segTypes,
+    const int*          segSameSense,
+    const double*       segData,
+    const int*          segDataOffsets,
+    XbimCurveHandle*    prebuiltCurves,
+    int                 numPrebuilt,
+    XbimCurveHandle*    outHandle);
+
+/*
  * Build a 3D offset curve from a basis curve, an offset distance, and a
  * reference direction vector. Uses Geom_OffsetCurve(basis, offset, refDir).
  *
@@ -3874,6 +3911,25 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_composite_bspline(
     XbimContextHandle   ctx,
     XbimCurve2dHandle*  curves,
     int                 numCurves,
+    XbimCurve2dHandle*  outHandle);
+
+/*
+ * Build a degree-1 2D B-spline (polyline) directly from flat (x,y) point pairs.
+ * Uses cumulative chord-length parametrisation with clamped knot multiplicity.
+ * Much faster than building individual line segments and joining via
+ * Geom2dConvert_CompCurveToBSplineCurve.
+ *
+ *   ctx       – a valid context handle (used for logging; may be NULL)
+ *   points    – flat array of 2D coordinates: [x0, y0, x1, y1, ...]
+ *   numPoints – number of (x,y) point pairs (must be >= 2)
+ *   outHandle – receives the new 2D B-spline curve handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_polyline_bspline(
+    XbimContextHandle   ctx,
+    const double*       points,
+    int                 numPoints,
     XbimCurve2dHandle*  outHandle);
 
 /*

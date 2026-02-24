@@ -117,7 +117,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_edges(
         {
             gp_Pnt p1 = BRep_Tool::Pnt(vFirst);
             gp_Pnt p2 = BRep_Tool::Pnt(vLast);
-            if (p1.IsEqual(p2, Precision::Confusion()))
+            if (p1.IsEqual(p2, ctx->minimumGap))
                 wire.Closed(true);
         }
 
@@ -447,7 +447,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polyline(
             }
 
             TopoDS_Vertex v;
-            builder.MakeVertex(v, pt, Precision::Confusion());
+            builder.MakeVertex(v, pt, ctx->precision);
             vertices.Append(v);
         }
 
@@ -544,7 +544,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polygon(
             gp_Pnt p1(pointsXYZ[i * 3],     pointsXYZ[i * 3 + 1],     pointsXYZ[i * 3 + 2]);
             gp_Pnt p2(pointsXYZ[(i+1) * 3], pointsXYZ[(i+1) * 3 + 1], pointsXYZ[(i+1) * 3 + 2]);
 
-            if (p1.Distance(p2) < Precision::Confusion())
+            if (p1.Distance(p2) < ctx->minimumGap)
                 continue; /* skip degenerate edges */
 
             BRepBuilderAPI_MakeEdge edgeMaker(p1, p2);
@@ -560,7 +560,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_polygon(
                          pointsXYZ[(numPoints-1) * 3 + 2]);
             gp_Pnt pFirst(pointsXYZ[0], pointsXYZ[1], pointsXYZ[2]);
 
-            if (pLast.Distance(pFirst) >= Precision::Confusion())
+            if (pLast.Distance(pFirst) >= ctx->minimumGap)
             {
                 BRepBuilderAPI_MakeEdge edgeMaker(pLast, pFirst);
                 if (edgeMaker.IsDone())

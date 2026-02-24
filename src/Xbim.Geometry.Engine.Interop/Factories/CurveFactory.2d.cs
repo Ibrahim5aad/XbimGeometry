@@ -488,6 +488,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// </summary>
         private XbimBoundedCurve2d BuildCompositeCurve2d(IIfcCompositeCurve ifcComposite)
         {
+            // Fast path: if all segments are polylines, build a single degree-1 B-spline
+            // directly from the flattened 2D points, bypassing CompCurveToBSplineCurve entirely.
+            if (TryBuildAllPolylineComposite2d(ifcComposite, out var fastResult))
+                return fastResult;
+
+            // General path: build each segment individually, then join via CompCurveToBSplineCurve
             var segmentCurves = BuildCompositeCurveSegments2d(ifcComposite);
             try
             {
@@ -512,6 +518,133 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 foreach (var c in segmentCurves)
                     c.Dispose();
             }
+        }
+
+        /// <summary>
+        /// Checks whether all segments of a composite curve are polylines or trimmed lines.
+        /// If so, flattens all 2D points and builds a single degree-1 B-spline directly.
+        /// </summary>
+        private bool TryBuildAllPolylineComposite2d(IIfcCompositeCurve ifcComposite, out XbimBoundedCurve2d result)
+        {
+            result = null!;
+
+            // Collect all 2D points from all segments
+            var allXY = new List<double>();
+            int lastLabel = -1;
+
+            foreach (var segment in ifcComposite.Segments)
+            {
+                if (segment.EntityLabel == lastLabel) continue;
+                lastLabel = segment.EntityLabel;
+
+                if (segment is IIfcReparametrisedCompositeCurveSegment reparam
+                    && (double)reparam.ParamLength != 1.0)
+                    return false; // unsupported segment type
+
+                var parentCurve = segment.ParentCurve;
+                if (parentCurve == null) continue;
+
+                if (parentCurve is IIfcPolyline polyline && polyline.Points.Count >= 2)
+                {
+                    // Collect 2D points from polyline
+                    var pts = new List<(double x, double y)>();
+                    foreach (var pt in polyline.Points)
+                    {
+                        var coords = pt.Coordinates;
+                        pts.Add((coords[0], coords.Count > 1 ? coords[1] : 0.0));
+                    }
+
+                    if (!segment.SameSense)
+                        pts.Reverse();
+
+                    // Append, deduplicating at junction
+                    foreach (var (x, y) in pts)
+                    {
+                        if (allXY.Count >= 2)
+                        {
+                            double prevX = allXY[allXY.Count - 2];
+                            double prevY = allXY[allXY.Count - 1];
+                            double dx = x - prevX, dy = y - prevY;
+                            if (dx * dx + dy * dy < 1e-20) // ~Precision::Confusion²
+                                continue;
+                        }
+                        allXY.Add(x);
+                        allXY.Add(y);
+                    }
+                }
+                else if (parentCurve is IIfcTrimmedCurve trimmed && trimmed.BasisCurve is IIfcLine)
+                {
+                    // Trimmed line: extract start and end points
+                    bool trimSense = trimmed.SenseAgreement;
+                    ExtractTrimParameters(trimmed, false,
+                        out double u1, out double u2, ref trimSense,
+                        out bool useCartesian, out var cp1, out var cp2);
+
+                    double sx, sy, ex, ey;
+                    if (useCartesian && cp1 != null && cp2 != null)
+                    {
+                        var coords1 = cp1.Coordinates;
+                        var coords2 = cp2.Coordinates;
+                        sx = coords1[0]; sy = coords1.Count > 1 ? coords1[1] : 0.0;
+                        ex = coords2[0]; ey = coords2.Count > 1 ? coords2[1] : 0.0;
+                    }
+                    else
+                    {
+                        return false; // can't extract points — fall back to general path
+                    }
+
+                    if (!trimmed.SenseAgreement)
+                    {
+                        (sx, ex) = (ex, sx);
+                        (sy, ey) = (ey, sy);
+                    }
+
+                    if (!segment.SameSense)
+                    {
+                        (sx, ex) = (ex, sx);
+                        (sy, ey) = (ey, sy);
+                    }
+
+                    // Add start point (dedup at junction)
+                    if (allXY.Count >= 2)
+                    {
+                        double prevX = allXY[allXY.Count - 2];
+                        double prevY = allXY[allXY.Count - 1];
+                        double dx = sx - prevX, dy = sy - prevY;
+                        if (dx * dx + dy * dy >= 1e-20)
+                        {
+                            allXY.Add(sx);
+                            allXY.Add(sy);
+                        }
+                    }
+                    else
+                    {
+                        allXY.Add(sx);
+                        allXY.Add(sy);
+                    }
+
+                    // Add end point
+                    allXY.Add(ex);
+                    allXY.Add(ey);
+                }
+                else
+                {
+                    return false; // non-linear segment — fall back to general path
+                }
+            }
+
+            int numPoints = allXY.Count / 2;
+            if (numPoints < 2)
+                return false;
+
+            int nativeResult = XbimGeometryNativeApi.xbim_curve2d_build_polyline_bspline(
+                ContextHandle, allXY.ToArray(), numPoints, out var curveHandle);
+
+            if (nativeResult != 0)
+                return false; // fall back to general path
+
+            result = new XbimBoundedCurve2d(curveHandle, XCurveType.IfcCompositeCurve);
+            return true;
         }
 
         #endregion

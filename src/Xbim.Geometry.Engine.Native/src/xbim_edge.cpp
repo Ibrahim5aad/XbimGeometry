@@ -132,7 +132,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_line(
         gp_Pnt p1(startX, startY, startZ);
         gp_Pnt p2(endX, endY, endZ);
 
-        if (p1.Distance(p2) < Precision::Confusion())
+        double tol = ctx ? ctx->minimumGap : Precision::Confusion();
+        if (p1.Distance(p2) < tol)
         {
             xbim_set_error("xbim_edge_build_line: start and end points are identical");
             xbim_log_warning(ctx, "Cannot build line edge: degenerate segment (zero length)");
@@ -724,9 +725,10 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_edge_build_circle_arc_3pt(
         gp_Pnt mid(p2X, p2Y, p2Z);
         gp_Pnt end(p3X, p3Y, p3Z);
 
-        if (start.Distance(mid) < Precision::Confusion() ||
-            mid.Distance(end) < Precision::Confusion() ||
-            start.Distance(end) < Precision::Confusion())
+        double tol = ctx ? ctx->minimumGap : Precision::Confusion();
+        if (start.Distance(mid) < tol ||
+            mid.Distance(end) < tol ||
+            start.Distance(end) < tol)
         {
             xbim_set_error("xbim_edge_build_circle_arc_3pt: two or more points are coincident");
             return XBIM_INVALID_ARG;

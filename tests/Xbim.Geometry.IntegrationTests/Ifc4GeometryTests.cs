@@ -40,7 +40,7 @@ namespace Xbim.Geometry.Engine.Tests
                 model.AddRevitWorkArounds();
                 advancedBrep.Should().NotBeNull();
                 var geomEngine = factory.CreateGeometryEngine(engineVersion, model, _loggerFactory);
-             
+
                 var solid = geomEngine.Create(advancedBrep, _logger) as IXbimSolid;
                 solid.Volume.Should().BeApproximately(102264692.6969, 1e-4);
             }
@@ -416,13 +416,13 @@ namespace Xbim.Geometry.Engine.Tests
                 triangulatedFaceSet.Should().NotBeNull();
 
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
-                
-                  var t = DateTime.Now;
+
+                var t = DateTime.Now;
                 var geom = geomEngine.CreateSurfaceModel(triangulatedFaceSet);
                 var elapsed = DateTime.Now - t;
                 var elapsedMm = elapsed.TotalMilliseconds;
                 Console.WriteLine($"Time taken to create solid from IfcTriangulatedFaceSet: {elapsedMm} ms");
-                
+
                 geom.Solids.Count.Should().Be(1);
                 Math.Abs(geom.Solids.First.BoundingBox.Volume - 1.32).Should().BeLessThan(1e-5);
 
@@ -442,7 +442,7 @@ namespace Xbim.Geometry.Engine.Tests
                 Math.Abs(geom.Solids.First.BoundingBox.Volume - 7680).Should().BeLessThan(1e-3);
             }
         }
-        
+
         [Fact]
         public void TriangulatedFaceSet3Test()
         {
@@ -721,12 +721,17 @@ namespace Xbim.Geometry.Engine.Tests
 
                 var pbhs = model.Instances[3942238] as IIfcBooleanClippingResult;
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
-                //test the faulty entity on its own
+
+
+                // Test the faulty entity on its own
                 var ex = Assert.Throws<XbimGeometryServiceException>(() => geomEngine.ModelService.WireFactory.Build(model.Instances[3942179] as IIfcCompositeCurve));
                 ex.Message.Should().Be("IfcCompositeCurve could not be built as a wire");
-                //see failure exception comes through the stack
-                var exSolid = Assert.Throws<XbimGeometryServiceException>(() => geomEngine.CreateSolidSet(pbhs, _logger).FirstOrDefault());
-                exSolid.Message.Should().Be("IfcCompositeCurve could not be built as a wire");
+
+
+                // We return the first operand now
+                var solid = geomEngine.CreateSolidSet(pbhs, _logger);
+                solid.Should().NotBeNullOrEmpty();
+                solid.Count.Should().Be(1);
             }
         }
 

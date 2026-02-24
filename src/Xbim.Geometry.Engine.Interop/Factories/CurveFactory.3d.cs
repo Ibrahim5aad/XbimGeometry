@@ -406,30 +406,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
         private XbimBoundedCurve3d BuildCompositeCurve(IIfcCompositeCurve ifcComposite)
         {
-            var segmentCurves = BuildCompositeCurveSegments3d(ifcComposite);
-            try
-            {
-                if (segmentCurves.Count == 0)
-                    throw new XbimGeometryServiceException(
-                        $"IIfcCompositeCurve #{ifcComposite.EntityLabel} has no valid segments.");
-
-                using var nativeSegments = new NativeHandleArray(
-                    segmentCurves.Select(c => c.Handle).ToArray());
-                int result = XbimGeometryNativeApi.xbim_curve_build_composite_bspline(
-                    ContextHandle, nativeSegments.Ptrs, nativeSegments.Length,
-                    out var compositeHandle);
-
-                if (result != 0)
-                    throw new XbimGeometryServiceException(
-                        $"Failed to build composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
-
-                return new XbimBoundedCurve3d(compositeHandle, XCurveType.IfcCompositeCurve);
-            }
-            finally
-            {
-                foreach (var c in segmentCurves)
-                    c.Dispose();
-            }
+            return BuildCompositeCurveBatch3d(ifcComposite);
         }
 
         private XbimBoundedCurve3d BuildIndexedPolyCurve(IIfcIndexedPolyCurve ifcIndexed)

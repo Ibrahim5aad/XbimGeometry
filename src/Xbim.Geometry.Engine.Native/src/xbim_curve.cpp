@@ -45,6 +45,9 @@
 #include <Standard_Failure.hxx>
 #include <GeomLib_Tool.hxx>
 #include <Geom_OffsetCurve.hxx>
+
+#include <vector>
+#include <algorithm>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <TopoDS_Wire.hxx>
@@ -466,9 +469,10 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_circle_3pt_3d(
         gp_Pnt p3(x3, y3, z3);
 
         /* Check for coincident points */
-        if (p1.Distance(p2) < Precision::Confusion() ||
-            p2.Distance(p3) < Precision::Confusion() ||
-            p1.Distance(p3) < Precision::Confusion())
+        double tol = ctx ? ctx->minimumGap : Precision::Confusion();
+        if (p1.Distance(p2) < tol ||
+            p2.Distance(p3) < tol ||
+            p1.Distance(p3) < tol)
         {
             xbim_set_error("xbim_curve_build_circle_3pt_3d: two or more points are coincident");
             return XBIM_INVALID_ARG;
@@ -1423,6 +1427,337 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_composite_bspline(
         return XBIM_ERROR;
     }
 }
+
+/*
+ * Helper: add a bounded curve to the composite converter with gap filling
+ * and approximation fallback.
+ */
+/*
+ * Build a degree-1 B-spline directly from a flat array of 3D points.
+ * Parametrised by cumulative chord length. Much faster than using
+ * CompCurveToBSplineCurve with individual line segments.
+ */
+static Handle(Geom_BSplineCurve) BuildPolylineBSpline(
+    const std::vector<gp_Pnt>& points)
+{
+    int N = (int)points.size();
+    if (N < 2)
+        return Handle(Geom_BSplineCurve)();
+
+    TColgp_Array1OfPnt poles(1, N);
+    TColStd_Array1OfReal knots(1, N);
+    TColStd_Array1OfInteger mults(1, N);
+
+    double cumDist = 0.0;
+    for (int i = 0; i < N; ++i)
+    {
+        poles(i + 1) = points[i];
+        if (i > 0)
+            cumDist += points[i].Distance(points[i - 1]);
+        knots(i + 1) = cumDist;
+        mults(i + 1) = (i == 0 || i == N - 1) ? 2 : 1;
+    }
+
+    return new Geom_BSplineCurve(poles, knots, mults, 1);
+}
+
+/*
+ * Collect points from a segment (LINE or POLYLINE) into the flat points vector.
+ * Handles sameSense reversal and deduplication at junctions.
+ */
+static void CollectLinearPoints(
+    int type,
+    const double* data,
+    int numDoubles,
+    bool reverse,
+    double tolerance,
+    std::vector<gp_Pnt>& allPoints)
+{
+    if (type == XBIM_CSEG_LINE)
+    {
+        gp_Pnt p1(data[0], data[1], data[2]);
+        gp_Pnt p2(data[3], data[4], data[5]);
+        if (p1.Distance(p2) < tolerance)
+            return;
+        if (reverse)
+            std::swap(p1, p2);
+
+        if (!allPoints.empty() && allPoints.back().IsEqual(p1, tolerance))
+            allPoints.push_back(p2);
+        else
+        {
+            allPoints.push_back(p1);
+            allPoints.push_back(p2);
+        }
+    }
+    else /* POLYLINE */
+    {
+        int numPts = numDoubles / 3;
+        if (numPts < 2)
+            return;
+
+        /* Read points in forward order, then reverse if needed */
+        std::vector<gp_Pnt> pts;
+        pts.reserve(numPts);
+        for (int p = 0; p < numPts; ++p)
+            pts.emplace_back(data[p * 3], data[p * 3 + 1], data[p * 3 + 2]);
+
+        if (reverse)
+            std::reverse(pts.begin(), pts.end());
+
+        /* Append, deduplicating at junction and collapsing zero-length spans */
+        for (size_t p = 0; p < pts.size(); ++p)
+        {
+            if (!allPoints.empty() && allPoints.back().IsEqual(pts[p], tolerance))
+                continue;
+            allPoints.push_back(pts[p]);
+        }
+    }
+}
+
+static bool AddToConverter(
+    XbimContextHandle ctx,
+    GeomConvert_CompCurveToBSplineCurve& converter,
+    const Handle(Geom_BoundedCurve)& bounded,
+    int segIndex)
+{
+    if (!converter.Add(bounded, ctx->minimumGap, Standard_False, Standard_False))
+    {
+        xbim_log_warning(ctx,
+            "xbim_curve_build_composite: segment %d is not continuous, skipping", segIndex);
+        return false;
+    }
+    return true;
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_build_composite(
+    XbimContextHandle   ctx,
+    int                 numSegments,
+    const int*          segTypes,
+    const int*          segSameSense,
+    const double*       segData,
+    const int*          segDataOffsets,
+    XbimCurveHandle*    prebuiltCurves,
+    int                 numPrebuilt,
+    XbimCurveHandle*    outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve_build_composite: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (numSegments < 1 || !segTypes || !segSameSense || !segData || !segDataOffsets)
+    {
+        xbim_set_error("xbim_curve_build_composite: invalid arguments");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        /* ── Fast path: all-linear composite ─────────────────────────────────
+         * When every segment is LINE or POLYLINE, we can flatten all points
+         * into a single array and build a degree-1 B-spline directly.
+         * This completely bypasses GeomConvert_CompCurveToBSplineCurve.
+         */
+        bool allLinear = true;
+        for (int i = 0; i < numSegments; ++i)
+        {
+            if (segTypes[i] != XBIM_CSEG_LINE && segTypes[i] != XBIM_CSEG_POLYLINE)
+            {
+                allLinear = false;
+                break;
+            }
+        }
+
+        if (allLinear)
+        {
+            std::vector<gp_Pnt> allPoints;
+            allPoints.reserve(numSegments * 4); /* reasonable initial size */
+
+            for (int i = 0; i < numSegments; ++i)
+            {
+                int numDoubles = segDataOffsets[i + 1] - segDataOffsets[i];
+                CollectLinearPoints(
+                    segTypes[i],
+                    segData + segDataOffsets[i],
+                    numDoubles,
+                    segSameSense[i] == 0,
+                    ctx->minimumGap,
+                    allPoints);
+            }
+
+            if ((int)allPoints.size() < 2)
+            {
+                xbim_set_error("xbim_curve_build_composite: all-linear composite has < 2 unique points");
+                return XBIM_ERROR;
+            }
+
+            Handle(Geom_BSplineCurve) result = BuildPolylineBSpline(allPoints);
+            if (result.IsNull())
+            {
+                xbim_set_error("xbim_curve_build_composite: failed to build polyline B-spline");
+                return XBIM_ERROR;
+            }
+
+            *outHandle = xbim_curve_create_from(result);
+            return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+        }
+
+        /* ── General path: mixed segment types ───────────────────────────────
+         * Uses CompCurveToBSplineCurve to join heterogeneous bounded curves.
+         * Polylines are built as direct B-splines (no local converter).
+         * 2-point polylines become Geom_TrimmedCurve (matching old engine).
+         */
+        GeomConvert_CompCurveToBSplineCurve converter(Convert_RationalC1);
+        int prebuiltIdx = 0;
+
+        for (int i = 0; i < numSegments; ++i)
+        {
+            int type = segTypes[i];
+            bool reverse = (segSameSense[i] == 0);
+            const double* data = segData + segDataOffsets[i];
+
+            Handle(Geom_BoundedCurve) bounded;
+
+            switch (type)
+            {
+            case XBIM_CSEG_LINE:
+            {
+                gp_Pnt p1(data[0], data[1], data[2]);
+                gp_Pnt p2(data[3], data[4], data[5]);
+                double dist = p1.Distance(p2);
+                if (dist < ctx->minimumGap)
+                {
+                    xbim_log_warning(ctx, "xbim_curve_build_composite: segment %d is a degenerate line, skipping", i);
+                    continue;
+                }
+                gp_Dir dir(gp_Vec(p1, p2));
+                bounded = new Geom_TrimmedCurve(new Geom_Line(p1, dir), 0.0, dist);
+                break;
+            }
+
+            case XBIM_CSEG_CIRCLE_TRIM:
+            {
+                gp_Pnt  center(data[0], data[1], data[2]);
+                gp_Dir  axis(data[3], data[4], data[5]);
+                gp_Dir  refDir(data[6], data[7], data[8]);
+                double  radius = data[9];
+                double  u1 = data[10];
+                double  u2 = data[11];
+                bool    sense = (data[12] != 0.0);
+
+                gp_Ax2 ax2(center, axis, refDir);
+                Handle(Geom_Circle) circle = new Geom_Circle(ax2, radius);
+                bounded = new Geom_TrimmedCurve(circle, u1, u2, sense);
+                break;
+            }
+
+            case XBIM_CSEG_POLYLINE:
+            {
+                int numDoubles = segDataOffsets[i + 1] - segDataOffsets[i];
+                int numPts = numDoubles / 3;
+                if (numPts < 2)
+                {
+                    xbim_log_warning(ctx, "xbim_curve_build_composite: segment %d polyline has < 2 points, skipping", i);
+                    continue;
+                }
+
+                if (numPts == 2)
+                {
+                    /* 2-point polyline = straight line (old engine fast path) */
+                    gp_Pnt p1(data[0], data[1], data[2]);
+                    gp_Pnt p2(data[3], data[4], data[5]);
+                    double dist = p1.Distance(p2);
+                    if (dist < ctx->minimumGap)
+                        continue;
+                    gp_Dir dir(gp_Vec(p1, p2));
+                    bounded = new Geom_TrimmedCurve(new Geom_Line(p1, dir), 0.0, dist);
+                }
+                else
+                {
+                    /* Multi-point polyline: build degree-1 B-spline directly */
+                    std::vector<gp_Pnt> pts;
+                    pts.reserve(numPts);
+                    gp_Pnt lastPt(data[0], data[1], data[2]);
+                    pts.push_back(lastPt);
+
+                    for (int p = 1; p < numPts; ++p)
+                    {
+                        gp_Pnt nextPt(data[p * 3], data[p * 3 + 1], data[p * 3 + 2]);
+                        if (!nextPt.IsEqual(lastPt, ctx->minimumGap))
+                        {
+                            pts.push_back(nextPt);
+                            lastPt = nextPt;
+                        }
+                    }
+
+                    if ((int)pts.size() < 2)
+                        continue;
+
+                    bounded = BuildPolylineBSpline(pts);
+                    if (bounded.IsNull())
+                        continue;
+                }
+                break;
+            }
+
+            case XBIM_CSEG_HANDLE:
+            {
+                if (prebuiltIdx >= numPrebuilt || !prebuiltCurves ||
+                    !prebuiltCurves[prebuiltIdx] || prebuiltCurves[prebuiltIdx]->curve.IsNull())
+                {
+                    xbim_log_warning(ctx, "xbim_curve_build_composite: segment %d has invalid pre-built handle, skipping", i);
+                    prebuiltIdx++;
+                    continue;
+                }
+                Handle(Geom_Curve) c = prebuiltCurves[prebuiltIdx]->curve;
+                bounded = Handle(Geom_BoundedCurve)::DownCast(c);
+                if (bounded.IsNull())
+                {
+                    xbim_log_warning(ctx, "xbim_curve_build_composite: segment %d pre-built curve is not bounded, skipping", i);
+                    prebuiltIdx++;
+                    continue;
+                }
+                /* Make a copy so reversal doesn't mutate the caller's handle */
+                bounded = Handle(Geom_BoundedCurve)::DownCast(bounded->Copy());
+                prebuiltIdx++;
+                break;
+            }
+
+            default:
+                xbim_log_warning(ctx, "xbim_curve_build_composite: segment %d has unknown type %d, skipping", i, type);
+                continue;
+            }
+
+            if (reverse)
+                bounded->Reverse();
+
+            AddToConverter(ctx, converter, bounded, i);
+        }
+
+        Handle(Geom_BSplineCurve) result = converter.BSplineCurve();
+        if (result.IsNull())
+        {
+            xbim_set_error("xbim_curve_build_composite: composite B-spline is null");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_curve_create_from(result);
+        return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve_build_composite");
+        xbim_set_error("xbim_curve_build_composite: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
 
 /* ── Convert curve to B-spline wire ─────────────────────────────────────────── */
 
