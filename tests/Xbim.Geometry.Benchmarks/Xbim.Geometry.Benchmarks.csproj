@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>CS8602;CS8604;CS1591</NoWarn>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- EngineMode: "New" (default) uses local ProjectReference, "Old" uses NuGet package -->
+    <EngineMode Condition="'$(EngineMode)' == ''">New</EngineMode>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.1" />
+    <PackageReference Include="Xbim.Essentials" Version="6.0.568" />
+  </ItemGroup>
+
+  <!-- New engine: local project reference -->
+  <ItemGroup Condition="'$(EngineMode)' != 'Old'">
+    <ProjectReference Include="..\..\src\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj" />
+  </ItemGroup>
+
+  <!-- Old engine: NuGet package -->
+  <ItemGroup Condition="'$(EngineMode)' == 'Old'">
+    <PackageReference Include="Xbim.Geometry.Engine.Interop" Version="6.3.873-netcore" />
+  </ItemGroup>
+
+  <!-- Link test files from IntegrationTests (no duplication) -->
+  <ItemGroup>
+    <Content Include="..\Xbim.Geometry.IntegrationTests\TestFiles\**\*.ifc"
+             Link="TestFiles\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\Xbim.Geometry.IntegrationTests\TestFiles\**\*.brep"
+             Link="TestFiles\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Copy native DLLs for new engine mode.
+       NativeBuildConfig selects Debug or Release native binaries (default: match managed Configuration). -->
+  <PropertyGroup Condition="'$(EngineMode)' != 'Old'">
+    <NativeBuildConfig Condition="'$(NativeBuildConfig)' == ''">$(Configuration)</NativeBuildConfig>
+    <NativeBuildDir>$(MSBuildThisFileDirectory)..\..\src\Xbim.Geometry.Engine.Native\build\$(NativeBuildConfig)\</NativeBuildDir>
+  </PropertyGroup>
+
+  <Target Name="CopyNativeDlls" AfterTargets="Build" Condition="'$(EngineMode)' != 'Old' And Exists('$(NativeBuildDir)xbim_geometry_native.dll')">
+    <PropertyGroup>
+      <NativeOutputDir>$(TargetDir)runtimes\win-x64\native\</NativeOutputDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <NativeDlls Include="$(NativeBuildDir)*.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(NativeOutputDir)" />
+    <Copy SourceFiles="@(NativeDlls)" DestinationFolder="$(NativeOutputDir)" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Copied native DLLs to $(NativeOutputDir)" />
+  </Target>
+
+</Project>
