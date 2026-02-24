@@ -11,6 +11,7 @@ using Xbim.Geometry.Engine.Interop.Rules;
 using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.GeometryResource;
 using Xbim.Ifc4.Interfaces;
+using Xbim.Ifc4.MeasureResource;
 
 namespace Xbim.Geometry.Engine.Interop.Factories
 {
@@ -450,9 +451,9 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                                 throw new XbimGeometryServiceException(
                                     $"IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}: ArcIndex must have exactly 3 indices.");
 
-                            int i1 = (int)(long)indices[0]! - 1;
-                            int i2 = (int)(long)indices[1]! - 1;
-                            int i3 = (int)(long)indices[2]! - 1;
+                            int i1 = (int)(IfcPositiveInteger)indices[0]! - 1;
+                            int i2 = (int)(IfcPositiveInteger)indices[1]! - 1;
+                            int i3 = (int)(IfcPositiveInteger)indices[2]! - 1;
 
                             var (sx, sy, sz) = points[i1];
                             var (mx, my, mz) = points[i2];
@@ -517,8 +518,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
 
                             for (int p = 0; p < indices.Count - 1; p++)
                             {
-                                int idx1 = (int)(long)indices[p]! - 1;
-                                int idx2 = (int)(long)indices[p + 1]! - 1;
+                                int idx1 = (int)(IfcPositiveInteger)indices[p]! - 1;
+                                int idx2 = (int)(IfcPositiveInteger)indices[p + 1]! - 1;
 
                                 var (x1, y1, z1) = points[idx1];
                                 var (x2, y2, z2) = points[idx2];

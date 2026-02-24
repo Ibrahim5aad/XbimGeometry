@@ -76,6 +76,9 @@ namespace Xbim.Geometry.Engine.Interop.Services
             if (geomRep is IIfcSectionedSpine sectionedSpine)
                 return _service.SolidFactory.Build(sectionedSpine);
 
+            if (geomRep is IIfcCurve curve)
+                return _service.WireFactory.Build(curve);
+
             // Bounding box (build as a simple block)
             if (geomRep is IIfcBoundingBox boundingBox)
                 return BuildBoundingBox(boundingBox);
