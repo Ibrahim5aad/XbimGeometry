@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <RootNamespace>Xbim.Geometry.Engine.Interop.Tests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

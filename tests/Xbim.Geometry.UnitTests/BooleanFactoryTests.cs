@@ -1,10 +1,13 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using Xbim.Common;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Geometry.Engine.Interop.Tests.Helpers;
+using Xbim.Ifc4;
 using Xbim.Ifc4.Interfaces;
+using Xbim.IO.Memory;
 using Xunit;
 
 namespace Xbim.Geometry.Engine.Interop.Tests;
@@ -16,10 +19,14 @@ public class BooleanFactoryTests : IDisposable
     private readonly IXSolidFactory _solidFactory;
     private readonly string _brepOutputDir;
 
+    private const double Precision = 1e-5;
+    private const double PrecisionMax = 0.1;
+
     public BooleanFactoryTests()
     {
         var loggerFactory = LoggerFactory.Create(b => b.AddConsole().SetMinimumLevel(LogLevel.Debug));
-        var model = IfcMoq.ModelMock();
+        var model = new MemoryModel(new EntityFactoryIfc4());
+        model.ModelFactors = new XbimModelFactors(angToRads: 1, 0.001, Precision);
         _service = new ModelGeometryService(model, loggerFactory);
         _booleanFactory = _service.BooleanFactory;
         _solidFactory = _service.SolidFactory;
@@ -307,4 +314,135 @@ public class BooleanFactoryTests : IDisposable
             "boolean union result should be a solid or compound");
         SaveBrep(shape, "CsgSolid_NestedBooleanTree");
     }
+
+    #region Displacement-Based Boolean Tests
+
+    [Fact]
+    public void Can_union_two_coincidental_blocks()
+    {
+        var booleanResult = IfcMoq.BooleanResultFromDisplacement();
+
+        var shape = _booleanFactory.Build(booleanResult);
+        Assert.True(shape.ShapeType == XShapeType.Solid || shape.ShapeType == XShapeType.Compound);
+        var solid = shape as IXSolid;
+        if (shape is IXCompound compound)
+        {
+            Assert.True(compound.IsSolidsOnly && compound.Solids.Count() == 1);
+            solid = compound.Solids.First();
+        }
+        solid.Should().NotBeNull();
+        solid!.Shells.Should().HaveCount(1);
+        solid.Shells.First().Faces.Should().HaveCount(6);
+    }
+
+    [Fact]
+    public void Can_cut_two_coincidental_blocks()
+    {
+        var booleanResult = IfcMoq.BooleanResultFromDisplacement(boolOp: IfcBooleanOperator.DIFFERENCE);
+        var shape = _booleanFactory.Build(booleanResult);
+        shape.IsEmptyShape().Should().BeTrue();
+    }
+
+    /// <summary>
+    /// These tests create two blocks and vary their distance apart to either union to one block if they
+    /// are less than or equal to 1mm apart, otherwise 2. This shows fuzz tolerance is working correctly.
+    /// </summary>
+    [Theory]
+    [InlineData(-10 - (PrecisionMax * 1.01), 0, 0, false)]
+    [InlineData(10 + (PrecisionMax * 1.01), 0, 0, false)]
+    [InlineData(-10 - PrecisionMax, 0, 0)]
+    [InlineData(10.0 + PrecisionMax, 0, 0)]
+    [InlineData(0, 0, -30)]
+    [InlineData(0, -20, 0)]
+    [InlineData(-10, 0, 0)]
+    [InlineData(0, 0, 30)]
+    [InlineData(0, 20, 0)]
+    [InlineData(10, 0, 0)]
+    [InlineData(0, 0, 0)]
+    public void Can_union_two_face_connected_blocks(double dispX, double dispY, double dispZ, bool singleSolid = true)
+    {
+        var booleanResult = IfcMoq.BooleanResultFromDisplacement(displacementX: dispX, displacementY: dispY, displacementZ: dispZ);
+        var shape = _booleanFactory.Build(booleanResult);
+        if (singleSolid)
+        {
+            Assert.True(shape.ShapeType == XShapeType.Solid || shape.ShapeType == XShapeType.Compound);
+            var solid = shape as IXSolid;
+            if (shape is IXCompound compound)
+            {
+                Assert.True(compound.IsSolidsOnly && compound.Solids.Count() == 1);
+                solid = compound.Solids.First();
+            }
+            solid!.Shells.Should().HaveCount(1);
+            solid.Shells.First().Faces.Should().HaveCount(6);
+        }
+        else
+        {
+            Assert.True(shape.ShapeType == XShapeType.Compound);
+            var compound = (IXCompound)shape;
+            Assert.True(compound.IsSolidsOnly);
+            compound.Solids.Should().HaveCount(2);
+        }
+    }
+
+    [Theory]
+    [InlineData(10, -10 - (PrecisionMax * 1.01), false)]
+    [InlineData(10, 10 + (PrecisionMax * 1.01), false)]
+    [InlineData(10, -10 - PrecisionMax, true)]
+    [InlineData(10, 10 + PrecisionMax, true)]
+    public void Can_cut_two_face_connected_blocks(double lenX, double dispX, bool intersects)
+    {
+        var booleanResult = IfcMoq.BooleanResultFromDisplacement(boolOp: IfcBooleanOperator.DIFFERENCE, lenX: lenX, displacementX: dispX);
+        var shape = _booleanFactory.Build(booleanResult);
+
+        Assert.True(shape.ShapeType == XShapeType.Solid);
+        var solid = (IXSolid)shape;
+        var box = solid.Bounds();
+        if (intersects)
+        {
+            var growth = 2 * (Math.Abs(dispX) - lenX);
+            box.LenX.Should().BeApproximately(lenX + growth, Precision);
+        }
+        else
+        {
+            box.LenX.Should().BeApproximately(lenX, Precision);
+        }
+    }
+
+    [Theory]
+    [InlineData(10, 5, true)]
+    [InlineData(10, -5, true)]
+    [InlineData(10, 10 - (Precision * 0.9), false)]
+    [InlineData(10, -10 - (Precision * 0.9), false)]
+    public void Can_intersect_two_blocks(double lenX, double dispX, bool intersects)
+    {
+        var booleanResult = IfcMoq.BooleanResultFromDisplacement(
+            boolOp: IfcBooleanOperator.INTERSECTION,
+            lenX: lenX,
+            displacementX: dispX);
+
+        if (!intersects)
+        {
+            var shape = _booleanFactory.Build(booleanResult);
+            shape.IsEmptyShape().Should().BeTrue();
+        }
+        else
+        {
+            var shape = _booleanFactory.Build(booleanResult);
+            Assert.True(shape.ShapeType == XShapeType.Solid);
+            var solid = (IXSolid)shape;
+            var box = solid.Bounds();
+            box.LenX.Should().BeApproximately(lenX - Math.Abs(dispX), Precision);
+        }
+    }
+
+    [Theory]
+    [InlineData(10)]
+    public void Can_build_nested_boolean_results(int depth)
+    {
+        var booleanResult = IfcMoq.DeepBooleanResult(depth: depth, displacement: 10);
+        var shape = _booleanFactory.Build(booleanResult);
+        shape.Should().NotBeNull();
+    }
+
+    #endregion
 }

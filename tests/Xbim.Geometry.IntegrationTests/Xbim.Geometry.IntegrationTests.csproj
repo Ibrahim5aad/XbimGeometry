@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
 		<IsPackable>false</IsPackable>
 		<Platforms>AnyCPU;x64;x86</Platforms>
+		<RootNamespace>Xbim.Geometry.Engine.Tests</RootNamespace>
 	</PropertyGroup>
 
   <PropertyGroup Condition="'$(Platform)' == 'x64' Or '$(Platform)' == 'AnyCPU'">

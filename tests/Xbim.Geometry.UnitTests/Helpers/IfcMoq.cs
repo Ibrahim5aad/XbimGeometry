@@ -15,7 +15,7 @@ namespace Xbim.Geometry.Engine.Interop.Tests.Helpers;
 /// Lightweight mock creators for IFC entities used in CSG primitive and profile tests.
 /// Replicates the patterns from the main test project's MoqCreators.
 /// </summary>
-internal static class IfcMoq
+internal static partial class IfcMoq
 {
     private static readonly ExpressMetaData MetaData =
         ExpressMetaData.GetMetadata(new EntityFactoryIfc4());
