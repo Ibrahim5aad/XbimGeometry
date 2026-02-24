@@ -713,10 +713,13 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_connected_face_set(
     const int*         faceData,
     int                faceDataLength,
     int                numFaces,
-    int                makeSolid,
-    int                upgradeFaceSets,
+    int                flags,
     XbimShapeHandle*   outHandle)
 {
+    bool makeSolid      = (flags & XBIM_FACESET_MAKE_SOLID)   != 0;
+    bool upgradeFaceSets = (flags & XBIM_FACESET_UPGRADE)     != 0;
+    bool skipWinding    = (flags & XBIM_FACESET_SKIP_WINDING) != 0;
+    bool skipWireFix    = (flags & XBIM_FACESET_SKIP_WIREFIX) != 0;
     xbim_clear_error();
 
     if (!outHandle)
@@ -934,85 +937,99 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_connected_face_set(
                 if (topoWire.NbChildren() > 2)
                     builder.Add(theFace, topoWire);
             }
-
             if (theFace.NbChildren() == 0)
                 continue;
 
-            /* ---- Validate outer wire winding ---- */
-            TopoDS_Wire outerBound = BRepTools::OuterWire(theFace);
-            ShapeFix_Wire wireFixer(outerBound, theFace, tol);
-            wireFixer.ClearModes();
-            wireFixer.FixVertexToleranceMode() = true;
-            wireFixer.Perform();
-
-            for (TopExp_Explorer exp(theFace, TopAbs_WIRE); exp.More(); exp.Next())
+            if (!skipWireFix || !skipWinding)
             {
-                const TopoDS_Wire& wire = TopoDS::Wire(exp.Current());
-                if (wire.IsEqual(outerBound))
+                /* ---- Validate outer wire winding ---- */
+                TopoDS_Wire outerBound = BRepTools::OuterWire(theFace);
+
+                if (!skipWireFix)
                 {
-                    TopoDS_Face tmpFace;
-                    builder.MakeFace(tmpFace, rec.plane, tol);
-                    builder.Add(tmpFace, wire);
-                    GProp_GProps gProps;
-                    BRepGProp::SurfaceProperties(tmpFace, gProps, tol);
-                    double area = gProps.Mass();
-                    if (std::abs(area) < Precision::Confusion())
+                    ShapeFix_Wire wireFixer(outerBound, theFace, tol);
+                    wireFixer.ClearModes();
+                    wireFixer.FixVertexToleranceMode() = true;
+                    wireFixer.Perform();
+                }
+
+                if (!skipWinding)
+                {
+                    for (TopExp_Explorer exp(theFace, TopAbs_WIRE); exp.More(); exp.Next())
+                    {
+                        const TopoDS_Wire& wire = TopoDS::Wire(exp.Current());
+                        if (wire.IsEqual(outerBound))
+                        {
+                            TopoDS_Face tmpFace;
+                            builder.MakeFace(tmpFace, rec.plane, tol);
+                            builder.Add(tmpFace, wire);
+                            GProp_GProps gProps;
+                            BRepGProp::SurfaceProperties(tmpFace, gProps, tol);
+                            double area = gProps.Mass();
+                            if (std::abs(area) < Precision::Confusion())
+                            {
+                                theFace.EmptyCopy();
+                                break;
+                            }
+                            bool isCounterClockwise = area > 0;
+                            if (!isCounterClockwise)
+                                rec.plane->SetAxis(rec.plane->Axis().Reversed());
+                            break;
+                        }
+                    }
+
+                    if (theFace.NbChildren() == 0)
+                        continue;
+                }
+
+                /* ---- Validate inner wire winding ---- */
+                if (!skipWinding && theFace.NbChildren() > 1)
+                {
+                    bool faceNeedsToBeRebuilt = false;
+                    TopoDS_ListOfShape innerWires;
+
+                    for (TopExp_Explorer exp(theFace, TopAbs_WIRE); exp.More(); exp.Next())
+                    {
+                        const TopoDS_Shape& wireShape = exp.Current();
+                        if (!wireShape.IsEqual(outerBound))
+                        {
+                            if (!skipWireFix)
+                            {
+                                ShapeFix_Wire innerWireFixer(TopoDS::Wire(wireShape), theFace, tol);
+                                innerWireFixer.ClearModes();
+                                innerWireFixer.FixVertexToleranceMode() = true;
+                                innerWireFixer.Perform();
+                            }
+
+                            TopoDS_Face tmpFace;
+                            builder.MakeFace(tmpFace, rec.plane, tol);
+                            builder.Add(tmpFace, wireShape);
+                            GProp_GProps gProps;
+                            BRepGProp::SurfaceProperties(tmpFace, gProps, tol);
+                            double area = gProps.Mass();
+                            if (std::abs(area) < Precision::Confusion())
+                                continue;
+                            bool isCounterClockwise = area > 0;
+                            if (isCounterClockwise)
+                            {
+                                /* Inner wire should be CW — reverse it */
+                                innerWires.Append(wireShape.Reversed());
+                                faceNeedsToBeRebuilt = true;
+                            }
+                            else
+                            {
+                                innerWires.Append(wireShape);
+                            }
+                        }
+                    }
+
+                    if (faceNeedsToBeRebuilt)
                     {
                         theFace.EmptyCopy();
-                        break;
+                        builder.Add(theFace, outerBound);
+                        for (auto it = innerWires.cbegin(); it != innerWires.cend(); ++it)
+                            builder.Add(theFace, *it);
                     }
-                    bool isCounterClockwise = area > 0;
-                    if (!isCounterClockwise)
-                        rec.plane->SetAxis(rec.plane->Axis().Reversed());
-                    break;
-                }
-            }
-
-            if (theFace.NbChildren() == 0)
-                continue;
-
-            /* ---- Validate inner wire winding ---- */
-            if (theFace.NbChildren() > 1)
-            {
-                bool faceNeedsToBeRebuilt = false;
-                TopoDS_ListOfShape innerWires;
-
-                for (TopExp_Explorer exp(theFace, TopAbs_WIRE); exp.More(); exp.Next())
-                {
-                    const TopoDS_Shape& wireShape = exp.Current();
-                    if (!wireShape.IsEqual(outerBound))
-                    {
-                        wireFixer.Init(TopoDS::Wire(wireShape), theFace, tol);
-                        wireFixer.Perform();
-
-                        TopoDS_Face tmpFace;
-                        builder.MakeFace(tmpFace, rec.plane, tol);
-                        builder.Add(tmpFace, wireShape);
-                        GProp_GProps gProps;
-                        BRepGProp::SurfaceProperties(tmpFace, gProps, tol);
-                        double area = gProps.Mass();
-                        if (std::abs(area) < Precision::Confusion())
-                            continue;
-                        bool isCounterClockwise = area > 0;
-                        if (isCounterClockwise)
-                        {
-                            /* Inner wire should be CW — reverse it */
-                            innerWires.Append(wireShape.Reversed());
-                            faceNeedsToBeRebuilt = true;
-                        }
-                        else
-                        {
-                            innerWires.Append(wireShape);
-                        }
-                    }
-                }
-
-                if (faceNeedsToBeRebuilt)
-                {
-                    theFace.EmptyCopy();
-                    builder.Add(theFace, outerBound);
-                    for (auto it = innerWires.cbegin(); it != innerWires.cend(); ++it)
-                        builder.Add(theFace, *it);
                 }
             }
 

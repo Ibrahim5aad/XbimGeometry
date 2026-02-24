@@ -153,8 +153,8 @@ namespace Xbim.Geometry.Engine.Tests
             brep.Should().NotBeNull();
             var engine = factory.CreateGeometryEngineV5(model, _loggerFactory);
 
+            using var shape = engine.Create(brep);
 
-            var shape = engine.Create(brep);
             if (shape is IXbimSolid solid)
             {
                 // solid.IsValid.Should().BeTrue();

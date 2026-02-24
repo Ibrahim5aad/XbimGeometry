@@ -2646,14 +2646,21 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_closed_shell(
  *   faceData       - packed face topology (see encoding above)
  *   faceDataLength - total number of ints in faceData
  *   numFaces       - number of faces encoded in faceData
- *   makeSolid        - if non-zero, convert the shell to a solid with orientation fix
- *   upgradeFaceSets  - if non-zero and makeSolid is set, detect multi-solid shells
- *                      and split them into individual solids (returns compound).
- *                      If zero, just does a simple shell-to-solid conversion.
+ *   flags          - bitfield controlling processing steps:
+ *                      0x01 MAKE_SOLID   - convert shell to solid with orientation fix
+ *                      0x02 UPGRADE      - detect/split multi-solid shells (requires MAKE_SOLID)
+ *                      0x04 SKIP_WINDING - skip per-face winding validation (BRepGProp)
+ *                      0x08 SKIP_WIREFIX - skip per-face ShapeFix_Wire
  *   outHandle        - receives the resulting shape (solid, compound, or shell)
  *
  * Returns XBIM_OK on success.
  */
+
+#define XBIM_FACESET_MAKE_SOLID   0x01
+#define XBIM_FACESET_UPGRADE      0x02
+#define XBIM_FACESET_SKIP_WINDING 0x04
+#define XBIM_FACESET_SKIP_WIREFIX 0x08
+
 XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_connected_face_set(
     XbimContextHandle  ctx,
     const double*      allPointsXYZ,
@@ -2661,8 +2668,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_connected_face_set(
     const int*         faceData,
     int                faceDataLength,
     int                numFaces,
-    int                makeSolid,
-    int                upgradeFaceSets,
+    int                flags,
     XbimShapeHandle*   outHandle);
 
 #pragma endregion

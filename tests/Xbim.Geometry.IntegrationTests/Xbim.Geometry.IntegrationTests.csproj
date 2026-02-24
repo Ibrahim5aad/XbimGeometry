@@ -625,9 +625,11 @@
 		<ProjectReference Include="..\..\src\Xbim.Tessellator\Xbim.Tessellator.csproj" />
 	</ItemGroup>
 
-	<!-- Copy native DLLs from CMake build output to runtimes/win-x64/native/ after build -->
+	<!-- Copy native DLLs from CMake build output to runtimes/win-x64/native/ after build.
+	     NativeBuildConfig selects Debug or Release native binaries (default: match managed Configuration). -->
 	<PropertyGroup>
-		<NativeBuildDir>$(MSBuildThisFileDirectory)..\..\src\Xbim.Geometry.Engine.Native\build\Debug\</NativeBuildDir>
+		<NativeBuildConfig Condition="'$(NativeBuildConfig)' == ''">$(Configuration)</NativeBuildConfig>
+		<NativeBuildDir>$(MSBuildThisFileDirectory)..\..\src\Xbim.Geometry.Engine.Native\build\$(NativeBuildConfig)\</NativeBuildDir>
 	</PropertyGroup>
 
 	<Target Name="CopyNativeDlls" AfterTargets="Build" Condition="Exists('$(NativeBuildDir)xbim_geometry_native.dll')">

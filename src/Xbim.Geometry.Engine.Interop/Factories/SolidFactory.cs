@@ -679,10 +679,12 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         {
             var (pointsXYZ, numPoints, faceData, numFaces) = MarshalFaceSet(faceSet);
 
-            int upgrade = _modelService.UpgradeFaceSets ? 1 : 0;
+            int flags = XbimGeometryNativeApi.FaceSetMakeSolid;
+            if (_modelService.UpgradeFaceSets)
+                flags |= XbimGeometryNativeApi.FaceSetUpgrade;
             int result = XbimGeometryNativeApi.xbim_shell_build_connected_face_set(
                 ContextHandle, pointsXYZ, numPoints, faceData, faceData.Length,
-                numFaces, 1 /* makeSolid */, upgrade, out var solidHandle);
+                numFaces, flags, out var solidHandle);
 
             if (result != 0)
                 throw new XbimGeometryServiceException(
@@ -1181,10 +1183,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 return null;
             }
 
+            int flags = 0;
+            if (makeSolid)
+                flags |= XbimGeometryNativeApi.FaceSetMakeSolid;
+            if (upgradeFaceSets)
+                flags |= XbimGeometryNativeApi.FaceSetUpgrade;
             int result = XbimGeometryNativeApi.xbim_shell_build_connected_face_set(
                 ContextHandle, pointsXYZ, numPoints, faceData, faceData.Length,
-                numFaces, makeSolid ? 1 : 0, upgradeFaceSets ? 1 : 0,
-                out var shellHandle);
+                numFaces, flags, out var shellHandle);
 
             if (result != 0)
             {
@@ -1555,8 +1561,8 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         }
 
         /// <summary>
-        /// Builds a shell (or solid if closed) from a triangulated face set by constructing
-        /// planar triangle faces from indexed coordinate data and sewing them together.
+        /// Builds a shell (or solid if closed) from a triangulated face set using
+        /// shared-topology construction from indexed coordinate data.
         /// </summary>
         private IXShape BuildTriangulatedFaceSet(IIfcTriangulatedFaceSet triangulated)
         {
@@ -1565,88 +1571,65 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new XbimGeometryServiceException(
                     $"TriangulatedFaceSet #{triangulated.EntityLabel}: missing Coordinates.");
 
-            double tolerance = _modelService.Precision;
             var coords = ExtractCoordinates(coordList);
             int numCoords = coordList.CoordList.Count;
-            var faceHandles = new List<NativeShapeHandle>();
 
-            try
+            // Marshal triangle indices into the faceData format expected by
+            // xbim_shell_build_connected_face_set: [numBounds, numPts, isOuter, i0, i1, i2, i0]
+            var faceDataList = new List<int>();
+            int faceCount = 0;
+
+            foreach (var triangle in triangulated.CoordIndex)
             {
-                // Build a planar face for each triangle
-                foreach (var triangle in triangulated.CoordIndex)
+                var indices = new List<int>();
+                foreach (var idx in triangle)
+                    indices.Add((int)(long)idx - 1); // 1-based to 0-based
+
+                if (indices.Count < 3)
+                    continue;
+
+                // Skip degenerate triangles (duplicate indices)
+                if (indices[0] == indices[1] || indices[1] == indices[2] || indices[0] == indices[2])
+                    continue;
+
+                // Validate index range
+                if (indices[0] < 0 || indices[0] >= numCoords ||
+                    indices[1] < 0 || indices[1] >= numCoords ||
+                    indices[2] < 0 || indices[2] >= numCoords)
                 {
-                    // CoordIndex contains 1-based indices
-                    var indices = new List<long>();
-                    foreach (var idx in triangle)
-                        indices.Add((long)idx);
-
-                    if (indices.Count < 3)
-                    {
-                        _logger.LogWarning("TriangulatedFaceSet #{Label}: skipping degenerate triangle with {Count} indices.",
-                            triangulated.EntityLabel, indices.Count);
-                        continue;
-                    }
-
-                    // Skip degenerate triangles (duplicate indices)
-                    if (indices[0] == indices[1] || indices[1] == indices[2] || indices[0] == indices[2])
-                        continue;
-
-                    // Extract 3 points from the coordinate array (convert 1-based to 0-based)
-                    var triCoords = new double[9];
-                    for (int i = 0; i < 3; i++)
-                    {
-                        int idx = (int)indices[i] - 1; // 1-based to 0-based
-                        if (idx < 0 || idx >= numCoords)
-                        {
-                            _logger.LogWarning("TriangulatedFaceSet #{Label}: index {Index} out of range.",
-                                triangulated.EntityLabel, indices[i]);
-                            goto nextTriangle;
-                        }
-                        triCoords[i * 3] = coords[idx * 3];
-                        triCoords[i * 3 + 1] = coords[idx * 3 + 1];
-                        triCoords[i * 3 + 2] = coords[idx * 3 + 2];
-                    }
-
-                    // Build a closed polygon wire from the 3 triangle vertices
-                    int result = XbimGeometryNativeApi.xbim_wire_build_polygon(
-                        ContextHandle, triCoords, 3, 1, out var wireHandle);
-
-                    if (result != 0)
-                    {
-                        _logger.LogWarning("TriangulatedFaceSet #{Label}: failed to build triangle wire: {Error}",
-                            triangulated.EntityLabel, XbimGeometryNativeApi.GetLastError());
-                        continue;
-                    }
-
-                    // Build a planar face from the triangle wire
-                    result = XbimGeometryNativeApi.xbim_face_build_from_wire(
-                        ContextHandle, wireHandle, out var faceHandle);
-
-                    wireHandle.Dispose();
-
-                    if (result != 0)
-                    {
-                        _logger.LogWarning("TriangulatedFaceSet #{Label}: failed to build triangle face: {Error}",
-                            triangulated.EntityLabel, XbimGeometryNativeApi.GetLastError());
-                        continue;
-                    }
-
-                    faceHandles.Add(faceHandle);
-                    nextTriangle:;
+                    _logger.LogWarning("TriangulatedFaceSet #{Label}: triangle index out of range.",
+                        triangulated.EntityLabel);
+                    continue;
                 }
 
-                if (faceHandles.Count == 0)
-                    throw new XbimGeometryServiceException(
-                        $"TriangulatedFaceSet #{triangulated.EntityLabel}: no valid faces were built.");
+                faceDataList.Add(1);              // numBounds = 1
+                faceDataList.Add(4);              // numPoints = 4 (3 vertices + close)
+                faceDataList.Add(1);              // isOuter = true
+                faceDataList.Add(indices[0]);
+                faceDataList.Add(indices[1]);
+                faceDataList.Add(indices[2]);
+                faceDataList.Add(indices[0]);     // close the loop
+                faceCount++;
+            }
 
-                return AssembleTessellatedShell(faceHandles, triangulated.Closed.HasValue && (bool)triangulated.Closed.Value,
-                    tolerance, triangulated.EntityLabel);
-            }
-            finally
-            {
-                foreach (var h in faceHandles)
-                    h.Dispose();
-            }
+            if (faceCount == 0)
+                throw new XbimGeometryServiceException(
+                    $"TriangulatedFaceSet #{triangulated.EntityLabel}: no valid faces.");
+
+            var faceData = faceDataList.ToArray();
+            bool isClosed = triangulated.Closed.HasValue && (bool)triangulated.Closed.Value;
+            int flags = XbimGeometryNativeApi.FaceSetSkipWinding | XbimGeometryNativeApi.FaceSetSkipWireFix;
+            if (isClosed)
+                flags |= XbimGeometryNativeApi.FaceSetMakeSolid;
+            int result = XbimGeometryNativeApi.xbim_shell_build_connected_face_set(
+                ContextHandle, coords, numCoords, faceData, faceData.Length,
+                faceCount, flags, out var handle);
+
+            if (result != 0)
+                throw new XbimGeometryServiceException(
+                    $"TriangulatedFaceSet #{triangulated.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+            return NativeShapeWrapper.WrapShape(handle);
         }
 
         /// <summary>
@@ -1660,7 +1643,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new XbimGeometryServiceException(
                     $"PolygonalFaceSet #{polygonal.EntityLabel}: missing Coordinates.");
 
-            double tolerance = _modelService.MinimumGap;
             bool isClosed = polygonal.Closed.HasValue && (bool)polygonal.Closed.Value;
 
             var (pointsXYZ, numPoints, faceData, numFaces) =
@@ -1670,10 +1652,14 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 throw new XbimGeometryServiceException(
                     $"PolygonalFaceSet #{polygonal.EntityLabel}: no valid faces.");
 
-            int upgrade = _modelService.UpgradeFaceSets ? 1 : 0;
+            int flags = 0;
+            if (isClosed)
+                flags |= XbimGeometryNativeApi.FaceSetMakeSolid;
+            if (_modelService.UpgradeFaceSets)
+                flags |= XbimGeometryNativeApi.FaceSetUpgrade;
             int result = XbimGeometryNativeApi.xbim_shell_build_connected_face_set(
                 ContextHandle, pointsXYZ, numPoints, faceData, faceData.Length,
-                numFaces, isClosed ? 1 : 0, upgrade, out var handle);
+                numFaces, flags, out var handle);
 
             if (result != 0)
                 throw new XbimGeometryServiceException(
@@ -1713,50 +1699,6 @@ namespace Xbim.Geometry.Engine.Interop.Factories
                 return null;
 
             return wireHandle;
-        }
-
-        /// <summary>
-        /// Assembles tessellated faces into a shell. If the tessellation is marked as closed,
-        /// attempts to create a solid; otherwise returns a sewn shell.
-        /// </summary>
-        private IXShape AssembleTessellatedShell(
-            List<NativeShapeHandle> faceHandles, bool isClosed, double tolerance, int entityLabel)
-        {
-            using var nativeFaces = new NativeHandleArray(faceHandles.ToArray());
-
-            if (isClosed && faceHandles.Count >= 4)
-            {
-                // Try to build as solid (sew + close)
-                int result = XbimGeometryNativeApi.xbim_shell_build_closed_shell(
-                    ContextHandle, nativeFaces.Ptrs, nativeFaces.Length, tolerance, out var solidHandle);
-
-                if (result == 0)
-                    return NativeShapeWrapper.WrapShape(solidHandle);
-
-                _logger.LogWarning(
-                    "TessellatedFaceSet #{Label}: closed shell conversion failed ({Error}), falling back to open shell.",
-                    entityLabel, XbimGeometryNativeApi.GetLastError());
-            }
-
-            // Build as open shell (sew only)
-            int shellResult = XbimGeometryNativeApi.xbim_shell_build_from_faces(
-                ContextHandle, nativeFaces.Ptrs, nativeFaces.Length, tolerance, out var rawShellHandle);
-
-            if (shellResult != 0)
-                throw new XbimGeometryServiceException(
-                    $"TessellatedFaceSet #{entityLabel}: failed to build shell: {XbimGeometryNativeApi.GetLastError()}");
-
-            // Sew the shell
-            int sewResult = XbimGeometryNativeApi.xbim_shell_sew(
-                ContextHandle, rawShellHandle, tolerance, out _, out var sewedHandle);
-
-            rawShellHandle.Dispose();
-
-            if (sewResult != 0)
-                throw new XbimGeometryServiceException(
-                    $"TessellatedFaceSet #{entityLabel}: failed to sew shell: {XbimGeometryNativeApi.GetLastError()}");
-
-            return NativeShapeWrapper.WrapShape(sewedHandle);
         }
 
         #region IFC4x3 Swept Solids

@@ -1,13 +1,9 @@
 ﻿using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using System;
-using System.IO;
-using System.Linq;
 using Xbim.Common.Geometry;
 using Xbim.Common.XbimExtensions;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
-using Xbim.Geometry.Engine.Interop.Diagnostics;
 using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Geometry.Exceptions;
 using Xbim.Ifc;
@@ -232,7 +228,9 @@ namespace Xbim.Geometry.Engine.Tests
             {
                 er.Entity.Should().NotBeNull();
                 var geomEngine = new XbimGeometryEngine(er.Entity.Model, _loggerFactory);
+
                 var beam = geomEngine.CreateSurfaceModel(er.Entity);
+
                 Math.Abs(beam.BoundingBox.Volume - 20000000).Should().BeLessThan(1);
             }
         }
@@ -416,8 +414,15 @@ namespace Xbim.Geometry.Engine.Tests
             {
                 var triangulatedFaceSet = model.Instances.OfType<IfcTriangulatedFaceSet>().FirstOrDefault();
                 triangulatedFaceSet.Should().NotBeNull();
+
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
+                
+                  var t = DateTime.Now;
                 var geom = geomEngine.CreateSurfaceModel(triangulatedFaceSet);
+                var elapsed = DateTime.Now - t;
+                var elapsedMm = elapsed.TotalMilliseconds;
+                Console.WriteLine($"Time taken to create solid from IfcTriangulatedFaceSet: {elapsedMm} ms");
+                
                 geom.Solids.Count.Should().Be(1);
                 Math.Abs(geom.Solids.First.BoundingBox.Volume - 1.32).Should().BeLessThan(1e-5);
 

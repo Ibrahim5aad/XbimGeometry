@@ -411,15 +411,11 @@ void xbim_brep_build_loop_wire(
         loopEdges.push_back(topoEdge);
     }
 
-    /* Add per-edge pcurves, but skip for ruled surfaces whose IFC-defined
-       surface may be wrong and will be rebuilt later in BuildFace. */
     if (!buildRuledSurface)
     {
         ShapeFix_Edge edgeFixer;
         for (auto& edge : loopEdges)
-        {
             edgeFixer.FixAddPCurve(edge, face, Standard_False);
-        }
     }
 
     /* Add edges to wire via BRep_Builder (preserves exact topology) */
@@ -438,7 +434,6 @@ void xbim_brep_build_loop_wire(
 
     loopWire.Closed(true);
 
-    /* Validate and fix the wire */
     BRepCheck_Analyzer analyser(loopWire, Standard_True);
     if (!analyser.IsValid())
     {
@@ -604,7 +599,6 @@ TopoDS_Face xbim_brep_build_face(
         }
     }
 
-    /* Validate and fix the face */
     try
     {
         BRepCheck_Analyzer analyser(topoAdvancedFace, Standard_False);

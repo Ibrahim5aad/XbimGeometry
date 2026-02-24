@@ -19,6 +19,12 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             NativeLibraryLoader.EnsureLoaded();
         }
 
+        // Flags for xbim_shell_build_connected_face_set
+        internal const int FaceSetMakeSolid   = 0x01;
+        internal const int FaceSetUpgrade     = 0x02;
+        internal const int FaceSetSkipWinding = 0x04;
+        internal const int FaceSetSkipWireFix = 0x08;
+
         #region Error Handling
 
         [DllImport(Lib, CallingConvention = CC)]
@@ -1072,8 +1078,7 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             [MarshalAs(UnmanagedType.LPArray)] int[] faceData,
             int faceDataLength,
             int numFaces,
-            int makeSolid,
-            int upgradeFaceSets,
+            int flags,
             out NativeShapeHandle outHandle);
 
         #endregion
