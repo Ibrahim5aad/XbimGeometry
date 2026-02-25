@@ -45,13 +45,6 @@ set(XBIM_OCCT_LIBS
     TKDESTEP
 )
 
-# Debug-only: OCCT visualization for shape inspection
-set(XBIM_OCCT_VIZ_LIBS
-    TKService
-    TKOpenGl
-    TKV3d
-)
-
 # Collect sources
 file(GLOB_RECURSE NATIVE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
@@ -74,14 +67,6 @@ target_include_directories(xbim_geometry_native
 )
 
 target_link_libraries(xbim_geometry_native PRIVATE ${XBIM_OCCT_LIBS})
-
-# Link visualization libs only in Debug builds
-target_link_libraries(xbim_geometry_native PRIVATE
-    $<$<CONFIG:Debug>:${XBIM_OCCT_VIZ_LIBS}>
-)
-target_compile_definitions(xbim_geometry_native PRIVATE
-    $<$<CONFIG:Debug>:XBIM_DEBUG_VIZ>
-)
 
 # Output naming
 set_target_properties(xbim_geometry_native PROPERTIES

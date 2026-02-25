@@ -17,7 +17,7 @@
     </Content>
   </ItemGroup>
 
-  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == '' Or '$(RuntimeIdentifier)' == 'linux-x64'">
     <Content Include="$(MSBuildThisFileDirectory)..\runtimes\linux-x64\native\**\*"
              Condition="Exists('$(MSBuildThisFileDirectory)..\runtimes\linux-x64\native\')">
       <Link>runtimes\linux-x64\native\%(RecursiveDir)%(Filename)%(Extension)</Link>

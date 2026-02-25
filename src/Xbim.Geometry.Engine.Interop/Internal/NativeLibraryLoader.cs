@@ -59,11 +59,33 @@ namespace Xbim.Geometry.Engine.Interop.Internal
             if (NativeLibrary.TryLoad(LibraryName, assembly, searchPath, out handle))
                 return handle;
 
+            // Build a diagnostic message that includes the OS-level load error
+            string loadError = GetLoadErrorDetail(ridPath ?? basePath);
+
             throw new DllNotFoundException(
                 $"Unable to load native library '{LibraryName}'. " +
                 $"Expected at: {ridPath ?? "(unknown RID path)"} or {basePath}. " +
                 $"Platform: {PlatformInfo.RuntimeIdentifier}, " +
-                $"Architecture: {PlatformInfo.ProcessArchitecture}");
+                $"Architecture: {PlatformInfo.ProcessArchitecture}" +
+                (loadError.Length > 0 ? $". Load error: {loadError}" : ""));
+        }
+
+        /// <summary>
+        /// Attempts to load the library via NativeLibrary.Load (which throws) to capture
+        /// the OS-level error message (e.g. missing shared library dependencies).
+        /// </summary>
+        private static string GetLoadErrorDetail(string path)
+        {
+            try
+            {
+                // NativeLibrary.Load throws with the dlopen/LoadLibrary error message
+                NativeLibrary.Load(path);
+                return "";
+            }
+            catch (DllNotFoundException ex)
+            {
+                return ex.Message;
+            }
         }
 
         /// <summary>

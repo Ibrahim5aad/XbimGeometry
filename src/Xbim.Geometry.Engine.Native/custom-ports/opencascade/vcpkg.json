@@ -7,14 +7,6 @@
   "supports": "!xbox",
   "dependencies": [
     {
-      "name": "angle",
-      "platform": "uwp"
-    },
-    {
-      "name": "opengl",
-      "platform": "!(android | ios | uwp | wasm32)"
-    },
-    {
       "name": "vcpkg-cmake",
       "host": true
     },

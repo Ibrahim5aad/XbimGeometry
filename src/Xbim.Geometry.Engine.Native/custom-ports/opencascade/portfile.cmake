@@ -34,17 +34,23 @@ if("jemalloc" IN_LIST FEATURES)
     list(APPEND FEATURE_OPTIONS "-DUSE_MMGR_TYPE=JEMALLOC")
 endif()
 
-# We turn off BUILD_MODULE_Draw as it requires TCL 8.6 and TK 8.6 specifically which conflicts with vcpkg only having TCL 9.0 
-# And pre-built ActiveTCL binaries are behind a marketing wall :(
-# We use the Unix install layout for Windows as it matches vcpkg
+# Build only the OCCT modules we actually use:
+#   FoundationClasses, ModelingData, ModelingAlgorithms, DataExchange
+# Disabled:
+#   Draw               — requires TCL
+#   DETools            — development/debugging tools
+#   Visualization      — OpenGL/X11 windowing (eliminates GL system dependency)
+#   ApplicationFramework — OCAF document framework
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
         ${FEATURE_OPTIONS}
         -DBUILD_LIBRARY_TYPE=${BUILD_TYPE}
         -DBUILD_MODULE_Draw=OFF
-        -DBUILD_DOC_Overview=OFF
         -DBUILD_MODULE_DETools=OFF
+        -DBUILD_MODULE_Visualization=OFF
+        -DBUILD_MODULE_ApplicationFramework=OFF
+        -DBUILD_DOC_Overview=OFF
         -DINSTALL_DIR_LAYOUT=Unix
         -DINSTALL_DIR_DOC=share/trash
         -DINSTALL_DIR_SCRIPT=share/trash # not relocatable
