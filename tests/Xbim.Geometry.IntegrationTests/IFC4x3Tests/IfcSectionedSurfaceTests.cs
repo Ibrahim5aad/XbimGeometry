@@ -15,10 +15,10 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
 {
     public class IfcSectionedSurfaceTests
     {
-        private readonly IXbimGeometryServicesFactory _factory;
+        private readonly IXGeometryConverterFactory _factory;
         private readonly ILoggerFactory _loggerFactory;
 
-        public IfcSectionedSurfaceTests(IXbimGeometryServicesFactory factory, ILoggerFactory loggerFactory)
+        public IfcSectionedSurfaceTests(IXGeometryConverterFactory factory, ILoggerFactory loggerFactory)
         {
             _factory = factory;
             _loggerFactory = loggerFactory;

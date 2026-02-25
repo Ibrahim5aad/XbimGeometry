@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Ifc4.GeometryResource;
 using Xbim.IO.Memory;
@@ -11,10 +12,10 @@ namespace Xbim.Geometry.Engine.Tests
 
     public class LoadGeometryEngine
     {
-        private readonly IXbimGeometryServicesFactory _factory;
+        private readonly IXGeometryConverterFactory _factory;
         private readonly ILoggerFactory _loggerFactory;
 
-        public LoadGeometryEngine(IXbimGeometryServicesFactory factory, ILoggerFactory loggerFactory)
+        public LoadGeometryEngine(IXGeometryConverterFactory factory, ILoggerFactory loggerFactory)
         {
             this._factory = factory;
             _loggerFactory = loggerFactory;

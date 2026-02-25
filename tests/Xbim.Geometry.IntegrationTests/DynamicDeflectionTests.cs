@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Xbim.Common.Model;
+using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Ifc;
 using Xbim.IO.Memory;
@@ -15,10 +16,10 @@ namespace Xbim.Geometry.Engine.Tests
     {
         private readonly ILoggerFactory _loggerFactory;
         private ILogger _logger;
-        private readonly IXbimGeometryServicesFactory _factory;
+        private readonly IXGeometryConverterFactory _factory;
 
 
-        public DynamicDeflectionTests(ILoggerFactory loggerFactory, IXbimGeometryServicesFactory factory)
+        public DynamicDeflectionTests(ILoggerFactory loggerFactory, IXGeometryConverterFactory factory)
         {
             _logger = loggerFactory.CreateLogger<DynamicDeflectionTests>();
             _loggerFactory = loggerFactory;

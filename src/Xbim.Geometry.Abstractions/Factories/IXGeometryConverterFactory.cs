@@ -15,10 +15,5 @@ namespace Xbim.Geometry.Abstractions
         /// Creates a Root Service to access Geometry Factories that are scoped to the current Model
         /// </summary>
         IXModelGeometryService CreateModelGeometryService(IModel model, ILoggerFactory loggerFactory);
-
-        /// <summary>
-        /// Gets the underlying model geometry service used by this engine
-        /// </summary>
-        IXModelGeometryService GetUnderlyingModelGeometryService(IXbimGeometryEngine geometryEngine);
     }
 }

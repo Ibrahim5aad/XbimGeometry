@@ -20,11 +20,11 @@ namespace Xbim.Geometry.Engine.Tests
     {
 
         private readonly ILoggerFactory _loggerFactory;
-        private readonly IXbimGeometryServicesFactory factory;
+        private readonly IXGeometryConverterFactory factory;
         readonly IXModelGeometryService _modelSvc;
 
 
-        public ProjectionFactoryTests(ILoggerFactory loggerFactory, IXbimGeometryServicesFactory factory)
+        public ProjectionFactoryTests(ILoggerFactory loggerFactory, IXGeometryConverterFactory factory)
         {
             _loggerFactory = loggerFactory;
             this.factory = factory;

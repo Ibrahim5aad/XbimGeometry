@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using Xbim.Common.Geometry;
 using Xbim.Common.Model;
+using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Ifc;
 using Xbim.Ifc4.Interfaces;
@@ -17,9 +18,9 @@ namespace Xbim.Geometry.Engine.Tests
 
     {
         private readonly ILoggerFactory _loggerFactory;
-        private readonly IXbimGeometryServicesFactory _geometryfactory;
+        private readonly IXGeometryConverterFactory _geometryfactory;
 
-        public GithubIssuesTests(ILoggerFactory loggerFactory, IXbimGeometryServicesFactory geometryfactory)
+        public GithubIssuesTests(ILoggerFactory loggerFactory, IXGeometryConverterFactory geometryfactory)
         {
             _loggerFactory = loggerFactory;
             _geometryfactory = geometryfactory;

@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Ifc4x3;
 using Xbim.Ifc4x3.GeometryResource;
@@ -11,11 +12,11 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
     public class IfcSpiralsTests
     {
         private const double Precision = 1e-5;
-        private readonly IXbimGeometryServicesFactory _factory;
+        private readonly IXGeometryConverterFactory _factory;
         private readonly ILoggerFactory _loggerFactory;
 
 
-        public IfcSpiralsTests(IXbimGeometryServicesFactory factory, ILoggerFactory loggerFactory)
+        public IfcSpiralsTests(IXGeometryConverterFactory factory, ILoggerFactory loggerFactory)
         {
             _factory = factory;
             _loggerFactory = loggerFactory;

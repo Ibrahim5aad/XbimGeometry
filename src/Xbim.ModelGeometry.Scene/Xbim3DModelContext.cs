@@ -569,7 +569,7 @@ namespace Xbim.ModelGeometry.Scene
         /// <param name="contextType"></param>
         /// <param name="requiredContextIdentifier"></param>
         public Xbim3DModelContext(IModel model, ILoggerFactory loggerFactory, string contextType = "model", string requiredContextIdentifier = null)
-            : this(model, contextType, requiredContextIdentifier, loggerFactory.CreateLogger<Xbim3DModelContext>(), loggerFactory)
+            : this(model, contextType, requiredContextIdentifier, loggerFactory?.CreateLogger<Xbim3DModelContext>(), loggerFactory)
         {
         }
         
@@ -588,11 +588,11 @@ namespace Xbim.ModelGeometry.Scene
             ILogger logger = null, ILoggerFactory loggerFactory = null) : base(logger)
         {
 
-            var factory = InternalServiceProvider.GetService<IXbimGeometryServicesFactory>();
+            var factory = InternalServiceProvider.GetService<IXGeometryConverterFactory>();
 
             if (factory == null)
             {
-                throw new InvalidOperationException("An implementation of IXbimGeometryServicesFactory could not be found.\n\nTo fix this add the following before calling any xbim functionality:\n\n XbimServices.Current.ConfigureServices(opt => opt.AddXbimToolkit(conf => conf.AddGeometryServices()));");
+                throw new InvalidOperationException("An implementation of IXGeometryConverterFactory could not be found.\n\nTo fix this add the following before calling any xbim functionality:\n\n XbimServices.Current.ConfigureServices(opt => opt.AddXbimToolkit(conf => conf.AddGeometryServices()));");
             }
 
             _model = model;

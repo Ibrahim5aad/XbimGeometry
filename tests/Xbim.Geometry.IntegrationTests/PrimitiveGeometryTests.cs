@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System;
 using System.Linq;
+using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Ifc4.Interfaces;
 using Xbim.IO.Memory;
@@ -17,9 +18,9 @@ namespace Xbim.Geometry.Engine.Tests
 
         private readonly ILogger _logger;
         private readonly ILoggerFactory _loggerFactory;
-        private readonly IXbimGeometryServicesFactory factory;
+        private readonly IXGeometryConverterFactory factory;
 
-        public PrimitiveGeometryTests(IXbimGeometryServicesFactory factory, ILoggerFactory loggerFactory)
+        public PrimitiveGeometryTests(IXGeometryConverterFactory factory, ILoggerFactory loggerFactory)
         {
             this.factory = factory;
             this._loggerFactory = loggerFactory;

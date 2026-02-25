@@ -16,9 +16,9 @@ namespace Xbim.Geometry.Engine.Tests
         #region Setup
 
         readonly ILoggerFactory _loggerFactory;
-        private readonly IXbimGeometryServicesFactory factory;
+        private readonly IXGeometryConverterFactory factory;
 
-        public CurveFactoryTests(IXbimGeometryServicesFactory factory, ILoggerFactory loggerFactory)
+        public CurveFactoryTests(IXGeometryConverterFactory factory, ILoggerFactory loggerFactory)
         {
             this._loggerFactory = loggerFactory;
             this.factory = factory;

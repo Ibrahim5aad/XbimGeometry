@@ -24,9 +24,8 @@ namespace Xbim.Geometry.Engine.Tests
         [InlineData(typeof(IXbimGeometryEngine))]
         [InlineData(typeof(XbimGeometryEngine))]
         [InlineData(typeof(IXbimManagedGeometryEngine))]
-        [InlineData(typeof(IXbimGeometryServicesFactory))]
         [InlineData(typeof(XbimGeometryEngineFactory))]
-        
+
         [Theory]
         public void CanResolveTypes(Type type)
         {
@@ -45,7 +44,6 @@ namespace Xbim.Geometry.Engine.Tests
         [InlineData(typeof(IXbimGeometryEngine))]
         [InlineData(typeof(XbimGeometryEngine))]
         [InlineData(typeof(IXbimManagedGeometryEngine))]
-        [InlineData(typeof(IXbimGeometryServicesFactory))]
         [InlineData(typeof(XbimGeometryEngineFactory))]
 
         [Theory]
@@ -115,11 +113,9 @@ namespace Xbim.Geometry.Engine.Tests
         {
             IServiceProvider provider = BuildServices();
 
-            var factory = provider.GetRequiredService<IXbimGeometryServicesFactory>();
-
             var model = new MemoryModel(new Ifc2x3.EntityFactoryIfc2x3());
             var loggerFactory = new LoggerFactory();
-            var engine = new XbimGeometryEngine(factory, loggerFactory, new GeometryEngineOptions());
+            var engine = new XbimGeometryEngine(model, loggerFactory, new GeometryEngineOptions());
 
             Assert.NotNull(engine);
         }
@@ -169,9 +165,8 @@ namespace Xbim.Geometry.Engine.Tests
             // engine.RegisterModel(model);
 
 
-            // Act 
-
-            var ex = Record.Exception(() => engine.CreatePoint(1, 2, 3, 4));
+            // Act — accessing model-scoped factories requires registration
+            var ex = Record.Exception(() => _ = ((IXGeometryEngineV6)engine).SolidFactory);
             ex.Should().BeOfType<InvalidOperationException>();
 
         }

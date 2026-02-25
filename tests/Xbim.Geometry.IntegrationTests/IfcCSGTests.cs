@@ -4,6 +4,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xbim.Common.Geometry;
+using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Geometry.Engine.Tests;
 using Xbim.Ifc4.GeometricModelResource;
@@ -20,10 +21,10 @@ namespace Xbim.Geometry.Engine.Tests
 
         private readonly ILogger _logger;
 
-        private readonly IXbimGeometryServicesFactory factory;
+        private readonly IXGeometryConverterFactory factory;
         private readonly ILoggerFactory _loggerFactory;
 
-        public IfcCsgTests(IXbimGeometryServicesFactory factory, ILoggerFactory loggerFactory)
+        public IfcCsgTests(IXGeometryConverterFactory factory, ILoggerFactory loggerFactory)
         {
             this.factory = factory;
             _loggerFactory = loggerFactory;

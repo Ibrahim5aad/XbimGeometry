@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Ifc4.Interfaces;
 using Xbim.IO.Memory;
@@ -17,9 +18,9 @@ namespace Xbim.Geometry.Engine.Tests
     {
         
         private ILoggerFactory _loggerFactory;
-        private readonly IXbimGeometryServicesFactory _factory;
+        private readonly IXGeometryConverterFactory _factory;
 
-        public IfcExampleFilesTests(ILoggerFactory loggerFactory, IXbimGeometryServicesFactory factory)
+        public IfcExampleFilesTests(ILoggerFactory loggerFactory, IXGeometryConverterFactory factory)
         {
             this._loggerFactory = loggerFactory;
             _factory = factory;

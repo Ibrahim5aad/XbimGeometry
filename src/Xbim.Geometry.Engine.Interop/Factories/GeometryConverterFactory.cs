@@ -1,7 +1,5 @@
-using System;
 using Microsoft.Extensions.Logging;
 using Xbim.Common;
-using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Ifc4.Interfaces;
@@ -23,18 +21,7 @@ namespace Xbim.Geometry.Engine.Interop.Factories
         /// <inheritdoc/>
         public IXbimGeometryEngine CreateGeometryEngine(IModel model, ILoggerFactory loggerFactory)
         {
-            var service = new ModelGeometryService(model, loggerFactory);
-            return new GeometryEngine(service, loggerFactory);
-        }
-
-        /// <inheritdoc/>
-        public IXModelGeometryService GetUnderlyingModelGeometryService(IXbimGeometryEngine geometryEngine)
-        {
-            if (geometryEngine is GeometryEngine engine)
-                return engine.ModelGeometryService;
-
-            throw new InvalidOperationException(
-                $"Cannot extract model geometry service from engine type {geometryEngine.GetType().Name}.");
+            return new XbimGeometryEngine(model, loggerFactory);
         }
     }
 }

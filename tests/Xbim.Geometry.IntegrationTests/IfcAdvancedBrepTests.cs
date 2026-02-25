@@ -19,9 +19,9 @@ namespace Xbim.Geometry.Engine.Tests
 
 
         private readonly ILoggerFactory _loggerFactory;
-        private readonly IXbimGeometryServicesFactory factory;
+        private readonly IXGeometryConverterFactory factory;
 
-        public IfcAdvancedBrepTests(ILoggerFactory loggerFactory, IXbimGeometryServicesFactory factory)
+        public IfcAdvancedBrepTests(ILoggerFactory loggerFactory, IXGeometryConverterFactory factory)
         {
             _loggerFactory = loggerFactory;
             this.factory = factory;

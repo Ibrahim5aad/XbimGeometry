@@ -68,7 +68,6 @@ namespace Xbim.Common.Configuration
             services.TryAddScoped<IXbimManagedGeometryEngine>(x => x.GetRequiredService<XbimGeometryEngine>());
             services.AddFactory<IXbimManagedGeometryEngine>();
 
-            services.TryAddSingleton<IXbimGeometryServicesFactory, XbimGeometryServicesFactory>();
             services.TryAddSingleton<XbimGeometryEngineFactory>();
 
             // Register the native geometry converter factory directly — no reflection or assembly loading needed

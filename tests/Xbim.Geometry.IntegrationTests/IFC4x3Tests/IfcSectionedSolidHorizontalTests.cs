@@ -17,13 +17,13 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
 {
     public class IfcSectionedSolidHorizontalTests
     {
-        private readonly IXbimGeometryServicesFactory _factory;
+        private readonly IXGeometryConverterFactory _factory;
         private readonly ILoggerFactory _loggerFactory;
         private readonly string _brepOutputDir;
         private const double Tolerance = 1e-5;
 
 
-        public IfcSectionedSolidHorizontalTests(IXbimGeometryServicesFactory factory, ILoggerFactory loggerFactory)
+        public IfcSectionedSolidHorizontalTests(IXGeometryConverterFactory factory, ILoggerFactory loggerFactory)
         {
             _factory = factory;
             _loggerFactory = loggerFactory;

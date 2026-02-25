@@ -12,11 +12,11 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
 {
     public class IfcDirectrixDerivedReferenceSweptAreaSolidTests
     {
-        private readonly IXbimGeometryServicesFactory _factory;
+        private readonly IXGeometryConverterFactory _factory;
         private readonly ILoggerFactory _loggerFactory;
 
 
-        public IfcDirectrixDerivedReferenceSweptAreaSolidTests(IXbimGeometryServicesFactory factory, ILoggerFactory loggerFactory)
+        public IfcDirectrixDerivedReferenceSweptAreaSolidTests(IXGeometryConverterFactory factory, ILoggerFactory loggerFactory)
         {
             _factory = factory;
             _loggerFactory = loggerFactory;

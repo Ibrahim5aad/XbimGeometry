@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Ifc4x3.GeometryResource;
 using Xbim.Ifc4x3;
@@ -17,11 +18,11 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
     public class IfcPolynomialCurveTests
     {
         private const double Precision = 1e-5;
-        private readonly IXbimGeometryServicesFactory _factory;
+        private readonly IXGeometryConverterFactory _factory;
         private readonly ILoggerFactory _loggerFactory;
 
 
-        public IfcPolynomialCurveTests(IXbimGeometryServicesFactory factory, ILoggerFactory loggerFactory)
+        public IfcPolynomialCurveTests(IXGeometryConverterFactory factory, ILoggerFactory loggerFactory)
         {
             _factory = factory;
             _loggerFactory = loggerFactory;

@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Ifc4x3.GeometryResource;
 using Xbim.IO.Memory;
@@ -10,11 +11,11 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
     public class IfcSegmentedReferenceCurveTests
     {
         private const double Precision = 1e-3;
-        private readonly IXbimGeometryServicesFactory _factory;
+        private readonly IXGeometryConverterFactory _factory;
         private readonly ILoggerFactory _loggerFactory;
 
 
-        public IfcSegmentedReferenceCurveTests(IXbimGeometryServicesFactory factory, ILoggerFactory loggerFactory)
+        public IfcSegmentedReferenceCurveTests(IXGeometryConverterFactory factory, ILoggerFactory loggerFactory)
         {
             _factory = factory;
             _loggerFactory = loggerFactory;

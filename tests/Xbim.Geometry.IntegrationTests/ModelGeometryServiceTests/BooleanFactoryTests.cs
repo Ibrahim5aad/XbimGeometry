@@ -16,12 +16,12 @@ namespace Xbim.Geometry.Engine.Tests
 
         #region Setup
 
-        private readonly IXbimGeometryServicesFactory factory;
+        private readonly IXGeometryConverterFactory factory;
         private readonly ILoggerFactory _loggerFactory;
 
         const double Precision = 1e-5;
 
-        public BooleanFactoryTests(IXbimGeometryServicesFactory factory, ILoggerFactory loggerFactory)
+        public BooleanFactoryTests(IXGeometryConverterFactory factory, ILoggerFactory loggerFactory)
         {
             this.factory = factory;
             _loggerFactory = loggerFactory;

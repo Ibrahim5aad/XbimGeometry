@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Xbim.Common.Geometry;
 using Xbim.Common.XbimExtensions;
+using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Geometry.Engine.Interop.Shapes;
 using Xbim.Geometry.Exceptions;
@@ -17,10 +18,10 @@ namespace Xbim.Geometry.Engine.Tests
     public class Ifc4GeometryTests
     {
         private readonly ILoggerFactory _loggerFactory;
-        private readonly IXbimGeometryServicesFactory factory;
+        private readonly IXGeometryConverterFactory factory;
         private readonly ILogger _logger;
 
-        public Ifc4GeometryTests(ILoggerFactory loggerFactory, IXbimGeometryServicesFactory factory)
+        public Ifc4GeometryTests(ILoggerFactory loggerFactory, IXGeometryConverterFactory factory)
         {
             _loggerFactory = loggerFactory;
             this.factory = factory;

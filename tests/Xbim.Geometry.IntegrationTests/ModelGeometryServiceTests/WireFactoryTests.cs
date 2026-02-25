@@ -16,7 +16,7 @@ namespace Xbim.Geometry.Engine.Tests
         private readonly IXModelGeometryService _modelSvc;
         #endregion
 
-        public WireFactoryTests(IXbimGeometryServicesFactory factory, ILoggerFactory loggerFactory)
+        public WireFactoryTests(IXGeometryConverterFactory factory, ILoggerFactory loggerFactory)
         {
             _modelSvc = factory.CreateModelGeometryService(new MemoryModel(new EntityFactoryIfc4()), loggerFactory);
         }

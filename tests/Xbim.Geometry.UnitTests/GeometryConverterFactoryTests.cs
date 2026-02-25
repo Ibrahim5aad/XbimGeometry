@@ -1,7 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Factories;
-using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Engine.Interop.Tests.Helpers;
 using Xunit;
 
@@ -39,7 +39,7 @@ public class GeometryConverterFactoryTests : IDisposable
         _disposables.Add((IDisposable)service);
 
         service.Should().NotBeNull();
-        service.Should().BeOfType<ModelGeometryService>();
+        service.Should().NotBeAssignableTo<XbimGeometryEngine>("standalone service is not an engine");
         service.Precision.Should().BeGreaterThan(0);
         service.OneMeter.Should().BeGreaterThan(0);
     }
@@ -51,13 +51,13 @@ public class GeometryConverterFactoryTests : IDisposable
         _disposables.Add((IDisposable)engine);
 
         engine.Should().NotBeNull();
-        engine.Should().BeOfType<GeometryEngine>();
+        engine.Should().BeOfType<XbimGeometryEngine>();
     }
 
     [Fact]
     public void Engine_DelegatesFactoryProperties_ToUnderlyingService()
     {
-        var engine = (GeometryEngine)_factory.CreateGeometryEngine(_model, _loggerFactory);
+        var engine = (IXGeometryEngineV6)_factory.CreateGeometryEngine(_model, _loggerFactory);
         _disposables.Add((IDisposable)engine);
 
         // Verify key factory properties are available through the engine

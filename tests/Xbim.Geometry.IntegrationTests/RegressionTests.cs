@@ -14,9 +14,9 @@ namespace Xbim.Geometry.Engine.Tests
     {
         private readonly ILoggerFactory _loggerFactory;
         private ILogger _logger;
-        private readonly IXbimGeometryServicesFactory _factory;
+        private readonly IXGeometryConverterFactory _factory;
 
-        public RegressionTests(ILoggerFactory loggerFactory, IXbimGeometryServicesFactory factory)
+        public RegressionTests(ILoggerFactory loggerFactory, IXGeometryConverterFactory factory)
         {
             _logger = loggerFactory.CreateLogger<RegressionTests>();
             _loggerFactory = loggerFactory;

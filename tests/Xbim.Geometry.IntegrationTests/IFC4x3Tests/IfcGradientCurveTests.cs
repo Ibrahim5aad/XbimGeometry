@@ -21,11 +21,11 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
 {
     public class IfcGradientCurveTests
     {
-        private readonly IXbimGeometryServicesFactory _factory;
+        private readonly IXGeometryConverterFactory _factory;
         private readonly ILoggerFactory _loggerFactory;
         private readonly string _brepOutputDir;
 
-        public IfcGradientCurveTests(IXbimGeometryServicesFactory factory, ILoggerFactory loggerFactory)
+        public IfcGradientCurveTests(IXGeometryConverterFactory factory, ILoggerFactory loggerFactory)
         {
             _factory = factory;
             _loggerFactory = loggerFactory;
