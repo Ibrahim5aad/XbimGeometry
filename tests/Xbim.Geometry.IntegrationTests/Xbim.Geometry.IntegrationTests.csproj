@@ -1,21 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net8.0</TargetFrameworks>
+		<TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 		<IsPackable>false</IsPackable>
-		<Platforms>AnyCPU;x64;x86</Platforms>
+		<IsTestProject>true</IsTestProject>
 		<RootNamespace>Xbim.Geometry.Engine.Tests</RootNamespace>
 	</PropertyGroup>
-
-  <PropertyGroup Condition="'$(Platform)' == 'x64' Or '$(Platform)' == 'AnyCPU'">
-    <RunSettingsFilePath>$(MSBuildProjectDirectory)\test.x64.runsettings</RunSettingsFilePath>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Platform)' == 'xx86'">
-    <RunSettingsFilePath>$(MSBuildProjectDirectory)\test.x86.runsettings</RunSettingsFilePath>
-  </PropertyGroup>
 
 	<PropertyGroup>
     <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
