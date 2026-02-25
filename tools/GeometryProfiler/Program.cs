@@ -1,7 +1,9 @@
 ﻿// See https://aka.ms/new-console-template for more information
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine.Interop.Factories;
 using Xbim.Ifc4.GeometricModelResource;
 using Xbim.Ifc4.GeometryResource;
 using Xbim.IO.Memory;
@@ -9,8 +11,9 @@ using Xbim.IO.Memory;
 Console.WriteLine("Profiling");
 ILoggerFactory loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
 using var csgModel = InitCsgModel();
-var modelService = XbimGeometryEngine.CreateModelGeometryService(csgModel, loggerFactory);
-var v5Engine = XbimGeometryEngine.CreateGeometryEngineV5(csgModel, loggerFactory);
+var converterFactory = new GeometryConverterFactory();
+var modelService = converterFactory.CreateModelGeometryService(csgModel, loggerFactory);
+var v5Engine = (IXGeometryEngineV6)converterFactory.CreateGeometryEngine(csgModel, loggerFactory);
 
 var cone = csgModel.Instances.OfType<IfcRightCircularCone>().First();
 var v5Time = Time(() => v5Engine.CreateSolid(cone, null), 1000);

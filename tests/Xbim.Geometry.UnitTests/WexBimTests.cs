@@ -27,7 +27,7 @@ public class WexBimTests
     [Fact]
     public void Can_read_and_write_block_as_wexbim()
     {
-        var geomEngineV6 = _geomConverterFactory.CreateGeometryEngineV6(new MemoryModel(new EntityFactoryIfc4()), _loggerFactory);
+        var geomEngineV6 = (IXGeometryEngineV6)_geomConverterFactory.CreateGeometryEngine(new MemoryModel(new EntityFactoryIfc4()), _loggerFactory);
 
         var blockMoq = IfcMoq.Block(xLen: 10, yLen: 10, zLen: 10) as IIfcCsgPrimitive3D;
         var solid = (IXSolid)geomEngineV6.Build(blockMoq);
@@ -45,7 +45,7 @@ public class WexBimTests
     [Fact]
     public void Can_read_and_write_different_mesh_granularity()
     {
-        var geomEngineV6 = _geomConverterFactory.CreateGeometryEngineV6(new MemoryModel(new EntityFactoryIfc4()), _loggerFactory);
+        var geomEngineV6 = (IXGeometryEngineV6)_geomConverterFactory.CreateGeometryEngine(new MemoryModel(new EntityFactoryIfc4()), _loggerFactory);
 
         var sphereMoq = IfcMoq.Sphere(radius: 10) as IIfcCsgPrimitive3D;
         var solid = (IXSolid)geomEngineV6.Build(sphereMoq);
@@ -78,7 +78,7 @@ public class WexBimTests
 
         var model = new MemoryModel(new EntityFactoryIfc4());
         model.ModelFactors = new XbimModelFactors(1, 0.001, 1e-5);
-        var geomEngineV6 = _geomConverterFactory.CreateGeometryEngineV6(model, _loggerFactory);
+        var geomEngineV6 = (IXGeometryEngineV6)_geomConverterFactory.CreateGeometryEngine(model, _loggerFactory);
         var solid = geomEngineV6.Create(sphereMoq) as IXbimSolid;
         using var ms = new MemoryStream();
         using var bw = new BinaryWriter(ms);
@@ -108,7 +108,7 @@ public class WexBimTests
 
         var model = new MemoryModel(new EntityFactoryIfc4());
         model.ModelFactors = new XbimModelFactors(1, 0.001, 1e-5);
-        var geomEngineV6 = _geomConverterFactory.CreateGeometryEngineV6(model, _loggerFactory);
+        var geomEngineV6 = (IXGeometryEngineV6)_geomConverterFactory.CreateGeometryEngine(model, _loggerFactory);
         var solid = geomEngineV6.Create(blockMoq) as IXbimSolid;
         using var ms = new MemoryStream();
         using var bw = new BinaryWriter(ms);

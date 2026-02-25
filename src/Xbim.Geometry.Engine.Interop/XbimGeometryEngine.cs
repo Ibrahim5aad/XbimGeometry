@@ -23,8 +23,7 @@ namespace Xbim.Geometry.Engine.Interop
     /// <summary>
     /// The xbim Geometry Engine. 
     /// </summary>
-    /// <remarks>This managed class provides an interoperability layer to the underlying native / "mixed-mode"
-    /// geometry engine. As of version 6 it supports switching between different implementation of the core geometry engine  
+    /// <remarks>This managed class provides an interoperability layer to the underlying native geometry engine.
     /// </remarks>
     public class XbimGeometryEngine : IXbimManagedGeometryEngine
     {
@@ -141,7 +140,7 @@ namespace Xbim.Geometry.Engine.Interop
         /// <exception cref="Exception">If an engine cannot be created</exception>
         public void RegisterModel(IModel model)
         {
-            _engine = factory.CreateGeometryEngine(_engineOptions.GeometryEngineVersion, model, _loggerFactory);
+            _engine = factory.CreateGeometryEngine(model, _loggerFactory);
             _logger.LogTrace("Created Instance of {fullName}", _engine.GetType().FullName);
             if (_engine == null)
             {

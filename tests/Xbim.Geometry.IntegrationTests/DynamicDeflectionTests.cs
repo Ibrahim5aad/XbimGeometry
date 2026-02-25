@@ -1,7 +1,6 @@
 ﻿using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Xbim.Common.Model;
-using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Ifc;
 using Xbim.IO.Memory;
@@ -40,7 +39,7 @@ namespace Xbim.Geometry.Engine.Tests
         public void CanSimplifyShapesByApplyingDynamicDeflectionWithCustomStrategy(string filePath)
         {
             using var model = MemoryModel.OpenRead(filePath);
-            var c = new Xbim3DModelContext(model, _loggerFactory, XGeometryEngineVersion.V6);
+            var c = new Xbim3DModelContext(model, _loggerFactory);
             var result = new SimplificationResult();
 
             var created = c.CreateContext(null, true);
@@ -59,7 +58,7 @@ namespace Xbim.Geometry.Engine.Tests
             (model.GeometryStore as InMemoryGeometryStore).ShapeGeometries.Clear();
 
             // With dynamic deflection
-            var c2 = new Xbim3DModelContext(model, _loggerFactory, XGeometryEngineVersion.V6);
+            var c2 = new Xbim3DModelContext(model, _loggerFactory);
 
             var strategy = new CustomDeflectionStrategy()
                 .AddPoint(sectionWidth: 5, slenderness: 5, facets: 3)
@@ -97,7 +96,7 @@ namespace Xbim.Geometry.Engine.Tests
         public void CanSimplifyShapesByApplyingDynamicDeflectionForTargetFacetCount(string filePath)
         {
             using var model = MemoryModel.OpenRead(filePath);
-            var c = new Xbim3DModelContext(model, _loggerFactory, XGeometryEngineVersion.V6);
+            var c = new Xbim3DModelContext(model, _loggerFactory);
             var result = new SimplificationResult();
 
             var created = c.CreateContext(null, true);
@@ -116,7 +115,7 @@ namespace Xbim.Geometry.Engine.Tests
             (model.GeometryStore as InMemoryGeometryStore).ShapeGeometries.Clear();
 
             // With dynamic deflection
-            var c2 = new Xbim3DModelContext(model, _loggerFactory, XGeometryEngineVersion.V6);
+            var c2 = new Xbim3DModelContext(model, _loggerFactory);
 
             var settings = DynamicDeflectionSettings.ForTargetFacetCount(3, 40);
 

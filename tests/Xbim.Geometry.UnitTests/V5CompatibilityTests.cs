@@ -25,7 +25,7 @@ public class V5CompatibilityTests : IDisposable
         var factory = new GeometryConverterFactory();
         _loggerFactory = LoggerFactory.Create(b => b.AddConsole().SetMinimumLevel(LogLevel.Debug));
         var model = IfcMoq.ModelMock();
-        _engine = factory.CreateGeometryEngineV6(model, _loggerFactory);
+        _engine = (IXGeometryEngineV6)factory.CreateGeometryEngine(model, _loggerFactory);
         _logger = _loggerFactory.CreateLogger<V5CompatibilityTests>();
     }
 

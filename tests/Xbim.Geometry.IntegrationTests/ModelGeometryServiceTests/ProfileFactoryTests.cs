@@ -28,7 +28,7 @@ namespace Xbim.Geometry.Engine.Tests
         void Can_Build_IIfcArbitraryProfileDef_With_Composite_Curve_Void()
         {
             using var model = MemoryModel.OpenRead("TestFiles/ArbritaryClosedProfileWithCompositeCurveVoid.ifc");
-            var engine = factory.CreateGeometryEngineV6(model, _loggerFactory);
+            var engine = (IXGeometryEngineV6)factory.CreateGeometryEngine(model, _loggerFactory);
             var ifcArbitraryProfileDefWithVoids = model.Instances[1] as IIfcArbitraryProfileDefWithVoids;
             var v6face = engine.ProfileFactory.BuildFace(ifcArbitraryProfileDefWithVoids);
             Assert.NotNull(v6face);
@@ -44,7 +44,7 @@ namespace Xbim.Geometry.Engine.Tests
         void Can_Build_IIfcArbitraryProfileDef_With_bad_precision_on_closing_segments()
         {
             using var model = MemoryModel.OpenRead("TestFiles/ArbritaryClosedProfileWithBadPrecisionOnClosingSegments.ifc");
-            var engine = factory.CreateGeometryEngineV6(model, _loggerFactory);
+            var engine = (IXGeometryEngineV6)factory.CreateGeometryEngine(model, _loggerFactory);
             var ifcArbitraryProfileDefWithVoids = model.Instances[1] as IIfcArbitraryProfileDefWithVoids;
             var v6face = engine.ProfileFactory.BuildFace(ifcArbitraryProfileDefWithVoids);
             Assert.NotNull(v6face);
@@ -57,7 +57,7 @@ namespace Xbim.Geometry.Engine.Tests
         public void Can_Build_Extruded_CompositeProfileDef()
         {
             using var model = MemoryModel.OpenRead("TestFiles/CuttingOpeningInCompositeProfileDefTest.ifc");
-            var engineV6 = factory.CreateGeometryEngineV6(model, _loggerFactory);
+            var engineV6 = (IXGeometryEngineV6)factory.CreateGeometryEngine(model, _loggerFactory);
             var extrusion = model.Instances[43] as IIfcExtrudedAreaSolid;
             extrusion.Should().NotBeNull();
             var occ = engineV6.Build(extrusion) as IXCompound;

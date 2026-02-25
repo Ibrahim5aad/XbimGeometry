@@ -33,7 +33,7 @@ namespace Xbim.Geometry.Engine.Tests
         public void Can_Clip_With_HalfSpace()
         {
             using var model = MemoryModel.OpenRead("TestFiles/BooleanClippingWithHalfSpace.ifc");
-            var geomEngine = factory.CreateGeometryEngineV6(model, _loggerFactory);
+            var geomEngine = (IXGeometryEngineV6)factory.CreateGeometryEngine(model, _loggerFactory);
             var booleanOp = model.Instances[1] as IIfcBooleanClippingResult;
             var shape = geomEngine.Build(booleanOp);
             shape.Should().NotBeNull();
@@ -50,7 +50,7 @@ namespace Xbim.Geometry.Engine.Tests
         public void Can_build_boolean_clipping_result_with_halfspaces()
         {
             using var model = MemoryModel.OpenRead("TestFiles/boolean_clipping_result_with_halfspace.ifc");
-            var geomEngine = factory.CreateGeometryEngineV6(model, _loggerFactory);
+            var geomEngine = (IXGeometryEngineV6)factory.CreateGeometryEngine(model, _loggerFactory);
             var booleanOp = model.Instances[1] as IIfcBooleanClippingResult;
             var shape = geomEngine.Create(booleanOp) as IXbimSolid;
             shape.Should().NotBeNull();
@@ -61,7 +61,7 @@ namespace Xbim.Geometry.Engine.Tests
         public void Can_build_boolean_result_with_small_solids()
         {
             using var model = MemoryModel.OpenRead("TestFiles/boolean_result_with_small_solids.ifc");
-            var geomEngine = factory.CreateGeometryEngineV6(model, _loggerFactory);
+            var geomEngine = (IXGeometryEngineV6)factory.CreateGeometryEngine(model, _loggerFactory);
             var booleanOp = model.Instances[1] as IIfcBooleanClippingResult;
             var shape = geomEngine.Create(booleanOp) as IXbimSolid;
             shape.Should().NotBeNull();
@@ -72,7 +72,7 @@ namespace Xbim.Geometry.Engine.Tests
         public void Can_build_boolean_result_with_bad_polygonal_half_space_bounds()
         {
             using var model = MemoryModel.OpenRead("TestFiles/boolean_result_with_bad_polygonal_half_space_bounds.ifc");
-            var geomEngine = factory.CreateGeometryEngineV6(model, _loggerFactory);
+            var geomEngine = (IXGeometryEngineV6)factory.CreateGeometryEngine(model, _loggerFactory);
             var booleanOp = model.Instances[1] as IIfcBooleanClippingResult;
             var shape = geomEngine.Create(booleanOp) as IXbimSolid;
             shape.Should().NotBeNull();

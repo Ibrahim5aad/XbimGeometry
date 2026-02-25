@@ -119,7 +119,7 @@ namespace Xbim.Geometry.Engine.Tests
 
             var model = new MemoryModel(new Ifc2x3.EntityFactoryIfc2x3());
             var loggerFactory = new LoggerFactory();
-            var engine = new XbimGeometryEngine(factory, loggerFactory, new GeometryEngineOptions { GeometryEngineVersion=XGeometryEngineVersion.V6});
+            var engine = new XbimGeometryEngine(factory, loggerFactory, new GeometryEngineOptions());
 
             Assert.NotNull(engine);
         }
@@ -130,7 +130,7 @@ namespace Xbim.Geometry.Engine.Tests
 
             var model = new MemoryModel(new Ifc2x3.EntityFactoryIfc2x3());
             var loggerFactory = new LoggerFactory();
-            var context = new Xbim3DModelContext(model, loggerFactory, XGeometryEngineVersion.V6);
+            var context = new Xbim3DModelContext(model, loggerFactory);
 
             Assert.NotNull(context);
         }
@@ -198,7 +198,7 @@ namespace Xbim.Geometry.Engine.Tests
             var factory = new XbimGeometryEngineFactory();
 
             // Act 
-            var options = new GeometryEngineOptions { GeometryEngineVersion = XGeometryEngineVersion.V5 };
+            var options = new GeometryEngineOptions();
             var engine = factory.CreateGeometryEngineForModel(model, options);
 
 
@@ -229,7 +229,7 @@ namespace Xbim.Geometry.Engine.Tests
             IServiceCollection services = new ServiceCollection();
             services
                 .AddLogging(opt => opt.AddXUnit())
-                .AddXbimToolkit(conf => conf.AddGeometryServices(opt => opt.Configure(o => o.GeometryEngineVersion = XGeometryEngineVersion.V5)))
+                .AddXbimToolkit(conf => conf.AddGeometryServices())
             ;
 
             return services.BuildServiceProvider();

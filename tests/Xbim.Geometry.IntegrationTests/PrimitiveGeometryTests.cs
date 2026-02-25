@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System;
 using System.Linq;
-using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Ifc4.Interfaces;
 using Xbim.IO.Memory;
@@ -28,15 +27,14 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
 
-        [Theory]
-        [InlineData(XGeometryEngineVersion.V6)]
-        public void can_build_ifc_faceted_brep(XGeometryEngineVersion engineVersion)
+        [Fact]
+        public void can_build_ifc_faceted_brep()
         {
             using (var model = MemoryModel.OpenRead(@"TestFiles/Primitives/ifc_faceted_brep.ifc"))
             {
                 var shape = model.Instances.OfType<IIfcFacetedBrep>().FirstOrDefault();
                 shape.Should().NotBeNull();
-                var geomEngine = factory.CreateGeometryEngine(engineVersion, model, _loggerFactory);
+                var geomEngine = factory.CreateGeometryEngine(model, _loggerFactory);
                 var geom = geomEngine.CreateSolidSet(shape, _logger);
                 var s = geom.First();
                 geom.Count.Should().Be(1);
@@ -47,33 +45,29 @@ namespace Xbim.Geometry.Engine.Tests
         /// <summary>
         /// This test has a blade shape solid which is defined to give a negative volume, but is corrected in V6 now and back ported to V5
         /// </summary>
-        /// <param name="engineVersion"></param>
-        [Theory]
-        [InlineData(XGeometryEngineVersion.V6)]
-        public void can_build_closed_shell(XGeometryEngineVersion engineVersion)
+        [Fact]
+        public void can_build_closed_shell()
         {
             using (var model = MemoryModel.OpenRead(@"TestFiles/Primitives/faulty_closed_shell.ifc"))
             {
                 var shape = model.Instances.OfType<IIfcClosedShell>().FirstOrDefault();
                 shape.Should().NotBeNull();
-                var geomEngine = factory.CreateGeometryEngine(engineVersion, model, _loggerFactory);
+                var geomEngine = factory.CreateGeometryEngine(model, _loggerFactory);
                 var geom = geomEngine.CreateSolidSet(shape, _logger).FirstOrDefault();
                 geom.Volume.Should().BeApproximately(136033.82966702414, 1e-5);
             }
         }
-        [Theory]
-        [InlineData(XGeometryEngineVersion.V6)]
-        public void can_build_poorly_aligned_planar_faces(XGeometryEngineVersion engineVersion)
+        [Fact]
+        public void can_build_poorly_aligned_planar_faces()
         {
             using (var model = MemoryModel.OpenRead(@"TestFiles/Primitives/poor_face_planar_fidelity.ifc"))
             {
                 var shape = model.Instances.OfType<IIfcClosedShell>().FirstOrDefault();
                 shape.Should().NotBeNull();
-                var geomEngine = factory.CreateGeometryEngine(engineVersion, model, _loggerFactory);
+                var geomEngine = factory.CreateGeometryEngine(model, _loggerFactory);
                 var geom = geomEngine.CreateSolidSet(shape, _logger).FirstOrDefault();
                 geom.Should().NotBeNull();
             }
-            if (engineVersion == XGeometryEngineVersion.V6) Console.WriteLine("V6 produces a different result from V5, investigation is required");
         }
 
 

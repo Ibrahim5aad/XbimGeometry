@@ -25,7 +25,7 @@ public class GeometryEngineV6Tests : IDisposable
         _converterFactory = new GeometryConverterFactory();
         _loggerFactory = LoggerFactory.Create(b => b.AddConsole().SetMinimumLevel(LogLevel.Debug));
         var model = IfcMoq.ModelMock();
-        _engine = _converterFactory.CreateGeometryEngineV6(model, _loggerFactory);
+        _engine = (IXGeometryEngineV6)_converterFactory.CreateGeometryEngine(model, _loggerFactory);
 
         _brepOutputDir = Path.Combine(
             Path.GetDirectoryName(typeof(GeometryEngineV6Tests).Assembly.Location)!,

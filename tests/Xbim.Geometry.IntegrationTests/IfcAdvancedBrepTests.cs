@@ -33,7 +33,7 @@ namespace Xbim.Geometry.Engine.Tests
             using (var er = new EntityRepository<IIfcAdvancedBrep>(nameof(IfcAdvancedBrepTrimmedCurveTest)))
             {
                 er.Entity.Should().NotBeNull();
-                var geomEngine = factory.CreateGeometryEngineV5(er.Entity.Model, _loggerFactory);
+                var geomEngine = factory.CreateGeometryEngine(er.Entity.Model, _loggerFactory);
                 var solid = geomEngine.CreateSolid(er.Entity);
                 solid.Faces.Count.Should().Be(14, "This solid should have 14 faces");
             }
@@ -46,7 +46,7 @@ namespace Xbim.Geometry.Engine.Tests
             {
                 var brep = model.Instances.OfType<IIfcAdvancedBrep>().FirstOrDefault();
                 brep.Should().NotBeNull();
-                var geomEngine = factory.CreateGeometryEngineV5(model, _loggerFactory);
+                var geomEngine = factory.CreateGeometryEngine(model, _loggerFactory);
                 var solids = geomEngine.CreateSolidSet(brep);
                 solids.Count.Should().Be(3); //this should really be one but the model is incorrect
                 solids.First().Faces.Count.Should().Be(60);
@@ -67,7 +67,7 @@ namespace Xbim.Geometry.Engine.Tests
                 var brep = model.Instances.OfType<IIfcAdvancedBrep>().FirstOrDefault();
                 brep.Should().NotBeNull();
 
-                var geomEngine = factory.CreateGeometryEngineV5(model, _loggerFactory);
+                var geomEngine = factory.CreateGeometryEngine(model, _loggerFactory);
 
                 var solids = geomEngine.CreateSolidSet(brep);
 
@@ -96,7 +96,7 @@ namespace Xbim.Geometry.Engine.Tests
                     model.AddWorkAroundTrimForPolylinesIncorrectlySetToOneForEntireCurve();
                 var surfaceSweep = model.Instances.OfType<IIfcSurfaceCurveSweptAreaSolid>().FirstOrDefault();
                 surfaceSweep.Should().NotBeNull();
-                var geomEngine = factory.CreateGeometryEngineV5(model, _loggerFactory);
+                var geomEngine = factory.CreateGeometryEngine(model, _loggerFactory);
                 if (throwsException)
                 {
                     var ex = Assert.Throws<XbimGeometryServiceException>(() => geomEngine.CreateSolid(surfaceSweep));
@@ -120,7 +120,7 @@ namespace Xbim.Geometry.Engine.Tests
             {
                 var brep = model.Instances.OfType<IIfcAdvancedBrep>().FirstOrDefault();
                 brep.Should().NotBeNull();
-                var geomEngine = factory.CreateGeometryEngineV5(model, _loggerFactory);
+                var geomEngine = factory.CreateGeometryEngine(model, _loggerFactory);
                 var solids = geomEngine.CreateSolidSet(brep);
                 var shapeGeom = geomEngine.CreateShapeGeometry(solids,
                     model.ModelFactors.Precision, model.ModelFactors.DeflectionTolerance,
@@ -151,7 +151,7 @@ namespace Xbim.Geometry.Engine.Tests
 
             var brep = model.Instances.OfType<IIfcAdvancedBrep>().FirstOrDefault();
             brep.Should().NotBeNull();
-            var engine = factory.CreateGeometryEngineV5(model, _loggerFactory);
+            var engine = factory.CreateGeometryEngine(model, _loggerFactory);
 
             using var shape = engine.Create(brep);
 

@@ -1,9 +1,12 @@
 ﻿using System.IO;
 using System.Linq;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Xbim.Common.Geometry;
 using Xbim.Common.XbimExtensions;
 using Xbim.Ifc;
 using Xbim.Ifc4.Interfaces;
+using Xbim.ModelGeometry.Scene;
 using Xbim.Tessellator;
 using Xunit;
 
@@ -11,6 +14,27 @@ namespace Xbim.Geometry.Engine.Tests
 {
     public class WexBIMTests
     {
+
+        [Fact]
+        public void SaveWexBimFile()
+        {
+            using (var m = IfcStore.Open("TestFiles/IfcExamples/SampleHouse4.ifc"))
+            {
+                var c = new Xbim3DModelContext(m, (ILoggerFactory)null);
+                var created = c.CreateContext(null, true, generateBREPs: true);
+            
+                using (var bw = new BinaryWriter(new FileStream("SampleHouse4.wexbim", FileMode.Create)))
+                {
+                    m.SaveAsWexBim(bw);
+                    bw.Close();
+                }
+            }
+
+            // asser file exists and has content
+            var fileInfo = new FileInfo("SampleHouse4.wexbim");
+            fileInfo.Exists.Should().BeTrue();
+            fileInfo.Length.Should().BeGreaterThan(0);
+        }
 
         /// <summary>
         /// Reads and writes the geometry of an Ifc file to WexBIM format

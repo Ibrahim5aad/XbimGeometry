@@ -3,11 +3,13 @@ using Microsoft.Extensions.Logging;
 using Xbim.Common;
 using Xbim.Common.Configuration;
 using Xbim.Common.Geometry;
-using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Geometry.Engine.Interop.Configuration;
 using Xbim.Ifc4.Interfaces;
 using Xbim.IO.Memory;
+#if OLD_ENGINE
+using Xbim.Geometry.Abstractions;
+#endif
 
 namespace Xbim.Geometry.Benchmarks.Infrastructure;
 
@@ -40,10 +42,10 @@ public static class EngineSetup
         _initialized = true;
     }
 
+#if OLD_ENGINE
     /// <summary>
     /// Creates an IXbimGeometryEngine for the given model using the specified engine version.
-    /// For old engine: V5 and V6 use different code paths.
-    /// For new engine: V5 and V6 are unified (same result).
+    /// V5 and V6 use different code paths in the old engine.
     /// </summary>
     public static IXbimGeometryEngine CreateEngine(IModel model, XGeometryEngineVersion version)
     {
@@ -51,6 +53,16 @@ public static class EngineSetup
         var options = new GeometryEngineOptions { GeometryEngineVersion = version };
         return new XbimGeometryEngine(model, LoggerFactory, options);
     }
+#else
+    /// <summary>
+    /// Creates an IXbimGeometryEngine for the given model.
+    /// </summary>
+    public static IXbimGeometryEngine CreateEngine(IModel model)
+    {
+        EnsureInitialized();
+        return new XbimGeometryEngine(model, LoggerFactory);
+    }
+#endif
 
     /// <summary>
     /// Opens an IFC file as a MemoryModel.

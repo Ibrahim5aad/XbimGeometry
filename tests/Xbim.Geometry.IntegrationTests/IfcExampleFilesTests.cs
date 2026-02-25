@@ -30,7 +30,7 @@ namespace Xbim.Geometry.Engine.Tests
         {
             //this file contains a set of IShapeProfile beaams and a set of T shaped profile beams
             using var model = MemoryModel.OpenRead("TestFiles/IfcExamples/beam-standard-case.ifc");
-            var geomEngineV6 = _factory.CreateGeometryEngineV6(model, _loggerFactory);
+            var geomEngineV6 = _factory.CreateGeometryEngine(model, _loggerFactory);
             foreach (var geomRep in model.Instances.OfType<IIfcSolidModel>())
             {
                 var brep = geomEngineV6.Create(geomRep);
@@ -42,7 +42,7 @@ namespace Xbim.Geometry.Engine.Tests
         {
             //this file contains a set of IShapeProfile beaams and a set of T shaped profile beams
             using var model = MemoryModel.OpenRead("TestFiles/IfcExamples/csg-primitive.ifc");
-            var geomEngineV6 = _factory.CreateGeometryEngineV6(model, _loggerFactory);
+            var geomEngineV6 = _factory.CreateGeometryEngine(model, _loggerFactory);
             foreach (var geomRep in model.Instances.OfType<IIfcCsgSolid>())
             {
                 var brep = geomEngineV6.Create(geomRep);

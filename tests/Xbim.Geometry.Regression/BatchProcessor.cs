@@ -7,7 +7,6 @@ using System.IO;
 using System.Linq;
 using Xbim.Common;
 using Xbim.Common.Configuration;
-using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Ifc;
 using Xbim.Ifc4.Interfaces;
@@ -61,13 +60,13 @@ namespace XbimRegression
 				.AddXbimToolkit(opt => opt
 					.AddLoggerFactory(_loggerFactory)
 					.AddEsentModel(Xbim.IO.Esent.EngineFormatVersion.JET_efvSynchronousLVCleanup)
-					.AddGeometryServices(builder => builder.Configure(c => c.GeometryEngineVersion = XGeometryEngineVersion.V6))));
+					.AddGeometryServices()));
             else
 				XbimServices.Current.ConfigureServices(services => services
 				.AddXbimToolkit(opt => opt
 					.AddLoggerFactory(_loggerFactory)
 					// .AddHeuristicModel()
-					.AddGeometryServices(builder => builder.Configure(c => c.GeometryEngineVersion = XGeometryEngineVersion.V6))));
+					.AddGeometryServices()));
 			_logger = _loggerFactory.CreateLogger<BatchProcessor>();
         }
 
@@ -82,7 +81,7 @@ namespace XbimRegression
             Console.WriteLine($"Executing in \"{d.FullName}\"");
             FileInfo csvFileInfo = new FileInfo(Params.ResultsFile);
             Console.WriteLine($"Reporting to \"{csvFileInfo.FullName}\"");            
-            Console.WriteLine($"Using engine {Params.EngineVersion}, AdjustWcs: {Params.AdjustWcs}");
+            Console.WriteLine($"AdjustWcs: {Params.AdjustWcs}");
 
             using var writer = new StreamWriter(Params.ResultsFile);
             writer.WriteLine(ProcessResult.CsvHeader);
@@ -203,7 +202,7 @@ namespace XbimRegression
                         _logger.LogInformation("Model {file} parsed, schema is {schema}", ifcFile, model.Header.FileSchema.Schemas.FirstOrDefault()?.ToString() ?? "Unknown");
                         var parseTime = watch.ElapsedMilliseconds;
                         var xbimFilename = BuildFileName(ifcFile, ".xbim", _params.CachingExtension);
-                        var context = new Xbim3DModelContext(model, loggerFactory: loggerFactory, Params.EngineVersion);
+                        var context = new Xbim3DModelContext(model, loggerFactory);
                         if (_params.MaxThreads > 0)
                             context.MaxThreads = _params.MaxThreads;
                         // context.CustomMeshingBehaviour = CustomMeshingBehaviour;

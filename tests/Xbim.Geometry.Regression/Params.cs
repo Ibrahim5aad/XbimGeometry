@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Xbim.Geometry.Abstractions;
 
 
 
@@ -21,8 +20,6 @@ namespace XbimRegression
         public bool AdjustWcs = true;
         public bool ReportProgress = false;
         public List<int> WriteBreps = null;
-
-        public XGeometryEngineVersion EngineVersion { get; set; } = XGeometryEngineVersion.V6;
 
         public Params(string[] args)
         {
@@ -113,9 +110,6 @@ namespace XbimRegression
                                 paramType = CompoundParameter.CachingExtension;
                                 Caching = true;
                                 break;
-                            case "/engine":
-                                paramType = CompoundParameter.GeometryEngine;
-                                break;
                             case "/progress":
                                 ReportProgress = true;
                                 break;
@@ -159,15 +153,6 @@ namespace XbimRegression
                             i--;
                         }
                         break;
-                    case CompoundParameter.GeometryEngine:
-                        if (arg.Equals("v5", StringComparison.OrdinalIgnoreCase))
-                            EngineVersion = XGeometryEngineVersion.V5;
-                        else if (arg.Equals("v6", StringComparison.OrdinalIgnoreCase))
-                            EngineVersion = XGeometryEngineVersion.V6;
-                        else
-                            Console.WriteLine($"Invalid geometry engine version '{arg}', expected 'v5' or 'v6'. Defaulting to v6.");
-                        paramType = CompoundParameter.None;
-                        break;
                 }
             }
             IsValid = true;
@@ -201,7 +186,6 @@ namespace XbimRegression
             Timeout,
             MaxThreads,
             CachingExtension,
-            GeometryEngine,
             Breps
         };
     }

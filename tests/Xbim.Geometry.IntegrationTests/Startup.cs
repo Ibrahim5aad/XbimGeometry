@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xbim.Common.Configuration;
-using Xbim.Geometry.Abstractions;
 using Xunit.DependencyInjection;
 using Xunit.DependencyInjection.Logging;
 namespace Xbim.Geometry.Engine.Tests
@@ -31,7 +30,7 @@ namespace Xbim.Geometry.Engine.Tests
                     .AddConsole())
                 .AddXbimToolkit(configure => configure
                     .AddMemoryModel()
-                    .AddGeometryServices(builder => builder.Configure(c => c.GeometryEngineVersion = XGeometryEngineVersion.V6))
+                    .AddGeometryServices()
                     )
                 ;
 

@@ -6,7 +6,6 @@ using System.IO;
 using System.Linq;
 using Xbim.Common.Geometry;
 using Xbim.Common.XbimExtensions;
-using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Ifc4.GeometricConstraintResource;
 using Xbim.Ifc4.GeometryResource;
@@ -253,7 +252,7 @@ namespace Xbim.Geometry.Engine.Tests
             {
                 m.LoadStep21(@"TestFiles/IFC4x3/ACCA_sleepers-linear-placement-cant-implicit.ifc");
 
-                var c = new Xbim3DModelContext(m, _loggerFactory, XGeometryEngineVersion.V6);
+                var c = new Xbim3DModelContext(m, _loggerFactory);
                 var result = c.CreateContext(null, false);
 
                 result.Should().Be(true);

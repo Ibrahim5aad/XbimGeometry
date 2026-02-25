@@ -1,7 +1,9 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using Xbim.Common.Geometry;
+#if OLD_ENGINE
 using Xbim.Geometry.Abstractions;
+#endif
 using Xbim.Geometry.Benchmarks.Infrastructure;
 using Xbim.Ifc4.Interfaces;
 using Xbim.IO.Memory;
@@ -12,8 +14,10 @@ namespace Xbim.Geometry.Benchmarks.Benchmarks;
 [BenchmarkCategory("BooleanOperations")]
 public class BooleanOperationBenchmarks
 {
+#if OLD_ENGINE
     [Params(XGeometryEngineVersion.V5, XGeometryEngineVersion.V6)]
     public XGeometryEngineVersion Version { get; set; }
+#endif
 
     private MemoryModel _simpleClipModel = null!;
     private MemoryModel _nestedModel = null!;
@@ -29,15 +33,27 @@ public class BooleanOperationBenchmarks
     public void Setup()
     {
         _simpleClipModel = EngineSetup.OpenModel("SimpleBooleanClipResultTest.ifc");
+#if OLD_ENGINE
         _simpleClipEngine = EngineSetup.CreateEngine(_simpleClipModel, Version);
+#else
+        _simpleClipEngine = EngineSetup.CreateEngine(_simpleClipModel);
+#endif
         _simpleClip = _simpleClipModel.Instances.OfType<IIfcBooleanClippingResult>().First();
 
         _nestedModel = EngineSetup.OpenModel("NestedBooleansTest.ifc");
+#if OLD_ENGINE
         _nestedEngine = EngineSetup.CreateEngine(_nestedModel, Version);
+#else
+        _nestedEngine = EngineSetup.CreateEngine(_nestedModel);
+#endif
         _nestedBoolean = _nestedModel.Instances.OfType<IIfcBooleanResult>().First();
 
         _complexModel = EngineSetup.OpenModel("ComplexNestedBooleanResult.ifc");
+#if OLD_ENGINE
         _complexEngine = EngineSetup.CreateEngine(_complexModel, Version);
+#else
+        _complexEngine = EngineSetup.CreateEngine(_complexModel);
+#endif
         _complexBoolean = _complexModel.Instances.OfType<IIfcBooleanResult>().First();
     }
 

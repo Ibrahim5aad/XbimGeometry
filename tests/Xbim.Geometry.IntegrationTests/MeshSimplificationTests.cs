@@ -8,7 +8,6 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web;
 using Xbim.Common.Model;
-using Xbim.Geometry.Abstractions;
 using Xbim.Ifc;
 using Xbim.IO.Memory;
 using Xbim.ModelGeometry.Scene;
@@ -35,7 +34,7 @@ namespace Xbim.Geometry.Engine.Tests
         {
             var reductionFactor = 0.3f;
             using var m = MemoryModel.OpenRead(file);
-            var c = new Xbim3DModelContext(m, _loggerFactory, XGeometryEngineVersion.V6);
+            var c = new Xbim3DModelContext(m, _loggerFactory);
             c.MaxThreads = 1;
             var name = Path.GetFileName(file);
             var result = new SimplificationResult();

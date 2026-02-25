@@ -1,5 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Xbim.Common;
+using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
 using Xbim.Ifc4.Interfaces;
 
@@ -27,22 +28,9 @@ namespace Xbim.Geometry.Engine.Interop
         }
 
         /// <inheritdoc/>
-        public IXbimGeometryEngine CreateGeometryEngineV5(IModel model, ILoggerFactory loggerFactory)
+        public IXbimGeometryEngine CreateGeometryEngine(IModel model, ILoggerFactory loggerFactory)
         {
-            return GeometryConverterFactory.CreateGeometryEngineV5(model, loggerFactory);
+            return GeometryConverterFactory.CreateGeometryEngine(model, loggerFactory);
         }
-
-        /// <inheritdoc/>
-        public IXGeometryEngineV6 CreateGeometryEngineV6(IModel model, ILoggerFactory loggerFactory)
-        {
-            return GeometryConverterFactory.CreateGeometryEngineV6(model, loggerFactory);
-        }
-
-        /// <inheritdoc/>
-        public IXbimGeometryEngine CreateGeometryEngine(XGeometryEngineVersion version, IModel model, ILoggerFactory loggerFactory)
-        {
-            return GeometryConverterFactory.CreateGeometryEngine(version, model, loggerFactory);
-        }
-
     }
 }

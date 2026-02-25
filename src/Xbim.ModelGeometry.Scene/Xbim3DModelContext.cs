@@ -535,7 +535,6 @@ namespace Xbim.ModelGeometry.Scene
 
         private readonly IfcRepresentationContextCollection _contexts;
         private readonly IXbimGeometryEngine _engine;
-        private readonly XGeometryEngineVersion engineVersion;
         private readonly IModel _model;
         private readonly DynamicDeflection _dynamicDeflection;
         
@@ -567,11 +566,10 @@ namespace Xbim.ModelGeometry.Scene
         /// </summary>
         /// <param name="model"></param>
         /// <param name="loggerFactory"></param>
-        /// <param name="engineVersion"></param>
         /// <param name="contextType"></param>
         /// <param name="requiredContextIdentifier"></param>
-        public Xbim3DModelContext(IModel model, ILoggerFactory loggerFactory, XGeometryEngineVersion engineVersion, string contextType = "model", string requiredContextIdentifier = null)
-            : this(model, contextType, requiredContextIdentifier, loggerFactory.CreateLogger<Xbim3DModelContext>(), engineVersion, loggerFactory)
+        public Xbim3DModelContext(IModel model, ILoggerFactory loggerFactory, string contextType = "model", string requiredContextIdentifier = null)
+            : this(model, contextType, requiredContextIdentifier, loggerFactory.CreateLogger<Xbim3DModelContext>(), loggerFactory)
         {
         }
         
@@ -585,10 +583,9 @@ namespace Xbim.ModelGeometry.Scene
         /// <param name="contextType"></param>
         /// <param name="requiredContextIdentifier"></param>
         /// <param name="logger"></param>
-        /// <param name="engineVersion"></param>
         /// <param name="loggerFactory"></param>
         public Xbim3DModelContext(IModel model, string contextType = "model", string requiredContextIdentifier = null,
-            ILogger logger = null, XGeometryEngineVersion engineVersion = XGeometryEngineVersion.V5, ILoggerFactory loggerFactory = null) : base(logger)
+            ILogger logger = null, ILoggerFactory loggerFactory = null) : base(logger)
         {
 
             var factory = InternalServiceProvider.GetService<IXbimGeometryServicesFactory>();
@@ -601,15 +598,11 @@ namespace Xbim.ModelGeometry.Scene
             _model = model;
             if (loggerFactory == null) loggerFactory = InternalServiceProvider.GetLoggerFactory();
             _logger = logger ?? (loggerFactory.CreateLogger<XbimGeometryEngine>());
-            this.engineVersion = engineVersion;
-            _engine = factory.CreateGeometryEngine(engineVersion, model, loggerFactory);
-            
+            _engine = factory.CreateGeometryEngine(model, loggerFactory);
+
             _dynamicDeflection = new DynamicDeflection(model.ModelFactors, _engine, _logger);
-            
-            if (engineVersion == XGeometryEngineVersion.V6)
-                _modelServices = ((IXGeometryEngineV6)_engine).ModelGeometryService;
-            else
-                _modelServices = factory.CreateModelGeometryService(model, loggerFactory);
+
+            _modelServices = ((IXGeometryEngineV6)_engine).ModelGeometryService;
             model.AddRevitWorkArounds();
             var wr2 = model.AddWorkAroundTrimForPolylinesIncorrectlySetToOneForEntireCurve();
             // Get the required context
@@ -743,7 +736,7 @@ namespace Xbim.ModelGeometry.Scene
         }
 
         /// <summary>Creates a 3D graphical representation of the model using the Geometry Engine</summary>
-        /// <remarks>Note: Brep generation is only supported with <see cref="XGeometryEngineVersion.V6"/> engine mode.</remarks>
+        /// <remarks>When enabled, meshing is based off full BREP representations (slower but higher fidelity).</remarks>
         /// <param name="progDelegate">A progress delegate</param>
         /// <param name="adjustWcs">When <c>true</c> adjusts for World Coordinate System placement</param>
         /// <param name="generateBREPs">When <c>true</c> meshing is based off BREPs (slower) otherwise <c>false</c> indicates we just want a mesh, without interim BREPs (faster)</param>
@@ -783,10 +776,7 @@ namespace Xbim.ModelGeometry.Scene
                     contextHelper.CustomMeshBehaviour = CustomMeshingBehaviour;
                     _logger.LogTrace("Starting Initialise sequence");
                     progDelegate?.Invoke(-1, "Initialise");
-                    // Creation of full BREP representation is an optional V6 only feature
-                    
-
-                    var createFullGeometry = engineVersion == XGeometryEngineVersion.V6 && generateBREPs == true;
+                    var createFullGeometry = generateBREPs;
                     if (!contextHelper.Initialise(adjustWcs, _engine, createFullGeometry))
                         throw new Exception("Failed to initialise geometric context, " + contextHelper.InitialiseError);
                     progDelegate?.Invoke(101, "Initialise");

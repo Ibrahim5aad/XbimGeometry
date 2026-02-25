@@ -1,8 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using System;
+using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Geometry.Engine.Interop.Configuration;
@@ -81,7 +81,6 @@ namespace Xbim.Common.Configuration
             // Geometry primitives factory (points, directions, locations, matrices, bounding boxes)
             services.TryAddSingleton<IXGeometryPrimitives, GeometryPrimitives>();
 
-            services.TryAddEnumerable(ServiceDescriptor.Singleton((IConfigureOptions<GeometryEngineOptions>)new DefaultGeometryEngineConfigurationOptions(XGeometryEngineVersion.V6)));
             configure(new GeometryEngineBuilder(services));
             return services;
         }

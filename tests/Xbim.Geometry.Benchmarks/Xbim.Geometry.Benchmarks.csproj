@@ -11,6 +11,7 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <!-- EngineMode: "New" (default) uses local ProjectReference, "Old" uses NuGet package -->
     <EngineMode Condition="'$(EngineMode)' == ''">New</EngineMode>
+    <DefineConstants Condition="'$(EngineMode)' == 'Old'">$(DefineConstants);OLD_ENGINE</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

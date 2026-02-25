@@ -4,7 +4,6 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xbim.Common.Geometry;
-using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Geometry.Engine.Tests;
 using Xbim.Ifc4.GeometricModelResource;
@@ -31,9 +30,8 @@ namespace Xbim.Geometry.Engine.Tests
             _logger = _loggerFactory.CreateLogger<IfcCsgTests>();
         }
 
-        [Theory]
-        [InlineData(XGeometryEngineVersion.V6)]
-        public void IfcRectangularPyramidTest(XGeometryEngineVersion engineVersion)
+        [Fact]
+        public void IfcRectangularPyramidTest()
         {
             using (var m = new MemoryModel(new Xbim.Ifc4.EntityFactoryIfc4()))
             {
@@ -47,7 +45,7 @@ namespace Xbim.Geometry.Engine.Tests
                     pyramid.Height = 20;
                     pyramid.XLength = 10;
                     pyramid.YLength = 15;
-                    var geomEngineV5 = factory.CreateGeometryEngine(engineVersion, m, _loggerFactory);
+                    var geomEngineV5 = factory.CreateGeometryEngine(m, _loggerFactory);
 
                     var solid = geomEngineV5.CreateSolid(pyramid);
 
@@ -65,9 +63,8 @@ namespace Xbim.Geometry.Engine.Tests
             }
         }
 
-        [Theory]
-        [InlineData(XGeometryEngineVersion.V6)]
-        public void IfcRightCircularCylinderTest(XGeometryEngineVersion engineVersion)
+        [Fact]
+        public void IfcRightCircularCylinderTest()
         {
             using (var m = new MemoryModel(new Xbim.Ifc4.EntityFactoryIfc4()))
             {
@@ -75,7 +72,7 @@ namespace Xbim.Geometry.Engine.Tests
                 {
                     const double h = 2; const double r = 0.5;
                     var cylinder = IfcModelBuilder.MakeRightCircularCylinder(m, r, h);
-                    var geomEngineV5 = factory.CreateGeometryEngine(engineVersion, m, _loggerFactory);
+                    var geomEngineV5 = factory.CreateGeometryEngine(m, _loggerFactory);
                     var solid = geomEngineV5.CreateSolid(cylinder, _logger);
 
                     solid.Faces.Count.Should().Be(3, "3 faces are required of a cylinder");
@@ -90,9 +87,8 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
 
-        [Theory]
-        [InlineData(XGeometryEngineVersion.V6)]
-        public void IfcRightCircularConeTest(XGeometryEngineVersion engineVersion)
+        [Fact]
+        public void IfcRightCircularConeTest()
         {
             using (var m = new MemoryModel(new Xbim.Ifc4.EntityFactoryIfc4()))
             {
@@ -105,7 +101,7 @@ namespace Xbim.Geometry.Engine.Tests
                     cylinder.Position = p;
                     cylinder.BottomRadius = 0.5;
                     cylinder.Height = 2;
-                    var geomEngine = factory.CreateGeometryEngine(engineVersion, m, _loggerFactory);
+                    var geomEngine = factory.CreateGeometryEngine(m, _loggerFactory);
                     var solid = geomEngine.CreateSolid(cylinder, _logger);
 
                     solid.Faces.Count.Should().Be(2, "2 faces are required of a cone");
@@ -120,9 +116,8 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
 
-        [Theory]
-        [InlineData(XGeometryEngineVersion.V6)]
-        public void IfcBlockTest(XGeometryEngineVersion engineVersion)
+        [Fact]
+        public void IfcBlockTest()
         {
             using (var m = new MemoryModel(new Xbim.Ifc4.EntityFactoryIfc4()))
             {
@@ -133,7 +128,7 @@ namespace Xbim.Geometry.Engine.Tests
                     try
                     {
 
-                        var geomEngine = factory.CreateGeometryEngine(engineVersion, m, _loggerFactory);
+                        var geomEngine = factory.CreateGeometryEngine(m, _loggerFactory);
                         var solid = geomEngine.CreateSolid(block, _logger);
 
                         solid.Faces.Count.Should().Be(6, "6 faces are required of a block");
@@ -156,9 +151,8 @@ namespace Xbim.Geometry.Engine.Tests
 
 
 
-        [Theory]
-        [InlineData(XGeometryEngineVersion.V6)]
-        public void IfcSphereTest(XGeometryEngineVersion engineVersion)
+        [Fact]
+        public void IfcSphereTest()
         {
             using (var m = new MemoryModel(new Xbim.Ifc4.EntityFactoryIfc4()))
             {
@@ -167,7 +161,7 @@ namespace Xbim.Geometry.Engine.Tests
                     const double r = 0.5;
 
                     var sphere = IfcModelBuilder.MakeSphere(m, r);
-                    var geomEngine = factory.CreateGeometryEngine(engineVersion, m, _loggerFactory);
+                    var geomEngine = factory.CreateGeometryEngine(m, _loggerFactory);
                     var solid = geomEngine.CreateSolid(sphere, _logger);
                     solid.Faces.Count.Should().Be(1, "1 face is required of a sphere");
                     solid.Vertices.Count.Should().Be(2, "2 vertices are required of a sphere");

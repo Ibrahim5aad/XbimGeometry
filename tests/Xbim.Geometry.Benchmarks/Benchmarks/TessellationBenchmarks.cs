@@ -1,7 +1,9 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using Xbim.Common.Geometry;
+#if OLD_ENGINE
 using Xbim.Geometry.Abstractions;
+#endif
 using Xbim.Geometry.Benchmarks.Infrastructure;
 using Xbim.Ifc4.Interfaces;
 using Xbim.IO.Memory;
@@ -12,8 +14,10 @@ namespace Xbim.Geometry.Benchmarks.Benchmarks;
 [BenchmarkCategory("Tessellation")]
 public class TessellationBenchmarks
 {
+#if OLD_ENGINE
     [Params(XGeometryEngineVersion.V5, XGeometryEngineVersion.V6)]
     public XGeometryEngineVersion Version { get; set; }
+#endif
 
     private MemoryModel _triangulatedModel = null!;
     private MemoryModel _polygonalModel = null!;
@@ -29,15 +33,27 @@ public class TessellationBenchmarks
     public void Setup()
     {
         _triangulatedModel = EngineSetup.OpenModel("TriangulatedFaceSetBasicTest.ifc");
+#if OLD_ENGINE
         _triangulatedEngine = EngineSetup.CreateEngine(_triangulatedModel, Version);
+#else
+        _triangulatedEngine = EngineSetup.CreateEngine(_triangulatedModel);
+#endif
         _triangulatedFaceSet = _triangulatedModel.Instances.OfType<IIfcTriangulatedFaceSet>().First();
 
         _polygonalModel = EngineSetup.OpenModel("Ifc4TestFiles/polygonal-face-tessellation.ifc");
+#if OLD_ENGINE
         _polygonalEngine = EngineSetup.CreateEngine(_polygonalModel, Version);
+#else
+        _polygonalEngine = EngineSetup.CreateEngine(_polygonalModel);
+#endif
         _polygonalFaceSet = _polygonalModel.Instances.OfType<IIfcPolygonalFaceSet>().First();
 
         _tessellatedBeamModel = EngineSetup.OpenModel("Ifc4TestFiles/beam-straight-i-shape-tessellated.ifc");
+#if OLD_ENGINE
         _tessellatedBeamEngine = EngineSetup.CreateEngine(_tessellatedBeamModel, Version);
+#else
+        _tessellatedBeamEngine = EngineSetup.CreateEngine(_tessellatedBeamModel);
+#endif
         _tessellatedBeam = _tessellatedBeamModel.Instances.OfType<IIfcTriangulatedFaceSet>().First();
     }
 

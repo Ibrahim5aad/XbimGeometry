@@ -25,7 +25,7 @@ namespace Xbim.Geometry.Engine.Tests.ModelGeometryServiceTests
         public void CanCreateModelPlacementBuilder()
         {
             using var model = new MemoryModel(new Ifc2x3.EntityFactoryIfc2x3());
-            var engine = _geometryConverterFactory.CreateGeometryEngineV6(model, new LoggerFactory());
+            var engine = (IXGeometryEngineV6)_geometryConverterFactory.CreateGeometryEngine(model, new LoggerFactory());
 
             var builder = engine.ModelGeometryService.ModelPlacementBuilder;
 
@@ -45,7 +45,7 @@ namespace Xbim.Geometry.Engine.Tests.ModelGeometryServiceTests
             const double originY = 300d;
 
             var model = MemoryModel.OpenRead("TestFiles/IfcExamples/WCSAdjustmentSample.ifc");
-            var engine = _geometryConverterFactory.CreateGeometryEngineV6(model, new LoggerFactory());
+            var engine = (IXGeometryEngineV6)_geometryConverterFactory.CreateGeometryEngine(model, new LoggerFactory());
 
             var builder = engine.ModelGeometryService.ModelPlacementBuilder;
 
@@ -68,7 +68,7 @@ namespace Xbim.Geometry.Engine.Tests.ModelGeometryServiceTests
             
             var model = MemoryModel.OpenRead("TestFiles/IfcExamples/WCSAdjustmentSample.ifc");
             var wall = model.Instances[wallId] as IIfcWall;
-            var engine = _geometryConverterFactory.CreateGeometryEngineV6(model, new LoggerFactory());
+            var engine = (IXGeometryEngineV6)_geometryConverterFactory.CreateGeometryEngine(model, new LoggerFactory());
             var builder = engine.ModelGeometryService.ModelPlacementBuilder;
 
             var location = builder.BuildLocation(wall.ObjectPlacement, true);
@@ -99,7 +99,7 @@ namespace Xbim.Geometry.Engine.Tests.ModelGeometryServiceTests
 
             var model = MemoryModel.OpenRead("TestFiles/IfcExamples/WCSAdjustmentSample.ifc");
             var wall = model.Instances[wallId] as IIfcWall;
-            var engine = _geometryConverterFactory.CreateGeometryEngineV6(model, new LoggerFactory());
+            var engine = (IXGeometryEngineV6)_geometryConverterFactory.CreateGeometryEngine(model, new LoggerFactory());
             var builder = engine.ModelGeometryService.ModelPlacementBuilder;
 
             var location = builder.BuildLocation(wall.ObjectPlacement, false);

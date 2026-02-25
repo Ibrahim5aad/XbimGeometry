@@ -35,7 +35,7 @@ namespace Xbim.Geometry.Engine.Tests
             {
                 var cc = model.Instances.OfType<IIfcCompositeCurve>().FirstOrDefault();
                 cc.Should().NotBeNull();
-                var geomEngine = factory.CreateGeometryEngineV6(model, _loggerFactory);
+                var geomEngine = (IXGeometryEngineV6)factory.CreateGeometryEngine(model, _loggerFactory);
                 var compositeCurve =geomEngine.WireFactory.Build(cc);
                 compositeCurve.Should().NotBeNull();
                 compositeCurve.Length.Should().BeApproximately(4.866638, 1e-5);
@@ -52,7 +52,7 @@ namespace Xbim.Geometry.Engine.Tests
             {
                 var ifcPolyline = model.Instances.OfType<IIfcPolyline>().FirstOrDefault();
                 ifcPolyline.Should().NotBeNull();
-                var geomEngine = factory.CreateGeometryEngineV6(model, _loggerFactory);
+                var geomEngine = (IXGeometryEngineV6)factory.CreateGeometryEngine(model, _loggerFactory);
                 var polyline = geomEngine.WireFactory.Build(ifcPolyline);
                 polyline.Should().NotBeNull();
                 polyline.EdgeLoop.Length.Should().Be(ifcPolyline.Points.Count -2); ;

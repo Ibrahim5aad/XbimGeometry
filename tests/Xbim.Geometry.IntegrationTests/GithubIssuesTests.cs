@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using Xbim.Common.Geometry;
 using Xbim.Common.Model;
-using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Ifc;
 using Xbim.Ifc4.Interfaces;
@@ -25,28 +24,26 @@ namespace Xbim.Geometry.Engine.Tests
             _loggerFactory = loggerFactory;
             _geometryfactory = geometryfactory;
         }
-        [Theory]
-        [InlineData(XGeometryEngineVersion.V6)]
-        public void Github_Issue_281(XGeometryEngineVersion engineVersion)
+        [Fact]
+        public void Github_Issue_281()
         {
             // this file resulted in a stack-overflow exception due to precision issues in the data.
-            // We have added better exception management so that the stack-overflow is not thrown any more, 
+            // We have added better exception management so that the stack-overflow is not thrown any more,
             // however the voids in the wall are still not computed correctly.
             //
             using (var m = new MemoryModel(new Ifc2x3.EntityFactoryIfc2x3()))
             {
                 m.LoadStep21("TestFiles/Github/Github_issue_281_minimal.ifc");
-                
-                var c = new Xbim3DModelContext(m, _loggerFactory, engineVersion);
+
+                var c = new Xbim3DModelContext(m, _loggerFactory);
                 var result = c.CreateContext(null, false);
 
                 result.Should().Be(true);
             }
         }
 
-        [Theory]
-        [InlineData(XGeometryEngineVersion.V6)]
-        public void Github_Issue_447(XGeometryEngineVersion engineVersion)
+        [Fact]
+        public void Github_Issue_447()
         {
             // This file contains a trimmed curve based on ellipse which has semiaxis1 < semiaxis2
             // and trimmed curve is parameterized with cartesian points.
@@ -66,7 +63,7 @@ namespace Xbim.Geometry.Engine.Tests
                 var expectedStart = new XbimPoint3D(trimPoint1.X, trimPoint1.Y, trimPoint1.Z);
                 var expectedEnd = new XbimPoint3D(trimPoint2.X, trimPoint2.Y, trimPoint2.Z);
 
-                IXbimGeometryEngine geomEngine = _geometryfactory.CreateGeometryEngine(engineVersion, model, _loggerFactory);
+                IXbimGeometryEngine geomEngine = _geometryfactory.CreateGeometryEngine(model, _loggerFactory);
                 var geom = geomEngine.CreateCurve(shape);
                 geom.Should().NotBeNull();
 
@@ -75,15 +72,14 @@ namespace Xbim.Geometry.Engine.Tests
             }
         }
 
-        [Theory]
-        [InlineData(XGeometryEngineVersion.V6)]
-        public void Github_Issue473(XGeometryEngineVersion engineVersion)
+        [Fact]
+        public void Github_Issue473()
         {
             // Performance of v6 engine very slow for complex BREPs, but much faster using the xbim Tesselator and skipping OCC.
             using (var m = new MemoryModel(new Ifc2x3.EntityFactoryIfc2x3()))
             {
                 m.LoadStep21(@"TestFiles/Github/Github_issue_473_minimal.ifc");
-                var c = new Xbim3DModelContext(m, _loggerFactory, engineVersion);
+                var c = new Xbim3DModelContext(m, _loggerFactory);
                 var timer = new Stopwatch();
                 timer.Start();
                 var result = c.CreateContext(null, false, false);
@@ -97,19 +93,18 @@ namespace Xbim.Geometry.Engine.Tests
             }
         }
 
-        [Theory]
-        [InlineData(XGeometryEngineVersion.V6)]
-        public void SupportMultipleProjectsAndContexts(XGeometryEngineVersion engineVersion)
+        [Fact]
+        public void SupportMultipleProjectsAndContexts()
         {
-            
+
             using (var m = new MemoryModel(new Ifc2x3.EntityFactoryIfc2x3()))
             {
                 // Multiple quirks in this model:
                 // 1. Has two projects and sites (& two RepresentationContexts - one of which has no sub context)
                 // 2. ShapeRepresentation with an Identifier of 'Surface' for 'SurfaceModel' - when a Body is typically expected.
                 m.LoadStep21(@"TestFiles/MultiProjectWithSurfaceModels.ifc");
-                
-                var c = new Xbim3DModelContext(m, _loggerFactory, engineVersion);
+
+                var c = new Xbim3DModelContext(m, _loggerFactory);
                 c.BodyRepresentations.Add("surface");
                 
                 var result = c.CreateContext(null, false);
@@ -137,15 +132,14 @@ namespace Xbim.Geometry.Engine.Tests
 
 
 
-        [Theory]
-        [InlineData(XGeometryEngineVersion.V6)]
-        public void Cutting_Issue(XGeometryEngineVersion engineVersion)
+        [Fact]
+        public void Cutting_Issue()
         {
 
             using (var m = new MemoryModel(new Ifc2x3.EntityFactoryIfc2x3()))
             {
                 m.LoadStep21("TestFiles/Github/Dormitory-ARC_Opening_444.ifc");
-                var c = new Xbim3DModelContext(m, _loggerFactory, engineVersion);
+                var c = new Xbim3DModelContext(m, _loggerFactory);
                 c.CreateContext(null, false);
 
                 var store = m.GeometryStore as InMemoryGeometryStore;
@@ -160,15 +154,14 @@ namespace Xbim.Geometry.Engine.Tests
             }
         }
 
-        [Theory]
-        [InlineData(XGeometryEngineVersion.V6)]
-        public void Issue_483(XGeometryEngineVersion engineVersion)
+        [Fact]
+        public void Issue_483()
         {
 
             using (var m = new MemoryModel(new Ifc2x3.EntityFactoryIfc2x3()))
             {
                 m.LoadStep21("TestFiles/Github/GitHub_issue_483_minimal.ifc");
-                var c = new Xbim3DModelContext(m, _loggerFactory, engineVersion);
+                var c = new Xbim3DModelContext(m, _loggerFactory);
                 c.CreateContext(null, false);
 
                 var store = m.GeometryStore as InMemoryGeometryStore;
@@ -181,9 +174,8 @@ namespace Xbim.Geometry.Engine.Tests
             }
         }
 
-        [Theory(Skip = "Broken in V6")]
-        [InlineData(XGeometryEngineVersion.V6)]
-        public void Github_Issue_512_broken(XGeometryEngineVersion engineVersion)
+        [Fact(Skip = "Broken in V6")]
+        public void Github_Issue_512_broken()
         {
             //var loggerFactory = new LoggerFactory();
             //XbimServices.Current.ConfigureServices(s => s.AddXbimToolkit(b => b.AddLoggerFactory(loggerFactory)).AddLogging(l => l.AddConsole()));
@@ -191,7 +183,7 @@ namespace Xbim.Geometry.Engine.Tests
             // Triggers OCC Memory violation
             using (var m = MemoryModel.OpenRead(ifcFile))
             {
-                var c = new Xbim3DModelContext(m, _loggerFactory, engineVersion);
+                var c = new Xbim3DModelContext(m, _loggerFactory);
                 var result = c.CreateContext(null, true);
 
                 result.Should().BeTrue();
@@ -200,18 +192,17 @@ namespace Xbim.Geometry.Engine.Tests
             }
         }
 
-        [Theory]
-        [InlineData(XGeometryEngineVersion.V5)]
-        public void Github_Issue_512(XGeometryEngineVersion engineVersion)
+        [Fact]
+        public void Github_Issue_512()
         {
-            
+
             //var loggerFactory = new LoggerFactory();
             //XbimServices.Current.ConfigureServices(s => s.AddXbimToolkit(b => b.AddLoggerFactory(loggerFactory)).AddLogging(l => l.AddConsole()));
             var ifcFile = @"TestFiles/Github/Github_issue_512.ifc";
             // Triggers OCC Memory violation
             using (var m = MemoryModel.OpenRead(ifcFile))
             {
-                var c = new Xbim3DModelContext(m, _loggerFactory, engineVersion);
+                var c = new Xbim3DModelContext(m, _loggerFactory);
                 var result = c.CreateContext(null, true);
 
                 result.Should().BeTrue();
@@ -227,7 +218,7 @@ namespace Xbim.Geometry.Engine.Tests
             // Triggers OCC Memory violation
             using (var m = MemoryModel.OpenRead(ifcFile))
             {
-                var c = new Xbim3DModelContext(m, _loggerFactory, XGeometryEngineVersion.V5);
+                var c = new Xbim3DModelContext(m, _loggerFactory);
                 var result = c.CreateContext(null, true);
 
                 result.Should().BeTrue();
@@ -252,7 +243,7 @@ namespace Xbim.Geometry.Engine.Tests
             // Triggers OCC Memory violation
             using (var m = MemoryModel.OpenRead(ifcFile))
             {
-                var c = new Xbim3DModelContext(m, _loggerFactory, XGeometryEngineVersion.V6);
+                var c = new Xbim3DModelContext(m, _loggerFactory);
                 var result = c.CreateContext(null, true);
 
                 result.Should().BeTrue();

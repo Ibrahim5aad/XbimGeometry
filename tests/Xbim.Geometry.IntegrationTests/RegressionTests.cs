@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Ifc;
 using Xbim.Ifc4.Interfaces;
@@ -26,7 +27,7 @@ namespace Xbim.Geometry.Engine.Tests
         public void CanBuildFaceSetsWithFaultedFacesWithColinearVertices()
         {
             using var model = MemoryModel.OpenRead("TestFiles/Regression/FaceSetWithColinearFaceVertices.ifc");
-            var engine = _factory.CreateGeometryEngineV6(model, _loggerFactory);
+            var engine = (IXGeometryEngineV6)_factory.CreateGeometryEngine(model, _loggerFactory);
             var shellBasedSurfaceModel = model.Instances[389345] as IIfcShellBasedSurfaceModel;
 
             var v6Solid = engine.Build(shellBasedSurfaceModel);

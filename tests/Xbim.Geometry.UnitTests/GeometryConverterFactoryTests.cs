@@ -1,6 +1,5 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Factories;
 using Xbim.Geometry.Engine.Interop.Services;
 using Xbim.Geometry.Engine.Interop.Tests.Helpers;
@@ -9,8 +8,8 @@ using Xunit;
 namespace Xbim.Geometry.Engine.Interop.Tests;
 
 /// <summary>
-/// Tests for GeometryConverterFactory: verifies factory creation methods,
-/// version dispatch, and service extraction.
+/// Tests for GeometryConverterFactory: verifies factory creation methods
+/// and service extraction.
 /// </summary>
 public class GeometryConverterFactoryTests : IDisposable
 {
@@ -46,21 +45,9 @@ public class GeometryConverterFactoryTests : IDisposable
     }
 
     [Fact]
-    public void CreateGeometryEngineV6_ReturnsValidEngine()
+    public void CreateGeometryEngine_ReturnsValidEngine()
     {
-        var engine = _factory.CreateGeometryEngineV6(_model, _loggerFactory);
-        _disposables.Add((IDisposable)engine);
-
-        engine.Should().NotBeNull();
-        engine.Should().BeOfType<GeometryEngine>();
-        engine.ModelGeometryService.Should().NotBeNull();
-        engine.ModelGeometryService.Should().BeOfType<ModelGeometryService>();
-    }
-
-    [Fact]
-    public void CreateGeometryEngine_V6_ReturnsV6Engine()
-    {
-        var engine = _factory.CreateGeometryEngine(XGeometryEngineVersion.V6, _model, _loggerFactory);
+        var engine = _factory.CreateGeometryEngine(_model, _loggerFactory);
         _disposables.Add((IDisposable)engine);
 
         engine.Should().NotBeNull();
@@ -68,23 +55,12 @@ public class GeometryConverterFactoryTests : IDisposable
     }
 
     [Fact]
-    public void CreateGeometryEngine_V5_ReturnsV6Engine()
+    public void Engine_DelegatesFactoryProperties_ToUnderlyingService()
     {
-        var engine = _factory.CreateGeometryEngine(XGeometryEngineVersion.V5, _model, _loggerFactory);
+        var engine = (GeometryEngine)_factory.CreateGeometryEngine(_model, _loggerFactory);
         _disposables.Add((IDisposable)engine);
 
-        engine.Should().NotBeNull();
-        engine.Should().BeOfType<GeometryEngine>();
-    }
-
-
-    [Fact]
-    public void V6Engine_DelegatesFactoryProperties_ToUnderlyingService()
-    {
-        var engine = _factory.CreateGeometryEngineV6(_model, _loggerFactory);
-        _disposables.Add((IDisposable)engine);
-
-        // Verify key factory properties are available through the V6 engine
+        // Verify key factory properties are available through the engine
         engine.SolidFactory.Should().NotBeNull();
         engine.ProfileFactory.Should().NotBeNull();
         engine.BooleanFactory.Should().NotBeNull();

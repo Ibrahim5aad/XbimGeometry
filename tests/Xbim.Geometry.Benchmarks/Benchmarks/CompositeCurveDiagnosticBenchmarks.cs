@@ -1,7 +1,9 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using Xbim.Common.Geometry;
+#if OLD_ENGINE
 using Xbim.Geometry.Abstractions;
+#endif
 using Xbim.Geometry.Benchmarks.Infrastructure;
 using Xbim.Geometry.Engine.Interop;
 using Xbim.Geometry.Engine.Interop.Factories;
@@ -35,13 +37,21 @@ public class CompositeCurveDiagnosticBenchmarks
     public void Setup()
     {
         _model = EngineSetup.OpenModel("Ifc4TestFiles/composite-curve.ifc");
+#if OLD_ENGINE
         var engine = (XbimGeometryEngine)EngineSetup.CreateEngine(_model, XGeometryEngineVersion.V6);
+#else
+        var engine = (XbimGeometryEngine)EngineSetup.CreateEngine(_model);
+#endif
         _curveFactory = (CurveFactory)engine.ModelService.CurveFactory;
         _curve = _model.Instances.OfType<IIfcCompositeCurve>().First();
         _preMarshalledData = _curveFactory.MarshalCompositeCurve(_curve);
 
         _model2 = EngineSetup.OpenModel("Ifc4TestFiles/composite-curve2.ifc");
+#if OLD_ENGINE
         var engine2 = (XbimGeometryEngine)EngineSetup.CreateEngine(_model2, XGeometryEngineVersion.V6);
+#else
+        var engine2 = (XbimGeometryEngine)EngineSetup.CreateEngine(_model2);
+#endif
         _curveFactory2 = (CurveFactory)engine2.ModelService.CurveFactory;
         _curve2 = _model2.Instances.OfType<IIfcCompositeCurve>().First();
         _preMarshalledData2 = _curveFactory2.MarshalCompositeCurve(_curve2);

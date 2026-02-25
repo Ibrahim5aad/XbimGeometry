@@ -1,7 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using System;
-using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Interop.Configuration;
 
 
@@ -12,18 +10,6 @@ namespace Xbim.Common.Configuration
     /// </summary>
     public static class GeometryEngineBuilderExtensions
     {
-        /// <summary>
-        /// Sets the version of the internal xbim Geometry Engine to use
-        /// </summary>
-        /// <param name="builder"></param>
-        /// <param name="version"></param>
-        /// <returns>The <see cref="IGeometryEngineBuilder"/> so that additional calls can be chained.</returns>
-        public static IGeometryEngineBuilder SetVersion(this IGeometryEngineBuilder builder, XGeometryEngineVersion version)
-        {
-            builder.Services.Add(ServiceDescriptor.Singleton((IConfigureOptions<GeometryEngineOptions>)new DefaultGeometryEngineConfigurationOptions(version)));
-            return builder;
-        }
-
         /// <summary>
         /// Configure the <paramref name="builder"/> with the <see cref="GeometryEngineOptions"/>.
         /// </summary>

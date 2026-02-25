@@ -35,7 +35,7 @@ namespace Xbim.Geometry.Engine.Tests
             {
                 er.Entity.Should().NotBeNull();
                 var geomEngine = new XbimGeometryEngine(er.Entity.Model, _loggerFactory);
-                var v6GeomEngine = _geomConverterFactory.CreateGeometryEngineV6(er.Entity.Model, _loggerFactory);
+                var v6GeomEngine = (IXGeometryEngineV6)_geomConverterFactory.CreateGeometryEngine(er.Entity.Model, _loggerFactory);
                 var v6Shape = v6GeomEngine.Build(er.Entity);
                 var solidSet = geomEngine.CreateSolidSet(er.Entity, _logger);
                 solidSet.Count.Should().Be(1, "This solid set should have 1 solid");
@@ -121,13 +121,12 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
 
-        [Theory]
-        [InlineData(XGeometryEngineVersion.V6)]
-        public void IfcCShapeProfileDefGirthTest(XGeometryEngineVersion engineVersion)
+        [Fact]
+        public void IfcCShapeProfileDefGirthTest()
         {
             using (var model = MemoryModel.OpenRead($@"TestFiles/test_rebro.ifc"))
             {
-                var geomEngine = new XbimGeometryEngine(model, _loggerFactory, new Interop.Configuration.GeometryEngineOptions { GeometryEngineVersion = engineVersion });
+                var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
                 var extrudedAreaSolid = model.Instances.OfType<IIfcExtrudedAreaSolid>().FirstOrDefault();
                 extrudedAreaSolid.Should().NotBeNull();
                 var solid = geomEngine.CreateSolid(extrudedAreaSolid, _logger);
