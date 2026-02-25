@@ -25,7 +25,7 @@ jobs:
             build-parallel: '-j $(nproc)'
           - os: windows-2022
             rid: win-x64
-            cmake-preset: win-x64-release
+            cmake-preset: win-x64
             build-parallel: '--parallel'
 
     runs-on: ${{ matrix.os }}
@@ -48,7 +48,10 @@ jobs:
       # ── Linux: install native build tools ─────────────────────────────
       - name: Install native build tools
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++
+        run: |
+          sudo apt-get update && sudo apt-get install -y \
+            cmake ninja-build g++ pkg-config \
+            libgl-dev libx11-dev libxext-dev libxi-dev libxmu-dev
 
       # ── vcpkg setup + caching ─────────────────────────────────────────
       - name: Setup vcpkg
