@@ -22,12 +22,10 @@ jobs:
           - os: ubuntu-24.04
             rid: linux-x64
             cmake-preset: linux-x64-release
-            vcpkg-triplet: x64-linux-release
             build-parallel: '-j $(nproc)'
           - os: windows-2022
             rid: win-x64
             cmake-preset: win-x64-release
-            vcpkg-triplet: x64-windows-release
             build-parallel: '--parallel'
 
     runs-on: ${{ matrix.os }}
@@ -73,7 +71,7 @@ jobs:
       # ── Native C++ build ──────────────────────────────────────────────
       - name: Configure native build
         shell: bash
-        run: cmake --preset ${{ matrix.cmake-preset }} -S src/Xbim.Geometry.Engine.Native -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg-triplet }}
+        run: cmake --preset ${{ matrix.cmake-preset }} -S src/Xbim.Geometry.Engine.Native -DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/src/Xbim.Geometry.Engine.Native/ci-triplets
 
       - name: Build native library
         shell: bash

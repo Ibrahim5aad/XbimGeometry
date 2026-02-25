@@ -95,7 +95,15 @@
 
 ## Full Model (Xbim3DModelContext.CreateContext)
 
-| Benchmark | New | Allocated |
-|-----------|----:|----------:|
-| beam-standard-case | 43.6 ms | 18.27 MB |
-| SampleHouse4 | 1,818 ms | 126.68 MB |
+### Multi-threaded (default)
+
+| Benchmark | Old V5 | Old V6 | New | Allocated |
+|-----------|-------:|-------:|----:|----------:|
+| beam-standard-case | 19.94 ms / 18.29 MB | 20.91 ms / 18.28 MB | **43.6 ms / 18.27 MB** | 18.3 MB |
+| SampleHouse4 | 1,841 ms / 126.76 MB | 1,719 ms / 126.74 MB | **1,736 ms / 126.7 MB** | 126.7 MB |
+
+### Single-threaded (MaxThreads = 1)
+
+| Benchmark | Old V5 | Old V6 | New | Allocated |
+|-----------|-------:|-------:|----:|----------:|
+| SampleHouse4 | 3,231 ms / 126.66 MB | 3,116 ms / 126.66 MB | **3,154 ms / 126.7 MB** | 126.7 MB |

@@ -37,6 +37,9 @@ public class FullModelBenchmarks
 {
     private readonly ILoggerFactory _loggerFactory = EngineSetup.LoggerFactory;
 
+    [Params(XGeometryEngineVersion.V5, XGeometryEngineVersion.V6)]
+    public XGeometryEngineVersion Version { get; set; }
+
     [GlobalSetup]
     public void Setup()
     {
@@ -47,7 +50,7 @@ public class FullModelBenchmarks
     public bool BeamStandardCase()
     {
         using var model = EngineSetup.OpenModel("IfcExamples/beam-standard-case.ifc");
-        var context = new Xbim3DModelContext(model, _loggerFactory, XGeometryEngineVersion.V6);
+        var context = new Xbim3DModelContext(model, _loggerFactory, Version);
         return context.CreateContext();
     }
 
@@ -55,7 +58,16 @@ public class FullModelBenchmarks
     public bool SampleHouse4()
     {
         using var model = EngineSetup.OpenModel("IfcExamples/SampleHouse4.ifc");
-        var context = new Xbim3DModelContext(model, _loggerFactory, XGeometryEngineVersion.V6);
+        var context = new Xbim3DModelContext(model, _loggerFactory, Version);
+        return context.CreateContext();
+    }
+
+    [Benchmark(Description = "Full model: SampleHouse4 (single-thread)")]
+    public bool SampleHouse4SingleThread()
+    {
+        using var model = EngineSetup.OpenModel("IfcExamples/SampleHouse4.ifc");
+        var context = new Xbim3DModelContext(model, _loggerFactory, Version);
+        context.MaxThreads = 1;
         return context.CreateContext();
     }
 }

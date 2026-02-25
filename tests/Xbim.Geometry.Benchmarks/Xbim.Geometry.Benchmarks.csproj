@@ -33,6 +33,11 @@
     <PackageReference Include="Xbim.ModelGeometry.Scene" Version="6.3.873-netcore" />
   </ItemGroup>
 
+  <!-- Exclude new-engine-only benchmarks when building with old engine -->
+  <ItemGroup Condition="'$(EngineMode)' == 'Old'">
+    <Compile Remove="Benchmarks\CompositeCurveDiagnosticBenchmarks.cs" />
+  </ItemGroup>
+
   <!-- Link test files from IntegrationTests (no duplication) -->
   <ItemGroup>
     <Content Include="..\Xbim.Geometry.IntegrationTests\TestFiles\**\*.ifc"

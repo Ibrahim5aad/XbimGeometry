@@ -6,7 +6,8 @@
     {
       "name": "opencascade",
       "features": [
-        "freetype"
+        "freetype",
+        "jemalloc"
       ]
     }
   ]
