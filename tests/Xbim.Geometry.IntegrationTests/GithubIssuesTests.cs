@@ -35,7 +35,7 @@ namespace Xbim.Geometry.Engine.Tests
             //
             using (var m = new MemoryModel(new Ifc2x3.EntityFactoryIfc2x3()))
             {
-                m.LoadStep21("TestFiles\\Github\\Github_issue_281_minimal.ifc");
+                m.LoadStep21("TestFiles/Github/Github_issue_281_minimal.ifc");
                 
                 var c = new Xbim3DModelContext(m, _loggerFactory, engineVersion);
                 var result = c.CreateContext(null, false);
@@ -52,7 +52,7 @@ namespace Xbim.Geometry.Engine.Tests
             // and trimmed curve is parameterized with cartesian points.
             // This test checks for a bug in XBimCurve geometry creation procedure when incorrect parameter values
             // are calculated for these specific conditions described above.
-            using (var model = MemoryModel.OpenRead(@"TestFiles\Github\Github_issue_447.ifc"))
+            using (var model = MemoryModel.OpenRead(@"TestFiles/Github/Github_issue_447.ifc"))
             {
                 var shape = model.Instances.OfType<IIfcTrimmedCurve>().FirstOrDefault();
                 shape.Should().NotBeNull();
@@ -82,7 +82,7 @@ namespace Xbim.Geometry.Engine.Tests
             // Performance of v6 engine very slow for complex BREPs, but much faster using the xbim Tesselator and skipping OCC.
             using (var m = new MemoryModel(new Ifc2x3.EntityFactoryIfc2x3()))
             {
-                m.LoadStep21(@"TestFiles\Github\Github_issue_473_minimal.ifc");
+                m.LoadStep21(@"TestFiles/Github/Github_issue_473_minimal.ifc");
                 var c = new Xbim3DModelContext(m, _loggerFactory, engineVersion);
                 var timer = new Stopwatch();
                 timer.Start();
@@ -107,7 +107,7 @@ namespace Xbim.Geometry.Engine.Tests
                 // Multiple quirks in this model:
                 // 1. Has two projects and sites (& two RepresentationContexts - one of which has no sub context)
                 // 2. ShapeRepresentation with an Identifier of 'Surface' for 'SurfaceModel' - when a Body is typically expected.
-                m.LoadStep21(@"TestFiles\MultiProjectWithSurfaceModels.ifc");
+                m.LoadStep21(@"TestFiles/MultiProjectWithSurfaceModels.ifc");
                 
                 var c = new Xbim3DModelContext(m, _loggerFactory, engineVersion);
                 c.BodyRepresentations.Add("surface");
@@ -117,7 +117,7 @@ namespace Xbim.Geometry.Engine.Tests
                 c.ShapeInstances().Should().HaveCount(3);
                 c.ShapeGeometries().Should().HaveCount(3);
 
-                var wexBimFilename = @"TestFiles\MultiProjectWithSurfaceModels.wexbim";
+                var wexBimFilename = @"TestFiles/MultiProjectWithSurfaceModels.wexbim";
                 // Optional: Export to 'wexbim' format for use in WebUI's xViewer - geometry only
                 using (var wexBimFile = File.Create(wexBimFilename))
                 {
@@ -144,14 +144,14 @@ namespace Xbim.Geometry.Engine.Tests
 
             using (var m = new MemoryModel(new Ifc2x3.EntityFactoryIfc2x3()))
             {
-                m.LoadStep21("TestFiles\\Github\\Dormitory-ARC_Opening_444.ifc");
+                m.LoadStep21("TestFiles/Github/Dormitory-ARC_Opening_444.ifc");
                 var c = new Xbim3DModelContext(m, _loggerFactory, engineVersion);
                 c.CreateContext(null, false);
 
                 var store = m.GeometryStore as InMemoryGeometryStore;
 
                 var geom = store.ShapeGeometries.Values.First(c => c.IfcShapeLabel == 13519);
-                using (var fs = System.IO.File.Create(@"TestFiles\Github\Dormitory-ARC_Opening_444.wexbim"))
+                using (var fs = System.IO.File.Create(@"TestFiles/Github/Dormitory-ARC_Opening_444.wexbim"))
                 using (var bw = new System.IO.BinaryWriter(fs))
                     m.SaveAsWexBim(bw);
                 geom.FaceCount.Should().Be(50);
@@ -167,7 +167,7 @@ namespace Xbim.Geometry.Engine.Tests
 
             using (var m = new MemoryModel(new Ifc2x3.EntityFactoryIfc2x3()))
             {
-                m.LoadStep21("TestFiles\\Github\\GitHub_issue_483_minimal.ifc");
+                m.LoadStep21("TestFiles/Github/GitHub_issue_483_minimal.ifc");
                 var c = new Xbim3DModelContext(m, _loggerFactory, engineVersion);
                 c.CreateContext(null, false);
 
@@ -187,7 +187,7 @@ namespace Xbim.Geometry.Engine.Tests
         {
             //var loggerFactory = new LoggerFactory();
             //XbimServices.Current.ConfigureServices(s => s.AddXbimToolkit(b => b.AddLoggerFactory(loggerFactory)).AddLogging(l => l.AddConsole()));
-            var ifcFile = @"TestFiles\Github\Github_issue_512.ifc";
+            var ifcFile = @"TestFiles/Github/Github_issue_512.ifc";
             // Triggers OCC Memory violation
             using (var m = MemoryModel.OpenRead(ifcFile))
             {
@@ -207,7 +207,7 @@ namespace Xbim.Geometry.Engine.Tests
             
             //var loggerFactory = new LoggerFactory();
             //XbimServices.Current.ConfigureServices(s => s.AddXbimToolkit(b => b.AddLoggerFactory(loggerFactory)).AddLogging(l => l.AddConsole()));
-            var ifcFile = @"TestFiles\Github\Github_issue_512.ifc";
+            var ifcFile = @"TestFiles/Github/Github_issue_512.ifc";
             // Triggers OCC Memory violation
             using (var m = MemoryModel.OpenRead(ifcFile))
             {
@@ -223,7 +223,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void Github_Issue_512b()
         {
-            var ifcFile = @"TestFiles\Github\Github_issue_512b.ifc";
+            var ifcFile = @"TestFiles/Github/Github_issue_512b.ifc";
             // Triggers OCC Memory violation
             using (var m = MemoryModel.OpenRead(ifcFile))
             {
@@ -248,7 +248,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void Github_Issue_557()
         {
-            var ifcFile = @"TestFiles\Github\Github_issue_557.ifc";
+            var ifcFile = @"TestFiles/Github/Github_issue_557.ifc";
             // Triggers OCC Memory violation
             using (var m = MemoryModel.OpenRead(ifcFile))
             {

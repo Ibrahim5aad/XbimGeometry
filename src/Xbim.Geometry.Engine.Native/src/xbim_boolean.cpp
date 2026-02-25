@@ -594,7 +594,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_boolean_section(
                 TopoDS::Face(faceWork),
                 tolerance);
             wireFixer.Perform();
-            fr.Add(wireFixer.Wire());
+            TopoDS_Wire wire = wireFixer.Wire();
+            fr.Add(wire);
         }
 
         fr.Perform();

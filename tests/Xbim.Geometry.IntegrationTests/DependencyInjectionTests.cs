@@ -207,7 +207,7 @@ namespace Xbim.Geometry.Engine.Tests
             point.Should().NotBeNull();
         }
 
-        [Fact]
+        [Fact(Skip = "Esent is Windows only")]
         public void CanRegisterServicesMultipleTimes()
         {
             //Arrange

@@ -32,7 +32,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void Can_Clip_With_HalfSpace()
         {
-            using var model = MemoryModel.OpenRead("testfiles/BooleanClippingWithHalfSpace.ifc");
+            using var model = MemoryModel.OpenRead("TestFiles/BooleanClippingWithHalfSpace.ifc");
             var geomEngine = factory.CreateGeometryEngineV6(model, _loggerFactory);
             var booleanOp = model.Instances[1] as IIfcBooleanClippingResult;
             var shape = geomEngine.Build(booleanOp);
@@ -49,7 +49,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void Can_build_boolean_clipping_result_with_halfspaces()
         {
-            using var model = MemoryModel.OpenRead("testfiles/boolean_clipping_result_with_halfspace.ifc");
+            using var model = MemoryModel.OpenRead("TestFiles/boolean_clipping_result_with_halfspace.ifc");
             var geomEngine = factory.CreateGeometryEngineV6(model, _loggerFactory);
             var booleanOp = model.Instances[1] as IIfcBooleanClippingResult;
             var shape = geomEngine.Create(booleanOp) as IXbimSolid;
@@ -60,7 +60,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void Can_build_boolean_result_with_small_solids()
         {
-            using var model = MemoryModel.OpenRead("testfiles/boolean_result_with_small_solids.ifc");
+            using var model = MemoryModel.OpenRead("TestFiles/boolean_result_with_small_solids.ifc");
             var geomEngine = factory.CreateGeometryEngineV6(model, _loggerFactory);
             var booleanOp = model.Instances[1] as IIfcBooleanClippingResult;
             var shape = geomEngine.Create(booleanOp) as IXbimSolid;
@@ -71,7 +71,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void Can_build_boolean_result_with_bad_polygonal_half_space_bounds()
         {
-            using var model = MemoryModel.OpenRead("testfiles/boolean_result_with_bad_polygonal_half_space_bounds.ifc");
+            using var model = MemoryModel.OpenRead("TestFiles/boolean_result_with_bad_polygonal_half_space_bounds.ifc");
             var geomEngine = factory.CreateGeometryEngineV6(model, _loggerFactory);
             var booleanOp = model.Instances[1] as IIfcBooleanClippingResult;
             var shape = geomEngine.Create(booleanOp) as IXbimSolid;
@@ -81,7 +81,7 @@ namespace Xbim.Geometry.Engine.Tests
 
 
         [Theory]
-        [InlineData(@"TestFiles\IFC4TestFiles\wffdmcc3-_Navis - Existing.ifc")]
+        [InlineData(@"TestFiles/Ifc4TestFiles/wffdmcc3-_Navis - Existing.ifc")]
         public void CanBuildIfcClippingBooleanResult(string filePath)
         {
             // Arrange

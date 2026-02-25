@@ -32,7 +32,7 @@ namespace Xbim.Geometry.Engine.Tests
         [InlineData(XGeometryEngineVersion.V6)]
         public void can_build_ifc_faceted_brep(XGeometryEngineVersion engineVersion)
         {
-            using (var model = MemoryModel.OpenRead(@"TestFiles\Primitives\ifc_faceted_brep.ifc"))
+            using (var model = MemoryModel.OpenRead(@"TestFiles/Primitives/ifc_faceted_brep.ifc"))
             {
                 var shape = model.Instances.OfType<IIfcFacetedBrep>().FirstOrDefault();
                 shape.Should().NotBeNull();
@@ -52,7 +52,7 @@ namespace Xbim.Geometry.Engine.Tests
         [InlineData(XGeometryEngineVersion.V6)]
         public void can_build_closed_shell(XGeometryEngineVersion engineVersion)
         {
-            using (var model = MemoryModel.OpenRead(@"TestFiles\Primitives\faulty_closed_shell.ifc"))
+            using (var model = MemoryModel.OpenRead(@"TestFiles/Primitives/faulty_closed_shell.ifc"))
             {
                 var shape = model.Instances.OfType<IIfcClosedShell>().FirstOrDefault();
                 shape.Should().NotBeNull();
@@ -65,7 +65,7 @@ namespace Xbim.Geometry.Engine.Tests
         [InlineData(XGeometryEngineVersion.V6)]
         public void can_build_poorly_aligned_planar_faces(XGeometryEngineVersion engineVersion)
         {
-            using (var model = MemoryModel.OpenRead(@"TestFiles\Primitives\poor_face_planar_fidelity.ifc"))
+            using (var model = MemoryModel.OpenRead(@"TestFiles/Primitives/poor_face_planar_fidelity.ifc"))
             {
                 var shape = model.Instances.OfType<IIfcClosedShell>().FirstOrDefault();
                 shape.Should().NotBeNull();

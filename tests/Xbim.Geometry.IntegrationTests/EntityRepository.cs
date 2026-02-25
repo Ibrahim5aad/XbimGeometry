@@ -20,7 +20,7 @@ namespace Xbim.Geometry.Engine.Tests
         public EntityRepository(string name)
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
         {
-            var path = Path.GetFullPath($@"Testfiles\{name}.ifc");
+            var path = Path.GetFullPath($@"TestFiles/{name}.ifc");
             File.Exists(path).Should().BeTrue();
             Debug.WriteLine($"Opening '{path}' for tests.");
             Model = MemoryModel.OpenRead(path);

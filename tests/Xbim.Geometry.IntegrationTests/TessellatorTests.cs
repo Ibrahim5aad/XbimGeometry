@@ -17,7 +17,7 @@ namespace Xbim.Geometry.Engine.Tests
         public void Test_Large_Coordinates_Reduction()
         {
             XbimGeometryType tp = Xbim.Common.Geometry.XbimGeometryType.PolyhedronBinary;
-            using (var model = IfcStore.Open("TestFiles\\LargeTriangulatedCoordinates.ifc"))
+            using (var model = IfcStore.Open("TestFiles/LargeTriangulatedCoordinates.ifc"))
             {
                 var xbimTessellator = new XbimTessellator(model, tp);
                 var representation = model.Instances.FirstOrDefault<IIfcFacetedBrep>();
@@ -53,7 +53,7 @@ namespace Xbim.Geometry.Engine.Tests
         public void Test_PolygonalFaceSet_Tessellation()
         {
             XbimGeometryType tp = Xbim.Common.Geometry.XbimGeometryType.PolyhedronBinary;
-            using (var model = IfcStore.Open("TestFiles\\Ifc4TestFiles\\polygonal-face-tessellation.ifc"))
+            using (var model = IfcStore.Open("TestFiles/Ifc4TestFiles/polygonal-face-tessellation.ifc"))
             {
                 var xbimTessellator = new XbimTessellator(model, tp);
                 XbimShapeGeometry shapeGeom;
@@ -68,7 +68,7 @@ namespace Xbim.Geometry.Engine.Tests
         public void TestBoundingBoxSize()
         {
             XbimGeometryType tp = Xbim.Common.Geometry.XbimGeometryType.PolyhedronBinary;
-            using (var model = IfcStore.Open("TestFiles\\IfcExamples\\Roof-01_BCAD.ifc"))
+            using (var model = IfcStore.Open("TestFiles/IfcExamples/Roof-01_BCAD.ifc"))
             {
                 var xbimTessellator = new XbimTessellator(model, tp);
                 XbimShapeGeometry shapeGeom;
@@ -83,7 +83,7 @@ namespace Xbim.Geometry.Engine.Tests
         public void TestPnSize_Add2_Support()
         {
             XbimGeometryType tp = Xbim.Common.Geometry.XbimGeometryType.PolyhedronBinary;
-            using (var model = IfcStore.Open("TestFiles\\Ifc4TestFiles\\IfcTriangulatedFaceSet.ifc"))
+            using (var model = IfcStore.Open("TestFiles/Ifc4TestFiles/IfcTriangulatedFaceSet.ifc"))
             {
                 var xbimTessellator = new XbimTessellator(model, tp);
                 XbimShapeGeometry shapeGeom;

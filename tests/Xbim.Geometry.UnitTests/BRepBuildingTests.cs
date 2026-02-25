@@ -160,9 +160,7 @@ public class BRepBuildingTests : IDisposable
         var outerWire2 = modelService.WireFactory.BuildWire(outerBound2);
         var face = modelService.FaceFactory.BuildFace(plane, new[] { outerWire1, innerWire, outerWire2 });
 
-        System.IO.File.WriteAllText("D://temp//face new" + ".brep", face.BrepString());
         var fixedFaces = modelService.ShapeFactory.FixFace(face);
-        System.IO.File.WriteAllText("D://temp//fixedFaces " + ".brep", fixedFaces.FirstOrDefault()?.BrepString() ?? "No fixed faces");
 
         fixedFaces.Count().Should().Be(2, "Two outer bounds have been provided, this should cause the fixer to split the face");
         var fixedFace1 = fixedFaces.First();

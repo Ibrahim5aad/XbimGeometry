@@ -33,10 +33,10 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
         [Theory]
-        [InlineData("TestFiles\\DynamicDeflectionTestCases\\Pipe7260.ifc")]
-        [InlineData("TestFiles\\DynamicDeflectionTestCases\\Pipe7310.ifc")]
-        [InlineData("TestFiles\\DynamicDeflectionTestCases\\ReinforcingBar1.ifc")]
-        [InlineData("TestFiles\\DynamicDeflectionTestCases\\ReinforcingBar2.ifc")]
+        [InlineData("TestFiles/DynamicDeflectionTestCases/Pipe7260.ifc")]
+        [InlineData("TestFiles/DynamicDeflectionTestCases/Pipe7310.ifc")]
+        [InlineData("TestFiles/DynamicDeflectionTestCases/ReinforcingBar1.ifc")]
+        [InlineData("TestFiles/DynamicDeflectionTestCases/ReinforcingBar2.ifc")]
         public void CanSimplifyShapesByApplyingDynamicDeflectionWithCustomStrategy(string filePath)
         {
             using var model = MemoryModel.OpenRead(filePath);
@@ -90,10 +90,10 @@ namespace Xbim.Geometry.Engine.Tests
 
 
         [Theory]
-        [InlineData("TestFiles\\DynamicDeflectionTestCases\\Pipe7260.ifc")]
-        [InlineData("TestFiles\\DynamicDeflectionTestCases\\Pipe7310.ifc")]
-        [InlineData("TestFiles\\DynamicDeflectionTestCases\\ReinforcingBar1.ifc")]
-        [InlineData("TestFiles\\DynamicDeflectionTestCases\\ReinforcingBar2.ifc")]
+        [InlineData("TestFiles/DynamicDeflectionTestCases/Pipe7260.ifc")]
+        [InlineData("TestFiles/DynamicDeflectionTestCases/Pipe7310.ifc")]
+        [InlineData("TestFiles/DynamicDeflectionTestCases/ReinforcingBar1.ifc")]
+        [InlineData("TestFiles/DynamicDeflectionTestCases/ReinforcingBar2.ifc")]
         public void CanSimplifyShapesByApplyingDynamicDeflectionForTargetFacetCount(string filePath)
         {
             using var model = MemoryModel.OpenRead(filePath);

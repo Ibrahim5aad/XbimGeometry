@@ -26,7 +26,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void Empty_Polyline()
         {
-            using (var model = MemoryModel.OpenRead(@"TestFiles\Polyline.ifc"))
+            using (var model = MemoryModel.OpenRead(@"TestFiles/polyline.ifc"))
             {
                 var poly = model.Instances.OfType<IIfcPolyline>().FirstOrDefault();
                 var geomEngine = new XbimGeometryEngine(model, loggerFactory);
@@ -36,7 +36,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void Composite_curve_issue_261()
         {
-            using (var model = MemoryModel.OpenRead(@"TestFiles\Composite_curve_issue_261.ifc"))
+            using (var model = MemoryModel.OpenRead(@"TestFiles/composite_curve_issue_261.ifc"))
             {
                 var composite_curve = model.Instances.OfType<IIfcCompositeCurve>().FirstOrDefault();
                 var geomEngine = new XbimGeometryEngine(model, loggerFactory);
@@ -47,7 +47,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void TestIfFaceIsPlanar()
         {
-            using (var model = MemoryModel.OpenRead(@"TestFiles\non_planar_wire.ifc"))
+            using (var model = MemoryModel.OpenRead(@"TestFiles/non_planar_wire.ifc"))
             {
                 var polyloop = model.Instances.OfType<IIfcPolyLoop>().FirstOrDefault();
                 polyloop.Should().NotBeNull();

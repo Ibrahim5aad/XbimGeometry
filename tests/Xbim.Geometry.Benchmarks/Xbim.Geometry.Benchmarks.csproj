@@ -30,6 +30,7 @@
   <!-- Old engine: NuGet package -->
   <ItemGroup Condition="'$(EngineMode)' == 'Old'">
     <PackageReference Include="Xbim.Geometry.Engine.Interop" Version="6.3.873-netcore" />
+    <PackageReference Include="Xbim.ModelGeometry.Scene" Version="6.3.873-netcore" />
   </ItemGroup>
 
   <!-- Link test files from IntegrationTests (no duplication) -->

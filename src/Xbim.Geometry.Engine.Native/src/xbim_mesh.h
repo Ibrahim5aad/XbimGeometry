@@ -211,7 +211,7 @@ private:
     std::vector<NCollection_Vector<Vec3Int>> indicesPerFace_;
     std::vector<std::vector<PackedNormal>> normalsPerFace_;
 
-    static const unsigned char VERSION = 1;
+    static constexpr unsigned char VERSION = 1;
 };
 
 #pragma endregion

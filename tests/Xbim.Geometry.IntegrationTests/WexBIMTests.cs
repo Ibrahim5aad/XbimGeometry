@@ -18,7 +18,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void ReadAndWriteWexBimFile()
         {
-            using (var m = IfcStore.Open("TestFiles\\IfcExamples\\SampleHouse4.ifc"))
+            using (var m = IfcStore.Open("TestFiles/IfcExamples/SampleHouse4.ifc"))
             {
                 var wall = m.Instances[1229] as IIfcWall;
                 Assert.NotNull(wall);

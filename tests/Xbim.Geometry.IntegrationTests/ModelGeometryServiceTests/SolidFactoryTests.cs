@@ -27,7 +27,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void Can_extrude_arbitrary_profile_def_with_voids()
         {
-            using var model = MemoryModel.OpenRead("testfiles/ExtrudedAreaSolidFailsOnExtrusion.ifc");
+            using var model = MemoryModel.OpenRead("TestFiles/ExtrudedAreaSolidFailsOnExtrusion.ifc");
             var engine = _factory.CreateGeometryEngineV6(model, _loggerFactory);
             var ifcExtrudedAreaSolid = model.Instances[1] as IIfcExtrudedAreaSolid;
             var v6Solid = engine.SolidFactory.Build(ifcExtrudedAreaSolid) as IXSolid;

@@ -30,8 +30,8 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
         }
 
         [Theory]
-        [InlineData(@"TestFiles\IFC4x3\PlacmentOfSignal.ifc", 3021)]
-        [InlineData(@"TestFiles\IFC4x3\Viadotto Acerno.ifc", 194771)]
+        [InlineData(@"TestFiles/IFC4x3/PlacmentOfSignal.ifc", 3021)]
+        [InlineData(@"TestFiles/IFC4x3/Viadotto Acerno.ifc", 194771)]
         public void CanBuildLinearPlacement(string filePath, int placementId)
         {
 
@@ -50,7 +50,7 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
 
 
         [Theory]
-        [InlineData(@"TestFiles\IFC4x3\PlacmentOfSignal.ifc")]
+        [InlineData(@"TestFiles/IFC4x3/PlacmentOfSignal.ifc")]
         public void CanBuildIfcRefrentsLocations(string filePath)
         {
             // Arrange

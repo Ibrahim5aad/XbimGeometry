@@ -31,7 +31,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void Can_convert_ifc_composite_curve_with_cartesian_preferred_trim()
         {
-            using (var model = MemoryModel.OpenRead(@"TestFiles\composite_curve_with_cartesian_preferred_trim.ifc"))
+            using (var model = MemoryModel.OpenRead(@"TestFiles/composite_curve_with_cartesian_preferred_trim.ifc"))
             {
                 var cc = model.Instances.OfType<IIfcCompositeCurve>().FirstOrDefault();
                 cc.Should().NotBeNull();
@@ -48,7 +48,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void Can_convert_polyline_with_very_close_points()
         {
-            using (var model = MemoryModel.OpenRead(@"TestFiles\polyline_with_very_close_points.ifc"))
+            using (var model = MemoryModel.OpenRead(@"TestFiles/polyline_with_very_close_points.ifc"))
             {
                 var ifcPolyline = model.Instances.OfType<IIfcPolyline>().FirstOrDefault();
                 ifcPolyline.Should().NotBeNull();

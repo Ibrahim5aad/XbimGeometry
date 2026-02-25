@@ -25,7 +25,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void CanBuildFaceSetsWithFaultedFacesWithColinearVertices()
         {
-            using var model = MemoryModel.OpenRead("TestFiles\\Regression\\FaceSetWithColinearFaceVertices.ifc");
+            using var model = MemoryModel.OpenRead("TestFiles/Regression/FaceSetWithColinearFaceVertices.ifc");
             var engine = _factory.CreateGeometryEngineV6(model, _loggerFactory);
             var shellBasedSurfaceModel = model.Instances[389345] as IIfcShellBasedSurfaceModel;
 
@@ -38,7 +38,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void IfcHalfspace_FailingGeom()
         {
-            using (var m = MemoryModel.OpenRead("TestFiles\\Regression\\FailingGeom.ifc"))
+            using (var m = MemoryModel.OpenRead("TestFiles/Regression/FailingGeom.ifc"))
             {
                 var geomEngine = new XbimGeometryEngine(m, _loggerFactory);
                 var extSolid = m.Instances.OfType<IIfcExtrudedAreaSolid>().FirstOrDefault(hs => hs.EntityLabel == 185025);

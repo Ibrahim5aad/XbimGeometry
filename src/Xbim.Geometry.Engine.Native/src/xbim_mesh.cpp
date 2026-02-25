@@ -171,7 +171,7 @@ void FaceMeshIterator::initFace()
                 gp_Dir aNormal(gp::DZ());
                 if (polyTriang_->HasUVNodes())
                 {
-                    const gp_XY& uv = polyTriang_->UVNode(i).XY();
+                    const gp_XY uv = polyTriang_->UVNode(i).XY();
                     slTool_.SetParameters(uv.X(), uv.Y());
                     if (slTool_.IsNormalDefined())
                         aNormal = slTool_.Normal();

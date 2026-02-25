@@ -45,8 +45,8 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
         }
 
         [Theory]
-        [InlineData(@"TestFiles\IFC4x3\Viadotto Acerno.ifc", 160615)]
-        [InlineData(@"TestFiles\IFC4x3\SectionedSolidHorizontal-1.ifc", 116)]
+        [InlineData(@"TestFiles/IFC4x3/Viadotto Acerno.ifc", 160615)]
+        [InlineData(@"TestFiles/IFC4x3/SectionedSolidHorizontal-1.ifc", 116)]
         public void CanBuildIfcSectionedSolidHorizontal(string ifcFile, int solidId)
         {
             // Arrange

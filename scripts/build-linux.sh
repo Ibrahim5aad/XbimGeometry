@@ -65,12 +65,8 @@ run_tests() {
     info "Building .NET solution..."
     dotnet build "$REPO_ROOT/Xbim.Geometry.Engine.sln" -c "$BUILD_CONFIG" --no-restore
 
-    info "Running unit tests..."
-    dotnet test "$REPO_ROOT/tests/Xbim.Geometry.UnitTests/Xbim.Geometry.UnitTests.csproj" \
-        -c "$BUILD_CONFIG" --no-build --logger "console;verbosity=normal"
-
-    info "Running integration tests..."
-    dotnet test "$REPO_ROOT/tests/Xbim.Geometry.IntegrationTests/Xbim.Geometry.IntegrationTests.csproj" \
+    info "Running tests..."
+    dotnet test "$REPO_ROOT/Xbim.Geometry.Engine.sln" \
         -c "$BUILD_CONFIG" --no-build --logger "console;verbosity=normal"
 
     ok "All tests passed."

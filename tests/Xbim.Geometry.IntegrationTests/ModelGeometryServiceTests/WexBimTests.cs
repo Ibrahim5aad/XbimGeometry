@@ -24,7 +24,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void Can_read_and_write_faceted_brep_to_wexbim_V5_and_V6()
         {
-            using var mm = MemoryModel.OpenRead("testfiles/FacetedBrepForSmoothing.ifc");
+            using var mm = MemoryModel.OpenRead("TestFiles/FacetedBrepForSmoothing.ifc");
             var geomEngineV6 = _geomConverterFactory.CreateGeometryEngineV6(mm, _loggerFactory);
             var geomEngineV5 = _geomConverterFactory.CreateGeometryEngineV5(mm, _loggerFactory);
             var ifcFacetedBrep = mm.Instances[32] as IIfcFacetedBrep;

@@ -33,7 +33,7 @@ namespace Xbim.Geometry.Engine.Tests
         public void multi_boolean_opening_operations_test()
         {
 
-            using (var model = MemoryModel.OpenRead(@"TestFiles\complex.ifc"))
+            using (var model = MemoryModel.OpenRead(@"TestFiles/complex.ifc"))
             {
 
 
@@ -185,7 +185,8 @@ namespace Xbim.Geometry.Engine.Tests
 
 
                     return boolRes8;
-                };
+                }
+
                 IXbimSolidSet batched_cuts()
                 {
                     return geomEngine.CreateSolidSet(er.Instance<IIfcBooleanResult>(8), _logger);
@@ -282,7 +283,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void SubtractionResultsInClosedWindow()
         {
-            using (var model = MemoryModel.OpenRead(@"TestFiles\SubtractionResultsInClosedWindow.ifc"))
+            using (var model = MemoryModel.OpenRead(@"TestFiles/SubtractionResultsInClosedWindow.ifc"))
             {
                 _logger.LogInformation("Running SubtractionResultsInClosedWindow");
                 var wallBrep = model.Instances[12752] as IIfcFacetedBrep;
@@ -662,8 +663,6 @@ namespace Xbim.Geometry.Engine.Tests
                     var b = geomEngine.CreateSolid(cylinder, _logger);
                     var solidSet = a.Union(b, m.ModelFactors.PrecisionBoolean);
                     solidSet.Count.Should().Be(1, "unioning these two solids should return a single solid");
-                     var brepStr = solidSet.First().ToBRep;
-                File.WriteAllText("D://temp//BooleanUnionSolidTest " + ".brep", brepStr );
                     IsSolidTest(solidSet.First);
                 }
             }
@@ -1063,7 +1062,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void IfcBooleanClippingResult()
         {
-            using (var model = MemoryModel.OpenRead(@".\TestFiles\IfcWallWithIfcBooleanClippingResult1.ifc"))
+            using (var model = MemoryModel.OpenRead(@"./TestFiles/IfcWallWithIfcBooleanClippingResult1.ifc"))
             {
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
                 var wallBCR = model.Instances[34] as IIfcBooleanClippingResult;
@@ -1071,7 +1070,7 @@ namespace Xbim.Geometry.Engine.Tests
                 solidSet.Sum(s => s.Faces.Count).Should().Be(14);
             }
 
-            using (var model = MemoryModel.OpenRead(@".\TestFiles\IfcWallWithIfcBooleanClippingResult2.ifc"))
+            using (var model = MemoryModel.OpenRead(@"./TestFiles/IfcWallWithIfcBooleanClippingResult2.ifc"))
             {
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
                 var wallBCR = model.Instances[40] as IIfcBooleanClippingResult;

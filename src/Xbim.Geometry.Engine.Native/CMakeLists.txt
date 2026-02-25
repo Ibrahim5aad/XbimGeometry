@@ -86,9 +86,14 @@ target_compile_definitions(xbim_geometry_native PRIVATE
 # Output naming
 set_target_properties(xbim_geometry_native PROPERTIES
     OUTPUT_NAME "xbim_geometry_native"
-    PREFIX ""
     DEBUG_POSTFIX ""
 )
+
+# On Windows, suppress the default "lib" prefix that MinGW would add.
+# On Linux/macOS the default "lib" prefix is correct (libxbim_geometry_native.so).
+if(WIN32)
+    set_target_properties(xbim_geometry_native PROPERTIES PREFIX "")
+endif()
 
 # MSVC-specific settings
 if(MSVC)
@@ -122,18 +127,33 @@ else()
     set(XBIM_NATIVE_GLOB "*.so*")
 endif()
 
+# On Linux/macOS, look for dependencies in the same directory as the library.
+if(NOT WIN32)
+    set_target_properties(xbim_geometry_native PROPERTIES
+        INSTALL_RPATH "$ORIGIN"
+    )
+endif()
+
 install(TARGETS xbim_geometry_native
     RUNTIME DESTINATION "runtimes/${XBIM_RID}/native"
     LIBRARY DESTINATION "runtimes/${XBIM_RID}/native"
 )
 
 # Also install OCCT runtime dependencies alongside our native library.
-# vcpkg copies dependent DLLs to the build output directory; we need them
-# in the runtimes/ layout too for NuGet packaging.
-install(CODE "
-    file(GLOB _build_dlls \"$<TARGET_FILE_DIR:xbim_geometry_native>/${XBIM_NATIVE_GLOB}\")
-    list(FILTER _build_dlls EXCLUDE REGEX \"test_[^/]*$\")
-    list(FILTER _build_dlls EXCLUDE REGEX \"xbim_geometry_native\")
-    file(INSTALL \${_build_dlls} DESTINATION \"\${CMAKE_INSTALL_PREFIX}/runtimes/${XBIM_RID}/native\")
-")
+if(WIN32)
+    # On Windows, vcpkg copies dependent DLLs to the build output directory.
+    install(CODE "
+        file(GLOB _build_dlls \"$<TARGET_FILE_DIR:xbim_geometry_native>/${XBIM_NATIVE_GLOB}\")
+        list(FILTER _build_dlls EXCLUDE REGEX \"test_[^/]*$\")
+        list(FILTER _build_dlls EXCLUDE REGEX \"xbim_geometry_native\")
+        file(INSTALL \${_build_dlls} DESTINATION \"\${CMAKE_INSTALL_PREFIX}/runtimes/${XBIM_RID}/native\")
+    ")
+else()
+    # On Linux, vcpkg keeps .so files in its own lib directory — they are not
+    # copied to the build output like Windows DLLs. Copy them from vcpkg.
+    install(CODE "
+        file(GLOB _vcpkg_libs \"${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib/libTK*.so*\")
+        file(INSTALL \${_vcpkg_libs} DESTINATION \"\${CMAKE_INSTALL_PREFIX}/runtimes/${XBIM_RID}/native\")
+    ")
+endif()
 

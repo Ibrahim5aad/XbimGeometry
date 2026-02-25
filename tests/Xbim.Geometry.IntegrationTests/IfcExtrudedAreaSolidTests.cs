@@ -78,7 +78,7 @@ namespace Xbim.Geometry.Engine.Tests
         [InlineData("bar2.stripped", 54395.84019374512)]
         public void SweptDiskSolidTest(string fileName, double requiredVolume)
         {
-            using (var model = MemoryModel.OpenRead($@"TestFiles\{fileName}.ifc"))
+            using (var model = MemoryModel.OpenRead($@"TestFiles/{fileName}.ifc"))
             {
                 var sweptDisk = model.Instances.OfType<IIfcSweptDiskSolid>().FirstOrDefault();
                 sweptDisk.Should().NotBeNull();
@@ -94,7 +94,7 @@ namespace Xbim.Geometry.Engine.Tests
         [InlineData("SweptDiskSolidPolygonal_1", 89535)]
         public void SweptDiskSolidPolygonalTest(string fileName, double requiredVolume)
         {
-            using (var model = MemoryModel.OpenRead($@"TestFiles\{fileName}.ifc"))
+            using (var model = MemoryModel.OpenRead($@"TestFiles/{fileName}.ifc"))
             {
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
                 var sweptSolid = model.Instances.OfType<IIfcSweptDiskSolidPolygonal>().FirstOrDefault();
@@ -109,7 +109,7 @@ namespace Xbim.Geometry.Engine.Tests
         [InlineData("CurveParametersDegrees", 4228625579)]
         public void ExtrudedAreaSolidTest(string fileName, double requiredVolume)
         {
-            using (var model = MemoryModel.OpenRead($@"TestFiles\{fileName}.ifc"))
+            using (var model = MemoryModel.OpenRead($@"TestFiles/{fileName}.ifc"))
             {
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
                 var sweptSolid = model.Instances.OfType<IIfcExtrudedAreaSolid>().FirstOrDefault(e => e.EntityLabel == 135);
@@ -125,7 +125,7 @@ namespace Xbim.Geometry.Engine.Tests
         [InlineData(XGeometryEngineVersion.V6)]
         public void IfcCShapeProfileDefGirthTest(XGeometryEngineVersion engineVersion)
         {
-            using (var model = MemoryModel.OpenRead($@"TestFiles\test_rebro.ifc"))
+            using (var model = MemoryModel.OpenRead($@"TestFiles/test_rebro.ifc"))
             {
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory, new Interop.Configuration.GeometryEngineOptions { GeometryEngineVersion = engineVersion });
                 var extrudedAreaSolid = model.Instances.OfType<IIfcExtrudedAreaSolid>().FirstOrDefault();
@@ -138,7 +138,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void can_build_empty_rectangle_profile_extrusion()
         {
-            using (var model = MemoryModel.OpenRead($@"TestFiles\empty_rectangle_profile_extrusion.ifc"))
+            using (var model = MemoryModel.OpenRead($@"TestFiles/empty_rectangle_profile_extrusion.ifc"))
             {
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
                 var sweptSolid = model.Instances.OfType<IIfcExtrudedAreaSolid>().FirstOrDefault();

@@ -42,7 +42,7 @@ namespace Xbim.Geometry.Engine.Tests
         [Fact]
         public void Incorrectly_defined_edge_curve()
         {
-            using (var model = MemoryModel.OpenRead(@"TestFiles\incorrectly_defined_edge_curve.ifc"))
+            using (var model = MemoryModel.OpenRead(@"TestFiles/incorrectly_defined_edge_curve.ifc"))
             {
                 var brep = model.Instances.OfType<IIfcAdvancedBrep>().FirstOrDefault();
                 brep.Should().NotBeNull();
@@ -60,7 +60,7 @@ namespace Xbim.Geometry.Engine.Tests
         public void Incorrectly_defined_edge_curve_with_identical_points()
         {
 
-            using (var model = MemoryModel.OpenRead(@"TestFiles\incorrectly_defined_edge_curve_with_identical_points.ifc"))
+            using (var model = MemoryModel.OpenRead(@"TestFiles/incorrectly_defined_edge_curve_with_identical_points.ifc"))
             {
                 //this model needs workarounds to be applied
                 model.AddRevitWorkArounds();
@@ -88,7 +88,7 @@ namespace Xbim.Geometry.Engine.Tests
 
         public void SurfaceCurveSweptAreaSolid_Tests(string fileName, double requiredVolume, bool addLinearExtrusionWorkAround = true, bool addPolyTrimWorkAround = false, bool throwsException = false)
         {
-            using (var model = MemoryModel.OpenRead($@"TestFiles\{fileName}.ifc"))
+            using (var model = MemoryModel.OpenRead($@"TestFiles/{fileName}.ifc"))
             {
                 if (addLinearExtrusionWorkAround)
                     ((XbimModelFactors)model.ModelFactors).AddWorkAround("#SurfaceOfLinearExtrusion");
@@ -116,7 +116,7 @@ namespace Xbim.Geometry.Engine.Tests
         public void Advanced_brep_with_sewing_issues()
         {
 
-            using (var model = MemoryModel.OpenRead(@"TestFiles\advanced_brep_with_sewing_issues.ifc"))
+            using (var model = MemoryModel.OpenRead(@"TestFiles/advanced_brep_with_sewing_issues.ifc"))
             {
                 var brep = model.Instances.OfType<IIfcAdvancedBrep>().FirstOrDefault();
                 brep.Should().NotBeNull();
@@ -146,7 +146,7 @@ namespace Xbim.Geometry.Engine.Tests
         public void Advanced_brep_tests(string brepFileName, int count, double volumeV5)
         {
 
-            using var model = MemoryModel.OpenRead($@"TestFiles\{brepFileName}.ifc");
+            using var model = MemoryModel.OpenRead($@"TestFiles/{brepFileName}.ifc");
             model.AddRevitWorkArounds();
 
             var brep = model.Instances.OfType<IIfcAdvancedBrep>().FirstOrDefault();

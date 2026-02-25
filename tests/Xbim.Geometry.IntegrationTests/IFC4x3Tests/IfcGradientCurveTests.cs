@@ -45,13 +45,13 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
         }
 
         [Theory]
-        [InlineData(@"TestFiles\IFC4x3\test.ifc")]
-        [InlineData(@"TestFiles\IFC4x3\Viadotto Acerno.ifc")]
-        [InlineData(@"TestFiles\IFC4x3\SectionedSolidHorizontal-1.ifc")]
-        // [InlineData(@"TestFiles\IFC4x3\PlacmentOfSignal.ifc")] // this has a known issue (discontinuous curve)
-        [InlineData(@"TestFiles\IFC4x3\T2.ifc")]
-        [InlineData(@"TestFiles\IFC4x3\T2-mod.ifc")]
-        [InlineData(@"TestFiles\IFC4x3\T2-mod2.ifc")]
+        [InlineData(@"TestFiles/IFC4x3/test.ifc")]
+        [InlineData(@"TestFiles/IFC4x3/Viadotto Acerno.ifc")]
+        [InlineData(@"TestFiles/IFC4x3/SectionedSolidHorizontal-1.ifc")]
+        // [InlineData(@"TestFiles/IFC4x3/PlacmentOfSignal.ifc")] // this has a known issue (discontinuous curve)
+        [InlineData(@"TestFiles/IFC4x3/T2.ifc")]
+        [InlineData(@"TestFiles/IFC4x3/T2-mod.ifc")]
+        [InlineData(@"TestFiles/IFC4x3/T2-mod2.ifc")]
         public void CanBuildLinearPlacements(string filePath)
         {
             var logger = _loggerFactory.CreateLogger<IfcGradientCurveTests>();
@@ -78,10 +78,10 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
         }
 
         [Theory]
-        [InlineData(@"TestFiles\IFC4x3\test.ifc")]
-        [InlineData(@"TestFiles\IFC4x3\Viadotto Acerno.ifc")]
-        [InlineData(@"TestFiles\IFC4x3\SectionedSolidHorizontal-1.ifc")]
-        [InlineData(@"TestFiles\IFC4x3\PlacmentOfSignal.ifc")]
+        [InlineData(@"TestFiles/IFC4x3/test.ifc")]
+        [InlineData(@"TestFiles/IFC4x3/Viadotto Acerno.ifc")]
+        [InlineData(@"TestFiles/IFC4x3/SectionedSolidHorizontal-1.ifc")]
+        [InlineData(@"TestFiles/IFC4x3/PlacmentOfSignal.ifc")]
         public void CanBuildIfcGradientCurve(string filePath)
         {
             // Arrange

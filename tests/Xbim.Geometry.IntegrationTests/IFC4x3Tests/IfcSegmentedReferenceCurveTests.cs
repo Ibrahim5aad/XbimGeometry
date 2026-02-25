@@ -22,7 +22,7 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
 
 
         [Theory]
-        [InlineData(@"TestFiles\IFC4x3\PlacmentOfSignal.ifc")]
+        [InlineData(@"TestFiles/IFC4x3/PlacmentOfSignal.ifc")]
         public void CanBuildIfcSegmentedReferenceCurve(string filePath)
         {
             // Arrange
@@ -38,7 +38,7 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
         }
 
         [Theory]
-        [InlineData(@"TestFiles\IFC4x3\PlacmentOfSignal.ifc")]
+        [InlineData(@"TestFiles/IFC4x3/PlacmentOfSignal.ifc")]
         public void IfNoSuperElevationIfcSegmentedReferenceCurveIsSameAsBaseCurve(string filePath)
         {
             // Arrange

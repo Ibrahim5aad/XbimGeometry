@@ -28,7 +28,7 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
         {
             // ACCA sleeper with cant/superelevation — directrix spans ~50m along X
             using var model = MemoryModel.OpenRead(
-                @"TestFiles\IFC4x3\ACCA_sleepers-linear-placement-cant-implicit.ifc");
+                @"TestFiles/IFC4x3/ACCA_sleepers-linear-placement-cant-implicit.ifc");
             var solid = model.Instances[2778] as IfcDirectrixDerivedReferenceSweptAreaSolid;
             var modelSvc = _factory.CreateModelGeometryService(model, _loggerFactory);
 
@@ -57,7 +57,7 @@ namespace Xbim.Geometry.Engine.Tests.IFC4x3Tests
         {
             // DirectrixDerived solid — directrix spans ~100m, 3m×3m cross-section
             using var model = MemoryModel.OpenRead(
-                @"TestFiles\IFC4x3\DirectrixDerivedReferenceSweptAreaSolid-2.ifc");
+                @"TestFiles/IFC4x3/DirectrixDerivedReferenceSweptAreaSolid-2.ifc");
             var solid = model.Instances[119] as IfcDirectrixDerivedReferenceSweptAreaSolid;
             var modelSvc = _factory.CreateModelGeometryService(model, _loggerFactory);
 

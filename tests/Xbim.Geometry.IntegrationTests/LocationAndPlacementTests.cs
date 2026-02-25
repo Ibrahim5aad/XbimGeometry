@@ -33,12 +33,12 @@ namespace Xbim.Geometry.Engine.Tests
         }
 
         [Fact]
-        // [DeploymentItem("TestFiles\\LargeTriangulatedCoordinates.ifc")]
+        // [DeploymentItem("TestFiles/LargeTriangulatedCoordinates.ifc")]
         public void LargeCoordinatesDisplacementTest()
         {
             using (var m = new MemoryModel(new Ifc2x3.EntityFactoryIfc2x3()))
             {
-                m.LoadStep21("TestFiles\\LargeTriangulatedCoordinates.ifc");
+                m.LoadStep21("TestFiles/LargeTriangulatedCoordinates.ifc");
                 var c = new Xbim3DModelContext(m);
                 c.CreateContext(null, false);
 
@@ -251,7 +251,7 @@ namespace Xbim.Geometry.Engine.Tests
             // Model has IFCPOINTBYDISTANCEEXPRESSION.DistanceAlong expressed as IFCNONNEGATIVELENGTHMEASURE not IfcLengthMeasure
             using (var m = new MemoryModel(new Ifc4x3.EntityFactoryIfc4x3Add2()))
             {
-                m.LoadStep21(@"TestFiles\IFC4x3\ACCA_sleepers-linear-placement-cant-implicit.ifc");
+                m.LoadStep21(@"TestFiles/IFC4x3/ACCA_sleepers-linear-placement-cant-implicit.ifc");
 
                 var c = new Xbim3DModelContext(m, _loggerFactory, XGeometryEngineVersion.V6);
                 var result = c.CreateContext(null, false);

@@ -30,7 +30,7 @@ namespace Xbim.Geometry.Engine.Tests
 
 
         [Theory]
-        [InlineData(@"TestFiles\MeshSimplificationTestCases\IfcFlowTerminal.ifc")]
+        [InlineData(@"TestFiles/MeshSimplificationTestCases/IfcFlowTerminal.ifc")]
         public void CanSimplifyMesh(string file)
         {
             var reductionFactor = 0.3f;
