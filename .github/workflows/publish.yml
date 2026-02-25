@@ -1,0 +1,130 @@
+name: Publish NuGet
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  actions: read
+  packages: write
+
+env:
+  BUILD_CONFIG: Release
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # ── Extract version from tag ─────────────────────────────────────
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Packaging version: $TAG"
+
+      # ── Download native artifacts from the CI run for this commit ─────
+      - name: Find successful CI run
+        id: ci-run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_ID=$(gh run list \
+            --workflow=ci.yml \
+            --commit "${{ github.sha }}" \
+            --status=success \
+            --limit=1 \
+            --json databaseId \
+            -q '.[0].databaseId')
+
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::No successful CI run found for commit ${{ github.sha }}. Push to native-engine and wait for CI to pass before tagging."
+            exit 1
+          fi
+
+          echo "RUN_ID=$RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "Using CI run: $RUN_ID"
+
+      - name: Download Windows native binaries
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh run download ${{ steps.ci-run.outputs.RUN_ID }} -n native-win-x64 -D staging/runtimes/win-x64/native/
+
+      - name: Download Linux native binaries
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh run download ${{ steps.ci-run.outputs.RUN_ID }} -n native-linux-x64 -D staging/runtimes/linux-x64/native/
+
+      # ── NuGet CLI (not pre-installed on Ubuntu runners) ──────────────
+      - name: Setup NuGet CLI
+        uses: nuget/setup-nuget@v2
+
+      # ── Pack per-platform native runtime packages ─────────────────────
+      - name: Copy icon for nuspec
+        run: cp xbim-toolkit-icon.png staging/
+
+      - name: Pack Windows runtime package
+        run: |
+          cd staging
+          nuget pack ../nuget/Xbim.Geometry.Engine.Native.runtime.win-x64.nuspec \
+            -Version ${{ steps.version.outputs.VERSION }} \
+            -OutputDirectory ../packages
+        shell: bash
+
+      - name: Pack Linux runtime package
+        run: |
+          cd staging
+          nuget pack ../nuget/Xbim.Geometry.Engine.Native.runtime.linux-x64.nuspec \
+            -Version ${{ steps.version.outputs.VERSION }} \
+            -OutputDirectory ../packages
+        shell: bash
+
+      # ── Pack managed Interop package with runtime deps ────────────────
+      - name: Register local package source
+        run: dotnet nuget add source ${{ github.workspace }}/packages --name local
+
+      - name: Build Interop project
+        run: |
+          dotnet build src/Xbim.Geometry.Engine.Interop/Xbim.Geometry.Engine.Interop.csproj \
+            -c ${{ env.BUILD_CONFIG }} \
+            -p:IncludeNativeRuntimeDependencies=true \
+            -p:Version=${{ steps.version.outputs.VERSION }}
+
+      - name: Pack Interop package
+        run: |
+          dotnet pack src/Xbim.Geometry.Engine.Interop/Xbim.Geometry.Engine.Interop.csproj \
+            -c ${{ env.BUILD_CONFIG }} --no-build \
+            -p:IncludeNativeRuntimeDependencies=true \
+            -p:Version=${{ steps.version.outputs.VERSION }} \
+            -o packages
+
+      # ── Upload + Publish ──────────────────────────────────────────────
+      - name: Upload NuGet packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: packages/*.nupkg
+          retention-days: 30
+
+      - name: Publish to GitHub Packages
+        run: |
+          dotnet nuget push "packages/*.nupkg" \
+            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            --api-key ${{ secrets.GITHUB_TOKEN }} \
+            --skip-duplicate
+        shell: bash

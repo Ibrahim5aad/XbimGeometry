@@ -1,0 +1,124 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [native-engine]
+    paths-ignore: ['*.md', 'docs/**']
+  pull_request:
+    branches: [native-engine]
+    paths-ignore: ['*.md', 'docs/**']
+
+env:
+  BUILD_CONFIG: Release
+  DOTNET_VERSION: '8.0.x'
+  VCPKG_COMMIT: 'b322364f06308bdd24823f9d8f03fe0cc86fd46f'  # 2024.12.16
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            rid: linux-x64
+            cmake-preset: linux-x64-release
+            build-parallel: '-j $(nproc)'
+          - os: windows-2022
+            rid: win-x64
+            cmake-preset: win-x64-release
+            build-parallel: '--parallel'
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+
+    env:
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-cache
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── .NET SDK ──────────────────────────────────────────────────────
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # ── Linux: install native build tools ─────────────────────────────
+      - name: Install native build tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++
+
+      # ── vcpkg setup + caching ─────────────────────────────────────────
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+          vcpkgDirectory: '${{ github.workspace }}/vcpkg'
+
+      - name: Create vcpkg binary cache directory
+        shell: bash
+        run: mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-${{ matrix.rid }}-${{ hashFiles('src/Xbim.Geometry.Engine.Native/vcpkg.json') }}
+          restore-keys: vcpkg-${{ matrix.rid }}-
+
+      # ── Native C++ build ──────────────────────────────────────────────
+      - name: Configure native build
+        shell: bash
+        run: cmake --preset ${{ matrix.cmake-preset }} -S src/Xbim.Geometry.Engine.Native
+
+      - name: Build native library
+        shell: bash
+        run: cmake --build src/Xbim.Geometry.Engine.Native/build --config ${{ env.BUILD_CONFIG }} ${{ matrix.build-parallel }}
+
+      - name: Stage native binaries
+        shell: bash
+        run: |
+          cmake --install src/Xbim.Geometry.Engine.Native/build \
+            --config ${{ env.BUILD_CONFIG }} \
+            --prefix src/Xbim.Geometry.Engine.Interop
+
+      # ── .NET build + test ─────────────────────────────────────────────
+      - name: Restore .NET
+        run: dotnet restore Xbim.Geometry.Engine.sln
+
+      - name: Build .NET
+        run: dotnet build Xbim.Geometry.Engine.sln -c ${{ env.BUILD_CONFIG }} --no-restore
+
+      - name: Run unit tests
+        shell: bash
+        run: |
+          dotnet test tests/Xbim.Geometry.UnitTests/Xbim.Geometry.UnitTests.csproj \
+            -c ${{ env.BUILD_CONFIG }} --no-build \
+            --logger "trx;LogFileName=unit-results.trx" \
+            --results-directory ${{ github.workspace }}/test-results
+
+      - name: Run integration tests
+        shell: bash
+        run: |
+          dotnet test tests/Xbim.Geometry.IntegrationTests/Xbim.Geometry.IntegrationTests.csproj \
+            -c ${{ env.BUILD_CONFIG }} --no-build \
+            --logger "trx;LogFileName=integration-results.trx" \
+            --results-directory ${{ github.workspace }}/test-results
+
+      # ── Artifacts ─────────────────────────────────────────────────────
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.rid }}
+          path: ${{ github.workspace }}/test-results/
+          retention-days: 14
+
+      - name: Upload native binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.rid }}
+          path: src/Xbim.Geometry.Engine.Interop/runtimes/${{ matrix.rid }}/native/
+          retention-days: 14
