@@ -44,20 +44,31 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Packaging version: $VERSION"
 
-      # ── Download native artifacts from the CI run for this commit ─────
+      # ── Download native artifacts from CI ──────────────────────────────
       - name: Find successful CI run
         id: ci-run
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RUN_ID=$(gh run list \
-            --workflow=ci.yml \
-            --commit "${{ github.sha }}" \
-            --status=success \
-            --limit=1 \
-            --json databaseId \
-            -q '.[0].databaseId')
+          # For tag pushes, match the exact commit. For manual dispatch, use latest successful.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RUN_ID=$(gh run list \
+              --workflow=ci.yml \
+              --branch=native-engine \
+              --status=success \
+              --limit=1 \
+              --json databaseId \
+              -q '.[0].databaseId')
+          else
+            RUN_ID=$(gh run list \
+              --workflow=ci.yml \
+              --commit "${{ github.sha }}" \
+              --status=success \
+              --limit=1 \
+              --json databaseId \
+              -q '.[0].databaseId')
+          fi
 
           if [ -z "$RUN_ID" ]; then
             echo "::error::No successful CI run found for commit ${{ github.sha }}. Push to native-engine and wait for CI to pass before tagging."
