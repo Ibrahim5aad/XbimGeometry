@@ -25,22 +25,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-24.04
-            rid: linux-x64
-            cmake-preset: linux-x64-release
-            build-parallel: '-j $(nproc)'
-          - os: windows-2022
-            rid: win-x64
-            cmake-preset: win-x64-release
-            build-parallel: '--parallel'
+        include: ${{ fromJSON(
+          (github.event_name == 'workflow_dispatch' && inputs.platform == 'linux')
+            && '[{"os":"ubuntu-24.04","rid":"linux-x64","cmake-preset":"linux-x64-release","build-parallel":"-j $(nproc)"}]'
+          || (github.event_name == 'workflow_dispatch' && inputs.platform == 'windows')
+            && '[{"os":"windows-2022","rid":"win-x64","cmake-preset":"win-x64-release","build-parallel":"--parallel"}]'
+          || '[{"os":"ubuntu-24.04","rid":"linux-x64","cmake-preset":"linux-x64-release","build-parallel":"-j $(nproc)"},{"os":"windows-2022","rid":"win-x64","cmake-preset":"win-x64-release","build-parallel":"--parallel"}]'
+          ) }}
 
     runs-on: ${{ matrix.os }}
-    if: >-
-      github.event_name != 'workflow_dispatch'
-      || inputs.platform == 'all'
-      || (inputs.platform == 'linux' && matrix.rid == 'linux-x64')
-      || (inputs.platform == 'windows' && matrix.rid == 'win-x64')
     timeout-minutes: 60
 
     env:
