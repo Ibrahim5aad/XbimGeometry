@@ -18,7 +18,7 @@ on:
 env:
   BUILD_CONFIG: Release
   DOTNET_VERSION: '8.0.x'
-  VCPKG_COMMIT: 'b42b19a62b63514ed9fa2a81e07ce75e613c83c0'  # 2026.02.23
+  VCPKG_COMMIT: 'b322364f06308bdd24823f9d8f03fe0cc86fd46f'  # 2024.12.16
   GLIBC_TUNABLES: glibc.rtld.optional_static_tls=2048
   
 jobs:
