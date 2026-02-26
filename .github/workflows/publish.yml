@@ -90,7 +90,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh run download ${{ steps.ci-run.outputs.RUN_ID }} -n native-linux-x64 -D staging/runtimes/linux-x64/native/
 
-      # ── NuGet CLI (not pre-installed on Ubuntu runners) ──────────────
+      # ── NuGet CLI (needs Mono on Linux) ─────────────────────────────
+      - name: Install Mono
+        run: sudo apt-get update && sudo apt-get install -y mono-complete
+
       - name: Setup NuGet CLI
         uses: nuget/setup-nuget@v2
 
