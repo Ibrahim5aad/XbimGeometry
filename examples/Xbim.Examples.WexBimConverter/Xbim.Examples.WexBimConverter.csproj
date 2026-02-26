@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <SignAssembly>false</SignAssembly>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Xbim.Essentials" Version="6.0.568" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj" />
+    <ProjectReference Include="..\..\src\Xbim.ModelGeometry.Scene\Xbim.ModelGeometry.Scene.csproj" />
+    <ProjectReference Include="..\..\src\Xbim.Tessellator\Xbim.Tessellator.csproj" />
+  </ItemGroup>
+
+</Project>

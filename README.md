@@ -20,8 +20,8 @@ even for public packages, so you need a Personal Access Token.
 2. Add the xBimTeam feed:
 
 ```bash
-dotnet nuget add source "https://nuget.pkg.github.com/xBimTeam/index.json" \
-  --name xbim-github \
+dotnet nuget add source "https://nuget.pkg.github.com/ibrahim5aad/index.json" \
+  --name ibrahim-saad-github \
   --username YOUR_GITHUB_USERNAME \
   --password YOUR_GITHUB_PAT \
   --store-password-in-clear-text
@@ -43,7 +43,7 @@ Native binaries for Windows and Linux are pulled in automatically via runtime pa
 ```xml
 <configuration>
   <packageSources>
-    <add key="xbim-github" value="https://nuget.pkg.github.com/xBimTeam/index.json" />
+    <add key="xbim-github" value="https://nuget.pkg.github.com/Ibrahim5aad/index.json" />
   </packageSources>
   <packageSourceCredentials>
     <xbim-github>
@@ -60,7 +60,9 @@ Native binaries for Windows and Linux are pulled in automatically via runtime pa
 
 ## Usage
 
-Register the Geometry Engine with the xbim service provider:
+### Service Registration
+
+Register the geometry engine with the xbim service provider:
 
 ```csharp
 // Option 1: use the built-in service container
@@ -71,6 +73,69 @@ XbimServices.Current.ConfigureServices(opt =>
 services.AddXbimToolkit(conf => conf.AddGeometryServices());
 // after building the container:
 XbimServices.Current.UseExternalServiceProvider(serviceProvider);
+```
+
+### Opening a Model and Creating Geometry
+
+```csharp
+using var model = IfcStore.Open("SampleHouse.ifc");
+
+var loggerFactory = new LoggerFactory();
+var geomEngine = new XbimGeometryEngine(model, loggerFactory);
+var logger = loggerFactory.CreateLogger("MyApp");
+
+// Build a solid from an IFC element
+var extrudedSolid = model.Instances.OfType<IIfcExtrudedAreaSolid>().First();
+IXbimSolid solid = geomEngine.CreateSolid(extrudedSolid, logger);
+
+Console.WriteLine($"Volume: {solid.Volume}");
+Console.WriteLine($"Faces:  {solid.Faces.Count}");
+```
+
+### Tessellation
+
+```csharp
+// Tessellate a geometry object into a triangulated mesh
+XbimShapeGeometry mesh = geomEngine.CreateShapeGeometry(
+    solid,
+    model.ModelFactors.Precision,
+    model.ModelFactors.DeflectionTolerance,
+    model.ModelFactors.DeflectionAngle,
+    XbimGeometryType.PolyhedronBinary,
+    logger);
+
+XbimRect3D boundingBox = mesh.BoundingBox;
+```
+
+### Full Scene Export to WexBIM
+
+The most common workflow — convert an entire IFC model into a WexBIM file
+for web or desktop viewing:
+
+```csharp
+using var model = IfcStore.Open("SampleHouse.ifc");
+
+var context = new Xbim3DModelContext(model);
+context.CreateContext();   // builds model scene
+
+using var fs = File.Create("output.wexbim");
+using var bw = new BinaryWriter(fs);
+model.SaveAsWexBim(bw);
+```
+
+By default, `CreateContext()` sets `generateBREPs: false`. In this mode, IFC shapes
+that are already tessellated (`IfcTriangulatedFaceSet`, `IfcPolygonalFaceSet`,
+`IfcFaceBasedSurfaceModel`, `IfcShellBasedSurfaceModel`, `IfcFacetedBrep`, etc.)
+are meshed directly by the built-in `XbimTessellator` without constructing full BREP
+solids through the geometry engine. This is significantly faster for models that
+consist mostly of pre-tessellated geometry.
+
+Pass `generateBREPs: true` to force all shapes through the geometry engine's full
+BREP pipeline before tessellation. This produces higher-fidelity meshes at the cost
+of longer processing times:
+
+```csharp
+context.CreateContext(generateBREPs: true);
 ```
 
 ---
@@ -101,51 +166,102 @@ cd vcpkg && ./bootstrap-vcpkg.sh  # Linux
 Set the `VCPKG_ROOT` environment variable to the vcpkg directory. The CMake presets
 reference it to locate the toolchain file.
 
-### Native Library
+### Build Scripts
 
-The native engine is a CMake C/C++ shared library using vcpkg for dependencies
-(OpenCASCADE 7.9.3, FreeType, etc.).
+Helper scripts handle the full native + managed + test pipeline:
 
-**Windows:**
+**Windows (PowerShell):**
+```powershell
+.\scripts\build-windows.ps1              # full build + test
+.\scripts\build-windows.ps1 -Native      # native C++ only
+.\scripts\build-windows.ps1 -Test        # .NET test only (assumes native already built)
+.\scripts\build-windows.ps1 -Clean       # wipe build artifacts and start fresh
+.\scripts\build-windows.ps1 -Config Debug  # build Debug instead of Release
+```
+
+**Linux:**
+```bash
+./scripts/build-linux.sh                 # full build + test
+./scripts/build-linux.sh --native        # native C++ only
+./scripts/build-linux.sh --test          # .NET test only
+./scripts/build-linux.sh --clean         # wipe build artifacts and start fresh
+```
+
+> On first run, vcpkg downloads and builds OpenCASCADE — this can take 30+ minutes but
+> is cached for subsequent builds.
+
+### Manual Build
+
+If you prefer running the steps yourself:
+
+**Native library (Windows):**
 ```bash
 cd src/Xbim.Geometry.Engine.Native
 cmake --preset win-x64-release
 cmake --build build --config Release
 ```
 
-**Linux:**
+**Native library (Linux):**
 ```bash
 cd src/Xbim.Geometry.Engine.Native
 cmake --preset linux-x64-release
 cmake --build build --config Release
 ```
 
-> On first run, vcpkg downloads and builds OpenCASCADE — this can take 30+ minutes but
-> is cached for subsequent builds.
-
-### Managed Solution
-
+**Managed solution:**
 ```bash
 dotnet build Xbim.Geometry.Engine.sln
 ```
 
-No C++ toolchain is needed for the managed projects — they call the native library via P/Invoke.
-
-### Tests
-
+**Tests:**
 ```bash
 dotnet test Xbim.Geometry.Engine.sln
 ```
 
 ---
 
+## Examples
+
+The `examples/` directory contains apps that demonstrate the geometry engine:
+
+- **Xbim.Examples.QuickStart** — Minimal console app that exercises the README code samples: opens an IFC model, creates geometry, tessellates, and exports to WexBIM.
+- **Xbim.Examples.WexBimConverter** — CLI tool that converts IFC files to the compact WexBIM binary format.
+- **Xbim.Examples.Viewer** — Avalonia desktop app that opens and renders WexBIM files with OpenGL.
+
+### Quick Start
+
+```bash
+# Build the example projects
+dotnet build examples/Xbim.Examples.sln
+
+# Convert an IFC file to WexBIM (requires native engine built and staged)
+dotnet run --project examples/Xbim.Examples.WexBimConverter -- path/to/model.ifc
+
+# Open the viewer
+dotnet run --project examples/Xbim.Examples.Viewer.Desktop
+```
+
+A pre-generated `SampleHouse4.wexbim` is included in `examples/testdata/` for testing the viewer without needing to build the native engine.
+
+### Smoke Test
+
+```bash
+# Windows
+.\examples\smoke-test.ps1
+
+# Linux / macOS
+./examples/smoke-test.sh
+```
+
+Pass `--convert` (or `-Convert` on Windows) to also run the converter on a test IFC file.
+
+---
+
 ## Acknowledgements
 
-We'd like to acknowledge OpenCascade for the use of their library, which is permitted under clause 6 of [their
-Licence](https://www.opencascade.com/content/licensing).
+We'd like to acknowledge OpenCascade for the use of their library, which is permitted under clause 6 of [their Licence](https://www.opencascade.com/content/licensing).
 
-The XbimTeam wishes to thank [JetBrains](https://www.jetbrains.com/) for supporting the XbimToolkit project
-with free open source [Resharper](https://www.jetbrains.com/resharper/) licenses.
+The XbimTeam wishes to thank [JetBrains](https://www.jetbrains.com/) for supporting the XbimToolkit project with free open source [Resharper](https://www.jetbrains.com/resharper/) licenses.
 
 Thanks also to [GitHub Actions](https://github.com/features/actions) for automating our builds and package publishing.
 

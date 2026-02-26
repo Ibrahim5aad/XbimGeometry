@@ -1,0 +1,73 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Xbim.Examples.Viewer.ViewModels"
+             x:Class="Xbim.Examples.Viewer.Views.ProductListView"
+             x:DataType="vm:ProductListViewModel">
+
+    <DockPanel>
+        <!-- Header -->
+        <Border DockPanel.Dock="Top"
+                Padding="8,6"
+                Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+            <TextBlock Text="Products"
+                       FontWeight="SemiBold"
+                       FontSize="13" />
+        </Border>
+
+        <!-- Action buttons -->
+        <StackPanel DockPanel.Dock="Top"
+                    Orientation="Horizontal"
+                    Spacing="4"
+                    Margin="6,4"
+                    MinHeight="28">
+            <Button Content="Zoom"
+                    Command="{Binding ZoomToSelectedCommand}"
+                    FontSize="11"
+                    Padding="8,3"
+                    ToolTip.Tip="Zoom camera to the selected product" />
+            <Button Content="Isolate"
+                    Command="{Binding IsolateSelectedCommand}"
+                    FontSize="11"
+                    Padding="8,3"
+                    ToolTip.Tip="Show only the selected product" />
+            <Button Content="Show All"
+                    Command="{Binding ShowAllCommand}"
+                    FontSize="11"
+                    Padding="8,3"
+                    ToolTip.Tip="Restore all products" />
+        </StackPanel>
+
+        <!-- Grouped product tree -->
+        <TreeView ItemsSource="{Binding Groups}"
+                  x:Name="ProductTree"
+                  Padding="0">
+            <TreeView.DataTemplates>
+                <!-- Group header: type name + count -->
+                <TreeDataTemplate DataType="vm:ProductGroup"
+                                  ItemsSource="{Binding Items}">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="{Binding TypeName}"
+                                   FontWeight="SemiBold"
+                                   FontSize="12" />
+                        <TextBlock Text="{Binding Count, StringFormat='({0})'}"
+                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                   FontSize="12" />
+                    </StackPanel>
+                </TreeDataTemplate>
+
+                <!-- Leaf item: product label -->
+                <DataTemplate DataType="vm:ProductItem">
+                    <TextBlock Text="{Binding DisplayName}"
+                               FontSize="12" />
+                </DataTemplate>
+            </TreeView.DataTemplates>
+
+            <TreeView.Styles>
+                <Style Selector="TreeViewItem">
+                    <Setter Property="IsExpanded" Value="False" />
+                </Style>
+            </TreeView.Styles>
+        </TreeView>
+    </DockPanel>
+
+</UserControl>
