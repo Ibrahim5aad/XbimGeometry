@@ -18,7 +18,7 @@
 	  <PackageReference Include="System.Configuration.ConfigurationManager" Version="6.0.1" />
 	</ItemGroup>
 	<ItemGroup>
-	  <ProjectReference Include="..\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj" />
+	  <ProjectReference Include="..\Xbim.Geometry.Engine\Xbim.Geometry.Engine.csproj" />
 	  <ProjectReference Include="..\Xbim.Tessellator\Xbim.Tessellator.csproj" />
 	</ItemGroup>
 	<ItemGroup>

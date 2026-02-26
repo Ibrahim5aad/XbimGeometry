@@ -117,20 +117,20 @@ jobs:
             -OutputDirectory packages
         shell: bash
 
-      # ── Pack managed Interop package with runtime deps ────────────────
+      # ── Pack managed Engine package with runtime deps ──────────────────
       - name: Register local package source
         run: dotnet nuget add source ${{ github.workspace }}/packages --name local
 
-      - name: Build Interop project
+      - name: Build Engine project
         run: |
-          dotnet build src/Xbim.Geometry.Engine.Interop/Xbim.Geometry.Engine.Interop.csproj \
+          dotnet build src/Xbim.Geometry.Engine/Xbim.Geometry.Engine.csproj \
             -c ${{ env.BUILD_CONFIG }} \
             -p:IncludeNativeRuntimeDependencies=true \
             -p:Version=${{ steps.version.outputs.VERSION }}
 
-      - name: Pack Interop package
+      - name: Pack Engine package
         run: |
-          dotnet pack src/Xbim.Geometry.Engine.Interop/Xbim.Geometry.Engine.Interop.csproj \
+          dotnet pack src/Xbim.Geometry.Engine/Xbim.Geometry.Engine.csproj \
             -c ${{ env.BUILD_CONFIG }} --no-build \
             -p:IncludeNativeRuntimeDependencies=true \
             -p:Version=${{ steps.version.outputs.VERSION }} \

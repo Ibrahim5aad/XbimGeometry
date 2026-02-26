@@ -49,10 +49,10 @@ cmake --build build --config Release -j $(nproc)
 ### 2. Stage native binaries for .NET
 
 ```bash
-cmake --install build --config Release --prefix ../Xbim.Geometry.Engine.Interop
+cmake --install build --config Release --prefix ../Xbim.Geometry.Engine
 ```
 
-This copies `libxbim_geometry_native.so` to `src/Xbim.Geometry.Engine.Interop/runtimes/linux-x64/native/`.
+This copies `libxbim_geometry_native.so` to `src/Xbim.Geometry.Engine/runtimes/linux-x64/native/`.
 
 ### 3. Build & test .NET
 

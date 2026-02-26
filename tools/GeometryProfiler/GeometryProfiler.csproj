@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj" />
+    <ProjectReference Include="..\..\src\Xbim.Geometry.Engine\Xbim.Geometry.Engine.csproj" />
   </ItemGroup>
 
 </Project>

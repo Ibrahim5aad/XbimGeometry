@@ -12,7 +12,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 NATIVE_DIR="$REPO_ROOT/src/Xbim.Geometry.Engine.Native"
-INTEROP_DIR="$REPO_ROOT/src/Xbim.Geometry.Engine.Interop"
+INTEROP_DIR="$REPO_ROOT/src/Xbim.Geometry.Engine"
 BUILD_DIR="$NATIVE_DIR/build"
 BUILD_CONFIG="${BUILD_CONFIG:-Release}"
 

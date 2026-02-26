@@ -103,7 +103,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 # ── Install (stage native binaries for NuGet packaging) ─────────────────────
-# Usage: cmake --install build --config Release --prefix ../Xbim.Geometry.Engine.Interop
+# Usage: cmake --install build --config Release --prefix ../Xbim.Geometry.Engine
 # This stages native DLLs into runtimes/{rid}/native/ for NuGet package inclusion.
 if(WIN32)
     set(XBIM_RID "win-x64")

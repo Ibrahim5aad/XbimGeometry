@@ -24,7 +24,7 @@
 
   <!-- New engine: local project references -->
   <ItemGroup Condition="'$(EngineMode)' != 'Old'">
-    <ProjectReference Include="..\..\src\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj" />
+    <ProjectReference Include="..\..\src\Xbim.Geometry.Engine\Xbim.Geometry.Engine.csproj" />
     <ProjectReference Include="..\..\src\Xbim.ModelGeometry.Scene\Xbim.ModelGeometry.Scene.csproj" />
   </ItemGroup>
 

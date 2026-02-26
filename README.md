@@ -30,7 +30,7 @@ dotnet nuget add source "https://nuget.pkg.github.com/ibrahim5aad/index.json" \
 3. Install the package:
 
 ```bash
-dotnet add package Xbim.Geometry.Engine.Interop --prerelease
+dotnet add package Xbim.Geometry.Engine --prerelease
 ```
 
 Native binaries for Windows and Linux are pulled in automatically via runtime packages.

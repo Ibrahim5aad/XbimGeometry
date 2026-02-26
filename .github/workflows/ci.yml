@@ -99,16 +99,16 @@ jobs:
         run: |
           cmake --install src/Xbim.Geometry.Engine.Native/build \
             --config ${{ env.BUILD_CONFIG }} \
-            --prefix src/Xbim.Geometry.Engine.Interop
+            --prefix src/Xbim.Geometry.Engine
 
       - name: Verify staged native binaries
         shell: bash
         run: |
           echo "=== Staged native binaries ==="
-          ls -lR src/Xbim.Geometry.Engine.Interop/runtimes/ || echo "WARNING: runtimes directory not found"
-          if [ -f src/Xbim.Geometry.Engine.Interop/runtimes/${{ matrix.rid }}/native/libxbim_geometry_native.so ]; then
+          ls -lR src/Xbim.Geometry.Engine/runtimes/ || echo "WARNING: runtimes directory not found"
+          if [ -f src/Xbim.Geometry.Engine/runtimes/${{ matrix.rid }}/native/libxbim_geometry_native.so ]; then
             echo "=== Shared library dependencies ==="
-            ldd src/Xbim.Geometry.Engine.Interop/runtimes/${{ matrix.rid }}/native/libxbim_geometry_native.so || true
+            ldd src/Xbim.Geometry.Engine/runtimes/${{ matrix.rid }}/native/libxbim_geometry_native.so || true
           fi
 
       # ── .NET build + test ─────────────────────────────────────────────
@@ -121,7 +121,7 @@ jobs:
       - name: Ensure native libraries in test output
         shell: bash
         run: |
-          native_src="src/Xbim.Geometry.Engine.Interop/runtimes/${{ matrix.rid }}/native"
+          native_src="src/Xbim.Geometry.Engine/runtimes/${{ matrix.rid }}/native"
           for test_dir in tests/Xbim.Geometry.UnitTests tests/Xbim.Geometry.IntegrationTests; do
             dest="$test_dir/bin/${{ env.BUILD_CONFIG }}/net8.0/runtimes/${{ matrix.rid }}/native"
             mkdir -p "$dest"
@@ -157,5 +157,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-${{ matrix.rid }}
-          path: src/Xbim.Geometry.Engine.Interop/runtimes/${{ matrix.rid }}/native/
+          path: src/Xbim.Geometry.Engine/runtimes/${{ matrix.rid }}/native/
           retention-days: 14

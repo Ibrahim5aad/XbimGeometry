@@ -20,7 +20,7 @@ $ErrorActionPreference = "Stop"
 
 $RepoRoot   = (Resolve-Path "$PSScriptRoot\..").Path
 $NativeDir  = "$RepoRoot\src\Xbim.Geometry.Engine.Native"
-$InteropDir = "$RepoRoot\src\Xbim.Geometry.Engine.Interop"
+$InteropDir = "$RepoRoot\src\Xbim.Geometry.Engine"
 $BuildDir   = "$NativeDir\build"
 
 # ── Colours ──────────────────────────────────────────────────────────────────

@@ -23,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj" />
+    <ProjectReference Include="..\..\src\Xbim.Geometry.Engine\Xbim.Geometry.Engine.csproj" />
     <ProjectReference Include="..\..\src\Xbim.Geometry.Abstractions\Xbim.Geometry.Abstractions.csproj" />
   </ItemGroup>
 
@@ -33,7 +33,7 @@
     <NativeCmakeBuildDir Condition="'$(NativeBuildConfig)' == 'Debug'">build-debug</NativeCmakeBuildDir>
     <NativeCmakeBuildDir Condition="'$(NativeBuildConfig)' != 'Debug'">build</NativeCmakeBuildDir>
     <NativeBuildDir>$(MSBuildThisFileDirectory)..\..\src\Xbim.Geometry.Engine.Native\$(NativeCmakeBuildDir)\$(NativeBuildConfig)\</NativeBuildDir>
-    <LinuxNativeDir>$(MSBuildThisFileDirectory)..\..\src\Xbim.Geometry.Engine.Interop\runtimes\linux-x64\native\</LinuxNativeDir>
+    <LinuxNativeDir>$(MSBuildThisFileDirectory)..\..\src\Xbim.Geometry.Engine\runtimes\linux-x64\native\</LinuxNativeDir>
   </PropertyGroup>
 
   <!-- Windows: copy DLLs from CMake build output -->

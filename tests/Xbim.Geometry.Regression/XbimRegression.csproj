@@ -22,7 +22,7 @@
 		<PackageReference Include="NReco.Logging.File" Version="1.2.2" />	
 	</ItemGroup>
 	<ItemGroup>
-		<ProjectReference Include="..\..\src\Xbim.Geometry.Engine.Interop\Xbim.Geometry.Engine.Interop.csproj">
+		<ProjectReference Include="..\..\src\Xbim.Geometry.Engine\Xbim.Geometry.Engine.csproj">
 		  <Private>True</Private>
 		</ProjectReference>
 		<ProjectReference Include="..\..\src\Xbim.ModelGeometry.Scene\Xbim.ModelGeometry.Scene.csproj" />

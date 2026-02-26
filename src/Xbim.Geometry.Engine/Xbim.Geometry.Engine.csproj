@@ -2,10 +2,10 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Title>Xbim Geometry Engine (P/Invoke Interop)</Title>
-    <Description>Cross-platform P/Invoke interop layer for the Xbim Geometry Engine native library.</Description>
+    <Title>Xbim Geometry Engine</Title>
+    <Description>Cross-platform geometry engine for xBIM, backed by OpenCASCADE.</Description>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
-    <PackageId>Xbim.Geometry.Engine.Interop</PackageId>
+    <PackageId>Xbim.Geometry.Engine</PackageId>
     <RootNamespace>Xbim.Geometry.Engine.Interop</RootNamespace>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -53,7 +53,7 @@
     Native library packaging: two modes controlled by IncludeNativeRuntimeDependencies.
 
     CI pack (IncludeNativeRuntimeDependencies=true):
-      Natives live in separate runtime NuGet packages. The Interop package declares
+      Natives live in separate runtime NuGet packages. This package declares
       dependencies on them so NuGet resolves the correct runtimes/{rid}/native/ at build time.
 
     Local dev pack (default):
@@ -110,7 +110,7 @@
     native libraries copied to their output directories.
   -->
   <ItemGroup>
-    <None Include="buildTransitive\Xbim.Geometry.Engine.Interop.targets" Pack="true" PackagePath="buildTransitive\" Condition="Exists('buildTransitive\Xbim.Geometry.Engine.Interop.targets')" />
+    <None Include="buildTransitive\Xbim.Geometry.Engine.targets" Pack="true" PackagePath="buildTransitive\" Condition="Exists('buildTransitive\Xbim.Geometry.Engine.targets')" />
   </ItemGroup>
 
 </Project>
