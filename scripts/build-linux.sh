@@ -41,19 +41,31 @@ check_prereqs() {
 
 # ── Native C++ build ────────────────────────────────────────────────────────
 build_native() {
+    local config_lower
+    config_lower="$(echo "$BUILD_CONFIG" | tr '[:upper:]' '[:lower:]')"
+    local preset="linux-x64-${config_lower}"
+    local dir="$BUILD_DIR"
+    if [[ "$BUILD_CONFIG" != "Release" ]]; then
+        dir="$NATIVE_DIR/build-debug"
+    fi
+
     info "Configuring native build (${BUILD_CONFIG})..."
-    cmake --preset linux-x64-release -S "$NATIVE_DIR"
+    cmake --preset "$preset" -S "$NATIVE_DIR"
 
     info "Building native library..."
-    cmake --build "$BUILD_DIR" --config "$BUILD_CONFIG" -j "$(nproc)"
+    cmake --build "$dir" --config "$BUILD_CONFIG" -j "$(nproc)"
 
-    ok "Native build complete: $BUILD_DIR"
+    ok "Native build complete: $dir"
 }
 
 # ── Stage native binaries into runtimes/linux-x64/native/ ───────────────────
 stage_native() {
+    local dir="$BUILD_DIR"
+    if [[ "$BUILD_CONFIG" != "Release" ]]; then
+        dir="$NATIVE_DIR/build-debug"
+    fi
     info "Staging native binaries for .NET..."
-    cmake --install "$BUILD_DIR" --config "$BUILD_CONFIG" --prefix "$INTEROP_DIR"
+    cmake --install "$dir" --config "$BUILD_CONFIG" --prefix "$INTEROP_DIR"
     ok "Staged to $INTEROP_DIR/runtimes/linux-x64/native/"
 }
 
@@ -76,6 +88,7 @@ run_tests() {
 clean() {
     info "Cleaning build artifacts..."
     rm -rf "$BUILD_DIR"
+    rm -rf "$NATIVE_DIR/build-debug"
     rm -rf "$INTEROP_DIR/runtimes/linux-x64"
     find "$REPO_ROOT" -type d \( -name bin -o -name obj \) -exec rm -rf {} + 2>/dev/null || true
     ok "Clean complete."

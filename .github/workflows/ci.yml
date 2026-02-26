@@ -72,7 +72,7 @@ jobs:
       # ── Native C++ build ──────────────────────────────────────────────
       - name: Configure native build
         shell: bash
-        run: cmake --preset ${{ matrix.cmake-preset }} -S src/Xbim.Geometry.Engine.Native "-DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/src/Xbim.Geometry.Engine.Native/triplets/release"
+        run: cmake --preset ${{ matrix.cmake-preset }} -S src/Xbim.Geometry.Engine.Native
         env:
           VCPKG_BINARY_SOURCES: clear
 
