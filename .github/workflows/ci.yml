@@ -37,9 +37,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
 
-    env:
-      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-cache
-
     steps:
       # ── Checkout ──────────────────────────────────────────────────────
       - name: Checkout
@@ -62,22 +59,22 @@ jobs:
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
           vcpkgDirectory: '${{ github.workspace }}/vcpkg'
+          doNotCache: true
+        env:
+          VCPKG_BINARY_SOURCES: clear
 
-      - name: Create vcpkg binary cache directory
-        shell: bash
-        run: mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
-
-      - name: Cache vcpkg packages
+      - name: Cache vcpkg installed packages
         uses: actions/cache@v4
         with:
-          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: vcpkg-${{ matrix.rid }}-${{ hashFiles('src/Xbim.Geometry.Engine.Native/vcpkg.json') }}
-          restore-keys: vcpkg-${{ matrix.rid }}-
+          path: src/Xbim.Geometry.Engine.Native/build/vcpkg_installed
+          key: vcpkg-installed-${{ matrix.rid }}-${{ env.VCPKG_COMMIT }}-${{ hashFiles('src/Xbim.Geometry.Engine.Native/vcpkg.json', 'src/Xbim.Geometry.Engine.Native/triplets/release/*.cmake') }}
 
       # ── Native C++ build ──────────────────────────────────────────────
       - name: Configure native build
         shell: bash
         run: cmake --preset ${{ matrix.cmake-preset }} -S src/Xbim.Geometry.Engine.Native "-DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/src/Xbim.Geometry.Engine.Native/triplets/release"
+        env:
+          VCPKG_BINARY_SOURCES: clear
 
       - name: Dump vcpkg logs on failure
         if: failure()
