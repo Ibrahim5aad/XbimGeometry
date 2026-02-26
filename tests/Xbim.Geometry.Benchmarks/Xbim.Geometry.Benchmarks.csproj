@@ -53,7 +53,9 @@
        NativeBuildConfig selects Debug or Release native binaries (default: match managed Configuration). -->
   <PropertyGroup Condition="'$(EngineMode)' != 'Old'">
     <NativeBuildConfig Condition="'$(NativeBuildConfig)' == ''">$(Configuration)</NativeBuildConfig>
-    <NativeBuildDir>$(MSBuildThisFileDirectory)..\..\src\Xbim.Geometry.Engine.Native\build\$(NativeBuildConfig)\</NativeBuildDir>
+    <NativeCmakeBuildDir Condition="'$(NativeBuildConfig)' == 'Debug'">build-debug</NativeCmakeBuildDir>
+    <NativeCmakeBuildDir Condition="'$(NativeBuildConfig)' != 'Debug'">build</NativeCmakeBuildDir>
+    <NativeBuildDir>$(MSBuildThisFileDirectory)..\..\src\Xbim.Geometry.Engine.Native\$(NativeCmakeBuildDir)\$(NativeBuildConfig)\</NativeBuildDir>
   </PropertyGroup>
 
   <Target Name="CopyNativeDlls" AfterTargets="Build" Condition="'$(EngineMode)' != 'Old' And Exists('$(NativeBuildDir)xbim_geometry_native.dll')">

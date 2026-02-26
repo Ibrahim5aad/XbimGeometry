@@ -25,7 +25,7 @@ jobs:
             build-parallel: '-j $(nproc)'
           - os: windows-2022
             rid: win-x64
-            cmake-preset: win-x64
+            cmake-preset: win-x64-release
             build-parallel: '--parallel'
 
     runs-on: ${{ matrix.os }}
@@ -71,7 +71,21 @@ jobs:
       # ── Native C++ build ──────────────────────────────────────────────
       - name: Configure native build
         shell: bash
-        run: cmake --preset ${{ matrix.cmake-preset }} -S src/Xbim.Geometry.Engine.Native "-DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/src/Xbim.Geometry.Engine.Native/ci-triplets"
+        run: cmake --preset ${{ matrix.cmake-preset }} -S src/Xbim.Geometry.Engine.Native "-DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/src/Xbim.Geometry.Engine.Native/triplets/release"
+
+      - name: Dump vcpkg logs on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "=== vcpkg build logs ==="
+          for f in src/Xbim.Geometry.Engine.Native/build/vcpkg_installed/vcpkg/issue_body.md \
+                   vcpkg/buildtrees/opencascade/install-*-out.log \
+                   vcpkg/buildtrees/opencascade/config-*-out.log; do
+            if [ -f "$f" ]; then
+              echo "--- $f ---"
+              tail -80 "$f"
+            fi
+          done
 
       - name: Build native library
         shell: bash

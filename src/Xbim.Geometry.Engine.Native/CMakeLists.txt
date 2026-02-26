@@ -98,6 +98,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         -Wall
         -Wextra
         -fvisibility=hidden
+        -ftls-model=global-dynamic
     )
 endif()
 

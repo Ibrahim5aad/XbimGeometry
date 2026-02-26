@@ -17,7 +17,10 @@
   <!-- Native library build output directories (set via CMake build) -->
   <PropertyGroup>
     <NativeBuildRoot>$(MSBuildThisFileDirectory)..\Xbim.Geometry.Engine.Native\</NativeBuildRoot>
-    <WinX64NativeDir>$(NativeBuildRoot)build\Release\</WinX64NativeDir>
+    <NativeBuildConfig Condition="'$(NativeBuildConfig)' == ''">$(Configuration)</NativeBuildConfig>
+    <NativeCmakeBuildDir Condition="'$(NativeBuildConfig)' == 'Debug'">build-debug</NativeCmakeBuildDir>
+    <NativeCmakeBuildDir Condition="'$(NativeBuildConfig)' != 'Debug'">build</NativeCmakeBuildDir>
+    <WinX64NativeDir>$(NativeBuildRoot)$(NativeCmakeBuildDir)\$(NativeBuildConfig)\</WinX64NativeDir>
   </PropertyGroup>
 
   <ItemGroup>
@@ -81,6 +84,25 @@
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       <Visible>false</Visible>
     </None>
+  </ItemGroup>
+
+  <!-- Local dev: copy staged native libraries to output for project-reference consumers -->
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)runtimes\win-x64\native\xbim_geometry_native.dll')">
+    <Content Include="$(MSBuildThisFileDirectory)runtimes\win-x64\native\**\*">
+      <Link>runtimes\win-x64\native\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>false</Pack>
+      <Visible>false</Visible>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)runtimes/linux-x64/native/libxbim_geometry_native.so')">
+    <Content Include="$(MSBuildThisFileDirectory)runtimes/linux-x64/native/**/*">
+      <Link>runtimes/linux-x64/native/%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>false</Pack>
+      <Visible>false</Visible>
+    </Content>
   </ItemGroup>
 
   <!--

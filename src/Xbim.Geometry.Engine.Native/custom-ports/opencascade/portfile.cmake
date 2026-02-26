@@ -35,12 +35,13 @@ if("jemalloc" IN_LIST FEATURES)
 endif()
 
 # Build only the OCCT modules we actually use:
-#   FoundationClasses, ModelingData, ModelingAlgorithms, DataExchange
+#   FoundationClasses, ModelingData, ModelingAlgorithms,
+#   DataExchange, ApplicationFramework
+# DataExchange (TKDESTEP) depends on ApplicationFramework (TKCAF, TKLCAF, TKXCAF).
 # Disabled:
 #   Draw               — requires TCL
 #   DETools            — development/debugging tools
 #   Visualization      — OpenGL/X11 windowing (eliminates GL system dependency)
-#   ApplicationFramework — OCAF document framework
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
@@ -49,7 +50,6 @@ vcpkg_cmake_configure(
         -DBUILD_MODULE_Draw=OFF
         -DBUILD_MODULE_DETools=OFF
         -DBUILD_MODULE_Visualization=OFF
-        -DBUILD_MODULE_ApplicationFramework=OFF
         -DBUILD_DOC_Overview=OFF
         -DINSTALL_DIR_LAYOUT=Unix
         -DINSTALL_DIR_DOC=share/trash

@@ -45,23 +45,30 @@ function Check-Prereqs {
 
 # ── Native C++ build ────────────────────────────────────────────────────────
 function Build-Native {
-    if (-not (Test-Path $BuildDir)) {
-        Info "Configuring native build..."
-        cmake --preset win-x64 -S $NativeDir
+    $configLower = $Config.ToLower()
+    $preset      = "win-x64-$configLower"
+    $dir         = if ($Config -eq "Release") { $BuildDir } else { "$NativeDir\build-debug" }
+
+    if (-not (Test-Path $dir)) {
+        Info "Configuring native build ($Config)..."
+        cmake --preset $preset -S $NativeDir
+        if ($LASTEXITCODE -ne 0) { Fail "CMake configure failed." }
     } else {
         Info "Build directory exists, skipping configure (use -Clean to reconfigure)."
     }
 
     Info "Building native library ($Config)..."
-    cmake --build $BuildDir --config $Config
+    cmake --build $dir --config $Config
+    if ($LASTEXITCODE -ne 0) { Fail "CMake build failed." }
 
-    Ok "Native build complete: $BuildDir"
+    Ok "Native build complete: $dir"
 }
 
 # ── Stage native binaries into runtimes/win-x64/native/ ─────────────────────
 function Stage-Native {
+    $dir = if ($Config -eq "Release") { $BuildDir } else { "$NativeDir\build-debug" }
     Info "Staging native binaries for .NET..."
-    cmake --install $BuildDir --config $Config --prefix $InteropDir
+    cmake --install $dir --config $Config --prefix $InteropDir
     Ok "Staged to $InteropDir\runtimes\win-x64\native\"
 }
 
@@ -84,6 +91,8 @@ function Run-Tests {
 function Clean-All {
     Info "Cleaning build artifacts..."
     if (Test-Path $BuildDir)   { Remove-Item $BuildDir -Recurse -Force }
+    $DebugBuildDir = "$NativeDir\build-debug"
+    if (Test-Path $DebugBuildDir) { Remove-Item $DebugBuildDir -Recurse -Force }
     $runtimeDir = "$InteropDir\runtimes\win-x64"
     if (Test-Path $runtimeDir) { Remove-Item $runtimeDir -Recurse -Force }
     Get-ChildItem $RepoRoot -Include bin, obj -Recurse -Directory | Remove-Item -Recurse -Force
