@@ -1,6 +1,6 @@
 using Xbim.Geometry.Exceptions;
 
-namespace Xbim.Geometry.Engine.Interop.Rules
+namespace Xbim.Geometry.Engine.Rules
 {
     /// <summary>
     /// Thrown when an IFC entity violates a formal Where Rule defined in the IFC specification.

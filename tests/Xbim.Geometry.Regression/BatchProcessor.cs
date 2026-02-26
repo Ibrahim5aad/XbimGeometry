@@ -7,7 +7,7 @@ using System.IO;
 using System.Linq;
 using Xbim.Common;
 using Xbim.Common.Configuration;
-using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine;
 using Xbim.Ifc;
 using Xbim.Ifc4.Interfaces;
 using Xbim.IO.Memory;

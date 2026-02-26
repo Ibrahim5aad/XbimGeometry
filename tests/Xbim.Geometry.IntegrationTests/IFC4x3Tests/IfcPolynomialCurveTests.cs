@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine;
 using Xbim.Ifc4x3.GeometryResource;
 using Xbim.Ifc4x3;
 using Xbim.IO.Memory;

@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using Xbim.Geometry.Abstractions;
 
-namespace Xbim.Geometry.Engine.Interop.Primitives
+namespace Xbim.Geometry.Engine.Primitives
 {
     /// <summary>
     /// Pure C# implementation of <see cref="IXMatrix"/> for representing 4x4 transforms.

@@ -3,15 +3,15 @@ using Microsoft.Extensions.Logging;
 using Xbim.Common;
 using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Factories;
-using Xbim.Geometry.Engine.Interop.Tests.Helpers;
+using Xbim.Geometry.Engine.Factories;
+using Xbim.Geometry.Engine.Tests.Helpers;
 using Xbim.Geometry.WexBim;
 using Xbim.Ifc4;
 using Xbim.Ifc4.Interfaces;
 using Xbim.IO.Memory;
 using Xunit;
 
-namespace Xbim.Geometry.Engine.Interop.Tests;
+namespace Xbim.Geometry.Engine.Tests;
 
 public class WexBimTests
 {

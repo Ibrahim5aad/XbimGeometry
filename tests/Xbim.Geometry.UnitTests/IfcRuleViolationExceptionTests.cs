@@ -1,9 +1,9 @@
 using FluentAssertions;
-using Xbim.Geometry.Engine.Interop.Rules;
+using Xbim.Geometry.Engine.Rules;
 using Xbim.Geometry.Exceptions;
 using Xunit;
 
-namespace Xbim.Geometry.Engine.Interop.Tests;
+namespace Xbim.Geometry.Engine.Tests;
 
 public class IfcRuleViolationExceptionTests
 {

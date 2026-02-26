@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
-using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Engine.Internal;
 
-namespace Xbim.Geometry.Engine.Interop.Handles
+namespace Xbim.Geometry.Engine.Handles
 {
     /// <summary>
     /// A <see cref="SafeHandle"/> wrapping the native XbimLocationHandle.

@@ -2,7 +2,7 @@
 using Xbim.Geometry.Abstractions;
 using System.Linq;
 
-namespace Xbim.Geometry.Engine.Interop.BRepExtensions
+namespace Xbim.Geometry.Engine.BRepExtensions
 {
 
     /// <summary>

@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 
-namespace Xbim.Geometry.Engine.Interop.Configuration
+namespace Xbim.Geometry.Engine.Configuration
 {
     internal class GeometryEngineBuilder : IGeometryEngineBuilder
     {

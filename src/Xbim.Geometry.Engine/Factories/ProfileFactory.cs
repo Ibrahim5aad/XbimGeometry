@@ -4,16 +4,16 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Handles;
-using Xbim.Geometry.Engine.Interop.Internal;
-using Xbim.Geometry.Engine.Interop.Primitives;
-using Xbim.Geometry.Engine.Interop.Services;
-using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Engine.Handles;
+using Xbim.Geometry.Engine.Internal;
+using Xbim.Geometry.Engine.Primitives;
+using Xbim.Geometry.Engine.Services;
+using Xbim.Geometry.Engine.Shapes;
 using Xbim.Ifc4.Interfaces;
-using Xbim.Geometry.Engine.Interop.Rules;
+using Xbim.Geometry.Engine.Rules;
 using Xbim.Geometry.Exceptions;
 
-namespace Xbim.Geometry.Engine.Interop.Factories
+namespace Xbim.Geometry.Engine.Factories
 {
     /// <summary>
     /// Builds 2D profile faces from IFC profile definition entities (parametric, arbitrary,

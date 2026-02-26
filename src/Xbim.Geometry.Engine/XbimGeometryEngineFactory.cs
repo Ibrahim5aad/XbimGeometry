@@ -2,11 +2,11 @@
 using System;
 using Xbim.Common;
 using Xbim.Common.Configuration;
-using Xbim.Geometry.Engine.Interop.Configuration;
-using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Engine.Configuration;
+using Xbim.Geometry.Engine.Internal;
 using Xbim.Ifc4.Interfaces;
 
-namespace Xbim.Geometry.Engine.Interop
+namespace Xbim.Geometry.Engine
 {
     /// <summary>
     /// Factory used to create new <see cref="IXbimGeometryEngine"/> instances

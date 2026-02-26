@@ -1,4 +1,4 @@
-﻿namespace Xbim.Geometry.Engine.Interop.Configuration
+﻿namespace Xbim.Geometry.Engine.Configuration
 {
     /// <summary>
     /// Configuration options relating to the Geometry Engine

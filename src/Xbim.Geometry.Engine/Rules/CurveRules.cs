@@ -1,6 +1,6 @@
 using Xbim.Ifc4.Interfaces;
 
-namespace Xbim.Geometry.Engine.Interop.Rules
+namespace Xbim.Geometry.Engine.Rules
 {
     /// <summary>
     /// IFC Where Rule validators for curve entities.

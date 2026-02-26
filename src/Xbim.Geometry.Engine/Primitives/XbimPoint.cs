@@ -1,7 +1,7 @@
 using System;
 using Xbim.Common.Geometry;
 
-namespace Xbim.Geometry.Engine.Interop.Primitives
+namespace Xbim.Geometry.Engine.Primitives
 {
     internal sealed class XbimPoint : IXbimPoint
     {

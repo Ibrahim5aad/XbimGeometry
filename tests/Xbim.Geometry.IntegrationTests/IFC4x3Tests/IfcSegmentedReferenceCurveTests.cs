@@ -1,7 +1,7 @@
 ﻿using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine;
 using Xbim.Ifc4x3.GeometryResource;
 using Xbim.IO.Memory;
 using Xunit;

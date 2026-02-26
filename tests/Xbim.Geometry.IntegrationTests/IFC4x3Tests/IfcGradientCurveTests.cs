@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using System.Threading.Tasks.Sources;
 using Xbim.Common;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine;
 using Xbim.Ifc4x3;
 using Xbim.Ifc4x3.GeometricConstraintResource;
 using Xbim.Ifc4x3.GeometricModelResource;

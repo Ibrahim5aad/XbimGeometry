@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Linq;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine;
 using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
 using Xbim.IO.Memory;

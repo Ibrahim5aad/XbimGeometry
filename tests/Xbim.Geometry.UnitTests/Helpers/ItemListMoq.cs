@@ -3,7 +3,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using Xbim.Common;
 
-namespace Xbim.Geometry.Engine.Interop.Tests.Helpers;
+namespace Xbim.Geometry.Engine.Tests.Helpers;
 
 /// <summary>
 /// Minimal IItemSet implementation for mock IFC entities.

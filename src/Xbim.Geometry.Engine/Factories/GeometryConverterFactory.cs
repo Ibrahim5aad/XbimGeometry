@@ -1,10 +1,10 @@
 using Microsoft.Extensions.Logging;
 using Xbim.Common;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Services;
+using Xbim.Geometry.Engine.Services;
 using Xbim.Ifc4.Interfaces;
 
-namespace Xbim.Geometry.Engine.Interop.Factories
+namespace Xbim.Geometry.Engine.Factories
 {
     /// <summary>
     /// Creates geometry engine instances and model-level geometry services

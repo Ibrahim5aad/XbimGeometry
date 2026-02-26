@@ -1,5 +1,5 @@
 ﻿using System;
-using Xbim.Geometry.Engine.Interop.Configuration;
+using Xbim.Geometry.Engine.Configuration;
 
 
 namespace Xbim.Common.Configuration

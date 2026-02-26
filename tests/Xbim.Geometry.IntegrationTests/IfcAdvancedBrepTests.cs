@@ -6,7 +6,7 @@ using Xbim.Common;
 using Xbim.Common.Geometry;
 using Xbim.Ifc4.Interfaces;
 using Xbim.IO.Memory;
-using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine;
 using Xbim.Geometry.Exceptions;
 using Xbim.Geometry.Abstractions;
 

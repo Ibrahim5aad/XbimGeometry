@@ -1,7 +1,7 @@
 ﻿using FluentAssertions;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop;
-using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Engine;
+using Xbim.Geometry.Engine.Shapes;
 using Xbim.Ifc;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4x3.GeometricModelResource;

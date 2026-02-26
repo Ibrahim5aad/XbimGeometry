@@ -2,13 +2,13 @@ using System;
 using System.Collections.Generic;
 using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Handles;
-using Xbim.Geometry.Engine.Interop.Internal;
-using Xbim.Geometry.Engine.Interop.Primitives;
-using Xbim.Geometry.Engine.Interop.Services;
+using Xbim.Geometry.Engine.Handles;
+using Xbim.Geometry.Engine.Internal;
+using Xbim.Geometry.Engine.Primitives;
+using Xbim.Geometry.Engine.Services;
 using Xbim.Geometry.Exceptions;
 
-namespace Xbim.Geometry.Engine.Interop.Shapes
+namespace Xbim.Geometry.Engine.Shapes
 {
     /// <summary>
     /// Base implementation of <see cref="IXShape"/> and <see cref="IXbimGeometryObject"/>

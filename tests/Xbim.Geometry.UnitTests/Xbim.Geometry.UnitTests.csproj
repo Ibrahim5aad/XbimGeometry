@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <RootNamespace>Xbim.Geometry.Engine.Interop.Tests</RootNamespace>
+    <RootNamespace>Xbim.Geometry.Engine.Tests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -33,33 +33,24 @@
     <NativeCmakeBuildDir Condition="'$(NativeBuildConfig)' == 'Debug'">build-debug</NativeCmakeBuildDir>
     <NativeCmakeBuildDir Condition="'$(NativeBuildConfig)' != 'Debug'">build</NativeCmakeBuildDir>
     <NativeBuildDir>$(MSBuildThisFileDirectory)..\..\src\Xbim.Geometry.Engine.Native\$(NativeCmakeBuildDir)\$(NativeBuildConfig)\</NativeBuildDir>
-    <LinuxNativeDir>$(MSBuildThisFileDirectory)..\..\src\Xbim.Geometry.Engine\runtimes\linux-x64\native\</LinuxNativeDir>
   </PropertyGroup>
 
-  <!-- Windows: copy DLLs from CMake build output -->
-  <Target Name="CopyNativeDlls" AfterTargets="Build" Condition="Exists('$(NativeBuildDir)xbim_geometry_native.dll')">
-    <PropertyGroup>
-      <NativeOutputDir>$(TargetDir)runtimes\win-x64\native\</NativeOutputDir>
-    </PropertyGroup>
+  <Target Name="CopyNativeDlls" AfterTargets="Build"
+          Condition="Exists('$(NativeBuildDir)xbim_geometry_native.dll')">
     <ItemGroup>
       <NativeDlls Include="$(NativeBuildDir)*.dll" />
     </ItemGroup>
-    <MakeDir Directories="$(NativeOutputDir)" />
-    <Copy SourceFiles="@(NativeDlls)" DestinationFolder="$(NativeOutputDir)" SkipUnchangedFiles="true" />
-    <Message Importance="high" Text="Copied native DLLs to $(NativeOutputDir)" />
+    <MakeDir Directories="$(TargetDir)runtimes\win-x64\native\" />
+    <Copy SourceFiles="@(NativeDlls)" DestinationFolder="$(TargetDir)runtimes\win-x64\native\" SkipUnchangedFiles="true" />
   </Target>
 
-  <!-- Linux: copy .so files from cmake install output -->
-  <Target Name="CopyNativeSo" AfterTargets="Build" Condition="Exists('$(LinuxNativeDir)libxbim_geometry_native.so')">
-    <PropertyGroup>
-      <NativeOutputDir>$(TargetDir)runtimes/linux-x64/native/</NativeOutputDir>
-    </PropertyGroup>
+  <Target Name="CopyNativeSo" AfterTargets="Build"
+          Condition="Exists('$(NativeBuildDir)libxbim_geometry_native.so')">
     <ItemGroup>
-      <NativeSoFiles Include="$(LinuxNativeDir)*.so*" />
+      <NativeSoFiles Include="$(NativeBuildDir)*.so*" />
     </ItemGroup>
-    <MakeDir Directories="$(NativeOutputDir)" />
-    <Copy SourceFiles="@(NativeSoFiles)" DestinationFolder="$(NativeOutputDir)" SkipUnchangedFiles="true" />
-    <Message Importance="high" Text="Copied native .so files to $(NativeOutputDir)" />
+    <MakeDir Directories="$(TargetDir)runtimes\linux-x64\native\" />
+    <Copy SourceFiles="@(NativeSoFiles)" DestinationFolder="$(TargetDir)runtimes\linux-x64\native\" SkipUnchangedFiles="true" />
   </Target>
 
 </Project>

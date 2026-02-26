@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Xbim.Geometry.Engine.Interop.Internal
+namespace Xbim.Geometry.Engine.Internal
 {
     /// <summary>
     /// P/Invoke declarations for native handle destruction functions.

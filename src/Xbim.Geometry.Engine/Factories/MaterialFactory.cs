@@ -1,8 +1,8 @@
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Materials;
+using Xbim.Geometry.Engine.Materials;
 using Xbim.Ifc4.Interfaces;
 
-namespace Xbim.Geometry.Engine.Interop.Factories
+namespace Xbim.Geometry.Engine.Factories
 {
     /// <summary>
     /// Builds visual material and colour objects from IFC surface style definitions.

@@ -2,8 +2,8 @@
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop;
-using Xbim.Geometry.Engine.Interop.Factories;
+using Xbim.Geometry.Engine;
+using Xbim.Geometry.Engine.Factories;
 using Xbim.Ifc4.GeometricModelResource;
 using Xbim.Ifc4.GeometryResource;
 using Xbim.IO.Memory;

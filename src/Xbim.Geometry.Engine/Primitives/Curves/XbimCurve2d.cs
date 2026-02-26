@@ -4,11 +4,11 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Handles;
-using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Engine.Handles;
+using Xbim.Geometry.Engine.Internal;
 using Xbim.Geometry.Exceptions;
 
-namespace Xbim.Geometry.Engine.Interop.Primitives
+namespace Xbim.Geometry.Engine.Primitives
 {
     /// <summary>
     /// Wraps a native 2D curve handle (Geom2d_Curve), implementing <see cref="IXCurve"/>

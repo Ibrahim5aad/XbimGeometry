@@ -2,7 +2,7 @@ using System;
 using Xbim.Geometry.Abstractions;
 using Xbim.Ifc4.Interfaces;
 
-namespace Xbim.Geometry.Engine.Interop.Materials
+namespace Xbim.Geometry.Engine.Materials
 {
     /// <summary>
     /// Represents colour properties applied to a specific shape within a BRep document,

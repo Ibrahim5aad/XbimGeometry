@@ -1,6 +1,6 @@
 using Xbim.Geometry.Abstractions;
 
-namespace Xbim.Geometry.Engine.Interop.Primitives
+namespace Xbim.Geometry.Engine.Primitives
 {
     internal readonly struct XQuaternion : IXQuaternion
     {

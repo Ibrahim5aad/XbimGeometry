@@ -5,9 +5,9 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Engine.Internal;
 
-namespace Xbim.Geometry.Engine.Interop.Primitives
+namespace Xbim.Geometry.Engine.Primitives
 {
     /// <summary>
     /// Represents a 2D footprint projected from a 3D shape onto the XY plane.

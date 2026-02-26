@@ -1,11 +1,11 @@
 using System;
 using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Handles;
-using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Engine.Handles;
+using Xbim.Geometry.Engine.Internal;
 using Xbim.Geometry.Exceptions;
 
-namespace Xbim.Geometry.Engine.Interop.Shapes
+namespace Xbim.Geometry.Engine.Shapes
 {
     /// <summary>
     /// Factory for wrapping a <see cref="NativeShapeHandle"/> into the correct

@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using Xbim.Geometry.Engine.Interop.Handles;
+using Xbim.Geometry.Engine.Handles;
 
-namespace Xbim.Geometry.Engine.Interop.Internal
+namespace Xbim.Geometry.Engine.Internal
 {
     /// <summary>
     /// P/Invoke declarations for all xbim_geometry_native exported functions.

@@ -1,11 +1,11 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using Xbim.Geometry.Engine.Interop.Internal;
-using Xbim.Geometry.Engine.Interop.Services;
-using Xbim.Geometry.Engine.Interop.Tests.Helpers;
+using Xbim.Geometry.Engine.Internal;
+using Xbim.Geometry.Engine.Services;
+using Xbim.Geometry.Engine.Tests.Helpers;
 using Xunit;
 
-namespace Xbim.Geometry.Engine.Interop.Tests;
+namespace Xbim.Geometry.Engine.Tests;
 
 /// <summary>
 /// Verifies that native log events reach the managed ILogger with the correct

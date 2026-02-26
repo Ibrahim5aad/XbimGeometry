@@ -2,10 +2,10 @@ using System;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Handles;
-using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Engine.Handles;
+using Xbim.Geometry.Engine.Internal;
 
-namespace Xbim.Geometry.Engine.Interop.Services
+namespace Xbim.Geometry.Engine.Services
 {
     /// <summary>
     /// Managed logging service that bridges ILogger to the native XbimLogCallback.

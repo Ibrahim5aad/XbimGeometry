@@ -6,7 +6,7 @@ using System;
 using System.Diagnostics;
 using Xbim.Common.Configuration;
 
-namespace Xbim.Geometry.Engine.Interop.Internal
+namespace Xbim.Geometry.Engine.Internal
 {
     /// <summary>
     /// An Internal Service provider wrapping the <see cref="XbimServices"/> which supports fall back to a minimal services implementation when the consuming application

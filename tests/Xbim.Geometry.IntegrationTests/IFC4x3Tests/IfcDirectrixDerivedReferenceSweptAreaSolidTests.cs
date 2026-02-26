@@ -1,6 +1,6 @@
 using FluentAssertions;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine;
 using Xbim.Ifc4x3.GeometricModelResource;
 using Xbim.IO.Memory;
 using Xunit;

@@ -2,14 +2,14 @@ using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Handles;
-using Xbim.Geometry.Engine.Interop.Internal;
-using Xbim.Geometry.Engine.Interop.Primitives;
-using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Engine.Handles;
+using Xbim.Geometry.Engine.Internal;
+using Xbim.Geometry.Engine.Primitives;
+using Xbim.Geometry.Engine.Shapes;
 using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
 
-namespace Xbim.Geometry.Engine.Interop.Services
+namespace Xbim.Geometry.Engine.Services
 {
     /// <summary>
     /// Provides shape manipulation operations: boolean operations on shapes,

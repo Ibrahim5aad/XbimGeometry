@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Xbim.Geometry.Abstractions;
 
-namespace Xbim.Geometry.Engine.Interop.BRepExtensions
+namespace Xbim.Geometry.Engine.BRepExtensions
 {
     internal class ShapeEqualityComparer : IEqualityComparer<IXShape>
     {

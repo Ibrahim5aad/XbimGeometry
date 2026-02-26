@@ -1,14 +1,14 @@
 using System.Linq;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using Xbim.Geometry.Engine.Interop.Factories;
+using Xbim.Geometry.Engine.Factories;
 using Xbim.Ifc4x3;
 using Xbim.Ifc4x3.GeometryResource;
 using Xbim.Ifc4x3.MeasureResource;
 using Xbim.IO.Memory;
 using Xunit;
 
-namespace Xbim.Geometry.Engine.Interop.Tests;
+namespace Xbim.Geometry.Engine.Tests;
 
 /// <summary>
 /// Tests for IFC4x3 IfcPolynomialCurve support via the native polynomial curve builder.

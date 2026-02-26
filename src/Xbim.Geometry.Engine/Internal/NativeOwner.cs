@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace Xbim.Geometry.Engine.Interop.Internal
+namespace Xbim.Geometry.Engine.Internal
 {
     /// <summary>
     /// Base class for managed wrappers that own a single native <see cref="SafeHandle"/>.

@@ -5,11 +5,11 @@ using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
 #endif
 using Xbim.Geometry.Benchmarks.Infrastructure;
-using Xbim.Geometry.Engine.Interop;
-using Xbim.Geometry.Engine.Interop.Factories;
+using Xbim.Geometry.Engine;
+using Xbim.Geometry.Engine.Factories;
 using Xbim.Ifc4.Interfaces;
 using Xbim.IO.Memory;
-using static Xbim.Geometry.Engine.Interop.Factories.CurveFactory;
+using static Xbim.Geometry.Engine.Factories.CurveFactory;
 
 namespace Xbim.Geometry.Benchmarks.Benchmarks;
 

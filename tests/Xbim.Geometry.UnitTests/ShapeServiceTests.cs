@@ -2,12 +2,12 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Services;
-using Xbim.Geometry.Engine.Interop.Tests.Helpers;
+using Xbim.Geometry.Engine.Services;
+using Xbim.Geometry.Engine.Tests.Helpers;
 using Xbim.Ifc4.Interfaces;
 using Xunit;
 
-namespace Xbim.Geometry.Engine.Interop.Tests;
+namespace Xbim.Geometry.Engine.Tests;
 
 public class ShapeServiceTests : IDisposable
 {

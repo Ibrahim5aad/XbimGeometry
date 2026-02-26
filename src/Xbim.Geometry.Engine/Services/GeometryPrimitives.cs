@@ -1,8 +1,8 @@
 using System;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Primitives;
+using Xbim.Geometry.Engine.Primitives;
 
-namespace Xbim.Geometry.Engine.Interop.Services
+namespace Xbim.Geometry.Engine.Services
 {
     /// <summary>
     /// Factory for building geometry primitive objects (points, directions, locations,

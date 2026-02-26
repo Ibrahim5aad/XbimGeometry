@@ -1,14 +1,14 @@
 using FluentAssertions;
 using Moq;
 using Xbim.Common;
-using Xbim.Geometry.Engine.Interop.Rules;
-using Xbim.Geometry.Engine.Interop.Tests.Helpers;
+using Xbim.Geometry.Engine.Rules;
+using Xbim.Geometry.Engine.Tests.Helpers;
 using Xbim.Ifc4.GeometryResource;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4.MeasureResource;
 using Xunit;
 
-namespace Xbim.Geometry.Engine.Interop.Tests;
+namespace Xbim.Geometry.Engine.Tests;
 
 public class CurveRulesTests
 {

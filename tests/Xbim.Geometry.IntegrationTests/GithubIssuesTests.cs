@@ -4,7 +4,7 @@ using System.Diagnostics;
 using Xbim.Common.Geometry;
 using Xbim.Common.Model;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine;
 using Xbim.Ifc;
 using Xbim.Ifc4.Interfaces;
 using Xbim.IO.Memory;

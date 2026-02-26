@@ -1,11 +1,11 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Factories;
-using Xbim.Geometry.Engine.Interop.Tests.Helpers;
+using Xbim.Geometry.Engine.Factories;
+using Xbim.Geometry.Engine.Tests.Helpers;
 using Xunit;
 
-namespace Xbim.Geometry.Engine.Interop.Tests;
+namespace Xbim.Geometry.Engine.Tests;
 
 /// <summary>
 /// Tests for GeometryConverterFactory: verifies factory creation methods

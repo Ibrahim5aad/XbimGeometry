@@ -5,11 +5,11 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Xbim.Common.Geometry;
-using Xbim.Geometry.Engine.Interop.Handles;
-using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Engine.Handles;
+using Xbim.Geometry.Engine.Internal;
 using Xbim.Geometry.Exceptions;
 
-namespace Xbim.Geometry.Engine.Interop.Shapes
+namespace Xbim.Geometry.Engine.Shapes
 {
     /// <summary>
     /// Mixed collection of geometry objects implementing <see cref="IXbimGeometryObjectSet"/>.

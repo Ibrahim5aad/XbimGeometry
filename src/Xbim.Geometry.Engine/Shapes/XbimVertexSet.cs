@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Xbim.Common.Geometry;
 
-namespace Xbim.Geometry.Engine.Interop.Shapes
+namespace Xbim.Geometry.Engine.Shapes
 {
     /// <summary>
     /// Collection of vertices implementing <see cref="IXbimVertexSet"/>.

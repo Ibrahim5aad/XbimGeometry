@@ -11,13 +11,13 @@ using Xbim.Common.Exceptions;
 using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Abstractions.Extensions;
-using Xbim.Geometry.Engine.Interop.Configuration;
-using Xbim.Geometry.Engine.Interop.Factories;
-using Xbim.Geometry.Engine.Interop.Handles;
-using Xbim.Geometry.Engine.Interop.Internal;
-using Xbim.Geometry.Engine.Interop.Primitives;
-using Xbim.Geometry.Engine.Interop.Services;
-using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Engine.Configuration;
+using Xbim.Geometry.Engine.Factories;
+using Xbim.Geometry.Engine.Handles;
+using Xbim.Geometry.Engine.Internal;
+using Xbim.Geometry.Engine.Primitives;
+using Xbim.Geometry.Engine.Services;
+using Xbim.Geometry.Engine.Shapes;
 using Xbim.Geometry.Exceptions;
 using Xbim.Geometry.WexBim;
 using Xbim.Ifc;
@@ -26,7 +26,7 @@ using Xbim.Ifc4.Interfaces;
 
 
 
-namespace Xbim.Geometry.Engine.Interop
+namespace Xbim.Geometry.Engine
 {
     /// <summary>
     /// The xbim Geometry Engine.

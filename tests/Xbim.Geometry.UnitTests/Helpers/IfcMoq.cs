@@ -9,7 +9,7 @@ using Xbim.Ifc4.MeasureResource;
 using Xbim.Ifc4.ProfileResource;
 using Xbim.Ifc4.TopologyResource;
 
-namespace Xbim.Geometry.Engine.Interop.Tests.Helpers;
+namespace Xbim.Geometry.Engine.Tests.Helpers;
 
 /// <summary>
 /// Lightweight mock creators for IFC entities used in CSG primitive and profile tests.

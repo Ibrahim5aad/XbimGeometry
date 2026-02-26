@@ -6,7 +6,7 @@ using System.IO;
 using System.Linq;
 using Xbim.Common.Geometry;
 using Xbim.Common.XbimExtensions;
-using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine;
 using Xbim.Ifc4.GeometricConstraintResource;
 using Xbim.Ifc4.GeometryResource;
 using Xbim.Ifc4.Interfaces;

@@ -1,12 +1,12 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using Xbim.Geometry.Engine.Interop.Handles;
-using Xbim.Geometry.Engine.Interop.Internal;
-using Xbim.Geometry.Engine.Interop.Services;
-using Xbim.Geometry.Engine.Interop.Tests.Helpers;
+using Xbim.Geometry.Engine.Handles;
+using Xbim.Geometry.Engine.Internal;
+using Xbim.Geometry.Engine.Services;
+using Xbim.Geometry.Engine.Tests.Helpers;
 using Xunit;
 
-namespace Xbim.Geometry.Engine.Interop.Tests;
+namespace Xbim.Geometry.Engine.Tests;
 
 /// <summary>
 /// Tests for segmented reference curve construction via the native C API.

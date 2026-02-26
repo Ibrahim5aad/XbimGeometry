@@ -3,7 +3,7 @@ using Xbim.Common;
 using Xbim.Common.Metadata;
 using Xbim.Ifc4;
 
-namespace Xbim.Geometry.Engine.Interop.Tests.Helpers;
+namespace Xbim.Geometry.Engine.Tests.Helpers;
 
 /// <summary>
 /// Default value provider for Moq that produces IItemSet implementations

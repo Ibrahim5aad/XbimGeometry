@@ -13,7 +13,7 @@ using Xbim.Ifc4.GeometryResource;
 using Xbim.Ifc4.Interfaces;
 using Xbim.IO.Memory;
 using Xbim.Geometry.Engine.Tests;
-using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine;
 
 namespace Xbim.Geometry.Engine.Tests
 {

@@ -4,10 +4,10 @@ using Microsoft.Extensions.Logging;
 using System;
 using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop;
-using Xbim.Geometry.Engine.Interop.Configuration;
-using Xbim.Geometry.Engine.Interop.Factories;
-using Xbim.Geometry.Engine.Interop.Services;
+using Xbim.Geometry.Engine;
+using Xbim.Geometry.Engine.Configuration;
+using Xbim.Geometry.Engine.Factories;
+using Xbim.Geometry.Engine.Services;
 using Xbim.Ifc4.Interfaces;
 
 namespace Xbim.Common.Configuration

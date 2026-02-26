@@ -1,9 +1,9 @@
 using System;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Services;
+using Xbim.Geometry.Engine.Services;
 
-namespace Xbim.Geometry.Engine.Interop.Factories
+namespace Xbim.Geometry.Engine.Factories
 {
     /// <summary>
     /// Builds shell shapes from collections of faces. Shells represent

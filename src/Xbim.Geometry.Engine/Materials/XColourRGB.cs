@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Xbim.Geometry.Abstractions;
 
-namespace Xbim.Geometry.Engine.Interop.Materials
+namespace Xbim.Geometry.Engine.Materials
 {
     /// <summary>
     /// Represents an RGB colour with components in the 0.0 to 1.0 range.

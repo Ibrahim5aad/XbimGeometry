@@ -2,11 +2,11 @@ using System;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Internal;
-using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Engine.Internal;
+using Xbim.Geometry.Engine.Shapes;
 using Xbim.Geometry.Exceptions;
 
-namespace Xbim.Geometry.Engine.Interop.Services
+namespace Xbim.Geometry.Engine.Services
 {
     /// <summary>
     /// Serializes and deserializes shapes to/from compact binary format

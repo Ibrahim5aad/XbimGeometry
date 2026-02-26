@@ -1,8 +1,8 @@
 ﻿using System;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Handles;
+using Xbim.Geometry.Engine.Handles;
 
-namespace Xbim.Geometry.Engine.Interop.Primitives
+namespace Xbim.Geometry.Engine.Primitives
 {
     /// <summary>
     /// Wraps a native 3D trimmed curve with a reference to its basis curve.

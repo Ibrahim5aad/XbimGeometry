@@ -7,7 +7,7 @@ using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4.MeasureResource;
 using Xbim.Ifc4.ProfileResource;
 
-namespace Xbim.Geometry.Engine.Interop.Tests.Helpers;
+namespace Xbim.Geometry.Engine.Tests.Helpers;
 
 /// <summary>
 /// Additional mock creators migrated from IntegrationTests MoqCreators.

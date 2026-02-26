@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Linq;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4;
 using Xbim.IO.Memory;

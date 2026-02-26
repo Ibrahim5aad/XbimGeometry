@@ -1,12 +1,12 @@
 using System;
 using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Handles;
-using Xbim.Geometry.Engine.Interop.Internal;
-using Xbim.Geometry.Engine.Interop.Primitives;
+using Xbim.Geometry.Engine.Handles;
+using Xbim.Geometry.Engine.Internal;
+using Xbim.Geometry.Engine.Primitives;
 using Xbim.Geometry.Exceptions;
 
-namespace Xbim.Geometry.Engine.Interop.Shapes
+namespace Xbim.Geometry.Engine.Shapes
 {
     /// <summary>
     /// Represents an edge shape (TopoDS_Edge), implementing <see cref="IXEdge"/>

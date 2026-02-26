@@ -1,10 +1,10 @@
 using System;
 using System.Linq;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Handles;
-using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Engine.Handles;
+using Xbim.Geometry.Engine.Internal;
 
-namespace Xbim.Geometry.Engine.Interop.Shapes
+namespace Xbim.Geometry.Engine.Shapes
 {
     /// <summary>
     /// Implementation of <see cref="IXCompound"/> backed by a <see cref="NativeShapeHandle"/>

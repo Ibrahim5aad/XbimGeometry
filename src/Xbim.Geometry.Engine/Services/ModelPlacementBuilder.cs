@@ -2,13 +2,13 @@ using System;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Factories;
-using Xbim.Geometry.Engine.Interop.Primitives;
+using Xbim.Geometry.Engine.Factories;
+using Xbim.Geometry.Engine.Primitives;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4x3.GeometricConstraintResource;
 using Xbim.Ifc4x3.GeometryResource;
 
-namespace Xbim.Geometry.Engine.Interop.Services
+namespace Xbim.Geometry.Engine.Services
 {
     /// <summary>
     /// Analyses an IFC model's placement tree to identify the world coordinate system

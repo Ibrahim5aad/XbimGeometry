@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using System.Drawing;
 using System.Security.Cryptography;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine;
 using Xbim.Ifc4;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4x3;

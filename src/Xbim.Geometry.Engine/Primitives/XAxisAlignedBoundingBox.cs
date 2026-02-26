@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using Xbim.Geometry.Abstractions;
 
-namespace Xbim.Geometry.Engine.Interop.Primitives
+namespace Xbim.Geometry.Engine.Primitives
 {
     internal class XAxisAlignedBoundingBox : IXAxisAlignedBoundingBox
     {

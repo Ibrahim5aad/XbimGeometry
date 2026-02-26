@@ -1,4 +1,4 @@
-namespace Xbim.Geometry.Engine.Interop.Rules
+namespace Xbim.Geometry.Engine.Rules
 {
     /// <summary>
     /// IFC Where Rule validators for solid model entities.

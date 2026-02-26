@@ -1,12 +1,12 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Services;
-using Xbim.Geometry.Engine.Interop.Shapes;
-using Xbim.Geometry.Engine.Interop.Tests.Helpers;
+using Xbim.Geometry.Engine.Services;
+using Xbim.Geometry.Engine.Shapes;
+using Xbim.Geometry.Engine.Tests.Helpers;
 using Xunit;
 
-namespace Xbim.Geometry.Engine.Interop.Tests;
+namespace Xbim.Geometry.Engine.Tests;
 
 /// <summary>
 /// Tests swept area solid operations via the full P/Invoke path:

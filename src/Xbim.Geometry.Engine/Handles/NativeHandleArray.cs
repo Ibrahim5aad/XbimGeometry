@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Xbim.Geometry.Engine.Interop.Handles
+namespace Xbim.Geometry.Engine.Handles
 {
     /// <summary>
     /// Safely extracts raw pointers from an array of <see cref="SafeHandle"/> instances

@@ -2,12 +2,12 @@ using System;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Internal;
-using Xbim.Geometry.Engine.Interop.Primitives;
-using Xbim.Geometry.Engine.Interop.Services;
-using Xbim.Geometry.Engine.Interop.Shapes;
+using Xbim.Geometry.Engine.Internal;
+using Xbim.Geometry.Engine.Primitives;
+using Xbim.Geometry.Engine.Services;
+using Xbim.Geometry.Engine.Shapes;
 
-namespace Xbim.Geometry.Engine.Interop.Factories
+namespace Xbim.Geometry.Engine.Factories
 {
     /// <summary>
     /// Creates WexBim mesh byte buffers from 3D shapes, including triangulation,

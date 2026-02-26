@@ -1,6 +1,6 @@
-using Xbim.Geometry.Engine.Interop.Internal;
+using Xbim.Geometry.Engine.Internal;
 
-namespace Xbim.Geometry.Engine.Interop
+namespace Xbim.Geometry.Engine
 {
     /// <summary>
     /// Conventions for locating platform-specific native binaries.

@@ -1,7 +1,7 @@
 using System;
 using Xbim.Geometry.Abstractions;
 
-namespace Xbim.Geometry.Engine.Interop.Services
+namespace Xbim.Geometry.Engine.Services
 {
     /// <summary>
     /// Mesh tessellation parameters.

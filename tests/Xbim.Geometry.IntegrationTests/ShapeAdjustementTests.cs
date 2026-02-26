@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Xbim.Common.Geometry;
-using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine;
 using Xbim.Ifc4.GeometryResource;
 using Xbim.Ifc4.ProfileResource;
 using Xbim.IO.Memory;

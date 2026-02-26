@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Xbim.Geometry.Abstractions;
 
-namespace Xbim.Geometry.Engine.Interop.Primitives
+namespace Xbim.Geometry.Engine.Primitives
 {
     /// <summary>
     /// A closed loop of 2D points forming a polygon ring.

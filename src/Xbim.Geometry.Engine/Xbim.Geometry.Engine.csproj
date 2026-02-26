@@ -6,7 +6,7 @@
     <Description>Cross-platform geometry engine for xBIM, backed by OpenCASCADE.</Description>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <PackageId>Xbim.Geometry.Engine</PackageId>
-    <RootNamespace>Xbim.Geometry.Engine.Interop</RootNamespace>
+    <RootNamespace>Xbim.Geometry.Engine</RootNamespace>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

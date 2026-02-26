@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Abstractions.WexBim;
-using Xbim.Geometry.Engine.Interop.Primitives;
+using Xbim.Geometry.Engine.Primitives;
 
 namespace Xbim.Geometry.WexBim
 {

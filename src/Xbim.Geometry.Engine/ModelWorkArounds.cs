@@ -7,7 +7,7 @@ using Xbim.Geometry.Abstractions;
 using Xbim.Ifc4.Interfaces;
 using Microsoft.Extensions.Logging;
 
-namespace Xbim.Geometry.Engine.Interop
+namespace Xbim.Geometry.Engine
 {
     /// <summary>
     /// Extension methods for <see cref="IModel"/>s applying workarounds for known issues in varuous authoring tool versions

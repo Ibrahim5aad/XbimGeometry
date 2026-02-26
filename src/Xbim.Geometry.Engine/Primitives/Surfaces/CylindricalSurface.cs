@@ -1,9 +1,9 @@
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Handles;
-using Xbim.Geometry.Engine.Interop.Primitives;
+using Xbim.Geometry.Engine.Handles;
+using Xbim.Geometry.Engine.Primitives;
 
 
-namespace Xbim.Geometry.Engine.Interop.Primitives;
+namespace Xbim.Geometry.Engine.Primitives;
 
 internal class CylindricalSurface : Surface, IXCylindricalSurface
 {

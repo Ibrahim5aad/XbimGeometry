@@ -1,7 +1,7 @@
 using Xbim.Geometry.Abstractions;
-using Xbim.Geometry.Engine.Interop.Handles;
+using Xbim.Geometry.Engine.Handles;
 
-namespace Xbim.Geometry.Engine.Interop.Primitives;
+namespace Xbim.Geometry.Engine.Primitives;
 
 internal class SphericalSurface : Surface, IXSphericalSurface
 {
