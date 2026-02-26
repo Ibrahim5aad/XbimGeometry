@@ -103,18 +103,18 @@ jobs:
 
       - name: Pack Windows runtime package
         run: |
-          cd staging
-          nuget pack ../nuget/Xbim.Geometry.Engine.Native.runtime.win-x64.nuspec \
+          nuget pack nuget/Xbim.Geometry.Engine.Native.runtime.win-x64.nuspec \
+            -BasePath staging \
             -Version ${{ steps.version.outputs.VERSION }} \
-            -OutputDirectory ../packages
+            -OutputDirectory packages
         shell: bash
 
       - name: Pack Linux runtime package
         run: |
-          cd staging
-          nuget pack ../nuget/Xbim.Geometry.Engine.Native.runtime.linux-x64.nuspec \
+          nuget pack nuget/Xbim.Geometry.Engine.Native.runtime.linux-x64.nuspec \
+            -BasePath staging \
             -Version ${{ steps.version.outputs.VERSION }} \
-            -OutputDirectory ../packages
+            -OutputDirectory packages
         shell: bash
 
       # ── Pack managed Interop package with runtime deps ────────────────
