@@ -37,11 +37,15 @@ endif()
 # Build only the OCCT modules we actually use:
 #   FoundationClasses, ModelingData, ModelingAlgorithms,
 #   DataExchange, ApplicationFramework
-# DataExchange (TKDESTEP) depends on ApplicationFramework (TKCAF, TKLCAF, TKXCAF).
-# Disabled:
+# DataExchange (TKDESTEP) depends on ApplicationFramework (TKCAF, TKLCAF, TKXCAF),
+# which transitively depends on TKService/TKV3d from Visualization.
+# We disable the Visualization module but those toolkits are still built as
+# transitive deps. USE_XLIB=OFF and USE_OPENGL=OFF prevent X11/GL headers
+# being required for TKService on Linux.
+# Disabled modules:
 #   Draw               — requires TCL
 #   DETools            — development/debugging tools
-#   Visualization      — OpenGL/X11 windowing (eliminates GL system dependency)
+#   Visualization      — OpenGL/X11 windowing
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
@@ -50,6 +54,8 @@ vcpkg_cmake_configure(
         -DBUILD_MODULE_Draw=OFF
         -DBUILD_MODULE_DETools=OFF
         -DBUILD_MODULE_Visualization=OFF
+        -DUSE_XLIB=OFF
+        -DUSE_OPENGL=OFF
         -DBUILD_DOC_Overview=OFF
         -DINSTALL_DIR_LAYOUT=Unix
         -DINSTALL_DIR_DOC=share/trash
