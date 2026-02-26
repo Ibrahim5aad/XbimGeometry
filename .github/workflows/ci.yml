@@ -67,7 +67,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: src/Xbim.Geometry.Engine.Native/build/vcpkg_installed
-          key: vcpkg-installed-${{ matrix.rid }}-${{ env.VCPKG_COMMIT }}-${{ hashFiles('src/Xbim.Geometry.Engine.Native/vcpkg.json', 'src/Xbim.Geometry.Engine.Native/triplets/release/*.cmake') }}
+          key: vcpkg-installed-${{ matrix.rid }}-${{ env.VCPKG_COMMIT }}-${{ hashFiles('src/Xbim.Geometry.Engine.Native/vcpkg.json', 'src/Xbim.Geometry.Engine.Native/vcpkg-configuration.json', 'src/Xbim.Geometry.Engine.Native/custom-ports/**', 'src/Xbim.Geometry.Engine.Native/triplets/release/*.cmake') }}
 
       # ── Native C++ build ──────────────────────────────────────────────
       - name: Configure native build
