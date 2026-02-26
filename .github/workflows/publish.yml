@@ -3,6 +3,11 @@ name: Publish NuGet
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 7.0.0-alpha.1)'
+        required: true
 
 permissions:
   actions: read
@@ -27,13 +32,17 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       # ── Extract version from tag ─────────────────────────────────────
-      - name: Extract version from tag
+      - name: Extract version
         id: version
         shell: bash
         run: |
-          TAG="${GITHUB_REF#refs/tags/v}"
-          echo "VERSION=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Packaging version: $TAG"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Packaging version: $VERSION"
 
       # ── Download native artifacts from the CI run for this commit ─────
       - name: Find successful CI run
