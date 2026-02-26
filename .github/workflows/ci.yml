@@ -18,7 +18,7 @@ on:
 env:
   BUILD_CONFIG: Release
   DOTNET_VERSION: '8.0.x'
-  VCPKG_COMMIT: 'b322364f06308bdd24823f9d8f03fe0cc86fd46f'  # 2024.12.16
+  VCPKG_COMMIT: 'b42b19a62b63514ed9fa2a81e07ce75e613c83c0'  # 2025.02.18
   GLIBC_TUNABLES: glibc.rtld.optional_static_tls=2048
   
 jobs:
@@ -117,16 +117,6 @@ jobs:
 
       - name: Build .NET
         run: dotnet build Xbim.Geometry.Engine.sln -c ${{ env.BUILD_CONFIG }} --no-restore
-
-      - name: Ensure native libraries in test output
-        shell: bash
-        run: |
-          native_src="src/Xbim.Geometry.Engine/runtimes/${{ matrix.rid }}/native"
-          for test_dir in tests/Xbim.Geometry.UnitTests tests/Xbim.Geometry.IntegrationTests; do
-            dest="$test_dir/bin/${{ env.BUILD_CONFIG }}/net8.0/runtimes/${{ matrix.rid }}/native"
-            mkdir -p "$dest"
-            cp -v "$native_src"/* "$dest/" 2>/dev/null || echo "NOTE: no files to copy to $dest"
-          done
 
       - name: Run unit tests
         shell: bash
