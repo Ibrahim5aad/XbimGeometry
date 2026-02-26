@@ -9,3 +9,9 @@ set(VCPKG_BUILD_TYPE release)
 if(PORT STREQUAL "jemalloc")
     set(VCPKG_LIBRARY_LINKAGE static)
 endif()
+
+
+if(PORT STREQUAL "opencascade")
+    set(VCPKG_CXX_FLAGS "-ftls-model=global-dynamic")
+    set(VCPKG_C_FLAGS "-ftls-model=global-dynamic")
+endif()
