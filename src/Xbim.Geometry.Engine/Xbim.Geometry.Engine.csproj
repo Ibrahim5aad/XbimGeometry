@@ -14,15 +14,6 @@
     <NoWarn>$(NoWarn);NU1900;CS8600;CS8602;CS8603;CS8604;CS8618;CS8625;CS8714;CS8767</NoWarn>
   </PropertyGroup>
 
-  <!-- Native library build output directories (set via CMake build) -->
-  <PropertyGroup>
-    <NativeBuildRoot>$(MSBuildThisFileDirectory)..\Xbim.Geometry.Engine.Native\</NativeBuildRoot>
-    <NativeBuildConfig Condition="'$(NativeBuildConfig)' == ''">$(Configuration)</NativeBuildConfig>
-    <NativeCmakeBuildDir Condition="'$(NativeBuildConfig)' == 'Debug'">build-debug</NativeCmakeBuildDir>
-    <NativeCmakeBuildDir Condition="'$(NativeBuildConfig)' != 'Debug'">build</NativeCmakeBuildDir>
-    <WinX64NativeDir>$(NativeBuildRoot)$(NativeCmakeBuildDir)\$(NativeBuildConfig)\</WinX64NativeDir>
-  </PropertyGroup>
-
   <ItemGroup>
     <InternalsVisibleTo Include="Xbim.Geometry.UnitTests, PublicKey=002400000480000094000000060200000024000052534131000400000100010029a3c6da60efcb3ebe48c3ce14a169b5fa08ffbf5f276392ffb2006a9a2d596f5929cf0e68568d14ac7cbe334440ca0b182be7fa6896d2a73036f24bca081b2427a8dec5689a97f3d62547acd5d471ee9f379540f338bbb0ae6a165b44b1ae34405624baa4388404bce6d3e30de128cec379147af363ce9c5845f4f92d405ed0" />
     <InternalsVisibleTo Include="Xbim.Geometry.IntegrationTests, PublicKey=002400000480000094000000060200000024000052534131000400000100010029a3c6da60efcb3ebe48c3ce14a169b5fa08ffbf5f276392ffb2006a9a2d596f5929cf0e68568d14ac7cbe334440ca0b182be7fa6896d2a73036f24bca081b2427a8dec5689a97f3d62547acd5d471ee9f379540f338bbb0ae6a165b44b1ae34405624baa4388404bce6d3e30de128cec379147af363ce9c5845f4f92d405ed0" />
@@ -56,8 +47,10 @@
       Natives live in separate runtime NuGet packages. This package declares
       dependencies on them so NuGet resolves the correct runtimes/{rid}/native/ at build time.
 
-    Local dev pack (default):
-      Embeds native binaries directly from the CMake build output (single platform).
+    Local dev (default):
+      'cmake install' stages binaries into runtimes/{rid}/native/ inside this project dir.
+      The Content items below serve both dotnet pack (Pack=true) and project-reference consumers
+      (CopyToOutputDirectory=PreserveNewest propagates transitively).
   -->
 
   <!-- CI pack: depend on per-platform native runtime packages -->
@@ -66,43 +59,15 @@
     <PackageReference Include="Xbim.Geometry.Engine.Native.runtime.linux-x64" Version="$(Version)" PrivateAssets="none" />
   </ItemGroup>
 
-  <!-- Local dev pack: embed Windows x64 native libraries from CMake build output -->
-  <ItemGroup Condition="'$(IncludeNativeRuntimeDependencies)' != 'true' And Exists('$(WinX64NativeDir)xbim_geometry_native.dll')">
-    <None Include="$(WinX64NativeDir)*.dll" Exclude="$(WinX64NativeDir)test_*.exe">
-      <Pack>true</Pack>
-      <PackagePath>runtimes/win-x64/native/</PackagePath>
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-      <Visible>false</Visible>
-    </None>
-  </ItemGroup>
-
-  <!-- Local dev pack: embed Linux x64 native libraries from CMake build output -->
-  <ItemGroup Condition="'$(IncludeNativeRuntimeDependencies)' != 'true' And Exists('$(NativeBuildRoot)build/Release/libxbim_geometry_native.so')">
-    <None Include="$(NativeBuildRoot)build/Release/*.so*">
-      <Pack>true</Pack>
-      <PackagePath>runtimes/linux-x64/native/</PackagePath>
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-      <Visible>false</Visible>
-    </None>
-  </ItemGroup>
-
-  <!-- Local dev: copy staged native libraries to output for project-reference consumers -->
-  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)runtimes\win-x64\native\xbim_geometry_native.dll')">
-    <Content Include="$(MSBuildThisFileDirectory)runtimes\win-x64\native\**\*">
-      <Link>runtimes\win-x64\native\%(RecursiveDir)%(Filename)%(Extension)</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>false</Pack>
-      <Visible>false</Visible>
-    </Content>
-  </ItemGroup>
-
-  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)runtimes/linux-x64/native/libxbim_geometry_native.so')">
-    <Content Include="$(MSBuildThisFileDirectory)runtimes/linux-x64/native/**/*">
-      <Link>runtimes/linux-x64/native/%(RecursiveDir)%(Filename)%(Extension)</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>false</Pack>
-      <Visible>false</Visible>
-    </Content>
+  <!-- Local dev: staged by 'cmake install', serves both dotnet pack and project-reference consumers -->
+  <ItemGroup Condition="'$(IncludeNativeRuntimeDependencies)' != 'true'">
+    <Content Include="runtimes\**\*"
+             Condition="Exists('$(MSBuildThisFileDirectory)runtimes\')"
+             Pack="true"
+             PackagePath="runtimes\"
+             Link="runtimes\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             Visible="false" />
   </ItemGroup>
 
   <!--

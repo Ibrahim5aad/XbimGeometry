@@ -617,30 +617,5 @@
 		<ProjectReference Include="..\..\src\Xbim.Tessellator\Xbim.Tessellator.csproj" />
 	</ItemGroup>
 
-	<!-- Copy native libraries from CMake build output after build -->
-	<PropertyGroup>
-		<NativeBuildConfig Condition="'$(NativeBuildConfig)' == ''">$(Configuration)</NativeBuildConfig>
-		<NativeCmakeBuildDir Condition="'$(NativeBuildConfig)' == 'Debug'">build-debug</NativeCmakeBuildDir>
-		<NativeCmakeBuildDir Condition="'$(NativeBuildConfig)' != 'Debug'">build</NativeCmakeBuildDir>
-		<NativeBuildDir>$(MSBuildThisFileDirectory)..\..\src\Xbim.Geometry.Engine.Native\$(NativeCmakeBuildDir)\$(NativeBuildConfig)\</NativeBuildDir>
-	</PropertyGroup>
-
-	<Target Name="CopyNativeDlls" AfterTargets="Build"
-	        Condition="Exists('$(NativeBuildDir)xbim_geometry_native.dll')">
-		<ItemGroup>
-			<NativeDlls Include="$(NativeBuildDir)*.dll" />
-		</ItemGroup>
-		<MakeDir Directories="$(TargetDir)runtimes\win-x64\native\" />
-		<Copy SourceFiles="@(NativeDlls)" DestinationFolder="$(TargetDir)runtimes\win-x64\native\" SkipUnchangedFiles="true" />
-	</Target>
-
-	<Target Name="CopyNativeSo" AfterTargets="Build"
-	        Condition="Exists('$(NativeBuildDir)libxbim_geometry_native.so')">
-		<ItemGroup>
-			<NativeSoFiles Include="$(NativeBuildDir)*.so*" />
-		</ItemGroup>
-		<MakeDir Directories="$(TargetDir)runtimes\linux-x64\native\" />
-		<Copy SourceFiles="@(NativeSoFiles)" DestinationFolder="$(TargetDir)runtimes\linux-x64\native\" SkipUnchangedFiles="true" />
-	</Target>
 
 </Project>

@@ -194,27 +194,38 @@ Helper scripts handle the full native + managed + test pipeline:
 
 If you prefer running the steps yourself:
 
-**Native library (Windows):**
+**1. Build the native library:**
+
 ```bash
 cd src/Xbim.Geometry.Engine.Native
+
+# Windows
 cmake --preset win-x64-release
 cmake --build build --config Release
-```
 
-**Native library (Linux):**
-```bash
-cd src/Xbim.Geometry.Engine.Native
+# Linux
 cmake --preset linux-x64-release
-cmake --build build --config Release
+cmake --build build --config Release -j $(nproc)
 ```
 
-**Managed solution:**
+For Debug builds, use the `win-x64-debug` / `linux-x64-debug` preset (output goes to `build-debug/`).
+
+**2. Stage native binaries for .NET:**
+
 ```bash
+cmake --install build --config Release --prefix ../Xbim.Geometry.Engine
+```
+
+This copies the native library and its OCCT dependencies into
+`src/Xbim.Geometry.Engine/runtimes/{rid}/native/`. The Engine project's
+`Content` items pick them up from there — both for `dotnet pack` and for
+transitive copy to test project output directories via `ProjectReference`.
+
+**3. Build and test the managed solution:**
+
+```bash
+cd ../..   # back to repo root
 dotnet build Xbim.Geometry.Engine.sln
-```
-
-**Tests:**
-```bash
 dotnet test Xbim.Geometry.Engine.sln
 ```
 
