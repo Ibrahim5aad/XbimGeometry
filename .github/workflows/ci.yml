@@ -51,7 +51,7 @@ jobs:
       # ── Linux: install native build tools ─────────────────────────────
       - name: Install native build tools
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++ pkg-config
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++ pkg-config autoconf autoconf-archive automake libtool
 
       # ── vcpkg setup + caching ─────────────────────────────────────────
       - name: Setup vcpkg
