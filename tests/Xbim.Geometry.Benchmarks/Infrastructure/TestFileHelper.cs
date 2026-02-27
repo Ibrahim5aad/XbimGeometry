@@ -12,6 +12,14 @@ public static class TestFileHelper
     /// </summary>
     public static string Resolve(string relativePath)
     {
+        // Support absolute paths for external test files
+        if (Path.IsPathRooted(relativePath))
+        {
+            if (!File.Exists(relativePath))
+                throw new FileNotFoundException($"Test file not found: {relativePath}", relativePath);
+            return relativePath;
+        }
+
         var baseDir = AppDomain.CurrentDomain.BaseDirectory;
         var fullPath = Path.Combine(baseDir, "TestFiles", relativePath);
 

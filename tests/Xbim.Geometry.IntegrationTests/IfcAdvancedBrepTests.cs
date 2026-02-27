@@ -143,7 +143,7 @@ namespace Xbim.Geometry.Engine.Tests
         [InlineData("advanced_brep_6", 1, 3246676   /*, DisplayName = "The top face of the sink does not have a hole defined in it, fault model. V6 is truer"*/)]
         [InlineData("advanced_brep_7", 2, 1821558   /*, DisplayName = "Pipe unit built as 2 pieces in V5, V6 correctly build to one piece"*/)]
         [InlineData("advanced_brep_8", 2, 53286     /*, DisplayName = "BSpline with displacement applied twice, example of RevitIncorrectBsplineSweptCurve, V6 corrects dual solids"*/)]
-        public void Advanced_brep_tests(string brepFileName, int count, double volumeV5)
+        public void Advanced_brep_tests(string brepFileName, int count, double volume)
         {
 
             using var model = MemoryModel.OpenRead($@"TestFiles/{brepFileName}.ifc");
@@ -157,8 +157,8 @@ namespace Xbim.Geometry.Engine.Tests
 
             if (shape is IXbimSolid solid)
             {
-                // solid.IsValid.Should().BeTrue();
-                volumeV5.Should().BeApproximately(solid.Volume, 10);
+                solid.IsValid.Should().BeTrue();
+                volume.Should().BeApproximately(solid.Volume, 10);
             }
             else if (shape is IXCompound c)
             {

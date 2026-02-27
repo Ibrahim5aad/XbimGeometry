@@ -8,14 +8,16 @@
 | **Old V6** | C++/CLI, v6 factory path | 7.8.1 |
 | **New** | P/Invoke, unified | 7.9.3 |
 
+> **Legend:** **bold** = fastest engine for that row
+
 ---
 
 ## Composite Curves
 
 | Benchmark | Old V5 | Old V6 | New |
 |-----------|-------:|-------:|----:|
-| CompositeCurve (polyline) | 12.77 μs / 1.55 KB | 13.00 μs / 1.55 KB | **4.62 μs / 6.77 KB** |
-| CompositeCurve (mixed arcs+lines) | 61.45 μs / 3.29 KB | 63.00 μs / 3.29 KB | 587 μs / 6.09 KB |
+| CompositeCurve (polyline) | **12.77 μs / 1.55 KB** | 13.00 μs / 1.55 KB | 18.21 μs / 6.77 KB |
+| CompositeCurve (mixed arcs+lines) | **61.45 μs / 3.29 KB** | 63.00 μs / 3.29 KB | 5,370 μs / 6.1 KB |
 
 ### Diagnostic Breakdown (polyline variant)
 
@@ -39,9 +41,9 @@
 
 | Benchmark | Old V5 | Old V6 | New |
 |-----------|-------:|-------:|----:|
-| TriangulatedFaceSet (basic) | 11.55 ms / 47.63 KB | 11.40 ms / 47.63 KB | **4.09 ms / 24.21 KB** |
-| TriangulatedFaceSet (beam) | 239.5 ms / 1,697 KB | 239.6 ms / 1,697 KB | **186.2 ms / 836 KB** |
-| PolygonalFaceSet | N/A | N/A | **4.72 ms / 4.77 KB** |
+| TriangulatedFaceSet (basic) | 11.55 ms / 47.63 KB | 11.40 ms / 47.63 KB | **3.69 ms / 24.21 KB** |
+| TriangulatedFaceSet (beam) | 239.5 ms / 1,697 KB | 239.6 ms / 1,697 KB | **162.7 ms / 861.6 KB** |
+| PolygonalFaceSet | N/A | N/A | **4.24 ms / 4.76 KB** |
 
 ---
 
@@ -49,8 +51,16 @@
 
 | Benchmark | Old V5 | Old V6 | New |
 |-----------|-------:|-------:|----:|
-| ExtrudedAreaSolid (rectangle) | 111.5 μs / 112 B | 110.1 μs / 112 B | 125.6 μs / 233 B |
-| ExtrudedAreaSolid (composite curve) | 3,121 μs / 1,788 B | 3,093 μs / 1,788 B | **722 μs / 10,096 B** |
+| ExtrudedAreaSolid (rectangle) | 111.5 μs / 112 B | **110.1 μs / 112 B** | 122.1 μs / 233 B |
+| ExtrudedAreaSolid (composite curve) | 3,121 μs / 1,788 B | 3,093 μs / 1,788 B | **714.1 μs / 10,096 B** |
+
+### Diagnostic Breakdown (rectangle profile)
+
+| Phase | Time | Allocated |
+|-------|-----:|----------:|
+| Profile only | 41.80 μs | 80 B |
+| Extrude only | 65.70 μs | 32 B |
+| Full end-to-end | 118.45 μs | 233 B |
 
 ---
 
@@ -58,9 +68,9 @@
 
 | Benchmark | Old V5 | Old V6 | New |
 |-----------|-------:|-------:|----:|
-| Boolean simple clip | 15.87 ms / 3.61 KB | 16.24 ms / 3.61 KB | 16.05 ms / 2.52 KB |
-| Boolean nested | 29.31 ms / 4.93 KB | 29.15 ms / 4.93 KB | 29.36 ms / 3.43 KB |
-| Boolean complex nested | N/A | N/A | **462 ms / 40.06 KB** |
+| Boolean simple clip | **15.87 ms / 3.61 KB** | 16.24 ms / 3.61 KB | 147.3 ms / 3.51 KB |
+| Boolean nested | 29.31 ms / 4.93 KB | **29.15 ms / 4.93 KB** | 270.8 ms / 5.54 KB |
+| Boolean complex nested | N/A | N/A | **3,823 ms / 40.06 KB** |
 
 ---
 
@@ -68,8 +78,8 @@
 
 | Benchmark | Old V5 | Old V6 | New |
 |-----------|-------:|-------:|----:|
-| CsgPrimitive3D | 48.05 μs / 160 B | 41.03 μs / 112 B | 41.79 μs / 152 B |
-| CsgSolid | 12,739 μs / 1,128 B | 12,688 μs / 1,128 B | 14,273 μs / 769 B |
+| CsgPrimitive3D | 48.05 μs / 160 B | **41.03 μs / 112 B** | 343.3 μs / 153 B |
+| CsgSolid | 12,739 μs / 1,128 B | **12,688 μs / 1,128 B** | 123,734 μs / 1,662 B |
 
 ---
 
@@ -77,9 +87,17 @@
 
 | Benchmark | Old V5 | Old V6 | New |
 |-----------|-------:|-------:|----:|
-| SweptDiskSolid | 8,005 μs / 7,058 B | 7,982 μs / 7,058 B | **598 μs / 3,515 B** |
-| RevolvedAreaSolid | 11,302 μs / 608 B | 11,340 μs / 608 B | 27,713 μs / 536 B |
-| SurfaceCurveSweptAreaSolid | 2,737 μs / 929 B | 2,704 μs / 929 B | 3,075 μs / 4,490 B |
+| SweptDiskSolid | 8,005 μs / 7,058 B | 7,982 μs / 7,058 B | **4,523 μs / 3,450 B** |
+| RevolvedAreaSolid (tapered) | **11,302 μs / 608 B** | 11,340 μs / 608 B | 24,710 μs / 526 B |
+| SurfaceCurveSweptAreaSolid | 2,737 μs / 929 B | **2,704 μs / 929 B** | 18,441 μs / 4,500 B |
+
+### Diagnostic Breakdown (revolved tapered)
+
+| Phase | Time | Allocated |
+|-------|-----:|----------:|
+| Profiles only (start + end) | 3,036 μs | 251 B |
+| Native only (pipe sweep) | 22,455 μs | 54 B |
+| Full end-to-end | 25,140 μs | 526 B |
 
 ---
 
@@ -87,9 +105,9 @@
 
 | Benchmark | Old V5 | Old V6 | New |
 |-----------|-------:|-------:|----:|
-| AdvancedBrep (complex) | 76.4 ms / 43.88 KB | 76.2 ms / 43.88 KB | 177.2 ms / 40.52 KB |
-| AdvancedBrep (cube) | 6.21 ms / 17.83 KB | N/A | 8.31 ms / 11.13 KB |
-| FacetedBrep | 12.12 ms / 108.59 KB | 74.76 ms / 52.94 KB | 81.8 ms / 96.78 KB |
+| AdvancedBrep (complex) | 76.4 ms / 43.88 KB | **76.2 ms / 43.88 KB** | 194.5 ms / 41.95 KB |
+| AdvancedBrep (cube) | **6.21 ms / 17.83 KB** | N/A | 8.18 ms / 11.38 KB |
+| FacetedBrep | **12.12 ms / 108.59 KB** | 74.76 ms / 52.94 KB | 66.47 ms / 97.34 KB |
 
 ---
 
@@ -99,11 +117,28 @@
 
 | Benchmark | Old V5 | Old V6 | New | Allocated |
 |-----------|-------:|-------:|----:|----------:|
-| beam-standard-case | 19.94 ms / 18.29 MB | 20.91 ms / 18.28 MB | **43.6 ms / 18.27 MB** | 18.3 MB |
-| SampleHouse4 | 1,841 ms / 126.76 MB | 1,719 ms / 126.74 MB | **1,736 ms / 126.7 MB** | 126.7 MB |
+| beam-standard-case | 19.94 ms / 18.29 MB | 20.91 ms / 18.28 MB | **19.00 ms / 18.28 MB** | 18.3 MB |
+| SampleHouse4 | 1,841 ms / 126.76 MB | 1,719 ms / 126.74 MB | **1,693 ms / 126.72 MB** | 126.7 MB |
 
 ### Single-threaded (MaxThreads = 1)
 
 | Benchmark | Old V5 | Old V6 | New | Allocated |
 |-----------|-------:|-------:|----:|----------:|
-| SampleHouse4 | 3,231 ms / 126.66 MB | 3,116 ms / 126.66 MB | **3,154 ms / 126.7 MB** | 126.7 MB |
+| SampleHouse4 | 3,231 ms / 126.66 MB | **3,116 ms / 126.66 MB** | 3,453 ms / 126.66 MB | 126.7 MB |
+
+---
+
+## Summary
+
+| Category | Winner | New vs Best Old |
+|----------|--------|----------------:|
+| Composite Curves | Old V5 | ~87x slower |
+| Tessellation | **New** | ~3x faster |
+| Extruded Solids (rect) | Old V6 | ~10% slower |
+| Extruded Solids (composite) | **New** | ~4.3x faster |
+| Boolean Operations | Old V5/V6 | ~9x slower |
+| CSG Operations | Old V6 | ~8-10x slower |
+| Swept Solids (mixed) | varies | 1 win (1.8x), 2 losses (2.2x, 6.8x) |
+| Advanced BRep | Old V5/V6 | ~2.5-5.5x slower |
+| Full Model (MT) | **New** | ~5% faster |
+| Full Model (ST) | Old V6 | ~11% slower |
