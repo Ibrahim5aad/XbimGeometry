@@ -846,23 +846,45 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_connected_face_set(
                 rec.bounds.push_back(std::move(bd));
             }
 
-            /* Compute best-fit plane */
-            if (ArePointsCollinear(pointsOnFace, tol))
+            /* Compute plane for this face */
+            int uniquePoints = ptIdx - 1; /* actual number of points collected */
+            if (uniquePoints >= 3 && uniquePoints <= 4 && nbBounds == 1)
             {
-                xbim_log_warning(ctx, "Face %d: all points are collinear, skipping", f);
-                continue;
+                /* Fast path for triangles: direct cross product.
+                   A triangular bound has 3 unique vertices + closing repeat = 4 points.
+                   This avoids the expensive GeomPlate_BuildAveragePlane (SVD). */
+                gp_Pnt p1 = pointsOnFace->Value(1);
+                gp_Pnt p2 = pointsOnFace->Value(2);
+                gp_Pnt p3 = pointsOnFace->Value(3);
+                gp_Vec v1(p1, p2), v2(p1, p3);
+                gp_Vec normal = v1.Crossed(v2);
+                if (normal.SquareMagnitude() < tol * tol)
+                {
+                    xbim_log_warning(ctx, "Face %d: degenerate triangle, skipping", f);
+                    continue;
+                }
+                rec.plane = new Geom_Plane(p1, gp_Dir(normal));
             }
-
-            GeomPlate_BuildAveragePlane averagePlaneBuilder(
-                pointsOnFace, pointsOnFace->Upper(), tol, 1, 2);
-
-            if (!averagePlaneBuilder.IsPlane())
+            else
             {
-                xbim_log_warning(ctx, "Face %d: could not compute a planar surface, skipping", f);
-                continue;
-            }
+                /* General polygon: best-fit plane via eigenvalue decomposition */
+                if (ArePointsCollinear(pointsOnFace, tol))
+                {
+                    xbim_log_warning(ctx, "Face %d: all points are collinear, skipping", f);
+                    continue;
+                }
 
-            rec.plane = averagePlaneBuilder.Plane();
+                GeomPlate_BuildAveragePlane averagePlaneBuilder(
+                    pointsOnFace, pointsOnFace->Upper(), tol, 1, 2);
+
+                if (!averagePlaneBuilder.IsPlane())
+                {
+                    xbim_log_warning(ctx, "Face %d: could not compute a planar surface, skipping", f);
+                    continue;
+                }
+
+                rec.plane = averagePlaneBuilder.Plane();
+            }
             faceRecords.push_back(std::move(rec));
         }
 
