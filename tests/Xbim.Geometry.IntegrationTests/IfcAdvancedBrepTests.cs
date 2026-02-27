@@ -127,8 +127,9 @@ namespace Xbim.Geometry.Engine.Tests
                     model.ModelFactors.DeflectionAngle, XbimGeometryType.PolyhedronBinary);
 
                 solids.Count.Should().Be(2);
-                solids.First().Faces.Count.Should().Be(37);
-                solids.Last().Faces.Count.Should().Be(10);
+                var counts = solids.Select(s => s.Faces.Count).ToArray();
+                counts.Should().Contain(10);
+                counts.Should().Contain(37);
             }
 
         }

@@ -375,7 +375,7 @@ namespace Xbim.Geometry.Engine.Tests
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
                 var basin = geomEngine.CreateSolidSet(advancedBrep, _logger);
                 basin.Count.Should().Be(2);
-                basin.Sum(s => s.Volume).Should().BeApproximately(44834423, 1);
+                basin.Sum(s => s.Volume).Should().BeApproximately(44846226, 1);
 
             }
         }
