@@ -1,6 +1,8 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System.Runtime.CompilerServices;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xbim.Common.Configuration;
+using Xbim.Ifc;
 using Xunit.DependencyInjection;
 using Xunit.DependencyInjection.Logging;
 namespace Xbim.Geometry.Engine.Tests
@@ -41,7 +43,11 @@ namespace Xbim.Geometry.Engine.Tests
 
             XbimServices.Current.UseExternalServiceCollection(services);
 
-
+            // Ibrahim: Force IfcStore's static constructor to run now (single-threaded, before parallel test execution).
+            // Without this, a TOCTOU race exists: IfcStore..cctor checks IsBuilt then calls ConfigureServices,
+            // but a parallel test can trigger XbimServices.Current.ServiceProvider (setting isBuilt=true) between
+            // those two steps, causing ConfigureServices to throw.
+            RuntimeHelpers.RunClassConstructor(typeof(IfcStore).TypeHandle);
 
         }
     }
