@@ -352,10 +352,11 @@ namespace Xbim.Geometry.Engine.Factories
             NativeShapeHandle shape;
             int result;
 
-            if (hollowProfile.WallThickness <= 0)
+            if (hollowProfile.WallThickness <= 0 || hollowProfile.WallThickness >= hollowProfile.Radius)
             {
                 _logger.LogWarning(
-                    "CircleHollowProfileDef #{EntityLabel} has zero or negative wall thickness.", hollowProfile.EntityLabel);
+                    "CircleHollowProfileDef #{EntityLabel} has invalid wall thickness ({WallThickness}) for radius ({Radius}), treating as solid circle.",
+                    hollowProfile.EntityLabel, hollowProfile.WallThickness, hollowProfile.Radius);
 
                 result = XbimGeometryNativeApi.xbim_profile_build_circle(
                                         ContextHandle,
