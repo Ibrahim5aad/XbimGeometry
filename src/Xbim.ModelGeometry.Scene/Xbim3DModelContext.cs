@@ -537,8 +537,22 @@ namespace Xbim.ModelGeometry.Scene
         private readonly IXbimGeometryEngine _engine;
         private readonly IModel _model;
         private readonly DynamicDeflection _dynamicDeflection;
-        
+
         private IXbimGeometryEngine Engine => _engine;
+
+        private readonly ContextDiagnostics _diag = new();
+
+        /// <summary>
+        /// When true, collects per-operation timing data during CreateContext().
+        /// Call <see cref="PrintDiagnostics"/> after CreateContext() to see results.
+        /// </summary>
+        public bool EnableDiagnostics { get => _diag.Enabled; set => _diag.Enabled = value; }
+
+        /// <summary>
+        /// Prints accumulated diagnostic timing data to the console.
+        /// Only produces output when <see cref="EnableDiagnostics"/> was true during CreateContext().
+        /// </summary>
+        public void PrintDiagnostics() => _diag.PrintSummary();
 
         /// <summary>
         /// Defines the duration milliseconds that Boolean operations will be allowed to run for.
@@ -777,8 +791,11 @@ namespace Xbim.ModelGeometry.Scene
                     _logger.LogTrace("Starting Initialise sequence");
                     progDelegate?.Invoke(-1, "Initialise");
                     var createFullGeometry = generateBREPs;
-                    if (!contextHelper.Initialise(adjustWcs, _engine, createFullGeometry))
-                        throw new Exception("Failed to initialise geometric context, " + contextHelper.InitialiseError);
+                    using (_diag.TrackPhase("Initialise"))
+                    {
+                        if (!contextHelper.Initialise(adjustWcs, _engine, createFullGeometry))
+                            throw new Exception("Failed to initialise geometric context, " + contextHelper.InitialiseError);
+                    }
                     progDelegate?.Invoke(101, "Initialise");
 
                     if (MaxThreads > 0)
@@ -787,13 +804,18 @@ namespace Xbim.ModelGeometry.Scene
                     }
 
                     _logger.LogTrace("Starting WriteShapeGeometries");
-                    WriteShapeGeometries(contextHelper, progDelegate, geometryTransaction, geomStorageType, postTessellationCallback, dynamicDeflectionSettings);
+                    using (_diag.TrackPhase("WriteShapeGeometries"))
+                        WriteShapeGeometries(contextHelper, progDelegate, geometryTransaction, geomStorageType, postTessellationCallback, dynamicDeflectionSettings);
+
                     _logger.LogTrace("Starting PrepareMapGeometryReferences");
-                    PrepareMapGeometryReferences(contextHelper, progDelegate);
+                    using (_diag.TrackPhase("PrepareMapGeometryReferences"))
+                        PrepareMapGeometryReferences(contextHelper, progDelegate);
 
                     // process features
                     _logger.LogTrace("Starting WriteProductsWithFeatures");
-                    var processed = WriteProductsWithFeatures(contextHelper, progDelegate, geomStorageType, geometryTransaction);
+                    HashSet<int> processed;
+                    using (_diag.TrackPhase("WriteProductsWithFeatures"))
+                        processed = WriteProductsWithFeatures(contextHelper, progDelegate, geomStorageType, geometryTransaction);
 
                     _logger.LogTrace("Starting WriteProductShapes");
                     progDelegate?.Invoke(-1, "WriteProductShapes");
@@ -803,8 +825,8 @@ namespace Xbim.ModelGeometry.Scene
                             && !processed.Contains(p.EntityLabel)
                         ).ToList();
 
-
-                    WriteProductShapes(contextHelper, productsRemaining, geometryTransaction);
+                    using (_diag.TrackPhase("WriteProductShapes"))
+                        WriteProductShapes(contextHelper, productsRemaining, geometryTransaction);
                     progDelegate?.Invoke(101, "WriteProductShapes");
                     //Write out the actual representation item reference count
 
@@ -812,9 +834,12 @@ namespace Xbim.ModelGeometry.Scene
                     //Write out the regions of the model
                     progDelegate?.Invoke(-1, "WriteRegionsToDb");
                     _logger.LogTrace("Starting WriteRegionsToStore");
-                    foreach (var cluster in contextHelper.Clusters)
+                    using (_diag.TrackPhase("WriteRegionsToStore"))
                     {
-                        nextRegionNumber = WriteRegionsToStore(cluster.Key, cluster.Value, geometryTransaction, contextHelper.PlacementTree.WorldCoordinateSystem, nextRegionNumber);
+                        foreach (var cluster in contextHelper.Clusters)
+                        {
+                            nextRegionNumber = WriteRegionsToStore(cluster.Key, cluster.Value, geometryTransaction, contextHelper.PlacementTree.WorldCoordinateSystem, nextRegionNumber);
+                        }
                     }
                     progDelegate?.Invoke(101, "WriteRegionsToDb");
 
@@ -1010,7 +1035,9 @@ namespace Xbim.ModelGeometry.Scene
                     // make the finished shape
                     if (behaviour.HasFlag(MeshingBehaviourResult.PerformAdditions) && openingAndProjectionOp.ProjectGeometries.Any())
                     {
-                        var nextGeom = elementGeom.Union(openingAndProjectionOp.ProjectGeometries, _modelServices.MinimumGap, _logger);
+                        IXbimGeometryObjectSet nextGeom;
+                        using (_diag.Track(DiagOp.BooleanUnion))
+                            nextGeom = elementGeom.Union(openingAndProjectionOp.ProjectGeometries, _modelServices.MinimumGap, _logger);
                         if (nextGeom.IsValid)
                         {
                             if (nextGeom.First != null && nextGeom.First.IsValid)
@@ -1028,7 +1055,8 @@ namespace Xbim.ModelGeometry.Scene
                         IXbimGeometryObjectSet nextGeom;
                         try
                         {
-                            nextGeom = elementGeom.Cut(openingAndProjectionOp.CutGeometries, _modelServices.MinimumGap, _logger);
+                            using (_diag.Track(DiagOp.BooleanCut))
+                                nextGeom = elementGeom.Cut(openingAndProjectionOp.CutGeometries, _modelServices.MinimumGap, _logger);
                             if (nextGeom.IsValid)
                             {
                                 if (nextGeom.First != null && nextGeom.First.IsValid)
@@ -1061,18 +1089,21 @@ namespace Xbim.ModelGeometry.Scene
                         };
                         var memStream = new MemoryStream(0x4000);
 
-                        if (geomType == XbimGeometryType.PolyhedronBinary)
+                        using (_diag.Track(DiagOp.Triangulation))
                         {
-                            using var bw = new BinaryWriter(memStream);
-                            Engine.WriteTriangulation(bw, geom, mf.Precision,
-                                thisDeflectionDistance, thisDeflectionAngle);
-                        }
-                        else
-                        {
-                            using (var tw = new StreamWriter(memStream))
+                            if (geomType == XbimGeometryType.PolyhedronBinary)
                             {
-                                Engine.WriteTriangulation(tw, geom, mf.Precision,
+                                using var bw = new BinaryWriter(memStream);
+                                Engine.WriteTriangulation(bw, geom, mf.Precision,
                                     thisDeflectionDistance, thisDeflectionAngle);
+                            }
+                            else
+                            {
+                                using (var tw = new StreamWriter(memStream))
+                                {
+                                    Engine.WriteTriangulation(tw, geom, mf.Precision,
+                                        thisDeflectionDistance, thisDeflectionAngle);
+                                }
                             }
                         }
                         ((IXbimShapeGeometryData)shapeGeometry).ShapeData = memStream.ToArray();
@@ -1508,13 +1539,16 @@ namespace Xbim.ModelGeometry.Scene
                     IXbimGeometryObject geomModel = null;
                     if (contextHelper.GenerateFullGeometry == false && ShouldTesselateShapeDirectly(shapeMetaData, xbimTessellator)) // if we can mesh the shape directly just do it
                     {
-                        shapeGeom = xbimTessellator.Mesh(shape);
+                        using (_diag.Track(DiagOp.DirectTessellation))
+                            shapeGeom = xbimTessellator.Mesh(shape);
                     }
                     else //we need to create a geometry object
                     {
                         try
                         {
+                            var timer = _diag.StartTimer();
                             geomModel = Engine.Create(shape, _logger);
+                            _diag.RecordCreate(timer, shape.GetType().Name, failed: geomModel == null || !geomModel.IsValid);
                         }
                         catch (XbimGeometryFaceSetTooLargeException fse)
                         {
@@ -1550,7 +1584,9 @@ namespace Xbim.ModelGeometry.Scene
                                 (deflection, deflectionAngle) = (def.Linear, def.Angular);
                             }
                             
+                            var meshTimer = _diag.StartTimer();
                             shapeGeom = Engine.CreateShapeGeometry(geomModel, precision, deflection, deflectionAngle, geomStorageType, _logger);
+                            _diag.RecordMesh(meshTimer, shape.GetType().Name);
                             if (shapeMetaData.IsFeatureElementShape)
                             {
                                 if (geomModel is IXbimGeometryObjectSet geomSet)

@@ -3,13 +3,16 @@ using Microsoft.Extensions.Logging;
 using Xbim.Common;
 using Xbim.Common.Configuration;
 using Xbim.Common.Geometry;
-using Xbim.Geometry.Engine;
-using Xbim.Geometry.Engine.Configuration;
-using Xbim.Ifc4.Interfaces;
-using Xbim.IO.Memory;
 #if OLD_ENGINE
 using Xbim.Geometry.Abstractions;
+using Xbim.Geometry.Engine.Interop;
+using Xbim.Geometry.Engine.Interop.Configuration;
+#else
+using Xbim.Geometry.Engine;
+using Xbim.Geometry.Engine.Configuration;
 #endif
+using Xbim.Ifc4.Interfaces;
+using Xbim.IO.Memory;
 
 namespace Xbim.Geometry.Benchmarks.Infrastructure;
 

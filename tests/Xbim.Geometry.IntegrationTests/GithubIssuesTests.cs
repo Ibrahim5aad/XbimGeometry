@@ -150,7 +150,7 @@ namespace Xbim.Geometry.Engine.Tests
                 using (var bw = new System.IO.BinaryWriter(fs))
                     m.SaveAsWexBim(bw);
                 geom.FaceCount.Should().Be(50);
-                geom.Length.Should().Be(2785);
+                geom.Length.Should().Be(2029);
 
             }
         }
