@@ -17,6 +17,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <cstdint>
+#include <cmath>
 
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
@@ -1078,33 +1079,88 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_gtransform(
             trsf = trsf.Multiplied(scale);
         }
 
-        /* For pure uniform scale from origin, use BRepBuilderAPI_Transform (exact geometry)
-           instead of BRepBuilderAPI_GTransform which approximates curved surfaces. */
-        Standard_Real s = trsf.Value(1, 1);
-        bool isUniformScaleFromOrigin =
-            (s > 0) &&
-            (fabs(trsf.Value(2, 2) - s) < 1e-15) &&
-            (fabs(trsf.Value(3, 3) - s) < 1e-15) &&
-            (fabs(trsf.Value(1, 2)) < 1e-15) && (fabs(trsf.Value(1, 3)) < 1e-15) &&
-            (fabs(trsf.Value(2, 1)) < 1e-15) && (fabs(trsf.Value(2, 3)) < 1e-15) &&
-            (fabs(trsf.Value(3, 1)) < 1e-15) && (fabs(trsf.Value(3, 2)) < 1e-15) &&
-            (fabs(trsf.Value(1, 4)) < 1e-15) && (fabs(trsf.Value(2, 4)) < 1e-15) &&
-            (fabs(trsf.Value(3, 4)) < 1e-15);
+        /* Try to use BRepBuilderAPI_Transform (which preserves analytical surface
+           geometry — planes, cylinders, etc.) instead of BRepBuilderAPI_GTransform
+           (which approximates ALL surfaces as BSplines).
+
+           A gp_GTrsf that represents a proper affine transform (rotation + translation
+           + uniform scale) can be converted to a gp_Trsf. Only truly non-affine
+           transforms (non-uniform scale, shearing) require BRepBuilderAPI_GTransform. */
 
         TopoDS_Shape transformed;
-        if (isUniformScaleFromOrigin)
+
+        // Extract the 3x3 rotation/scale matrix
+        double r11 = trsf.Value(1, 1), r12 = trsf.Value(1, 2), r13 = trsf.Value(1, 3);
+        double r21 = trsf.Value(2, 1), r22 = trsf.Value(2, 2), r23 = trsf.Value(2, 3);
+        double r31 = trsf.Value(3, 1), r32 = trsf.Value(3, 2), r33 = trsf.Value(3, 3);
+        double tx  = trsf.Value(1, 4), ty  = trsf.Value(2, 4), tz  = trsf.Value(3, 4);
+
+        // Compute column lengths (scale factors along each axis)
+        double sx = sqrt(r11*r11 + r21*r21 + r31*r31);
+        double sy = sqrt(r12*r12 + r22*r22 + r32*r32);
+        double sz = sqrt(r13*r13 + r23*r23 + r33*r33);
+
+        // Check if the transform is affine (uniform scale + rotation + translation)
+        bool isAffine = (sx > 1e-15 && sy > 1e-15 && sz > 1e-15 &&
+                         fabs(sx - sy) < 1e-10 * sx &&
+                         fabs(sx - sz) < 1e-10 * sx);
+
+        if (isAffine)
         {
-            gp_Trsf simpleTrsf;
-            simpleTrsf.SetScale(gp_Pnt(0.0, 0.0, 0.0), s);
-            BRepBuilderAPI_Transform simpleTransformer(shapeHandle->shape, simpleTrsf, Standard_True);
-            if (!simpleTransformer.IsDone())
+            // Normalize the rotation matrix
+            double invS = 1.0 / sx;
+            double n11 = r11 * invS, n12 = r12 * invS, n13 = r13 * invS;
+            double n21 = r21 * invS, n22 = r22 * invS, n23 = r23 * invS;
+            double n31 = r31 * invS, n32 = r32 * invS, n33 = r33 * invS;
+
+            // Verify it's a proper rotation (det ≈ +1, orthogonal columns)
+            double det = n11 * (n22*n33 - n23*n32)
+                       - n12 * (n21*n33 - n23*n31)
+                       + n13 * (n21*n32 - n22*n31);
+
+            bool isProperRotation = (fabs(fabs(det) - 1.0) < 1e-10);
+
+            if (isProperRotation)
             {
-                xbim_set_error("xbim_shape_gtransform: BRepBuilderAPI_Transform failed");
-                return XBIM_ERROR;
+                // Build a proper gp_Trsf from rotation + translation + uniform scale
+                gp_Trsf affineTrsf;
+
+                if (fabs(sx - 1.0) < 1e-10)
+                {
+                    // Pure rotation + translation (most common IFC case)
+                    // Use SetValues which handles rotation matrices directly
+                    affineTrsf.SetValues(
+                        n11, n12, n13, tx,
+                        n21, n22, n23, ty,
+                        n31, n32, n33, tz);
+                }
+                else
+                {
+                    // Rotation + translation + uniform scale
+                    gp_Trsf rotTrsf;
+                    rotTrsf.SetValues(
+                        n11, n12, n13, tx,
+                        n21, n22, n23, ty,
+                        n31, n32, n33, tz);
+
+                    gp_Trsf scaleTrsf;
+                    scaleTrsf.SetScale(gp_Pnt(0.0, 0.0, 0.0), sx);
+
+                    affineTrsf = rotTrsf.Multiplied(scaleTrsf);
+                }
+
+                BRepBuilderAPI_Transform transformer(shapeHandle->shape, affineTrsf, Standard_True);
+                if (transformer.IsDone())
+                {
+                    transformed = transformer.Shape();
+                }
+                // If BRepBuilderAPI_Transform fails, fall through to GTransform
             }
-            transformed = simpleTransformer.Shape();
         }
-        else
+
+        // Fallback: use GTransform for non-affine transforms (non-uniform scale, shear)
+        // or if the affine path failed
+        if (transformed.IsNull())
         {
             BRepBuilderAPI_GTransform transformer(shapeHandle->shape, trsf, Standard_True);
             if (!transformer.IsDone())

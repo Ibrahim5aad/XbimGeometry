@@ -90,6 +90,7 @@ TopoDS_Shape perform_boolean(
     try
     {
         hasWarnings = 0;
+
         BRepAlgoAPI_BooleanOperation bop;
         bop.SetArguments(arguments);
         bop.SetTools(tools);
@@ -110,15 +111,13 @@ TopoDS_Shape perform_boolean(
         if (bop.IsDone())
         {
             TopoDS_Shape result = bop.Shape();
+
             BRepCheck_Analyzer analyzer(result);
             bool isValid = analyzer.IsValid();
 
             if (!isValid)
             {
                 xbim_log_warning(ctx, "Boolean resulting shape is invalid, skipping SimplifyResult().");
-                // Return the invalid result as-is. In OCCT 7.9.3, accessing
-                // DSFiller() after an invalid result can throw Standard_TypeMismatch.
-                // The managed layer's graceful fallback handles this downstream.
                 return trim_topology(result);
             }
 
