@@ -117,6 +117,20 @@ jobs:
             -OutputDirectory packages
         shell: bash
 
+      # ── Pack Abstractions package ─────────────────────────────────────
+      - name: Build Abstractions project
+        run: |
+          dotnet build src/Xbim.Geometry.Abstractions/Xbim.Geometry.Abstractions.csproj \
+            -c ${{ env.BUILD_CONFIG }} \
+            -p:Version=${{ steps.version.outputs.VERSION }}
+
+      - name: Pack Abstractions package
+        run: |
+          dotnet pack src/Xbim.Geometry.Abstractions/Xbim.Geometry.Abstractions.csproj \
+            -c ${{ env.BUILD_CONFIG }} --no-build \
+            -p:Version=${{ steps.version.outputs.VERSION }} \
+            -o packages
+
       # ── Pack managed Engine package with runtime deps ──────────────────
       - name: Register local package source
         run: dotnet nuget add source ${{ github.workspace }}/packages --name local
@@ -133,6 +147,34 @@ jobs:
           dotnet pack src/Xbim.Geometry.Engine/Xbim.Geometry.Engine.csproj \
             -c ${{ env.BUILD_CONFIG }} --no-build \
             -p:IncludeNativeRuntimeDependencies=true \
+            -p:Version=${{ steps.version.outputs.VERSION }} \
+            -o packages
+
+      # ── Pack Tessellator package ────────────────────────────────────
+      - name: Build Tessellator project
+        run: |
+          dotnet build src/Xbim.Tessellator/Xbim.Tessellator.csproj \
+            -c ${{ env.BUILD_CONFIG }} \
+            -p:Version=${{ steps.version.outputs.VERSION }}
+
+      - name: Pack Tessellator package
+        run: |
+          dotnet pack src/Xbim.Tessellator/Xbim.Tessellator.csproj \
+            -c ${{ env.BUILD_CONFIG }} --no-build \
+            -p:Version=${{ steps.version.outputs.VERSION }} \
+            -o packages
+
+      # ── Pack Scene package ──────────────────────────────────────────
+      - name: Build Scene project
+        run: |
+          dotnet build src/Xbim.Geometry.Scene/Xbim.Geometry.Scene.csproj \
+            -c ${{ env.BUILD_CONFIG }} \
+            -p:Version=${{ steps.version.outputs.VERSION }}
+
+      - name: Pack Scene package
+        run: |
+          dotnet pack src/Xbim.Geometry.Scene/Xbim.Geometry.Scene.csproj \
+            -c ${{ env.BUILD_CONFIG }} --no-build \
             -p:Version=${{ steps.version.outputs.VERSION }} \
             -o packages
 

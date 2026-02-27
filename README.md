@@ -10,6 +10,17 @@ It provides geometric and topological operations for IFC building models — boo
 
 ---
 
+## Packages
+
+| Package | Description |
+|---------|-------------|
+| **Xbim.Geometry.Engine** | Core geometry engine — boolean operations, solid/shell/face building, tessellation. Automatically pulls in the native runtime packages for your platform. |
+| **Xbim.Geometry.Scene** | 3D scene construction from IFC models — `Xbim3DModelContext`, WexBIM export, placement trees, mesh layers. |
+| **Xbim.Tessellator** | Standalone managed tessellator for pre-meshed IFC representations (`IfcTriangulatedFaceSet`, `IfcFacetedBrep`, etc.) without requiring the native engine. |
+| **Xbim.Geometry.Abstractions** | Interfaces and abstractions (`IXShape`, `IXSolid`, `IXCurve`, etc.) shared across geometry packages. |
+
+For most use cases, reference **Xbim.Geometry.Scene** — it transitively brings in the Engine, Tessellator, and Abstractions.
+
 ## Installation
 
 Pre-release packages are published to **GitHub Packages**. GitHub requires authentication
@@ -27,9 +38,13 @@ dotnet nuget add source "https://nuget.pkg.github.com/ibrahim5aad/index.json" \
   --store-password-in-clear-text
 ```
 
-3. Install the package:
+3. Install the packages:
 
 ```bash
+# Full scene support (most common — includes Engine, Tessellator, and Abstractions)
+dotnet add package Xbim.Geometry.Scene --prerelease
+
+# Or just the engine if you don't need scene/WexBIM support
 dotnet add package Xbim.Geometry.Engine --prerelease
 ```
 
