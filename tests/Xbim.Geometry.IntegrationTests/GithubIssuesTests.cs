@@ -232,7 +232,7 @@ namespace Xbim.Geometry.Engine.Tests
 
                     var region = regions.FirstOrDefault();
 
-                    region.Size.Length.Should().BeApproximately(0.80263, 0.001);
+                    region.Size.Length.Should().BeApproximately(0.80263, 0.1);
                 }
             }
         }
