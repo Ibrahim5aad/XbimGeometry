@@ -5,7 +5,7 @@ using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine;
 using Xbim.Ifc;
 using Xbim.IO.Memory;
-using Xbim.ModelGeometry.Scene;
+using Xbim.Geometry.Scene;
 using Xunit;
 
 

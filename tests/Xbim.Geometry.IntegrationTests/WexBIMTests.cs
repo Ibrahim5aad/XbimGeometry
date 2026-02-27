@@ -6,7 +6,7 @@ using Xbim.Common.Geometry;
 using Xbim.Common.XbimExtensions;
 using Xbim.Ifc;
 using Xbim.Ifc4.Interfaces;
-using Xbim.ModelGeometry.Scene;
+using Xbim.Geometry.Scene;
 using Xbim.Tessellator;
 using Xunit;
 

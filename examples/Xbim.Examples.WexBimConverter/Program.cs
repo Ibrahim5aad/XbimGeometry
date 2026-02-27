@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using Xbim.Common;
 using Xbim.Ifc;
-using Xbim.ModelGeometry.Scene;
+using Xbim.Geometry.Scene;
 
 namespace Xbim.Examples.WexBimConverter;
 

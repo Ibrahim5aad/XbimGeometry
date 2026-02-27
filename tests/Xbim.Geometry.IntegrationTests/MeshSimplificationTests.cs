@@ -10,7 +10,7 @@ using System.Web;
 using Xbim.Common.Model;
 using Xbim.Ifc;
 using Xbim.IO.Memory;
-using Xbim.ModelGeometry.Scene;
+using Xbim.Geometry.Scene;
 using Xbim.Tessellator.MeshSimplification;
 using Xunit;
 

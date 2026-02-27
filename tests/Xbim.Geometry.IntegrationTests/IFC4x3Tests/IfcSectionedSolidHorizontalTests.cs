@@ -7,7 +7,7 @@ using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4x3.GeometricModelResource;
 using Xbim.Ifc4x3.SharedInfrastructureElements;
 using Xbim.IO.Memory;
-using Xbim.ModelGeometry.Scene;
+using Xbim.Geometry.Scene;
 using Xunit;
 using ILoggerFactory = Microsoft.Extensions.Logging.ILoggerFactory;
 

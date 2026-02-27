@@ -9,7 +9,7 @@ using Xbim.Geometry.Engine.Configuration;
 using Xbim.Geometry.Engine.Internal;
 using Xbim.Ifc4.Interfaces;
 using Xbim.IO.Memory;
-using Xbim.ModelGeometry.Scene;
+using Xbim.Geometry.Scene;
 using Xunit;
 
 namespace Xbim.Geometry.Engine.Tests

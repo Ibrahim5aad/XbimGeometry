@@ -4,7 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using Xbim.Common;
 using Xbim.Examples.Viewer.WexBim;
 using Xbim.Ifc;
-using Xbim.ModelGeometry.Scene;
+using Xbim.Geometry.Scene;
 
 namespace Xbim.Examples.Viewer.ViewModels;
 

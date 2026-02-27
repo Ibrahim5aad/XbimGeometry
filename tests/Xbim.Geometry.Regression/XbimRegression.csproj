@@ -25,7 +25,7 @@
 		<ProjectReference Include="..\..\src\Xbim.Geometry.Engine\Xbim.Geometry.Engine.csproj">
 		  <Private>True</Private>
 		</ProjectReference>
-		<ProjectReference Include="..\..\src\Xbim.ModelGeometry.Scene\Xbim.ModelGeometry.Scene.csproj" />
+		<ProjectReference Include="..\..\src\Xbim.Geometry.Scene\Xbim.Geometry.Scene.csproj" />
 	</ItemGroup>
 
 </Project>

@@ -6,7 +6,7 @@ using System.Linq;
 using Xbim.Ifc;
 using Xbim.Ifc4.Interfaces;
 using Xbim.IO.Parser;
-using Xbim.ModelGeometry.Scene;
+using Xbim.Geometry.Scene;
 
 namespace XbimRegression
 {

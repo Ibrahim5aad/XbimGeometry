@@ -5,7 +5,7 @@ using Xbim.Common.Geometry;
 using Xbim.Geometry.Engine;
 using Xbim.Ifc;
 using Xbim.Ifc4.Interfaces;
-using Xbim.ModelGeometry.Scene;
+using Xbim.Geometry.Scene;
 
 namespace Xbim.Examples.QuickStart;
 
