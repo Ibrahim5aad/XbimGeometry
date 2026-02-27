@@ -666,6 +666,11 @@ namespace Xbim.Geometry.Engine.Tests
                 var comp = model.Instances[3268144] as IIfcCompositeCurve;
                 var geomEngine = new XbimGeometryEngine(model, _loggerFactory);
                 var geom = geomEngine.CreateWire(comp, _logger);
+                geom.Should().NotBeNull();
+
+                var solid = model.Instances[3268164] as IIfcExtrudedAreaSolid;
+                var solidGeom = geomEngine.CreateSolid(solid, _logger);
+                solidGeom.Should().NotBeNull();
             }
         }
         /// <summary>
@@ -785,6 +790,7 @@ namespace Xbim.Geometry.Engine.Tests
 
             }
         }
+
 
         [Fact]
         public void LongRunningBooleanTest()

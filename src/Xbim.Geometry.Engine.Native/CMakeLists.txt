@@ -92,7 +92,7 @@ if(MSVC)
     )
 endif()
 
-# GCC/Clang settings for future Linux support
+# GCC/Clang settings
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(xbim_geometry_native PRIVATE
         -Wall

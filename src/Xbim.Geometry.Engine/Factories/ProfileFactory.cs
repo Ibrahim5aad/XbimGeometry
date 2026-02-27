@@ -1219,10 +1219,8 @@ namespace Xbim.Geometry.Engine.Factories
         }
 
         /// <summary>
-        /// Builds 2D curves from a composite curve's segments, decomposing multi-point polyline
-        /// segments into individual line edges. The pipe sweep creates one face per profile edge
-        /// per spine segment; merging polyline edges into a single B-spline would change the
-        /// face topology and break corner transitions.
+        /// Builds 2D curves from a composite curve's segments, with connectivity-based
+        /// sense correction that overrides incorrect SameSense flags.
         /// </summary>
         private List<NativeCurve2dHandle> BuildCompositeSegmentCurves2d(
             IIfcCompositeCurve compositeCurve, int entityLabel)
@@ -1291,7 +1289,44 @@ namespace Xbim.Geometry.Engine.Factories
                         segCurves.Add(built.DetachHandle());
                     }
 
-                    if (!segment.SameSense)
+                    bool shouldReverse = !segment.SameSense;
+
+                    // Connectivity check: override SameSense if it worsens the gap
+                    if (curves.Count > 0 && segCurves.Count > 0)
+                    {
+                        // Get end point of last accumulated curve
+                        var lastCurve = curves[curves.Count - 1];
+                        XbimGeometryNativeApi.xbim_curve2d_parameters(lastCurve, out _, out double prevLast);
+                        XbimGeometryNativeApi.xbim_curve2d_value(lastCurve, prevLast, out double pex, out double pey);
+
+                        // Get start/end of current segment group
+                        var firstSeg = segCurves[0];
+                        var lastSeg = segCurves[segCurves.Count - 1];
+                        XbimGeometryNativeApi.xbim_curve2d_parameters(firstSeg, out double fFirst, out _);
+                        XbimGeometryNativeApi.xbim_curve2d_value(firstSeg, fFirst, out double fsx, out double fsy);
+                        XbimGeometryNativeApi.xbim_curve2d_parameters(lastSeg, out _, out double lLast);
+                        XbimGeometryNativeApi.xbim_curve2d_value(lastSeg, lLast, out double lex, out double ley);
+
+                        double gapFwd = (fsx - pex) * (fsx - pex) + (fsy - pey) * (fsy - pey);
+                        double gapRev = (lex - pex) * (lex - pex) + (ley - pey) * (ley - pey);
+
+                        if (shouldReverse && gapRev > gapFwd)
+                        {
+                            _logger.LogWarning(
+                                "CompositeCurve for profile #{Label}: segment #{SegLabel} has incorrect SameSense, ignoring.",
+                                entityLabel, segment.EntityLabel);
+                            shouldReverse = false;
+                        }
+                        else if (!shouldReverse && gapFwd > gapRev)
+                        {
+                            _logger.LogWarning(
+                                "CompositeCurve for profile #{Label}: segment #{SegLabel} has incorrect SameSense, reversing.",
+                                entityLabel, segment.EntityLabel);
+                            shouldReverse = true;
+                        }
+                    }
+
+                    if (shouldReverse)
                     {
                         segCurves.Reverse();
                         foreach (var c in segCurves)

@@ -488,36 +488,274 @@ namespace Xbim.Geometry.Engine.Factories
         /// </summary>
         private XbimBoundedCurve2d BuildCompositeCurve2d(IIfcCompositeCurve ifcComposite)
         {
-            // Fast path: if all segments are polylines, build a single degree-1 B-spline
-            // directly from the flattened 2D points, bypassing CompCurveToBSplineCurve entirely.
+            // Fast path: if all segments are polylines/trimmed lines, build a single
+            // degree-1 B-spline directly from the flattened 2D points.
             if (TryBuildAllPolylineComposite2d(ifcComposite, out var fastResult))
                 return fastResult;
 
-            // General path: build each segment individually, then join via CompCurveToBSplineCurve
-            var segmentCurves = BuildCompositeCurveSegments2d(ifcComposite);
+            // Batch path: marshal all segments into flat arrays and make one native call
+            return BuildCompositeCurveBatch2d(ifcComposite);
+        }
+
+        /// <summary>
+        /// Marshals all segments of a 2D composite curve into flat arrays and builds
+        /// the composite B-spline via a single native call. Lines, trimmed circles, and
+        /// polylines are marshalled as data; everything else falls back to a pre-built handle.
+        /// </summary>
+        private XbimBoundedCurve2d BuildCompositeCurveBatch2d(IIfcCompositeCurve ifcComposite)
+        {
+            CurveRules.Validate(ifcComposite);
+
+            var types = new List<int>();
+            var sameSense = new List<int>();
+            var dataList = new List<double>();
+            var offsets = new List<int>();
+            var prebuiltHandles = new List<XbimCurve2d>();
+
             try
             {
-                if (segmentCurves.Count == 0)
+                int lastLabel = -1;
+                foreach (var segment in ifcComposite.Segments)
+                {
+                    if (segment.EntityLabel == lastLabel)
+                    {
+                        _logger.LogInformation(
+                            "IIfcCompositeCurve #{Label}: skipping duplicate segment #{SegLabel} (ArchiCAD bug).",
+                            ifcComposite.EntityLabel, segment.EntityLabel);
+                        continue;
+                    }
+                    lastLabel = segment.EntityLabel;
+
+                    if (segment is IIfcReparametrisedCompositeCurveSegment reparam
+                        && (double)reparam.ParamLength != 1.0)
+                        throw new XbimGeometryServiceException(
+                            $"IIfcReparametrisedCompositeCurveSegment #{segment.EntityLabel} is currently unsupported (ParamLength != 1).");
+
+                    if (segment.ParentCurve == null)
+                        continue;
+
+                    int sense = segment.SameSense ? 1 : 0;
+
+                    try
+                    {
+                        MarshalSegment2d(segment.ParentCurve, sense,
+                            types, sameSense, offsets, dataList, prebuiltHandles);
+                    }
+                    catch (IfcRuleViolationException ex)
+                    {
+                        _logger.LogWarning(
+                            "IIfcCompositeCurve #{Label}: skipping segment #{SegLabel} ({Rule}).",
+                            ifcComposite.EntityLabel, segment.EntityLabel, ex.Message);
+                        continue;
+                    }
+                }
+                offsets.Add(dataList.Count); // sentinel
+
+                if (types.Count == 0)
                     throw new XbimGeometryServiceException(
-                        $"IIfcCompositeCurve #{ifcComposite.EntityLabel} has no valid 2D segments.");
+                        $"IIfcCompositeCurve #{ifcComposite.EntityLabel} has no valid segments.");
 
-                using var nativeSegments = new NativeHandleArray(
-                    segmentCurves.Select(c => (SafeHandle)c.Handle).ToArray());
-                int result = XbimGeometryNativeApi.xbim_curve2d_build_composite_bspline(
-                    ContextHandle, nativeSegments.Ptrs, nativeSegments.Length,
-                    out var compositeHandle);
+                IntPtr[]? prebuiltPtrs = null;
+                NativeHandleArray nativePrebuilt = default;
+                try
+                {
+                    if (prebuiltHandles.Count > 0)
+                    {
+                        nativePrebuilt = new NativeHandleArray(
+                            prebuiltHandles.Select(c => (SafeHandle)c.Handle).ToArray());
+                        prebuiltPtrs = nativePrebuilt.Ptrs;
+                    }
 
-                if (result != 0)
-                    throw new XbimGeometryServiceException(
-                        $"Failed to build 2D composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+                    int result = XbimGeometryNativeApi.xbim_curve2d_build_composite(
+                        ContextHandle,
+                        types.Count,
+                        types.ToArray(),
+                        sameSense.ToArray(),
+                        dataList.ToArray(),
+                        offsets.ToArray(),
+                        prebuiltPtrs,
+                        prebuiltHandles.Count,
+                        out var compositeHandle);
 
-                return new XbimBoundedCurve2d(compositeHandle, XCurveType.IfcCompositeCurve);
+                    if (result != 0)
+                        throw new XbimGeometryServiceException(
+                            $"Failed to build composite curve #{ifcComposite.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                    return new XbimBoundedCurve2d(compositeHandle, XCurveType.IfcCompositeCurve);
+                }
+                finally
+                {
+                    if (prebuiltHandles.Count > 0)
+                        nativePrebuilt.Dispose();
+                }
             }
             finally
             {
-                foreach (var c in segmentCurves)
+                foreach (var c in prebuiltHandles)
                     c.Dispose();
             }
+        }
+
+        /// <summary>
+        /// Classifies a 2D parent curve as LINE, CIRCLE_TRIM, POLYLINE, or HANDLE
+        /// and appends the appropriate data to the flat arrays.
+        /// </summary>
+        private void MarshalSegment2d(
+            IIfcCurve parentCurve, int sense,
+            List<int> types, List<int> sameSenseList,
+            List<int> offsets, List<double> data,
+            List<XbimCurve2d> prebuiltHandles)
+        {
+            // Trimmed line → single LINE (4 doubles: sx, sy, ex, ey)
+            if (parentCurve is IIfcTrimmedCurve trimmed && trimmed.BasisCurve is IIfcLine)
+            {
+                bool trimSense = trimmed.SenseAgreement;
+                ExtractTrimParameters(trimmed, false,
+                    out double u1, out double u2, ref trimSense,
+                    out bool useCartesian, out var cp1, out var cp2);
+
+                double sx, sy, ex, ey;
+                bool canMarshal = true;
+                if (useCartesian && cp1 != null && cp2 != null)
+                {
+                    var c1 = cp1.Coordinates;
+                    var c2 = cp2.Coordinates;
+                    sx = c1[0]; sy = c1.Count > 1 ? c1[1] : 0.0;
+                    ex = c2[0]; ey = c2.Count > 1 ? c2[1] : 0.0;
+                }
+                else
+                {
+                    sx = sy = ex = ey = 0;
+                    canMarshal = false;
+                }
+
+                if (canMarshal)
+                {
+                    if (!trimmed.SenseAgreement)
+                    {
+                        (sx, ex) = (ex, sx);
+                        (sy, ey) = (ey, sy);
+                    }
+
+                    offsets.Add(data.Count);
+                    sameSenseList.Add(sense);
+                    types.Add(XbimGeometryNativeApi.CSegLine);
+                    data.AddRange(new[] { sx, sy, ex, ey });
+                    return;
+                }
+                // Fall through to HANDLE if can't extract points
+            }
+
+            // Polyline → single POLYLINE segment (N*2 doubles)
+            if (parentCurve is IIfcPolyline polyline && polyline.Points.Count >= 2)
+            {
+                var (px, py) = ExtractPolylinePoints2d(polyline);
+                offsets.Add(data.Count);
+                sameSenseList.Add(sense);
+                types.Add(XbimGeometryNativeApi.CSegPolyline);
+                for (int i = 0; i < px.Length; i++)
+                {
+                    data.Add(px[i]);
+                    data.Add(py[i]);
+                }
+                return;
+            }
+
+            // Trimmed circle → CIRCLE_TRIM (8 doubles)
+            if (MarshalCircleArc2d(parentCurve, sense, types, sameSenseList, offsets, data))
+                return;
+
+            // Fallback: build individually via P/Invoke
+            offsets.Add(data.Count);
+            sameSenseList.Add(sense);
+            types.Add(XbimGeometryNativeApi.CSegHandle);
+            var curve = (XbimCurve2d)BuildCurve2d(parentCurve);
+            prebuiltHandles.Add(curve);
+        }
+
+        /// <summary>
+        /// Tries to marshal a trimmed circle arc as flat 2D placement + trim data.
+        /// Returns true and appends 8 doubles on success:
+        /// cx, cy, refDirX, refDirY, radius, u1, u2, senseAgreement.
+        /// </summary>
+        private bool MarshalCircleArc2d(
+            IIfcCurve parentCurve, int segSense,
+            List<int> types, List<int> sameSenseList,
+            List<int> offsets, List<double> data)
+        {
+            if (!(parentCurve is IIfcTrimmedCurve trimmed && trimmed.BasisCurve is IIfcCircle circle))
+                return false;
+
+            if (circle.Radius <= 0)
+                return false;
+
+            if (circle.Position is not IIfcAxis2Placement2D axis2d)
+                return false;
+
+            double cx = axis2d.Location.Coordinates[0];
+            double cy = axis2d.Location.Coordinates[1];
+
+            double refDirX = 1, refDirY = 0;
+            if (axis2d.RefDirection != null)
+            {
+                refDirX = axis2d.RefDirection.DirectionRatios[0];
+                refDirY = axis2d.RefDirection.DirectionRatios[1];
+                double mag = Math.Sqrt(refDirX * refDirX + refDirY * refDirY);
+                if (mag > 1e-15) { refDirX /= mag; refDirY /= mag; }
+                else { refDirX = 1; refDirY = 0; }
+            }
+
+            bool trimSense = trimmed.SenseAgreement;
+            ExtractTrimParameters(trimmed, true,
+                out double u1, out double u2, ref trimSense,
+                out bool useCartesian, out var cp1, out var cp2);
+
+            if (useCartesian && cp1 != null && cp2 != null)
+            {
+                u1 = ProjectPointOnCircle2d(cp1, cx, cy, refDirX, refDirY);
+                u2 = ProjectPointOnCircle2d(cp2, cx, cy, refDirX, refDirY);
+                HandleEqualTrimParams(trimmed, true, ref u1, ref u2, ref trimSense);
+            }
+
+            offsets.Add(data.Count);
+            sameSenseList.Add(segSense);
+            types.Add(XbimGeometryNativeApi.CSegCircleTrim);
+            data.AddRange(new double[]
+            {
+                cx, cy,
+                refDirX, refDirY,
+                (double)circle.Radius,
+                u1, u2,
+                trimSense ? 1.0 : 0.0
+            });
+            return true;
+        }
+
+        /// <summary>
+        /// Projects a Cartesian point onto a 2D circle defined by center and reference direction,
+        /// returning the OCCT parameter (angle in radians from the reference direction).
+        /// </summary>
+        private static double ProjectPointOnCircle2d(
+            IIfcCartesianPoint cp,
+            double cx, double cy,
+            double refDirX, double refDirY)
+        {
+            var coords = cp.Coordinates;
+            double px = coords[0];
+            double py = coords.Count > 1 ? coords[1] : 0.0;
+
+            // Vector from circle center to point
+            double dx = px - cx;
+            double dy = py - cy;
+
+            // Project into circle's local frame (refDir = X axis, perpendicular = Y axis)
+            // Y axis = (-refDirY, refDirX) for counterclockwise rotation
+            double localX = dx * refDirX + dy * refDirY;
+            double localY = -dx * refDirY + dy * refDirX;
+
+            double angle = Math.Atan2(localY, localX);
+            if (angle < 0) angle += 2.0 * Math.PI;
+            return angle;
         }
 
         /// <summary>
@@ -554,7 +792,25 @@ namespace Xbim.Geometry.Engine.Factories
                         pts.Add((coords[0], coords.Count > 1 ? coords[1] : 0.0));
                     }
 
-                    if (!segment.SameSense)
+                    bool shouldReverse = !segment.SameSense;
+
+                    // Connectivity check: compare forward vs reversed gap to last point
+                    if (allXY.Count >= 2 && pts.Count >= 2)
+                    {
+                        double prevX = allXY[allXY.Count - 2];
+                        double prevY = allXY[allXY.Count - 1];
+                        var first = pts[0];
+                        var last = pts[pts.Count - 1];
+                        double gapFwd = (first.x - prevX) * (first.x - prevX) + (first.y - prevY) * (first.y - prevY);
+                        double gapRev = (last.x - prevX) * (last.x - prevX) + (last.y - prevY) * (last.y - prevY);
+
+                        if (shouldReverse && gapRev > gapFwd)
+                            shouldReverse = false;
+                        else if (!shouldReverse && gapFwd > gapRev)
+                            shouldReverse = true;
+                    }
+
+                    if (shouldReverse)
                         pts.Reverse();
 
                     // Append, deduplicating at junction
@@ -599,7 +855,23 @@ namespace Xbim.Geometry.Engine.Factories
                         (sy, ey) = (ey, sy);
                     }
 
-                    if (!segment.SameSense)
+                    bool shouldReverseLine = !segment.SameSense;
+
+                    // Connectivity check: compare forward vs reversed gap to last point
+                    if (allXY.Count >= 2)
+                    {
+                        double prevX = allXY[allXY.Count - 2];
+                        double prevY = allXY[allXY.Count - 1];
+                        double gapFwd = (sx - prevX) * (sx - prevX) + (sy - prevY) * (sy - prevY);
+                        double gapRev = (ex - prevX) * (ex - prevX) + (ey - prevY) * (ey - prevY);
+
+                        if (shouldReverseLine && gapRev > gapFwd)
+                            shouldReverseLine = false;
+                        else if (!shouldReverseLine && gapFwd > gapRev)
+                            shouldReverseLine = true;
+                    }
+
+                    if (shouldReverseLine)
                     {
                         (sx, ex) = (ex, sx);
                         (sy, ey) = (ey, sy);

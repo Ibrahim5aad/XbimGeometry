@@ -1381,6 +1381,376 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_polyline_bspline(
     }
 }
 
+/*
+ * Helper: build a degree-1 2D B-spline from an array of 2D points.
+ * Uses chord-length parameterization.
+ */
+static Handle(Geom2d_BSplineCurve) BuildPolylineBSpline2d(
+    const std::vector<gp_Pnt2d>& points)
+{
+    int N = (int)points.size();
+    if (N < 2)
+        return Handle(Geom2d_BSplineCurve)();
+
+    TColgp_Array1OfPnt2d poles(1, N);
+    TColStd_Array1OfReal knots(1, N);
+    TColStd_Array1OfInteger mults(1, N);
+
+    double cumDist = 0.0;
+    for (int i = 0; i < N; ++i)
+    {
+        poles(i + 1) = points[i];
+        if (i > 0)
+            cumDist += points[i].Distance(points[i - 1]);
+        knots(i + 1) = cumDist;
+        mults(i + 1) = (i == 0 || i == N - 1) ? 2 : 1;
+    }
+
+    return new Geom2d_BSplineCurve(poles, knots, mults, 1);
+}
+
+/*
+ * Collect 2D points from a segment (LINE or POLYLINE) into the flat points vector.
+ * Handles sameSense reversal and deduplication at junctions.
+ */
+static void CollectLinearPoints2d(
+    int type,
+    const double* data,
+    int numDoubles,
+    bool reverse,
+    double tolerance,
+    std::vector<gp_Pnt2d>& allPoints)
+{
+    if (type == XBIM_CSEG_LINE)
+    {
+        gp_Pnt2d p1(data[0], data[1]);
+        gp_Pnt2d p2(data[2], data[3]);
+        if (p1.Distance(p2) < tolerance)
+            return;
+
+        // Connectivity check: override reverse if it worsens the gap
+        if (!allPoints.empty())
+        {
+            double gapFwd = allPoints.back().Distance(p1);
+            double gapRev = allPoints.back().Distance(p2);
+            if (reverse && gapRev > gapFwd)
+                reverse = false;
+            else if (!reverse && gapFwd > gapRev)
+                reverse = true;
+        }
+
+        if (reverse)
+            std::swap(p1, p2);
+
+        if (!allPoints.empty() && allPoints.back().IsEqual(p1, tolerance))
+            allPoints.push_back(p2);
+        else
+        {
+            allPoints.push_back(p1);
+            allPoints.push_back(p2);
+        }
+    }
+    else /* POLYLINE */
+    {
+        int numPts = numDoubles / 2;
+        if (numPts < 2)
+            return;
+
+        std::vector<gp_Pnt2d> pts;
+        pts.reserve(numPts);
+        for (int p = 0; p < numPts; ++p)
+            pts.emplace_back(data[p * 2], data[p * 2 + 1]);
+
+        // Connectivity check: override reverse if it worsens the gap
+        if (!allPoints.empty())
+        {
+            double gapFwd = allPoints.back().Distance(pts.front());
+            double gapRev = allPoints.back().Distance(pts.back());
+            if (reverse && gapRev > gapFwd)
+                reverse = false;
+            else if (!reverse && gapFwd > gapRev)
+                reverse = true;
+        }
+
+        if (reverse)
+            std::reverse(pts.begin(), pts.end());
+
+        for (size_t p = 0; p < pts.size(); ++p)
+        {
+            if (!allPoints.empty() && allPoints.back().IsEqual(pts[p], tolerance))
+                continue;
+            allPoints.push_back(pts[p]);
+        }
+    }
+}
+
+static bool AddToConverter2d(
+    XbimContextHandle ctx,
+    Geom2dConvert_CompCurveToBSplineCurve& converter,
+    const Handle(Geom2d_BoundedCurve)& bounded,
+    int segIndex)
+{
+    if (!converter.Add(bounded, ctx->minimumGap, Standard_False))
+    {
+        // Reverse a copy and retry — the sense flag may be wrong
+        Handle(Geom2d_BoundedCurve) reversed =
+            Handle(Geom2d_BoundedCurve)::DownCast(bounded->Copy());
+        reversed->Reverse();
+        if (!converter.Add(reversed, ctx->minimumGap, Standard_False))
+        {
+            xbim_log_warning(ctx,
+                "xbim_curve2d_build_composite: segment %d is not continuous, skipping", segIndex);
+            return false;
+        }
+    }
+    return true;
+}
+
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_composite(
+    XbimContextHandle    ctx,
+    int                  numSegments,
+    const int*           segTypes,
+    const int*           segSameSense,
+    const double*        segData,
+    const int*           segDataOffsets,
+    XbimCurve2dHandle*   prebuiltCurves,
+    int                  numPrebuilt,
+    XbimCurve2dHandle*   outHandle)
+{
+    xbim_clear_error();
+
+    if (!outHandle)
+    {
+        xbim_set_error("xbim_curve2d_build_composite: outHandle is NULL");
+        return XBIM_INVALID_ARG;
+    }
+    *outHandle = nullptr;
+
+    if (numSegments < 1 || !segTypes || !segSameSense || !segData || !segDataOffsets)
+    {
+        xbim_set_error("xbim_curve2d_build_composite: invalid arguments");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        /* ── Fast path: all-linear composite ─────────────────────────────────
+         * When every segment is LINE or POLYLINE, flatten all 2D points
+         * into a single array and build a degree-1 B-spline directly.
+         */
+        bool allLinear = true;
+        for (int i = 0; i < numSegments; ++i)
+        {
+            if (segTypes[i] != XBIM_CSEG_LINE && segTypes[i] != XBIM_CSEG_POLYLINE)
+            {
+                allLinear = false;
+                break;
+            }
+        }
+
+        if (allLinear)
+        {
+            std::vector<gp_Pnt2d> allPoints;
+            allPoints.reserve(numSegments * 4);
+
+            for (int i = 0; i < numSegments; ++i)
+            {
+                int numDoubles = segDataOffsets[i + 1] - segDataOffsets[i];
+                CollectLinearPoints2d(
+                    segTypes[i],
+                    segData + segDataOffsets[i],
+                    numDoubles,
+                    segSameSense[i] == 0,
+                    ctx->minimumGap,
+                    allPoints);
+            }
+
+            if ((int)allPoints.size() < 2)
+            {
+                xbim_set_error("xbim_curve2d_build_composite: all-linear composite has < 2 unique points");
+                return XBIM_ERROR;
+            }
+
+            Handle(Geom2d_BSplineCurve) result = BuildPolylineBSpline2d(allPoints);
+            if (result.IsNull())
+            {
+                xbim_set_error("xbim_curve2d_build_composite: failed to build polyline B-spline");
+                return XBIM_ERROR;
+            }
+
+            *outHandle = xbim_curve2d_create_from(result);
+            return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+        }
+
+        /* ── General path: mixed segment types ───────────────────────────────
+         * Uses Geom2dConvert_CompCurveToBSplineCurve to join heterogeneous
+         * bounded 2D curves. Conic segments are approximated before adding
+         * (the 2D converter can't handle conics directly).
+         */
+        Geom2dConvert_CompCurveToBSplineCurve converter(Convert_RationalC1);
+        int prebuiltIdx = 0;
+
+        for (int i = 0; i < numSegments; ++i)
+        {
+            int type = segTypes[i];
+            bool reverse = (segSameSense[i] == 0);
+            const double* data = segData + segDataOffsets[i];
+
+            Handle(Geom2d_BoundedCurve) bounded;
+
+            switch (type)
+            {
+            case XBIM_CSEG_LINE:
+            {
+                gp_Pnt2d p1(data[0], data[1]);
+                gp_Pnt2d p2(data[2], data[3]);
+                double dist = p1.Distance(p2);
+                if (dist < ctx->minimumGap)
+                {
+                    xbim_log_warning(ctx, "xbim_curve2d_build_composite: segment %d is a degenerate line, skipping", i);
+                    continue;
+                }
+                gp_Dir2d dir(gp_Vec2d(p1, p2));
+                bounded = new Geom2d_TrimmedCurve(new Geom2d_Line(p1, dir), 0.0, dist);
+                break;
+            }
+
+            case XBIM_CSEG_CIRCLE_TRIM:
+            {
+                /* 2D layout: cx, cy, refDirX, refDirY, radius, u1, u2, sense */
+                gp_Pnt2d center(data[0], data[1]);
+                gp_Dir2d refDir(data[2], data[3]);
+                double   radius = data[4];
+                double   u1 = data[5];
+                double   u2 = data[6];
+                bool     sense = (data[7] != 0.0);
+
+                gp_Ax2d mainAxis(center, refDir);
+                gp_Ax22d ax22d(mainAxis, Standard_True);
+                Handle(Geom2d_Circle) circle = new Geom2d_Circle(ax22d, radius);
+
+                /* Match the proven arc construction from xbim_curve2d_build_arc_of_circle:
+                 * swap u1/u2 when !sense, then use GCE2d_MakeArcOfCircle which correctly
+                 * handles arc direction and parameter wrapping across 0/2PI. */
+                if (!sense)
+                    std::swap(u1, u2);
+
+                GCE2d_MakeArcOfCircle arcMaker(circle->Circ2d(), u1, u2, sense);
+                if (!arcMaker.IsDone())
+                {
+                    xbim_log_warning(ctx,
+                        "xbim_curve2d_build_composite: segment %d arc construction failed, skipping", i);
+                    continue;
+                }
+
+                /* Convert trimmed arc to exact rational B-spline for the converter. */
+                bounded = Geom2dConvert::CurveToBSplineCurve(arcMaker.Value());
+                break;
+            }
+
+            case XBIM_CSEG_POLYLINE:
+            {
+                int numDoubles = segDataOffsets[i + 1] - segDataOffsets[i];
+                int numPts = numDoubles / 2;
+                if (numPts < 2)
+                {
+                    xbim_log_warning(ctx, "xbim_curve2d_build_composite: segment %d polyline has < 2 points, skipping", i);
+                    continue;
+                }
+
+                if (numPts == 2)
+                {
+                    gp_Pnt2d p1(data[0], data[1]);
+                    gp_Pnt2d p2(data[2], data[3]);
+                    double dist = p1.Distance(p2);
+                    if (dist < ctx->minimumGap)
+                        continue;
+                    gp_Dir2d dir(gp_Vec2d(p1, p2));
+                    bounded = new Geom2d_TrimmedCurve(new Geom2d_Line(p1, dir), 0.0, dist);
+                }
+                else
+                {
+                    std::vector<gp_Pnt2d> pts;
+                    pts.reserve(numPts);
+                    gp_Pnt2d lastPt(data[0], data[1]);
+                    pts.push_back(lastPt);
+
+                    for (int p = 1; p < numPts; ++p)
+                    {
+                        gp_Pnt2d nextPt(data[p * 2], data[p * 2 + 1]);
+                        if (!nextPt.IsEqual(lastPt, ctx->minimumGap))
+                        {
+                            pts.push_back(nextPt);
+                            lastPt = nextPt;
+                        }
+                    }
+
+                    if ((int)pts.size() < 2)
+                        continue;
+
+                    bounded = BuildPolylineBSpline2d(pts);
+                    if (bounded.IsNull())
+                        continue;
+                }
+                break;
+            }
+
+            case XBIM_CSEG_HANDLE:
+            {
+                if (prebuiltIdx >= numPrebuilt || !prebuiltCurves ||
+                    !prebuiltCurves[prebuiltIdx] || prebuiltCurves[prebuiltIdx]->curve.IsNull())
+                {
+                    xbim_log_warning(ctx, "xbim_curve2d_build_composite: segment %d has invalid pre-built handle, skipping", i);
+                    prebuiltIdx++;
+                    continue;
+                }
+                Handle(Geom2d_Curve) c = prebuiltCurves[prebuiltIdx]->curve;
+                bounded = Handle(Geom2d_BoundedCurve)::DownCast(c);
+                if (bounded.IsNull())
+                {
+                    xbim_log_warning(ctx, "xbim_curve2d_build_composite: segment %d pre-built curve is not bounded, skipping", i);
+                    prebuiltIdx++;
+                    continue;
+                }
+                bounded = Handle(Geom2d_BoundedCurve)::DownCast(bounded->Copy());
+                prebuiltIdx++;
+
+                /* Convert conics to exact B-spline before adding to converter */
+                if (IsConic2d(bounded))
+                    bounded = Geom2dConvert::CurveToBSplineCurve(bounded);
+                break;
+            }
+
+            default:
+                xbim_log_warning(ctx, "xbim_curve2d_build_composite: segment %d has unknown type %d, skipping", i, type);
+                continue;
+            }
+
+            if (reverse)
+                bounded->Reverse();
+
+            AddToConverter2d(ctx, converter, bounded, i);
+        }
+
+        Handle(Geom2d_BSplineCurve) result = converter.BSplineCurve();
+        if (result.IsNull())
+        {
+            xbim_set_error("xbim_curve2d_build_composite: composite B-spline is null");
+            return XBIM_ERROR;
+        }
+
+        *outHandle = xbim_curve2d_create_from(result);
+        return (*outHandle) ? XBIM_OK : XBIM_ERROR;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_log_occt_failure(ctx, e, "xbim_curve2d_build_composite");
+        xbim_set_error("xbim_curve2d_build_composite: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
 #pragma endregion
 
 #pragma region Offset Curve 2D

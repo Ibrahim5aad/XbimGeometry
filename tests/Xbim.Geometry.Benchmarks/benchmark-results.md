@@ -16,24 +16,16 @@
 
 | Benchmark | Old V5 | Old V6 | New |
 |-----------|-------:|-------:|----:|
-| CompositeCurve (polyline) | **12.77 μs / 1.55 KB** | 13.00 μs / 1.55 KB | 18.21 μs / 6.77 KB |
-| CompositeCurve (mixed arcs+lines) | **61.45 μs / 3.29 KB** | 63.00 μs / 3.29 KB | 5,370 μs / 6.1 KB |
+| CompositeCurve (polyline) | 12.77 μs / 1.55 KB | 13.00 μs / 1.55 KB | **5.06 μs / 6.77 KB** |
+| CompositeCurve (mixed arcs+lines) | 61.45 μs / 3.29 KB | 63.00 μs / 3.29 KB | **50.5 μs / 6.11 KB** |
 
 ### Diagnostic Breakdown (polyline variant)
 
 | Phase | Time | Allocated |
 |-------|-----:|----------:|
-| Marshal only | 3.51 μs | 7,016 B |
-| Native only | 2.66 μs | 32 B |
-| Full end-to-end | 4.41 μs | 6,856 B |
-
-### Diagnostic Breakdown (mixed arcs+lines variant)
-
-| Phase | Time | Allocated |
-|-------|-----:|----------:|
-| Marshal only | 3.32 μs | 6,464 B |
-| Native only | 77.4 μs | 32 B |
-| Full end-to-end | 590 μs | 6,169 B |
+| Marshal only | 3.65 μs | 7,016 B |
+| Native only | 2.62 μs | 32 B |
+| Full end-to-end | 4.75 μs | 6,856 B |
 
 ---
 
@@ -68,9 +60,9 @@
 
 | Benchmark | Old V5 | Old V6 | New |
 |-----------|-------:|-------:|----:|
-| Boolean simple clip | **15.87 ms / 3.61 KB** | 16.24 ms / 3.61 KB | 147.3 ms / 3.51 KB |
-| Boolean nested | 29.31 ms / 4.93 KB | **29.15 ms / 4.93 KB** | 270.8 ms / 5.54 KB |
-| Boolean complex nested | N/A | N/A | **3,823 ms / 40.06 KB** |
+| Boolean simple clip | 15.87 ms / 3.61 KB | 16.24 ms / 3.61 KB | **14.76 ms / 2.45 KB** |
+| Boolean nested | 29.31 ms / 4.93 KB | 29.15 ms / 4.93 KB | **26.97 ms / 3.42 KB** |
+| Boolean complex nested | N/A | N/A | **452.6 ms / 39.73 KB** |
 
 ---
 
@@ -78,8 +70,8 @@
 
 | Benchmark | Old V5 | Old V6 | New |
 |-----------|-------:|-------:|----:|
-| CsgPrimitive3D | 48.05 μs / 160 B | **41.03 μs / 112 B** | 343.3 μs / 153 B |
-| CsgSolid | 12,739 μs / 1,128 B | **12,688 μs / 1,128 B** | 123,734 μs / 1,662 B |
+| CsgPrimitive3D | 48.05 μs / 160 B | 41.03 μs / 112 B | **36.20 μs / 152 B** |
+| CsgSolid | 12,739 μs / 1,128 B | **12,688 μs / 1,128 B** | 13,130 μs / 764 B |
 
 ---
 
@@ -89,7 +81,7 @@
 |-----------|-------:|-------:|----:|
 | SweptDiskSolid | 8,005 μs / 7,058 B | 7,982 μs / 7,058 B | **4,523 μs / 3,450 B** |
 | RevolvedAreaSolid (tapered) | **11,302 μs / 608 B** | 11,340 μs / 608 B | 24,710 μs / 526 B |
-| SurfaceCurveSweptAreaSolid | 2,737 μs / 929 B | **2,704 μs / 929 B** | 18,441 μs / 4,500 B |
+| SurfaceCurveSweptAreaSolid | 2,737 μs / 929 B | 2,704 μs / 929 B | **2,647 μs / 4,488 B** |
 
 ### Diagnostic Breakdown (revolved tapered)
 
@@ -105,9 +97,9 @@
 
 | Benchmark | Old V5 | Old V6 | New |
 |-----------|-------:|-------:|----:|
-| AdvancedBrep (complex) | 76.4 ms / 43.88 KB | **76.2 ms / 43.88 KB** | 194.5 ms / 41.95 KB |
-| AdvancedBrep (cube) | **6.21 ms / 17.83 KB** | N/A | 8.18 ms / 11.38 KB |
-| FacetedBrep | **12.12 ms / 108.59 KB** | 74.76 ms / 52.94 KB | 66.47 ms / 97.34 KB |
+| AdvancedBrep (complex) | 76.4 ms / 43.88 KB | **76.2 ms / 43.88 KB** | 185.9 ms / 40.52 KB |
+| AdvancedBrep (cube) | **6.21 ms / 17.83 KB** | N/A | 8.23 ms / 11.14 KB |
+| FacetedBrep | **12.12 ms / 108.59 KB** | 74.76 ms / 52.94 KB | 69.98 ms / 96.76 KB |
 
 ---
 
@@ -132,13 +124,18 @@
 
 | Category | Winner | New vs Best Old |
 |----------|--------|----------------:|
-| Composite Curves | Old V5 | ~87x slower |
+| Composite Curves (polyline) | **New** | ~2.5x faster |
+| Composite Curves (mixed) | **New** | ~1.2x faster |
 | Tessellation | **New** | ~3x faster |
 | Extruded Solids (rect) | Old V6 | ~10% slower |
 | Extruded Solids (composite) | **New** | ~4.3x faster |
-| Boolean Operations | Old V5/V6 | ~9x slower |
-| CSG Operations | Old V6 | ~8-10x slower |
-| Swept Solids (mixed) | varies | 1 win (1.8x), 2 losses (2.2x, 6.8x) |
-| Advanced BRep | Old V5/V6 | ~2.5-5.5x slower |
-| Full Model (MT) | **New** | ~5% faster |
+| Boolean simple clip | ~equal | ~7% faster (within noise) |
+| Boolean nested | **New** | ~7% faster |
+| CSG Primitive | **New** | ~12% faster |
+| CSG Solid | ~equal | ~3% slower (within noise) |
+| Swept Solids (mixed) | varies | 2 wins (1.8x, ~2%), 1 loss (2.2x) |
+| Advanced BRep (complex) | Old V6 | ~2.4x slower |
+| Advanced BRep (cube) | Old V5 | ~1.3x slower |
+| FacetedBrep | Old V5 | ~5.8x slower |
+| Full Model (MT) | ~equal | ~5% faster (within noise) |
 | Full Model (ST) | Old V6 | ~11% slower |

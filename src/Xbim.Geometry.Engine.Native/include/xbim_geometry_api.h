@@ -3933,6 +3933,38 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_polyline_bspline(
     XbimCurve2dHandle*  outHandle);
 
 /*
+ * Build a 2D composite B-spline from marshalled segment data in a single call.
+ * Mirrors xbim_curve_build_composite but with 2D data layout.
+ *
+ * Segment types (reuses XBIM_CSEG_* constants):
+ *   XBIM_CSEG_LINE        (0) – 4 doubles: start(xy), end(xy)
+ *   XBIM_CSEG_CIRCLE_TRIM (1) – 8 doubles: cx, cy, refDirX, refDirY,
+ *                                 radius, u1, u2, senseAgreement (0 or 1)
+ *   XBIM_CSEG_HANDLE      (2) – 0 doubles: uses next handle from prebuiltCurves
+ *   XBIM_CSEG_POLYLINE    (3) – N*2 doubles: p0(xy), p1(xy), ..., pN-1(xy)
+ *
+ *   segTypes       – [numSegments] segment type codes
+ *   segSameSense   – [numSegments] 1 = same sense, 0 = reverse
+ *   segData        – flat array of 2D curve parameters
+ *   segDataOffsets  – [numSegments+1] index offsets into segData per segment
+ *   prebuiltCurves – array of pre-built 2D curve handles for HANDLE-type segments
+ *   numPrebuilt    – number of pre-built handles
+ *   outHandle      – receives the composite 2D B-spline curve handle
+ *
+ * Returns XBIM_OK on success.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_build_composite(
+    XbimContextHandle    ctx,
+    int                  numSegments,
+    const int*           segTypes,
+    const int*           segSameSense,
+    const double*        segData,
+    const int*           segDataOffsets,
+    XbimCurve2dHandle*   prebuiltCurves,
+    int                  numPrebuilt,
+    XbimCurve2dHandle*   outHandle);
+
+/*
  * Build a 2D offset curve from a basis 2D curve and an offset distance.
  * Uses Geom2d_OffsetCurve(basis, offset).
  *

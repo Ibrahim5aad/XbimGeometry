@@ -1732,6 +1732,18 @@ namespace Xbim.Geometry.Engine.Internal
             out NativeCurve2dHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_build_composite(
+            NativeContextHandle ctx,
+            int numSegments,
+            [MarshalAs(UnmanagedType.LPArray)] int[] segTypes,
+            [MarshalAs(UnmanagedType.LPArray)] int[] segSameSense,
+            [MarshalAs(UnmanagedType.LPArray)] double[] segData,
+            [MarshalAs(UnmanagedType.LPArray)] int[] segDataOffsets,
+            [In] IntPtr[]? prebuiltCurves,
+            int numPrebuilt,
+            out NativeCurve2dHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_curve2d_build_offset(
             NativeContextHandle ctx,
             NativeCurve2dHandle basisHandle,
