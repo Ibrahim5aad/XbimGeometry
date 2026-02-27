@@ -13,7 +13,11 @@ using Xbim.Geometry.Abstractions;
 #endif
 using Xbim.Geometry.Benchmarks.Infrastructure;
 using Xbim.IO.Memory;
+#if OLD_ENGINE
+using Xbim.ModelGeometry.Scene;
+#else
 using Xbim.Geometry.Scene;
+#endif
 
 namespace Xbim.Geometry.Benchmarks.Benchmarks;
 

@@ -8,7 +8,6 @@
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepCheck_Shell.hxx>
-#include <BRepExtrema_DistShapeShape.hxx>
 #include <BRepFill.hxx>
 #include <BRepFill_Filling.hxx>
 #include <BRep_Tool.hxx>
@@ -24,6 +23,7 @@
 #include <ShapeFix_Shell.hxx>
 #include <ShapeFix_Solid.hxx>
 #include <ShapeAnalysis.hxx>
+#include <ShapeAnalysis_Surface.hxx>
 #include <Standard_Failure.hxx>
 #include <BRepTools_WireExplorer.hxx>
 #include <TopExp.hxx>
@@ -98,7 +98,6 @@ static bool locate_point_on_curve(
 
 /*
  * Check whether all edges of a wire lie within tolerance of a face's surface.
- * Uses BRepExtrema_DistShapeShape — same approach as old V5 WithinTolerance.
  */
 static bool within_tolerance(
     const TopoDS_Wire& wire,
@@ -107,17 +106,34 @@ static bool within_tolerance(
 {
     try
     {
-        /* Use tolerance * 10 matching old NativeAdvancedFacesBuilder::WithinTolerance */
+        /* Check that wire edges lie on the face surface within tolerance * 10.
+         * Samples each edge at start, midpoint, and end, then projects onto
+         * the surface. */
+        Handle(Geom_Surface) surface = BRep_Tool::Surface(face);
+        if (surface.IsNull())
+            return false;
+
         double tol10 = tolerance * 10;
-        BRepExtrema_DistShapeShape measure;
-        measure.LoadS1(face);
+        ShapeAnalysis_Surface sas(surface);
+
         for (TopExp_Explorer edgeExp(wire, TopAbs_EDGE); edgeExp.More(); edgeExp.Next())
         {
-            measure.LoadS2(edgeExp.Current());
-            if (!measure.Perform() || !measure.IsDone())
+            double first, last;
+            Handle(Geom_Curve) curve = BRep_Tool::Curve(
+                TopoDS::Edge(edgeExp.Current()), first, last);
+            if (curve.IsNull())
                 return false;
-            if (measure.Value() > tol10)
-                return false;
+
+            /* Sample start, midpoint, and end of the edge */
+            double params[3] = { first, (first + last) * 0.5, last };
+            for (int i = 0; i < 3; i++)
+            {
+                gp_Pnt pnt = curve->Value(params[i]);
+                gp_Pnt2d uv = sas.ValueOfUV(pnt, tol10);
+                gp_Pnt projected = surface->Value(uv.X(), uv.Y());
+                if (pnt.Distance(projected) > tol10)
+                    return false;
+            }
         }
         return true;
     }
@@ -141,7 +157,7 @@ static bool rebuild_ruled_surface(
 {
     /* Collect edges in wire traversal order (BRepTools_WireExplorer respects
      * vertex connectivity, unlike TopExp_Explorer which may give arbitrary order).
-     * This matches the old NativeAdvancedFacesBuilder::BuildFace approach. */
+     */
     std::vector<TopoDS_Edge> curveEdges;
     std::vector<TopoDS_Edge> allEdges;
 
@@ -159,7 +175,7 @@ static bool rebuild_ruled_surface(
     /* Helper: fix wire pcurves against a new surface and update outerWire */
     auto fix_wire_for_surface = [&](const TopoDS_Face& face)
     {
-        ShapeFix_Wire wf(outerWire, face, b.tolerance);
+        ShapeFix_Wire wf(outerWire, face, b.ctx->minimumGap);
         if (wf.Perform())
             outerWire = wf.Wire();
     };
@@ -300,7 +316,7 @@ TopoDS_Edge xbim_brep_build_orient_edge(
     {
         gp_Pnt p1 = BRep_Tool::Pnt(startV);
         gp_Pnt p2 = BRep_Tool::Pnt(endV);
-        if (p1.Distance(p2) <= b.tolerance)
+        if (p1.Distance(p2) <= b.ctx->precision)
             endV = startV;
     }
 
@@ -330,9 +346,9 @@ TopoDS_Edge xbim_brep_build_orient_edge(
         double trim1Tolerance, trim2Tolerance;
 
         bool foundP1 = locate_point_on_curve(sharedEdgeGeom, startV,
-            b.tolerance * 20, trimParam1, trim1Tolerance);
+            b.ctx->minimumGap, trimParam1, trim1Tolerance);
         bool foundP2 = locate_point_on_curve(sharedEdgeGeom, endV,
-            b.tolerance * 20, trimParam2, trim2Tolerance);
+            b.ctx->minimumGap, trimParam2, trim2Tolerance);
 
         if (!foundP1)
         {
@@ -340,7 +356,7 @@ TopoDS_Edge xbim_brep_build_orient_edge(
                 "Failed to project vertex to edge geometry: #%d, start point assumed",
                 edgeLabel);
             trimParam1 = sharedEdgeGeom->FirstParameter();
-            trim1Tolerance = b.tolerance;
+            trim1Tolerance = b.ctx->minimumGap;
         }
         if (!foundP2)
         {
@@ -348,7 +364,7 @@ TopoDS_Edge xbim_brep_build_orient_edge(
                 "Failed to project vertex to edge geometry: #%d, end point assumed",
                 edgeLabel);
             trimParam2 = sharedEdgeGeom->LastParameter();
-            trim2Tolerance = b.tolerance;
+            trim2Tolerance = b.ctx->minimumGap;
         }
 
         double currentStartTol = BRep_Tool::Tolerance(startV);
@@ -396,6 +412,7 @@ void xbim_brep_build_loop_wire(
     b.builder.MakeWire(loopWire);
 
     std::vector<TopoDS_Edge> loopEdges;
+    ShapeFix_Edge edgeFixer;
 
     for (const auto& edgeData : boundData.edges)
     {
@@ -408,36 +425,24 @@ void xbim_brep_build_loop_wire(
         if (topoEdge.IsNull())
             continue;
 
+        if (!buildRuledSurface)
+            edgeFixer.FixAddPCurve(topoEdge, face, Standard_False);
+
         loopEdges.push_back(topoEdge);
+        b.builder.Add(loopWire, topoEdge);
     }
-
-    if (!buildRuledSurface)
-    {
-        ShapeFix_Edge edgeFixer;
-        for (auto& edge : loopEdges)
-            edgeFixer.FixAddPCurve(edge, face, Standard_False);
-    }
-
-    /* Add edges to wire via BRep_Builder (preserves exact topology) */
-    for (const auto& edge : loopEdges)
-        b.builder.Add(loopWire, edge);
-
-    /* Reorder edges only (matching old V5: FixReorder but NOT FixAddPCurve
-       at wire level — pcurves were already added per-edge above) */
-    {
-        Handle(ShapeFix_Wire) wireFixer = new ShapeFix_Wire(loopWire, face, b.tolerance);
-        wireFixer->ClearModes();
-        wireFixer->FixReorderMode() = 1;
-        wireFixer->Perform();
+    
+    Handle(ShapeFix_Wire) wireFixer = 
+        new ShapeFix_Wire(loopWire, face, b.ctx->minimumGap);
+    if(wireFixer->FixReorder())
         loopWire = wireFixer->Wire();
-    }
 
     loopWire.Closed(true);
 
     BRepCheck_Analyzer analyser(loopWire, Standard_True);
     if (!analyser.IsValid())
     {
-        ShapeFix_Wire sfw(loopWire, face, b.tolerance);
+        ShapeFix_Wire sfw(loopWire, face, b.ctx->minimumGap);
         if (sfw.Perform())
         {
             loopWire = sfw.Wire();
@@ -473,7 +478,7 @@ TopoDS_Face xbim_brep_build_face(
     }
 
     /* Create a base face from the surface */
-    BRepBuilderAPI_MakeFace baseFaceMaker(faceData.surface, b.tolerance);
+    BRepBuilderAPI_MakeFace baseFaceMaker(faceData.surface, b.ctx->precision);
     if (!baseFaceMaker.IsDone())
     {
         xbim_log_warning(b.ctx, "Could not create base face from surface");
@@ -524,11 +529,11 @@ TopoDS_Face xbim_brep_build_face(
     if (faceData.buildRuledSurface)
     {
         bool needRebuild = true;
-        bool withinTol = within_tolerance(outerLoop, baseFace, b.tolerance);
+        bool withinTol = within_tolerance(outerLoop, baseFace, b.ctx->minimumGap);
 
         if (withinTol)
         {
-            ShapeFix_Wire wfIfc(outerLoop, baseFace, b.tolerance);
+            ShapeFix_Wire wfIfc(outerLoop, baseFace, b.ctx->minimumGap);
             if (wfIfc.FixEdgeCurves())
                 outerLoop = wfIfc.Wire();
 
@@ -588,7 +593,7 @@ TopoDS_Face xbim_brep_build_face(
                loops relative to the face (matching old V5 approach — handles
                non-planar surfaces correctly, unlike area-sign heuristics). */
             ShapeFix_Face faceFixer(topoAdvancedFace);
-            faceFixer.SetPrecision(b.tolerance);
+            faceFixer.SetPrecision(b.ctx->precision);
             if (faceFixer.FixOrientation())
                 topoAdvancedFace = faceFixer.Face();
         }
@@ -660,7 +665,7 @@ TopoDS_Shape xbim_brep_build_shell(
 
         /* Try ShapeFix_Shell */
         ShapeFix_Shell shellFixer(shell);
-        shellFixer.SetPrecision(b.tolerance);
+        shellFixer.SetPrecision(b.ctx->precision);
         if (shellFixer.Perform())
         {
             shell = shellFixer.Shell();
@@ -677,9 +682,9 @@ TopoDS_Shape xbim_brep_build_shell(
         /* Last resort: ShapeFix_Shape which can produce compound */
         TopoDS_Shape shape = shell;
         ShapeFix_Shape shapeFixer(shape);
-        shapeFixer.SetPrecision(b.tolerance);
-        shapeFixer.SetMinTolerance(b.tolerance);
-        shapeFixer.SetMaxTolerance(b.tolerance * 10);
+        shapeFixer.SetPrecision(b.ctx->minimumGap);
+        shapeFixer.SetMinTolerance(b.ctx->minimumGap);
+        shapeFixer.SetMaxTolerance(b.ctx->minimumGap * 10);
         if (shapeFixer.Perform())
         {
             shape = shapeFixer.Shape();
@@ -728,7 +733,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_create(
     }
 
     builder->ctx = ctx;
-    builder->tolerance = ctx->minimumGap;
     *outBuilder = builder;
     return XBIM_OK;
 }
@@ -894,7 +898,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_end_face(
 
 /*
  * Helper: wraps a shell as a solid using ShapeFix_Solid::SolidFromShell
- * (matching old V6 approach), with BRepClass3d_SolidClassifier safety net.
  */
 static bool shell_to_solid(
     const TopoDS_Shell& shell,
@@ -975,7 +978,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_build(
         if (result.ShapeType() == TopAbs_SHELL)
         {
             TopoDS_Solid solid;
-            if (shell_to_solid(TopoDS::Shell(result), solid, builder->tolerance))
+            if (shell_to_solid(TopoDS::Shell(result), solid, builder->ctx->minimumGap))
                 *outHandle = xbim_shape_create_from(solid);
             else
                 *outHandle = xbim_shape_create_from(result);
@@ -992,7 +995,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_advanced_brep_build(
         for (TopExp_Explorer shellExp(result, TopAbs_SHELL); shellExp.More(); shellExp.Next())
         {
             TopoDS_Solid solid;
-            if (shell_to_solid(TopoDS::Shell(shellExp.Current()), solid, builder->tolerance))
+            if (shell_to_solid(TopoDS::Shell(shellExp.Current()), solid, builder->ctx->minimumGap))
             {
                 b.Add(compound, solid);
                 solidCount++;

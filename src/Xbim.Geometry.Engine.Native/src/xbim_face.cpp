@@ -955,7 +955,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_surface_build_curve_bounded_plane(
             return XBIM_NULL_SHAPE;
         }
 
-        /* Add parametric curves to edges (mirrors NSurfaceFactory::FixInvalidEdges). */
+        /* Add parametric curves to edges. */
         ShapeFix_Edge edgeFixer;
         for (TopExp_Explorer exp(face, TopAbs_EDGE); exp.More(); exp.Next())
             edgeFixer.FixAddPCurve(TopoDS::Edge(exp.Current()), face, Standard_False);

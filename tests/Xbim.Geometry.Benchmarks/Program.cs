@@ -4,7 +4,11 @@ using Microsoft.Extensions.Logging;
 using Xbim.Common;
 using Xbim.Geometry.Benchmarks.Infrastructure;
 using Xbim.Ifc4.Interfaces;
+#if OLD_ENGINE
+using Xbim.ModelGeometry.Scene;
+#else
 using Xbim.Geometry.Scene;
+#endif
 #if OLD_ENGINE
 using Xbim.Geometry.Abstractions;
 #endif

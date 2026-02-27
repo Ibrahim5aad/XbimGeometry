@@ -97,9 +97,9 @@
 
 | Benchmark | Old V5 | Old V6 | New |
 |-----------|-------:|-------:|----:|
-| AdvancedBrep (complex) | 76.4 ms / 43.88 KB | **76.2 ms / 43.88 KB** | 185.9 ms / 40.52 KB |
-| AdvancedBrep (cube) | **6.21 ms / 17.83 KB** | N/A | 8.23 ms / 11.14 KB |
-| FacetedBrep | **12.12 ms / 108.59 KB** | 74.76 ms / 52.94 KB | 69.98 ms / 96.76 KB |
+| AdvancedBrep (complex) | 76.4 ms / 43.88 KB | **76.2 ms / 43.88 KB** | 79.7 ms / 40.1 KB |
+| AdvancedBrep (cube) | **6.21 ms / 17.83 KB** | N/A | 7.63 ms / 11.13 KB |
+| FacetedBrep | **12.12 ms / 108.59 KB** | 74.76 ms / 52.94 KB | 68.8 ms / 96.76 KB |
 
 ---
 
@@ -111,12 +111,14 @@
 |-----------|-------:|-------:|----:|----------:|
 | beam-standard-case | 19.94 ms / 18.29 MB | 20.91 ms / 18.28 MB | **19.00 ms / 18.28 MB** | 18.3 MB |
 | SampleHouse4 | 1,841 ms / 126.76 MB | 1,719 ms / 126.74 MB | **1,693 ms / 126.72 MB** | 126.7 MB |
+| Dormitory-ALL-IFC | 6,662 ms / ~291 MB | 7,362 ms / ~280 MB | **5,820 ms / ~291 MB** | ~291 MB |
 
 ### Single-threaded (MaxThreads = 1)
 
 | Benchmark | Old V5 | Old V6 | New | Allocated |
 |-----------|-------:|-------:|----:|----------:|
 | SampleHouse4 | 3,231 ms / 126.66 MB | **3,116 ms / 126.66 MB** | 3,453 ms / 126.66 MB | 126.7 MB |
+| Dormitory-ALL-IFC | 28,904 ms / ~339 MB | 32,541 ms / ~329 MB | **27,044 ms / ~339 MB** | ~339 MB |
 
 ---
 
@@ -134,8 +136,10 @@
 | CSG Primitive | **New** | ~12% faster |
 | CSG Solid | ~equal | ~3% slower (within noise) |
 | Swept Solids (mixed) | varies | 2 wins (1.8x, ~2%), 1 loss (2.2x) |
-| Advanced BRep (complex) | Old V6 | ~2.4x slower |
-| Advanced BRep (cube) | Old V5 | ~1.3x slower |
-| FacetedBrep | Old V5 | ~5.8x slower |
-| Full Model (MT) | ~equal | ~5% faster (within noise) |
-| Full Model (ST) | Old V6 | ~11% slower |
+| Advanced BRep (complex) | ~equal | ~5% slower (within noise) |
+| Advanced BRep (cube) | Old V5 | ~1.2x slower |
+| FacetedBrep | Old V5 | ~5.7x slower |
+| Full Model MT (small) | ~equal | ~5% faster (within noise) |
+| Full Model MT (large) | **New** | ~12% faster |
+| Full Model ST (small) | Old V6 | ~11% slower |
+| Full Model ST (large) | **New** | ~6% faster |

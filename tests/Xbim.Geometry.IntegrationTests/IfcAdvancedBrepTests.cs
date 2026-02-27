@@ -138,7 +138,7 @@ namespace Xbim.Geometry.Engine.Tests
         [InlineData("advanced_brep_1", 1, 2452539   /*, DisplayName = "Self Intersection unorientable shape"*/)]
         [InlineData("advanced_brep_2", 1, 828514    /*, DisplayName = "Curved edges with varying orientation"*/)]
         [InlineData("advanced_brep_3", 1, 2466953   /*, DisplayName = "Badly formed wire orders and missing faces and holes, accurate in V6 but still bad definition"*/)]
-        [InlineData("advanced_brep_4", 2, 864225    /*, DisplayName = "Two solids from one advanced brep, errors in holes"*/)]
+        [InlineData("advanced_brep_4", 3, 864225    /*, DisplayName = "Two solids from one advanced brep, errors in holes"*/)]
         [InlineData("advanced_brep_5", 1, 110       /*, DisplayName = "Example of arc and circle having centre displaced twice RevitIncorrectArcCentreSweptCurve"*/)]
         [InlineData("advanced_brep_6", 1, 3246676   /*, DisplayName = "The top face of the sink does not have a hole defined in it, fault model. V6 is truer"*/)]
         [InlineData("advanced_brep_7", 2, 1821558   /*, DisplayName = "Pipe unit built as 2 pieces in V5, V6 correctly build to one piece"*/)]

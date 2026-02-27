@@ -37,6 +37,8 @@
   <!-- Exclude new-engine-only benchmarks when building with old engine -->
   <ItemGroup Condition="'$(EngineMode)' == 'Old'">
     <Compile Remove="Benchmarks\CompositeCurveDiagnosticBenchmarks.cs" />
+    <Compile Remove="Benchmarks\ExtrudedSolidDiagnosticBenchmarks.cs" />
+    <Compile Remove="Benchmarks\RevolvedSolidDiagnosticBenchmarks.cs" />
   </ItemGroup>
 
   <!-- Link test files from IntegrationTests (no duplication) -->

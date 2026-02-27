@@ -57,7 +57,6 @@ struct XbimBrepFaceData
 struct XbimAdvancedBrepBuilder_
 {
     XbimContextHandle ctx;
-    double tolerance;
     BRep_Builder builder;
 
     /* Shared topology caches, keyed by IFC entity label */
@@ -75,7 +74,7 @@ struct XbimAdvancedBrepBuilder_
     XbimBrepBoundData* currentBound;
 
     XbimAdvancedBrepBuilder_()
-        : ctx(nullptr), tolerance(0.0), currentFace(nullptr), currentBound(nullptr)
+        : ctx(nullptr), currentFace(nullptr), currentBound(nullptr)
     {}
 };
 
