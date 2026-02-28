@@ -3779,6 +3779,19 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_length(
     double*           outLength);
 
 /*
+ * Find the parametric value at a given arc-length distance from a reference parameter.
+ * Uses GCPnts_AbscissaPoint for numerical computation (handles elliptic integrals, etc.).
+ *   referenceParam - the starting parameter on the curve
+ *   distance       - the arc-length distance (positive or negative) from referenceParam
+ *   outParam       - receives the computed parameter value
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_parameter_at_distance(
+    XbimCurve2dHandle handle,
+    double            referenceParam,
+    double            distance,
+    double*           outParam);
+
+/*
  * Evaluate a point on the 2D curve at parameter u.
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_value(

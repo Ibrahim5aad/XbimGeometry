@@ -1665,6 +1665,13 @@ namespace Xbim.Geometry.Engine.Internal
             out double outLength);
 
         [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_curve2d_parameter_at_distance(
+            NativeCurve2dHandle handle,
+            double referenceParam,
+            double distance,
+            out double outParam);
+
+        [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_curve2d_value(
             NativeCurve2dHandle handle,
             double u,

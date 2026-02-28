@@ -705,6 +705,57 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_length(
 }
 
 
+XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_parameter_at_distance(
+    XbimCurve2dHandle handle,
+    double            referenceParam,
+    double            distance,
+    double*           outParam)
+{
+    xbim_clear_error();
+
+    if (!handle)
+    {
+        xbim_set_error("xbim_curve2d_parameter_at_distance: null handle");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!outParam)
+    {
+        xbim_set_error("xbim_curve2d_parameter_at_distance: null output parameter");
+        return XBIM_INVALID_ARG;
+    }
+    *outParam = 0.0;
+
+    const Handle(Geom2d_Curve)& c = handle->curve;
+    if (c.IsNull())
+    {
+        xbim_set_error("xbim_curve2d_parameter_at_distance: curve is null");
+        return XBIM_ERROR;
+    }
+
+    try
+    {
+        Geom2dAdaptor_Curve adaptor(c);
+        GCPnts_AbscissaPoint abscissa(adaptor, distance, referenceParam);
+
+        if (!abscissa.IsDone())
+        {
+            xbim_set_error("xbim_curve2d_parameter_at_distance: "
+                           "GCPnts_AbscissaPoint failed to converge");
+            return XBIM_ERROR;
+        }
+
+        *outParam = abscissa.Parameter();
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        xbim_set_error(e.GetMessageString() ? e.GetMessageString()
+                       : "xbim_curve2d_parameter_at_distance: OCCT exception");
+        return XBIM_ERROR;
+    }
+}
+
+
 XBIM_EXPORT XbimResult XBIM_CALL xbim_curve2d_value(
     XbimCurve2dHandle handle,
     double            u,
