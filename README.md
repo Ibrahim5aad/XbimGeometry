@@ -28,7 +28,7 @@ even for public packages, so you need a Personal Access Token.
 
 1. [Create a PAT](https://github.com/settings/tokens) with the **`read:packages`** scope.
 
-2. Add the xBimTeam feed:
+2. Add source feed:
 
 ```bash
 dotnet nuget add source "https://nuget.pkg.github.com/ibrahim5aad/index.json" \
@@ -58,13 +58,13 @@ Native binaries for Windows and Linux are pulled in automatically via runtime pa
 ```xml
 <configuration>
   <packageSources>
-    <add key="xbim-github" value="https://nuget.pkg.github.com/Ibrahim5aad/index.json" />
+    <add key="is-github" value="https://nuget.pkg.github.com/ibrahim5aad/index.json" />
   </packageSources>
   <packageSourceCredentials>
-    <xbim-github>
+    <is-github>
       <add key="Username" value="YOUR_GITHUB_USERNAME" />
       <add key="ClearTextPassword" value="YOUR_GITHUB_PAT" />
-    </xbim-github>
+    </is-github>
   </packageSourceCredentials>
 </configuration>
 ```
