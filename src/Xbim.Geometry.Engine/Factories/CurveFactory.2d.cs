@@ -57,7 +57,7 @@ namespace Xbim.Geometry.Engine.Factories
             if (curve is IIfcOffsetCurve2D ifcOffset2D)
                 return BuildOffsetCurve2d(ifcOffset2D);
 
-            throw new NotSupportedException(
+            throw new XbimGeometryNotSupportedException(
                 $"2D curve type {curve.ExpressType.ExpressName} #{curve.EntityLabel} is not yet supported.");
         }
 

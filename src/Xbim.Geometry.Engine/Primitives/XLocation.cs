@@ -250,7 +250,7 @@ namespace Xbim.Geometry.Engine.Primitives
 
         public void SetTranslation(double x, double y, double z)
         {
-            throw new NotSupportedException("XLocation is immutable. Use Translated() instead.");
+            throw new XbimGeometryNotSupportedException("XLocation is immutable. Use Translated() instead.");
         }
 
         public IXLocation Translated(double x, double y, double z)

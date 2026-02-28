@@ -335,7 +335,7 @@ namespace Xbim.Geometry.Engine.Factories
             if (placement is IIfcAxis2Placement2D axis2D)
                 return BuildLocationFromAxis2D(axis2D);
 
-            throw new NotSupportedException($"Unsupported placement type: {placement.GetType().Name}");
+            throw new XbimGeometryNotSupportedException($"Unsupported placement type: {placement.GetType().Name}");
         }
 
         public IXLocation BuildLocation(IIfcAxis2Placement placement)
@@ -346,7 +346,7 @@ namespace Xbim.Geometry.Engine.Factories
             if (placement is IIfcAxis2Placement2D axis2D)
                 return BuildLocationFromAxis2D(axis2D);
 
-            throw new NotSupportedException($"Unsupported axis placement type: {placement.GetType().Name}");
+            throw new XbimGeometryNotSupportedException($"Unsupported axis placement type: {placement.GetType().Name}");
         }
 
         public IXLocation BuildLocation(IfcAxis2PlacementLinear linearPlacement)
@@ -803,7 +803,7 @@ namespace Xbim.Geometry.Engine.Factories
             if (transOp is IIfcCartesianTransformationOperator2D ct2d)
                 return ToTransform2D(ct2d);
 
-            throw new NotSupportedException($"Unsupported transformation operator type: {transOp.GetType().Name}");
+            throw new XbimGeometryNotSupportedException($"Unsupported transformation operator type: {transOp.GetType().Name}");
         }
 
         /// <summary>

@@ -26,15 +26,15 @@ internal class Surface : NativeOwner<NativeSurfaceHandle>, IXSurface
     public bool IsVPeriodic => false; // TODO: query from native when available
 
     public string BrepString() =>
-        throw new XbimNotGeometrySupportedException(
+        throw new XbimGeometryNotSupportedException(
             $"BRep export is not supported for elementary surface type {_surfaceType}.");
 
     public void WriteBrep(string filePath) =>
-        throw new XbimNotGeometrySupportedException(
+        throw new XbimGeometryNotSupportedException(
             $"BRep export is not supported for elementary surface type {_surfaceType}.");
 
     public void WriteStl(string filePath) =>
-        throw new XbimNotGeometrySupportedException(
+        throw new XbimGeometryNotSupportedException(
             $"STL export is not supported for elementary surface type {_surfaceType}.");
 }
 

@@ -44,7 +44,7 @@ namespace Xbim.Geometry.Engine.Factories
         public IXSolid Build(IIfcCsgPrimitive3D ifcCsgPrimitive)
         {
             if (!Enum.TryParse<XCsgPrimitive3dType>(ifcCsgPrimitive.ExpressType.ExpressName, out var csgType))
-                throw new NotSupportedException(
+                throw new XbimGeometryNotSupportedException(
                     $"Unsupported CsgPrimitive3D type: {ifcCsgPrimitive.ExpressType.ExpressName}");
 
             return csgType switch
@@ -54,7 +54,7 @@ namespace Xbim.Geometry.Engine.Factories
                 XCsgPrimitive3dType.IfcRightCircularCylinder => BuildRightCircularCylinder((IIfcRightCircularCylinder)ifcCsgPrimitive),
                 XCsgPrimitive3dType.IfcRightCircularCone => BuildRightCircularCone((IIfcRightCircularCone)ifcCsgPrimitive),
                 XCsgPrimitive3dType.IfcRectangularPyramid => BuildRectangularPyramid((IIfcRectangularPyramid)ifcCsgPrimitive),
-                _ => throw new NotSupportedException($"Unhandled CsgPrimitive3D type: {csgType}")
+                _ => throw new XbimGeometryNotSupportedException($"Unhandled CsgPrimitive3D type: {csgType}")
             };
         }
 
@@ -185,7 +185,7 @@ namespace Xbim.Geometry.Engine.Factories
         public IXShape Build(IIfcSolidModel ifcSolid)
         {
             if (!Enum.TryParse<XSolidModelType>(ifcSolid.ExpressType.ExpressName, out var solidType))
-                throw new NotSupportedException(
+                throw new XbimGeometryNotSupportedException(
                     $"Unsupported solid model type: {ifcSolid.ExpressType.ExpressName}");
 
             return solidType switch
@@ -205,7 +205,7 @@ namespace Xbim.Geometry.Engine.Factories
                 XSolidModelType.IfcFacetedBrepWithVoids => BuildFacetedBrepWithVoids((IIfcFacetedBrepWithVoids)ifcSolid),
                 XSolidModelType.IfcAdvancedBrep => BuildAdvancedBrep((IIfcAdvancedBrep)ifcSolid),
                 XSolidModelType.IfcAdvancedBrepWithVoids => BuildAdvancedBrepWithVoids((IIfcAdvancedBrepWithVoids)ifcSolid),
-                _ => throw new NotSupportedException(
+                _ => throw new XbimGeometryNotSupportedException(
                     $"Solid model type {solidType} is not yet implemented in the P/Invoke layer.")
             };
         }
@@ -611,7 +611,7 @@ namespace Xbim.Geometry.Engine.Factories
             if (treeRoot is IIfcCsgPrimitive3D csgPrimitive)
                 return Build(csgPrimitive);
 
-            throw new NotSupportedException(
+            throw new XbimGeometryNotSupportedException(
                 $"CSG solid #{ifcCsgSolid.EntityLabel}: unsupported tree root expression type {treeRoot.GetType().Name}.");
         }
 
@@ -1365,7 +1365,7 @@ namespace Xbim.Geometry.Engine.Factories
             }
             else
             {
-                throw new NotSupportedException(
+                throw new XbimGeometryNotSupportedException(
                     $"Half-space #{halfSpace.EntityLabel}: surface type {elementarySurface.GetType().Name} is not supported.");
             }
 

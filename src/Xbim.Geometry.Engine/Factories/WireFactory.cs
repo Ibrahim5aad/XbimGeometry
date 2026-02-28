@@ -93,7 +93,7 @@ namespace Xbim.Geometry.Engine.Factories
             if (ifcCurve is IIfcOffsetCurve2D || ifcCurve is IIfcOffsetCurve3D)
                 return BuildFromOffsetCurve(ifcCurve);
 
-            throw new NotSupportedException(
+            throw new XbimGeometryNotSupportedException(
                 $"Wire from curve type {ifcCurve.ExpressType.ExpressName} #{ifcCurve.EntityLabel} is not yet supported.");
         }
 
@@ -465,7 +465,7 @@ namespace Xbim.Geometry.Engine.Factories
 
             if(ifcCurve is IfcGradientCurve ifcGradient)
             {
-                throw new NotSupportedException($"IfcGradientCurve #{ifcGradient.EntityLabel} is not supported as a directrix curve.");
+                throw new XbimGeometryNotSupportedException($"IfcGradientCurve #{ifcGradient.EntityLabel} is not supported as a directrix curve.");
             }
             else if (ifcCurve is IIfcCompositeCurve ifcCompositeDirectrix)
                 return BuildDirectrixCompositeCurve(ifcCompositeDirectrix, start, end);
@@ -613,7 +613,7 @@ namespace Xbim.Geometry.Engine.Factories
                     if (segment is IIfcReparametrisedCompositeCurveSegment reparam &&
                         (double)reparam.ParamLength != 1.0)
                     {
-                        throw new NotSupportedException(
+                        throw new XbimGeometryNotSupportedException(
                             $"IIfcReparametrisedCompositeCurveSegment #{segment.EntityLabel} with ParamLength != 1 is not supported.");
                     }
 

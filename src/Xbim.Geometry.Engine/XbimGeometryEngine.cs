@@ -230,7 +230,7 @@ namespace Xbim.Geometry.Engine
                 return NativeShapeWrapper.WrapFace(faceSurface.Handle);
             }
 
-            throw new XbimNotGeometrySupportedException(
+            throw new XbimGeometryNotSupportedException(
                 $"Build: unsupported geometric representation type {geomRep.GetType().Name} (#{(geomRep as IPersistEntity)?.EntityLabel}).");
         }
 
@@ -348,7 +348,7 @@ namespace Xbim.Geometry.Engine
             using (new Tracer(LogHelper.CurrentFunctionName(), logger ?? _logger, geometryObject))
             {
                 if (storageType != XbimGeometryType.PolyhedronBinary)
-                    throw new XbimNotGeometrySupportedException("Only PolyhedronBinary storage type is supported.");
+                    throw new XbimGeometryNotSupportedException("Only PolyhedronBinary storage type is supported.");
 
                 var shapeGeom = new XbimShapeGeometry();
 
@@ -584,7 +584,7 @@ namespace Xbim.Geometry.Engine
                     return WrapShapeAsSolidSet(Service.SolidFactory.Build(halfSpace));
                 if (ifcSolid is IIfcCsgPrimitive3D csg)
                     return WrapShapeAsSolidSet(Service.SolidFactory.Build(csg));
-                throw new XbimNotGeometrySupportedException(
+                throw new XbimGeometryNotSupportedException(
                     $"Unsupported boolean operand type: {ifcSolid.GetType().Name}");
             }
         }
@@ -947,7 +947,7 @@ namespace Xbim.Geometry.Engine
                     return CreatePoint(poc, _logger);
                 if (pt is IIfcPointOnSurface pos)
                     return CreatePoint(pos, _logger);
-                throw new XbimNotGeometrySupportedException($"IIfcPoint type {pt.GetType().Name} is not supported.");
+                throw new XbimGeometryNotSupportedException($"IIfcPoint type {pt.GetType().Name} is not supported.");
             }
         }
 

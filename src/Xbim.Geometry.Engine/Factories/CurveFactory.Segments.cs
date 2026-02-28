@@ -132,7 +132,7 @@ namespace Xbim.Geometry.Engine.Factories
                 return lineHandle;
             }
 
-            throw new NotSupportedException(
+            throw new XbimGeometryNotSupportedException(
                 $"IfcGradientCurve #{ifcGradient.EntityLabel}: unsupported BaseCurve type {baseCurve.GetType().Name}.");
         }
 
@@ -244,6 +244,12 @@ namespace Xbim.Geometry.Engine.Factories
                 return BuildCircleCurveSegment2d(circle, startParam, endParam, length);
             }
 
+            // Ellipses: build 2D arc of ellipse with distance-to-parameter conversion
+            if (parentCurve is IIfcEllipse ellipse)
+            {
+                return BuildEllipseCurveSegment2d(ellipse, startParam, endParam, length);
+            }
+
             return BuildGenericCurveSegment2d(segment, parentCurve, startParam, endParam, length);
         }
 
@@ -319,18 +325,76 @@ namespace Xbim.Geometry.Engine.Factories
             return arcHandle;
         }
 
+        private NativeCurve2dHandle? BuildEllipseCurveSegment2d(
+            IIfcEllipse ellipse, double startParam, double endParam, double length)
+        {
+            double cx = 0, cy = 0, dx = 1.0, dy = 0.0;
+            if (ellipse.Position is IIfcAxis2Placement2D axis2d)
+            {
+                cx = axis2d.Location.Coordinates[0];
+                cy = axis2d.Location.Coordinates[1];
+                if (axis2d.RefDirection != null)
+                {
+                    dx = axis2d.RefDirection.DirectionRatios[0];
+                    dy = axis2d.RefDirection.DirectionRatios[1];
+                    double mag = Math.Sqrt(dx * dx + dy * dy);
+                    if (mag > 1e-15) { dx /= mag; dy /= mag; }
+                }
+            }
+
+            // Build full ellipse — native side swaps axes if SemiAxis1 < SemiAxis2
+            int ellResult = XbimGeometryNativeApi.xbim_curve2d_build_ellipse(
+                ContextHandle, cx, cy,
+                ellipse.SemiAxis1, ellipse.SemiAxis2,
+                dx, dy,
+                out var ellipseHandle);
+            if (ellResult != 0) return null;
+
+            // Convert distance-along parameters to angular parameters.
+            // Unlike circles (angle = distance / radius), ellipses require
+            // numerical arc-length inversion via GCPnts_AbscissaPoint.
+            // When axes are swapped, OCCT's parameter 0 points along the
+            // rotated major axis — the IFC origin (along SemiAxis1) maps
+            // to OCCT parameter -PI/2.
+            double referenceParam = 0.0;
+            if (ellipse.SemiAxis1 < ellipse.SemiAxis2)
+                referenceParam = -Math.PI / 2.0;
+
+            int r1 = XbimGeometryNativeApi.xbim_curve2d_parameter_at_distance(
+                ellipseHandle, referenceParam, startParam, out double u1);
+            if (r1 != 0)
+            {
+                ellipseHandle.Dispose();
+                return null;
+            }
+
+            int r2 = XbimGeometryNativeApi.xbim_curve2d_parameter_at_distance(
+                ellipseHandle, referenceParam, endParam, out double u2);
+            if (r2 != 0)
+            {
+                ellipseHandle.Dispose();
+                return null;
+            }
+
+            bool sameSense = length >= 0;
+
+            int arcResult = XbimGeometryNativeApi.xbim_curve2d_build_arc_of_ellipse(
+                ContextHandle, ellipseHandle, u1, u2, sameSense ? 1 : 0,
+                out var arcHandle);
+
+            ellipseHandle.Dispose();
+
+            if (arcResult != 0) return null;
+
+            XbimGeometryNativeApi.xbim_curve2d_align_to_origin(arcHandle);
+            return arcHandle;
+        }
+
         private NativeCurve2dHandle? BuildGenericCurveSegment2d(
             IfcCurveSegment segment, IIfcCurve parentCurve,
             double startParam, double endParam, double length)
         {
             using var curve2d = (XbimCurve2d)BuildCurve2d(parentCurve);
-
-            if (parentCurve is IIfcEllipse)
-            {
-                curve2d.Dispose();
-                throw new NotSupportedException(
-                    $"IfcEllipse is not supported as CurveSegment parent (#{segment.EntityLabel}).");
-            }
 
             bool sameSense = length >= 0;
 
@@ -548,7 +612,7 @@ namespace Xbim.Geometry.Engine.Factories
                 IfcSecondOrderPolynomialSpiral => XCurveType.IfcSecondOrderPolynomialSpiral,
                 IfcThirdOrderPolynomialSpiral => XCurveType.IfcThirdOrderPolynomialSpiral,
                 IfcSeventhOrderPolynomialSpiral => XCurveType.IfcSeventhOrderPolynomialSpiral,
-                _ => throw new NotSupportedException($"Unsupported spiral type {spiral.GetType().Name}")
+                _ => throw new XbimGeometryNotSupportedException($"Unsupported spiral type {spiral.GetType().Name}")
             };
         }
 

@@ -41,7 +41,7 @@ namespace Xbim.Geometry.Engine.Factories
         public IXFace BuildFace(IIfcProfileDef profileDef)
         {
             if (!Enum.TryParse<XProfileDefType>(profileDef.ExpressType.ExpressName, out var profileType))
-                throw new NotSupportedException(
+                throw new XbimGeometryNotSupportedException(
                     $"Profile type is not implemented: {profileDef.ExpressType.ExpressName}");
 
             return profileType switch
@@ -72,7 +72,7 @@ namespace Xbim.Geometry.Engine.Factories
                 XProfileDefType.IfcCompositeProfileDef => BuildCompositeFace((IIfcCompositeProfileDef)profileDef),
                 XProfileDefType.IfcDerivedProfileDef => BuildDerivedFace((IIfcDerivedProfileDef)profileDef),
                 XProfileDefType.IfcMirroredProfileDef => BuildMirroredFace((IIfcMirroredProfileDef)profileDef),
-                _ => throw new NotSupportedException(
+                _ => throw new XbimGeometryNotSupportedException(
                     $"Profile type {profileType} is not yet supported.")
             };
         }
@@ -819,7 +819,7 @@ namespace Xbim.Geometry.Engine.Factories
                     $"IndexedPolyCurve #{entityLabel} has no Points coordinate list.");
 
             if (pointList is not IIfcCartesianPointList2D pointList2D)
-                throw new NotSupportedException(
+                throw new XbimGeometryNotSupportedException(
                     $"IndexedPolyCurve #{entityLabel} points type {pointList.ExpressType.ExpressName} is not supported for 2D profiles.");
 
             var coords = new List<(double x, double y)>();
@@ -1073,7 +1073,7 @@ namespace Xbim.Geometry.Engine.Factories
             }
             else
             {
-                throw new NotSupportedException(
+                throw new XbimGeometryNotSupportedException(
                     $"Unsupported profile placement type: {position.GetType().Name}");
             }
         }

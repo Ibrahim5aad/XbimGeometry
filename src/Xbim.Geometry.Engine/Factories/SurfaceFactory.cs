@@ -74,7 +74,7 @@ namespace Xbim.Geometry.Engine.Factories
             if (surface is IIfcCurveBoundedSurface ifcCurveBoundedSurface)
                 return BuildCurveBoundedSurface(ifcCurveBoundedSurface);
 
-            throw new XbimNotGeometrySupportedException(
+            throw new XbimGeometryNotSupportedException(
                 $"Surface type {surface.ExpressType.ExpressName} #{surface.EntityLabel} is not yet supported.");
         }
 
@@ -428,7 +428,7 @@ namespace Xbim.Geometry.Engine.Factories
             {
                 IIfcArbitraryOpenProfileDef open => open.Curve,
                 IIfcArbitraryClosedProfileDef closed => closed.OuterCurve,
-                _ => throw new XbimNotGeometrySupportedException(
+                _ => throw new XbimGeometryNotSupportedException(
                     $"SurfaceOfRevolution #{ifcRevolution.EntityLabel}: unsupported SweptCurve profile type " +
                     $"{ifcRevolution.SweptCurve.ExpressType.ExpressName}.")
             };
@@ -478,7 +478,7 @@ namespace Xbim.Geometry.Engine.Factories
             {
                 IIfcArbitraryOpenProfileDef open => open.Curve,
                 IIfcArbitraryClosedProfileDef closed => closed.OuterCurve,
-                _ => throw new XbimNotGeometrySupportedException(
+                _ => throw new XbimGeometryNotSupportedException(
                     $"SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: unsupported SweptCurve profile type " +
                     $"{ifcExtrusion.SweptCurve.ExpressType.ExpressName}.")
             };

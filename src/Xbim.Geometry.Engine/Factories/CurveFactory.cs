@@ -746,7 +746,7 @@ namespace Xbim.Geometry.Engine.Factories
                 return points;
             }
 
-            throw new NotSupportedException(
+            throw new XbimGeometryNotSupportedException(
                 $"2D IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel} requires IIfcCartesianPointList2D, " +
                 $"but found {coordList?.GetType().Name ?? "null"}.");
         }
@@ -775,7 +775,7 @@ namespace Xbim.Geometry.Engine.Factories
                 return points;
             }
 
-            throw new NotSupportedException(
+            throw new XbimGeometryNotSupportedException(
                 $"Unsupported point list type in IIfcIndexedPolyCurve #{ifcIndexed.EntityLabel}.");
         }
 

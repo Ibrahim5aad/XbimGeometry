@@ -1573,6 +1573,10 @@ namespace Xbim.Geometry.Scene
                             _logger.LogWarning("Failed to build geometry for #{0}=({1})", shape.EntityLabel, shape.GetType().Name.ToUpper());
 
                         }
+                        catch (XbimGeometryNotSupportedException)
+                        {
+                            _logger.LogWarning("Geometry not supported for #{0}=({1})", shape.EntityLabel, shape.GetType().Name.ToUpper());
+                        }
 
                         if (geomModel != null && geomModel.IsValid)
                         {

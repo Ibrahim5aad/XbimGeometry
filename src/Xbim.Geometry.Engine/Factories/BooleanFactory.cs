@@ -99,7 +99,7 @@ namespace Xbim.Geometry.Engine.Factories
                     return FinishBoolean(boolResult, result, hasWarnings, firstHandle, outIntersect);
                 default:
                     firstHandle.Dispose();
-                    throw new NotSupportedException(
+                    throw new XbimGeometryNotSupportedException(
                         $"Boolean operator {boolResult.Operator} is not supported.");
             }
         }
@@ -264,7 +264,7 @@ namespace Xbim.Geometry.Engine.Factories
                                 ContextHandle, bodies.Ptrs, bodies.Length,
                                 tools.Ptrs, tools.Length,
                                 fuzzyTolerance, out hasWarnings, out outHandle),
-                        _ => throw new NotSupportedException(
+                        _ => throw new XbimGeometryNotSupportedException(
                             $"Boolean operator {op} is not supported.")
                     };
                 }
