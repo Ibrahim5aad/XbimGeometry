@@ -241,14 +241,19 @@ public static class WexBimFileReader
         int vertexCount = br.ReadInt32();
         int triangleCount = br.ReadInt32();
 
-        if (vertexCount == 0 || triangleCount == 0)
+        if (vertexCount == 0 && triangleCount == 0)
         {
-            // Skip the rest (face count) but there may be nothing to skip
-            // Read face count to advance the stream position
-            if (vertexCount == 0 && triangleCount == 0)
-            {
-                int emptyFaceCount = br.ReadInt32();
-            }
+            // Fully empty mesh: only face count follows
+            br.ReadInt32(); // face count (expected 0)
+            return (Array.Empty<float>(), Array.Empty<float>(), Array.Empty<int>());
+        }
+
+        if (triangleCount == 0)
+        {
+            // Vertices present but no triangles — must still consume the vertex
+            // positions and face count to keep the stream aligned.
+            for (int i = 0; i < vertexCount * 3; i++) br.ReadSingle();
+            br.ReadInt32(); // face count (expected 0)
             return (Array.Empty<float>(), Array.Empty<float>(), Array.Empty<int>());
         }
 
