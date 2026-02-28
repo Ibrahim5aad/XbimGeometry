@@ -683,7 +683,7 @@ namespace Xbim.Geometry.Engine.Factories
                 }
             }
 
-            throw new NotSupportedException(
+            throw new XbimGeometryNotSupportedException(
                 $"Arbitrary open profile #{profileDef.EntityLabel} is not supported.");
         }
 

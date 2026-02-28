@@ -14,7 +14,6 @@ namespace Xbim.Geometry.Abstractions
         /// <returns>modified copy of the shape</returns>
         IXShape UnifyDomain(IXShape shape);
         IXShape Convert(string brepString);
-        IXbimGeometryObject ConvertToV5(string brepString);
         string Convert(IXShape shape);
         string Convert(IXbimGeometryObject v5Shape);
 
@@ -27,6 +26,7 @@ namespace Xbim.Geometry.Abstractions
         IXShape Union(IXShape body, IEnumerable<IXShape> additions, double precision);
         IXShape Cut(IXShape body, IEnumerable<IXShape> subtractions, double precision);
         IXShape Intersect(IXShape body, IEnumerable<IXShape> intersections, double precision);
+
         /// <summary>
         /// Removes any placement
         /// </summary>

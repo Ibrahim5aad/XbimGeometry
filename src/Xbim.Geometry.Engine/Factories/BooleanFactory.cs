@@ -328,7 +328,7 @@ namespace Xbim.Geometry.Engine.Factories
                 return ExtractHandle(shape, operand);
             }
 
-            throw new NotSupportedException(
+            throw new XbimGeometryNotSupportedException(
                 $"Boolean operand type {operand.GetType().Name} is not supported.");
         }
 

@@ -61,39 +61,6 @@ namespace Xbim.Geometry.Engine.Factories
 
         #endregion
 
-        #region Build
-
-        public IXShape Build(IIfcGeometricRepresentationItem geomRep)
-        {
-            // Dispatch to appropriate factory based on IFC type
-            if (geomRep is IIfcSolidModel solidModel)
-                return _modelService.SolidFactory.Build(solidModel);
-
-            if (geomRep is IIfcBooleanResult boolResult)
-                return _modelService.BooleanFactory.Build(boolResult);
-
-            if (geomRep is IIfcFaceBasedSurfaceModel faceBasedModel)
-                return BuildFaceBasedSurfaceModel(faceBasedModel);
-
-            if (geomRep is IIfcShellBasedSurfaceModel shellModel)
-                return BuildShellBasedSurfaceModel(shellModel);
-
-            throw new NotSupportedException(
-                $"Geometric representation item type {geomRep.GetType().Name} is not supported.");
-        }
-
-        private IXShape BuildFaceBasedSurfaceModel(IIfcFaceBasedSurfaceModel model)
-        {
-            return _modelService.SolidFactory.Build(model);
-        }
-
-        private IXShape BuildShellBasedSurfaceModel(IIfcShellBasedSurfaceModel model)
-        {
-            return _modelService.SolidFactory.Build(model);
-        }
-
-        #endregion
-
         #region Domain / Fix
 
         public IXShape UnifyDomain(IXShape toFix)

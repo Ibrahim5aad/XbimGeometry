@@ -65,11 +65,6 @@ namespace Xbim.Geometry.Engine.Services
             return NativeShapeWrapper.WrapShape(handle);
         }
 
-        public IXbimGeometryObject ConvertToV5(string brepString)
-        {
-            throw new NotSupportedException("V5 geometry objects are not available in the P/Invoke layer.");
-        }
-
         public string Convert(IXShape shape)
         {
             ArgumentNullException.ThrowIfNull(shape);
@@ -88,9 +83,9 @@ namespace Xbim.Geometry.Engine.Services
             return brep;
         }
 
-        public string Convert(IXbimGeometryObject v5Shape)
+        public string Convert(IXbimGeometryObject shape)
         {
-            throw new NotSupportedException("V5 geometry objects are not available in the P/Invoke layer.");
+            return Convert(shape as IXShape); // throws if not an XbimShape
         }
 
         public IXShape Transform(IXShape shape, IXMatrix transformMatrix)

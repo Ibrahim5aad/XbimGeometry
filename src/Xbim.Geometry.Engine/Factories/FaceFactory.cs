@@ -65,7 +65,7 @@ namespace Xbim.Geometry.Engine.Factories
             if (surface is Surface Surface)
                 return BuildAdvancedFace(Surface, wires);
 
-            throw new NotSupportedException(
+            throw new XbimGeometryNotSupportedException(
                 $"Cannot build face from surface type {surface.GetType().Name}.");
         }
 
