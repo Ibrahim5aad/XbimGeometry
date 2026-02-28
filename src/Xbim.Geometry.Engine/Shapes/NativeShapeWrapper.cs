@@ -104,6 +104,23 @@ namespace Xbim.Geometry.Engine.Shapes
         }
 
         /// <summary>
+        /// Wraps a native shape handle as an <see cref="IXShell"/>.
+        /// Throws if the underlying shape is not a shell.
+        /// </summary>
+        internal static IXShell WrapShell(NativeShapeHandle handle)
+        {
+            if (handle == null || handle.IsInvalid)
+                throw new ArgumentException("Cannot wrap an invalid shape handle.", nameof(handle));
+
+            int result = XbimGeometryNativeApi.xbim_shape_type(handle, out int typeVal);
+            if (result != 0 || (XShapeType)typeVal != XShapeType.Shell)
+                throw new XbimGeometryServiceException(
+                    $"Expected a Shell shape but got {(XShapeType)typeVal}.");
+
+            return new XbimShell(handle);
+        }
+
+        /// <summary>
         /// Wraps a native shape handle as an <see cref="IXFace"/>.
         /// Throws if the underlying shape is not a face.
         /// </summary>

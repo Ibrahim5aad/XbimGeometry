@@ -775,19 +775,19 @@ namespace Xbim.Geometry.Engine
         public IXbimShell CreateShell(IIfcOpenShell shell, ILogger logger)
         {
             using (new Tracer(LogHelper.CurrentFunctionName(), logger ?? _logger, shell))
-                throw new NotSupportedException("CreateShell from IIfcOpenShell not yet supported.");
+                return (IXbimShell)((SolidFactory)Service.SolidFactory).BuildShell(shell);
         }
 
         public IXbimShell CreateShell(IIfcConnectedFaceSet shell, ILogger logger)
         {
             using (new Tracer(LogHelper.CurrentFunctionName(), logger ?? _logger, shell))
-                throw new NotSupportedException("CreateShell from IIfcConnectedFaceSet not yet supported.");
+                return (IXbimShell)((SolidFactory)Service.SolidFactory).BuildShell(shell);
         }
 
         public IXbimShell CreateShell(IIfcSurfaceOfLinearExtrusion linExt, ILogger logger)
         {
             using (new Tracer(LogHelper.CurrentFunctionName(), logger ?? _logger, linExt))
-                throw new NotSupportedException("CreateShell from IIfcSurfaceOfLinearExtrusion not yet supported.");
+                return CreateShellOfLinearExtrusion(linExt);
         }
 
         // --- Wire creation ---
@@ -1348,6 +1348,31 @@ namespace Xbim.Geometry.Engine
 
         private IXbimFace CreateFaceOfLinearExtrusion(IIfcSurfaceOfLinearExtrusion ifcExtrusion)
         {
+            var faceHandle = BuildFaceOfLinearExtrusion(ifcExtrusion);
+            return (IXbimFace)NativeShapeWrapper.WrapFace(faceHandle);
+        }
+
+        private IXbimShell CreateShellOfLinearExtrusion(IIfcSurfaceOfLinearExtrusion ifcExtrusion)
+        {
+            var faceHandle = BuildFaceOfLinearExtrusion(ifcExtrusion);
+
+            var faceHandles = new IntPtr[] { faceHandle.DangerousGetHandle() };
+            int result = XbimGeometryNativeApi.xbim_shell_build_from_faces(
+                Service.ContextHandle, faceHandles, 1, out var shellHandle);
+
+            if (result != 0)
+            {
+                faceHandle.Dispose();
+                throw new XbimGeometryServiceException(
+                    $"Failed to build shell from SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: " +
+                    $"{XbimGeometryNativeApi.GetLastError()}");
+            }
+
+            return (IXbimShell)NativeShapeWrapper.WrapShell(shellHandle);
+        }
+
+        private NativeShapeHandle BuildFaceOfLinearExtrusion(IIfcSurfaceOfLinearExtrusion ifcExtrusion)
+        {
             var built = Service.SurfaceFactory.Build(ifcExtrusion);
             if (built is not Surface surf)
                 throw new XbimGeometryServiceException(
@@ -1363,7 +1388,7 @@ namespace Xbim.Geometry.Engine
                     $"Failed to build face from SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: " +
                     $"{XbimGeometryNativeApi.GetLastError()}");
 
-            return (IXbimFace)NativeShapeWrapper.WrapFace(faceHandle);
+            return faceHandle;
         }
 
         private IXbimFace SurfaceToFace(IXSurface built, int entityLabel)

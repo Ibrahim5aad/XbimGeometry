@@ -625,6 +625,15 @@ namespace Xbim.Geometry.Engine.Factories
             return NativeShapeWrapper.WrapShape(solidHandle);
         }
 
+        public IXShape BuildShell(IIfcConnectedFaceSet faceSet)
+        {
+            var handle = BuildShellFromConnectedFaceSet(faceSet, makeSolid: false);
+            if (handle == null || handle.IsInvalid)
+                throw new XbimGeometryServiceException(
+                    "Failed to build shell from connected face set.");
+            return NativeShapeWrapper.WrapShape(handle);
+        }
+
         public IXShape Build(IIfcFacetedBrep ifcBrep)
         {
             var solidHandle = BuildClosedShellAsSolid(ifcBrep.Outer);
@@ -1537,7 +1546,7 @@ namespace Xbim.Geometry.Engine.Factories
             {
                 IIfcTriangulatedFaceSet triangulated => BuildTriangulatedFaceSet(triangulated),
                 IIfcPolygonalFaceSet polygonal => BuildPolygonalFaceSet(polygonal),
-                _ => throw new NotSupportedException(
+                _ => throw new XbimGeometryNotSupportedException(
                     $"Tessellated item type {ifcTessellatedItem.GetType().Name} is not supported.")
             };
         }
