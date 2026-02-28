@@ -353,7 +353,7 @@ public:
 
             Standard_Real denom = delta2 - delta1;
 
-            if (spiral.IsNull() && polynomial.IsNull() ||
+            if ((spiral.IsNull() && polynomial.IsNull()) ||
                 std::fabs(denom) < epsilon)
             {
                 return std::make_tuple(startSuperElev, startTilt);
@@ -370,7 +370,7 @@ public:
             /* Last segment — interpolate toward zero */
             Standard_Real denom = delta2 - delta1;
 
-            if (spiral.IsNull() && polynomial.IsNull() ||
+            if ((spiral.IsNull() && polynomial.IsNull()) ||
                 std::fabs(denom) < epsilon)
             {
                 return std::make_tuple(startSuperElev, startTilt);

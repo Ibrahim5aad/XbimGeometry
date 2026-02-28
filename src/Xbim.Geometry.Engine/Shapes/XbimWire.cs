@@ -129,7 +129,7 @@ namespace Xbim.Geometry.Engine.Shapes
         {
             get
             {
-                int result = XbimGeometryNativeApi.xbim_wire_is_planar(Handle, 1e-7, out int isPlanar);
+                int result = XbimGeometryNativeApi.xbim_wire_is_planar(Handle, out int isPlanar);
                 return result == 0 && isPlanar != 0;
             }
         }

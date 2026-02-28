@@ -124,7 +124,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_surface(
     double zDirX,   double zDirY,   double zDirZ,
     double xDirX,   double xDirY,   double xDirZ,
     double radius,
-    double tolerance,
     XbimShapeHandle*  outHandle)
 {
     xbim_clear_error();

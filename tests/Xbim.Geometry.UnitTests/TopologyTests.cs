@@ -375,7 +375,6 @@ public class TopologyTests : IDisposable
             0, 0, 1,   // zDir (normal)
             1, 0, 0,   // xDir
             0,          // radius (unused for plane)
-            1e-6,       // tolerance
             out var face).Should().Be(0);
         using (face)
         {
@@ -873,7 +872,7 @@ public class TopologyTests : IDisposable
             }
 
             var facePtrs = faces.Select(f => f.DangerousGetHandle()).ToArray();
-            XbimGeometryNativeApi.xbim_shell_build_from_faces(Ctx, facePtrs, 6, 1e-6, out var shell);
+            XbimGeometryNativeApi.xbim_shell_build_from_faces(Ctx, facePtrs, 6, out var shell);
             return shell;
         }
         finally

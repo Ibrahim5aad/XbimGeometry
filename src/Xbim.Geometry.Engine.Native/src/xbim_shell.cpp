@@ -57,7 +57,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_from_faces(
     XbimContextHandle        ctx,
     const XbimShapeHandle*   faceHandles,
     int                      numFaces,
-    double                   tolerance,
     XbimShapeHandle*         outHandle)
 {
     xbim_clear_error();
@@ -800,7 +799,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_connected_face_set(
 
             /* Collect all points on this face for plane computation */
             int totalPointsOnFace = 0;
-            int savedPos = pos;
 
             /* First pass: count total points */
             int tmpPos = pos;

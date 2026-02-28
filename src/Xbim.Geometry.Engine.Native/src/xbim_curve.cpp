@@ -938,8 +938,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_curve_get_elementary_props(
             Handle(Geom_Line) line = Handle(Geom_Line)::DownCast(handle->curve);
             if (!line.IsNull())
             {
-                const gp_Pnt& loc = line->Lin().Location();
-                const gp_Dir& dir = line->Lin().Direction();
+                gp_Pnt loc = line->Lin().Location();
+                gp_Dir dir = line->Lin().Direction();
                 *outOriginX = loc.X(); *outOriginY = loc.Y(); *outOriginZ = loc.Z();
                 *outDirX = dir.X();    *outDirY = dir.Y();    *outDirZ = dir.Z();
             }

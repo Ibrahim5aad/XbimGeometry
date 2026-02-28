@@ -73,11 +73,11 @@ public:
     const std::vector<Standard_Real>& CoefficientsY() const { return _coeffY; }
 
 private:
+    gp_Ax22d _placement;
     std::vector<Standard_Real> _coeffX;
     std::vector<Standard_Real> _coeffY;
     Standard_Real _firstParam;
     Standard_Real _lastParam;
-    gp_Ax22d _placement;
     gp_Trsf2d _placementTrsf;
 
     // Polynomial evaluation via Horner's method

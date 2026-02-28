@@ -1791,7 +1791,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_build_from_surface(
     double zDirX,   double zDirY,   double zDirZ,
     double xDirX,   double xDirY,   double xDirZ,
     double radius,
-    double tolerance,
     XbimShapeHandle*  outHandle);
 
 /*
@@ -2170,7 +2169,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_is_closed(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_is_planar(
     XbimShapeHandle wireHandle,
-    double          tolerance,
     int*            outPlanar);
 
 /*
@@ -2557,7 +2555,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shell_build_from_faces(
     XbimContextHandle        ctx,
     const XbimShapeHandle*   faceHandles,
     int                      numFaces,
-    double                   tolerance,
     XbimShapeHandle*         outHandle);
 
 /*

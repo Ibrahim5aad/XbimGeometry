@@ -146,8 +146,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_edges(
  */
 static bool adjust_vertex_tolerance(
     const TopoDS_Vertex& vertex,
-    const gp_Pnt& existingPt,
-    const gp_Pnt& incomingPt,
     double gap)
 {
     if (gap <= 0)
@@ -318,8 +316,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_curves(
                     }
                 }
 
-                adjust_vertex_tolerance(TopExp::LastVertex(TopoDS::Edge(edges.Last())),
-                    lastEdgeEndPoint, segStartPoint, gap);
+                adjust_vertex_tolerance(TopExp::LastVertex(TopoDS::Edge(edges.Last())), gap);
 
                 /* Check for wire closure */
                 TopoDS_Vertex segEndVertex;
@@ -327,8 +324,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_build_from_curves(
                 {
                     isClosed = true;
                     double closingGap = segEndPoint.Distance(theFirstPoint);
-                    adjust_vertex_tolerance(TopExp::FirstVertex(TopoDS::Edge(edges.First())),
-                        theFirstPoint, segEndPoint, closingGap);
+                    adjust_vertex_tolerance(TopExp::FirstVertex(TopoDS::Edge(edges.First())), closingGap);
                 }
                 else
                 {
@@ -943,7 +939,6 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_is_closed(
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_wire_is_planar(
     XbimShapeHandle wireHandle,
-    double          tolerance,
     int*            outPlanar)
 {
     xbim_clear_error();

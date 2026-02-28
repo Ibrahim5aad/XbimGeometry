@@ -847,7 +847,6 @@ namespace Xbim.Geometry.Engine.Internal
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_wire_is_planar(
             NativeShapeHandle wireHandle,
-            double tolerance,
             out int outPlanar);
 
         [DllImport(Lib, CallingConvention = CC)]
@@ -923,7 +922,6 @@ namespace Xbim.Geometry.Engine.Internal
             double zDirX, double zDirY, double zDirZ,
             double xDirX, double xDirY, double xDirZ,
             double radius,
-            double tolerance,
             out NativeShapeHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
@@ -1051,7 +1049,6 @@ namespace Xbim.Geometry.Engine.Internal
             NativeContextHandle ctx,
             [MarshalAs(UnmanagedType.LPArray)] IntPtr[] faceHandles,
             int numFaces,
-            double tolerance,
             out NativeShapeHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
