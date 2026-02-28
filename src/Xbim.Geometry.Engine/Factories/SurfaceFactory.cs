@@ -71,11 +71,10 @@ namespace Xbim.Geometry.Engine.Factories
             if (surface is IIfcCurveBoundedPlane ifcCurveBoundedPlane)
                 return BuildCurveBoundedPlane(ifcCurveBoundedPlane);
 
-            if (surface is IIfcCurveBoundedSurface)
-                throw new NotSupportedException(
-                    $"IfcCurveBoundedSurface #{surface.EntityLabel} is not supported.");
+            if (surface is IIfcCurveBoundedSurface ifcCurveBoundedSurface)
+                return BuildCurveBoundedSurface(ifcCurveBoundedSurface);
 
-            throw new NotSupportedException(
+            throw new XbimNotGeometrySupportedException(
                 $"Surface type {surface.ExpressType.ExpressName} #{surface.EntityLabel} is not yet supported.");
         }
 
@@ -261,7 +260,7 @@ namespace Xbim.Geometry.Engine.Factories
 
         #region Curve Bounded Plane
 
-        private FaceSurface BuildCurveBoundedPlane(IIfcCurveBoundedPlane ifcCurveBoundedPlane)
+        internal FaceSurface BuildCurveBoundedPlane(IIfcCurveBoundedPlane ifcCurveBoundedPlane)
         {
             GeometryFactory.BuildAxis2Placement3d(ifcCurveBoundedPlane.BasisSurface.Position,
                 out double ox, out double oy, out double oz,
@@ -307,6 +306,113 @@ namespace Xbim.Geometry.Engine.Factories
             }
         }
 
+        internal FaceSurface BuildCurveBoundedSurface(IIfcCurveBoundedSurface ifcCurveBoundedSurface)
+        {
+            // Build the basis surface (must be an analytical/parametric surface, not a face)
+            var basisSurface = Build(ifcCurveBoundedSurface.BasisSurface);
+            if (basisSurface is not Surface basis)
+                throw new XbimGeometryServiceException(
+                    $"CurveBoundedSurface #{ifcCurveBoundedSurface.EntityLabel}: " +
+                    $"basis surface type {basisSurface.SurfaceType} is not supported as a basis.");
+
+            var wireFactory = (WireFactory)_modelService.WireFactory;
+
+            // Separate outer boundary from inner boundaries
+            IIfcBoundaryCurve? outerBoundary = null;
+            var innerBoundaryList = new List<IIfcBoundaryCurve>();
+
+            if (!ifcCurveBoundedSurface.ImplicitOuter)
+            {
+                foreach (var boundary in ifcCurveBoundedSurface.Boundaries)
+                {
+                    if (outerBoundary == null && boundary is IIfcOuterBoundaryCurve)
+                        outerBoundary = boundary;
+                    else
+                        innerBoundaryList.Add(boundary);
+                }
+
+                if (outerBoundary == null)
+                    throw new XbimGeometryServiceException(
+                        $"CurveBoundedSurface #{ifcCurveBoundedSurface.EntityLabel}: " +
+                        "ImplicitOuter is false but no IIfcOuterBoundaryCurve found in Boundaries.");
+            }
+            else
+            {
+                // All boundaries are inner (holes); outer comes from natural surface bounds
+                innerBoundaryList.AddRange(ifcCurveBoundedSurface.Boundaries);
+            }
+
+            // Build inner boundary wires
+            var innerWires = innerBoundaryList
+                .Select(c => (XbimWire)wireFactory.Build(c))
+                .ToArray();
+
+            try
+            {
+                if (ifcCurveBoundedSurface.ImplicitOuter)
+                {
+                    // Build face from natural surface bounds
+                    int result = XbimGeometryNativeApi.xbim_face_build_surface_natural_bounds(
+                        ContextHandle, basis.Handle, _modelService.Precision, out var faceHandle);
+
+                    if (result != 0)
+                        throw new XbimGeometryServiceException(
+                            $"Failed to build naturally bounded face for CurveBoundedSurface " +
+                            $"#{ifcCurveBoundedSurface.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                    // Add inner wires (holes) if any
+                    if (innerWires.Length > 0)
+                    {
+                        var innerHandles = innerWires.Select(w => w.Handle).ToArray();
+                        using var innerWireArray = new NativeHandleArray(innerHandles);
+
+                        result = XbimGeometryNativeApi.xbim_face_add_wires(
+                            faceHandle, innerWireArray.Ptrs, innerWireArray.Length, out var newFaceHandle);
+
+                        faceHandle.Dispose();
+
+                        if (result != 0)
+                            throw new XbimGeometryServiceException(
+                                $"Failed to add inner boundaries to CurveBoundedSurface " +
+                                $"#{ifcCurveBoundedSurface.EntityLabel}: {XbimGeometryNativeApi.GetLastError()}");
+
+                        faceHandle = newFaceHandle;
+                    }
+
+                    return new FaceSurface(faceHandle, XSurfaceType.IfcCurveBoundedSurface);
+                }
+                else
+                {
+                    // Build outer wire from the explicit outer boundary
+                    using var outerWire = (XbimWire)wireFactory.Build(outerBoundary!);
+
+                    var innerHandles = innerWires.Select(w => w.Handle).ToArray();
+                    using var innerWireArray = new NativeHandleArray(innerHandles);
+
+                    int result = XbimGeometryNativeApi.xbim_face_build_advanced_with_surface(
+                        ContextHandle,
+                        basis.Handle,
+                        outerWire.Handle,
+                        innerWireArray.Ptrs,
+                        innerWireArray.Length,
+                        1, // sameSense
+                        out var faceHandle);
+
+                    if (result != 0)
+                        throw new XbimGeometryServiceException(
+                            $"Failed to build CurveBoundedSurface #{ifcCurveBoundedSurface.EntityLabel}: " +
+                            $"{XbimGeometryNativeApi.GetLastError()}");
+
+                    return new FaceSurface(faceHandle, XSurfaceType.IfcCurveBoundedSurface);
+                }
+            }
+            finally
+            {
+                foreach (var w in innerWires)
+                    w.Dispose();
+            }
+        }
+
         #endregion
 
         #region Surface of Revolution
@@ -322,7 +428,7 @@ namespace Xbim.Geometry.Engine.Factories
             {
                 IIfcArbitraryOpenProfileDef open => open.Curve,
                 IIfcArbitraryClosedProfileDef closed => closed.OuterCurve,
-                _ => throw new NotSupportedException(
+                _ => throw new XbimNotGeometrySupportedException(
                     $"SurfaceOfRevolution #{ifcRevolution.EntityLabel}: unsupported SweptCurve profile type " +
                     $"{ifcRevolution.SweptCurve.ExpressType.ExpressName}.")
             };
@@ -330,7 +436,6 @@ namespace Xbim.Geometry.Engine.Factories
             // Build the generatrix curve from the profile's curve property
             var curveFactory = (CurveFactory)_modelService.CurveFactory;
             using var curve = (XbimCurve)curveFactory.Build(ifcCurve);
-
            
             // Extract revolution axis
             var axisPoint = GeometryFactory.BuildPoint3d(ifcRevolution.AxisPosition.Location);
@@ -373,7 +478,7 @@ namespace Xbim.Geometry.Engine.Factories
             {
                 IIfcArbitraryOpenProfileDef open => open.Curve,
                 IIfcArbitraryClosedProfileDef closed => closed.OuterCurve,
-                _ => throw new NotSupportedException(
+                _ => throw new XbimNotGeometrySupportedException(
                     $"SurfaceOfLinearExtrusion #{ifcExtrusion.EntityLabel}: unsupported SweptCurve profile type " +
                     $"{ifcExtrusion.SweptCurve.ExpressType.ExpressName}.")
             };

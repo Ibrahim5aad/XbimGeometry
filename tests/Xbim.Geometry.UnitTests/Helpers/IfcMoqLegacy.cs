@@ -273,6 +273,60 @@ internal static partial class IfcMoq
         return plane;
     }
 
+    // ── Boundary curve mocks ────────────────────────────────────────
+
+    /// <summary>
+    /// Creates a rectangular boundary curve (closed composite curve) on the XY plane.
+    /// The rectangle has corners at (ox,oy,oz), (ox+w,oy,oz), (ox+w,oy+h,oz), (ox,oy+h,oz).
+    /// </summary>
+    public static T RectangularBoundaryCurve<T>(
+        double w = 10, double h = 20,
+        double ox = 0, double oy = 0, double oz = 0) where T : class, IIfcBoundaryCurve
+    {
+        var p0 = CartesianPoint3d(ox, oy, oz);
+        var p1 = CartesianPoint3d(ox + w, oy, oz);
+        var p2 = CartesianPoint3d(ox + w, oy + h, oz);
+        var p3 = CartesianPoint3d(ox, oy + h, oz);
+
+        var seg1 = CompositeCurveSegment3d(
+            TrimmedCurve3d(Line3d(p0, direction: Direction3d(1, 0, 0)), 0, w), entityLabel: 101);
+        var seg2 = CompositeCurveSegment3d(
+            TrimmedCurve3d(Line3d(p1, direction: Direction3d(0, 1, 0)), 0, h), entityLabel: 102);
+        var seg3 = CompositeCurveSegment3d(
+            TrimmedCurve3d(Line3d(p2, direction: Direction3d(-1, 0, 0)), 0, w), entityLabel: 103);
+        var seg4 = CompositeCurveSegment3d(
+            TrimmedCurve3d(Line3d(p3, direction: Direction3d(0, -1, 0)), 0, h), entityLabel: 104);
+
+        var moq = MakeMoq<T>();
+        moq.SetupGet(v => v.Dim).Returns(new IfcDimensionCount(3));
+        moq.SetupGet(x => x.ExpressType).Returns(
+            typeof(T) == typeof(IIfcOuterBoundaryCurve)
+                ? MetaData.ExpressType(typeof(IfcOuterBoundaryCurve))
+                : MetaData.ExpressType(typeof(IfcBoundaryCurve)));
+        var curve = moq.Object;
+        curve.Segments.AddRange(new[] { seg1, seg2, seg3, seg4 });
+        moq.SetupGet(v => v.NSegments).Returns(new IfcInteger(4));
+        return curve;
+    }
+
+    /// <summary>
+    /// Creates a mock IIfcCurveBoundedSurface.
+    /// </summary>
+    public static IIfcCurveBoundedSurface CurveBoundedSurface(
+        IIfcSurface basisSurface,
+        bool implicitOuter,
+        params IIfcBoundaryCurve[] boundaries)
+    {
+        var moq = MakeMoq<IIfcCurveBoundedSurface>();
+        moq.SetupGet(x => x.ExpressType).Returns(MetaData.ExpressType(typeof(IfcCurveBoundedSurface)));
+        var cbs = moq.Object;
+        cbs.BasisSurface = basisSurface;
+        cbs.ImplicitOuter = implicitOuter;
+        foreach (var b in boundaries)
+            cbs.Boundaries.Add(b);
+        return cbs;
+    }
+
     // ── Transform mocks ─────────────────────────────────────────────
 
     public static IIfcCartesianTransformationOperator3D CartesianTransformationOperator3d(double scale = 1, double x = 0, double y = 0, double z = 0)

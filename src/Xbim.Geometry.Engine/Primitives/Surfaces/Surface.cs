@@ -1,7 +1,8 @@
-using System;
+using System.Runtime.InteropServices;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Handles;
 using Xbim.Geometry.Engine.Internal;
+using Xbim.Geometry.Exceptions;
 
 namespace Xbim.Geometry.Engine.Primitives;
 
@@ -25,15 +26,15 @@ internal class Surface : NativeOwner<NativeSurfaceHandle>, IXSurface
     public bool IsVPeriodic => false; // TODO: query from native when available
 
     public string BrepString() =>
-        throw new NotSupportedException(
+        throw new XbimNotGeometrySupportedException(
             $"BRep export is not supported for elementary surface type {_surfaceType}.");
 
     public void WriteBrep(string filePath) =>
-        throw new NotSupportedException(
+        throw new XbimNotGeometrySupportedException(
             $"BRep export is not supported for elementary surface type {_surfaceType}.");
 
     public void WriteStl(string filePath) =>
-        throw new NotSupportedException(
+        throw new XbimNotGeometrySupportedException(
             $"STL export is not supported for elementary surface type {_surfaceType}.");
 }
 
@@ -54,17 +55,40 @@ internal sealed class FaceSurface : NativeOwner<NativeShapeHandle>, IXSurface
 
     public bool IsVPeriodic => false;
 
-    public string BrepString() =>
-        throw new NotSupportedException(
-            $"BRep export is not supported for bounded surface type {SurfaceType}.");
+    public string BrepString()
+    {
+        int result = XbimGeometryNativeApi.xbim_shape_to_brep_string(
+            Handle, out IntPtr strPtr, out int strLen);
 
-    public void WriteBrep(string filePath) =>
-        throw new NotSupportedException(
-            $"BRep export is not supported for bounded surface type {SurfaceType}.");
+        if (result != 0 || strPtr == IntPtr.Zero)
+            throw new XbimGeometryServiceException(
+                $"Failed to serialize surface to BRep: {XbimGeometryNativeApi.GetLastError()}");
 
-    public void WriteStl(string filePath) =>
-        throw new NotSupportedException(
-            $"STL export is not supported for bounded surface type {SurfaceType}.");
+        try
+        {
+            return Marshal.PtrToStringAnsi(strPtr, strLen);
+        }
+        finally
+        {
+            XbimGeometryNativeApi.xbim_string_free(strPtr);
+        }
+    }
+
+    public void WriteBrep(string filePath)
+    {
+        int result = XbimGeometryNativeApi.xbim_shape_write_brep(Handle, filePath);
+        if (result != 0)
+            throw new XbimGeometryServiceException(
+                $"Failed to write BRep file '{filePath}': {XbimGeometryNativeApi.GetLastError()}");
+    }
+
+    public void WriteStl(string filePath)
+    {
+        int result = XbimGeometryNativeApi.xbim_shape_write_stl(Handle, filePath, 0.1);
+        if (result != 0)
+            throw new XbimGeometryServiceException(
+                $"Failed to write STL file '{filePath}': {XbimGeometryNativeApi.GetLastError()}");
+    }
 }
 
 /// <summary>
