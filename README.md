@@ -220,7 +220,7 @@ cmake --build build --config Release
 
 # Linux
 cmake --preset linux-x64-release
-cmake --build build --config Release -j $(nproc)
+cmake --build build --config Release
 ```
 
 For Debug builds, use the `win-x64-debug` / `linux-x64-debug` preset (output goes to `build-debug/`).
