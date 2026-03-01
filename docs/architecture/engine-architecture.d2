@@ -1,0 +1,435 @@
+direction: down
+
+title: XbimGeometry Engine Architecture {
+  near: top-center
+  shape: text
+  style.font-size: 28
+  style.bold: true
+}
+
+# ══════════════════════════════════════════════
+#  SCENE
+# ══════════════════════════════════════════════
+scene: "Xbim.Geometry.Scene (net8.0)\nBuilds 3D model scene from IFC\nTriangulates shapes · Produces WexBim output" {
+  style.fill: "#2d1b4e"
+  style.stroke: "#7c4dff"
+  style.border-radius: 10
+  style.font-color: "#ede7f6"
+  style.font-size: 14
+
+  grid-columns: 3
+  grid-gap: 8
+
+  ctx: "Xbim3DModelContext\nscene creation entry point: CreateContext()" {
+    style.fill: "#4527a0"
+    style.stroke: "#b39ddb"
+    style.border-radius: 6
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+  place: "XbimPlacementTree\nIFC placements → global matrices" {
+    style.fill: "#4527a0"
+    style.stroke: "#b39ddb"
+    style.border-radius: 6
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+  tess: "Triangulation\nXbimTessellator + BRepMesh" {
+    style.fill: "#4527a0"
+    style.stroke: "#b39ddb"
+    style.border-radius: 6
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+  cluster: "XbimDbscan\nSpatial clustering → regions" {
+    style.fill: "#4527a0"
+    style.stroke: "#b39ddb"
+    style.border-radius: 6
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+  store: "GeometryStore\nShapeGeometry + Instances" {
+    style.fill: "#4527a0"
+    style.stroke: "#b39ddb"
+    style.border-radius: 6
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+  wexbim: "→ model.SaveAsWexBim()\nCompact binary mesh output" {
+    style.fill: "#6a1b9a"
+    style.stroke: "#ce93d8"
+    style.border-radius: 6
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+}
+
+# ══════════════════════════════════════════════
+#  ENGINE — Services
+# ══════════════════════════════════════════════
+services: "Services — Xbim.Geometry.Engine (net8.0)" {
+  style.fill: "#0d1b2a"
+  style.stroke: "#2196f3"
+  style.border-radius: 10
+  style.font-color: "#90caf9"
+  style.font-size: 14
+
+  grid-columns: 2
+
+  mgs: "ModelGeometryService\nCentral hub · lazy factory creation" {
+    style.fill: "#1565c0"
+    style.stroke: "#64b5f6"
+    style.border-radius: 6
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+  ge: "GeometryEngine\nIIfcRepresentationItem → factory" {
+    style.fill: "#1565c0"
+    style.stroke: "#64b5f6"
+    style.border-radius: 6
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+}
+
+# ══════════════════════════════════════════════
+#  ENGINE — Factories
+# ══════════════════════════════════════════════
+factories: "Factories — implement IXxxxFactory\nfrom Xbim.Geometry.Abstractions (netstandard2.0)" {
+  style.fill: "#0d1b2a"
+  style.stroke: "#4caf50"
+  style.border-radius: 10
+  style.font-color: "#a5d6a7"
+  style.font-size: 13
+
+  grid-columns: 3
+  grid-gap: 8
+
+  # Row 1 — delegation chains start here (top)
+  wf: "WireFactory\nPolylines · composites\n→ IXWire (3D path)" {
+    style.fill: "#2e7d32"
+    style.stroke: "#66bb6a"
+    style.border-radius: 6
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+  bf: "BooleanFactory\nTree evaluation\nUnion chain flattening" {
+    style.fill: "#2e7d32"
+    style.stroke: "#66bb6a"
+    style.border-radius: 6
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+  ff: "FaceFactory\nSurface + wire bounds\n→ IXFace" {
+    style.fill: "#2e7d32"
+    style.stroke: "#66bb6a"
+    style.border-radius: 6
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+  # Row 2 — middle of chains
+  pf: "ProfileFactory\n~20 IFC profile types\nParametric + arbitrary" {
+    style.fill: "#2e7d32"
+    style.stroke: "#66bb6a"
+    style.border-radius: 6
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+  sf: "SolidFactory\nCSG primitives\nExtrusions · revolves · sweeps" {
+    style.fill: "#2e7d32"
+    style.stroke: "#66bb6a"
+    style.border-radius: 6
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+  shf: "ShellFactory\nConnected face sets\nSewing operations" {
+    style.fill: "#2e7d32"
+    style.stroke: "#66bb6a"
+    style.border-radius: 6
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+  # Row 3 — bottom of chains
+  cf: "CurveFactory\n.2d / .3d / .Segments\nIFC4x3 spirals" {
+    style.fill: "#2e7d32"
+    style.stroke: "#66bb6a"
+    style.border-radius: 6
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+  suf: "SurfaceFactory\nPlanes · cylinders\nB-splines → IXSurface" {
+    style.fill: "#2e7d32"
+    style.stroke: "#66bb6a"
+    style.border-radius: 6
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+  rest: "Edge · Vertex · Compound\nProjection · WexBimMesh" {
+    style.fill: "#2e7d32"
+    style.stroke: "#66bb6a"
+    style.border-radius: 6
+    style.font-color: "#c8e6c9"
+    style.font-size: 11
+  }
+}
+
+# ══════════════════════════════════════════════
+#  SHAPES — Dual Interface
+# ══════════════════════════════════════════════
+shapes: "Shape Hierarchy — Dual Interface\nv6 (IX*) from Abstractions · v5 (IXbim*) from Essentials NuGet\nBoth backed by the SAME native calls — no v5/v6 split" {
+  style.fill: "#0d1b2a"
+  style.stroke: "#ff9800"
+  style.border-radius: 10
+  style.font-color: "#ffcc80"
+  style.font-size: 12
+  label.near: top-center
+
+  base: "XbimShape : NativeOwner<NativeShapeHandle>\nv6: IXShape (Bounds → IXAABB)\nv5: IXbimGeometryObject (BoundingBox → XbimRect3D)" {
+    style.fill: "#e65100"
+    style.stroke: "#ff9800"
+    style.border-radius: 8
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+
+  kids: " " {
+    style.fill: transparent
+    style.stroke: transparent
+    grid-columns: 7
+    grid-gap: 4
+
+    s1: "XbimSolid\nIXSolid\nIXbimSolid" {
+      style.fill: "#bf360c"
+      style.stroke: "#ff6e40"
+      style.border-radius: 4
+      style.font-color: "#ffffff"
+      style.font-size: 10
+    }
+    s2: "XbimShell\nIXShell\nIXbimShell" {
+      style.fill: "#bf360c"
+      style.stroke: "#ff6e40"
+      style.border-radius: 4
+      style.font-color: "#ffffff"
+      style.font-size: 10
+    }
+    s3: "XbimFace\nIXFace\nIXbimFace" {
+      style.fill: "#bf360c"
+      style.stroke: "#ff6e40"
+      style.border-radius: 4
+      style.font-color: "#ffffff"
+      style.font-size: 10
+    }
+    s4: "XbimWire\nIXWire\nIXbimWire" {
+      style.fill: "#bf360c"
+      style.stroke: "#ff6e40"
+      style.border-radius: 4
+      style.font-color: "#ffffff"
+      style.font-size: 10
+    }
+    s5: "XbimEdge\nIXEdge\nIXbimEdge" {
+      style.fill: "#bf360c"
+      style.stroke: "#ff6e40"
+      style.border-radius: 4
+      style.font-color: "#ffffff"
+      style.font-size: 10
+    }
+    s6: "XbimVertex\nIXVertex\nIXbimVertex" {
+      style.fill: "#bf360c"
+      style.stroke: "#ff6e40"
+      style.border-radius: 4
+      style.font-color: "#ffffff"
+      style.font-size: 10
+    }
+    s7: "XbimCompound\nIXCompound" {
+      style.fill: "#bf360c"
+      style.stroke: "#ff6e40"
+      style.border-radius: 4
+      style.font-color: "#ffffff"
+      style.font-size: 10
+    }
+  }
+
+  base -> kids: subtypes {style.stroke: "#ff9800"; style.stroke-width: 2}
+}
+
+# ══════════════════════════════════════════════
+#  HANDLES
+# ══════════════════════════════════════════════
+handles: SafeHandle Layer {
+  style.fill: "#0d1b2a"
+  style.stroke: "#78909c"
+  style.border-radius: 10
+  style.font-color: "#b0bec5"
+  style.font-size: 12
+  grid-columns: 7
+
+  ctx: NativeContextHandle {
+    style.fill: "#37474f"
+    style.stroke: "#546e7a"
+    style.border-radius: 4
+    style.font-color: "#90a4ae"
+    style.font-size: 9
+  }
+  sh: NativeShapeHandle {
+    style.fill: "#37474f"
+    style.stroke: "#546e7a"
+    style.border-radius: 4
+    style.font-color: "#90a4ae"
+    style.font-size: 9
+  }
+  ch: NativeCurveHandle {
+    style.fill: "#37474f"
+    style.stroke: "#546e7a"
+    style.border-radius: 4
+    style.font-color: "#90a4ae"
+    style.font-size: 9
+  }
+  c2h: NativeCurve2dHandle {
+    style.fill: "#37474f"
+    style.stroke: "#546e7a"
+    style.border-radius: 4
+    style.font-color: "#90a4ae"
+    style.font-size: 9
+  }
+  surh: NativeSurfaceHandle {
+    style.fill: "#37474f"
+    style.stroke: "#546e7a"
+    style.border-radius: 4
+    style.font-color: "#90a4ae"
+    style.font-size: 9
+  }
+  lh: NativeLocationHandle {
+    style.fill: "#37474f"
+    style.stroke: "#546e7a"
+    style.border-radius: 4
+    style.font-color: "#90a4ae"
+    style.font-size: 9
+  }
+  abh: NativeBrepBuilderHandle {
+    style.fill: "#37474f"
+    style.stroke: "#546e7a"
+    style.border-radius: 4
+    style.font-color: "#90a4ae"
+    style.font-size: 9
+  }
+}
+
+# ══════════════════════════════════════════════
+#  P/INVOKE
+# ══════════════════════════════════════════════
+pinvoke: "P/Invoke Boundary\n[DllImport(\"xbim_geometry_native\", StdCall)]\nNativeLibraryLoader → runtimes/{rid}/native/" {
+  style.fill: "#b71c1c"
+  style.stroke: "#ef5350"
+  style.border-radius: 8
+  style.font-color: "#ffffff"
+  style.font-size: 11
+}
+
+# ══════════════════════════════════════════════
+#  NATIVE SIDE (dashed boundary)
+# ══════════════════════════════════════════════
+native: "Native Layer — C++" {
+  style.fill: transparent
+  style.stroke: "#e94560"
+  style.stroke-dash: 5
+  style.border-radius: 12
+  style.font-color: "#e94560"
+  style.font-size: 14
+
+  api_h: "xbim_geometry_api.h — C-style thin API\n~200 extern \"C\" functions · single header \nOpaque handles · XbimResult xbim_xxx(handle, params, out*)\nxbim_get_last_error() · __stdcall (Win) / cdecl (Linux)" {
+    style.fill: "#16213e"
+    style.stroke: "#e94560"
+    style.border-radius: 8
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+
+  native_api: "API Regions (~30 groups)" {
+    style.fill: "#1a1a2e"
+    style.stroke: "#0f3460"
+    style.border-radius: 10
+    style.font-color: "#b0bec5"
+    style.font-size: 12
+
+    grid-columns: 4
+    grid-gap: 6
+
+    r1: "Context + Shape\ncreate · destroy · type\ntransform · bounds" {
+      style.fill: "#0f3460"
+      style.stroke: "#533483"
+      style.border-radius: 4
+      style.font-color: "#b0bec5"
+      style.font-size: 10
+    }
+    r2: "CSG + Extrusions\nblock · cylinder · sphere\nextrude · revolve · taper" {
+      style.fill: "#0f3460"
+      style.stroke: "#533483"
+      style.border-radius: 4
+      style.font-color: "#b0bec5"
+      style.font-size: 10
+    }
+    r3: "Profiles\nrect · circle · I/L/T/U\nhollow · arbitrary" {
+      style.fill: "#0f3460"
+      style.stroke: "#533483"
+      style.border-radius: 4
+      style.font-color: "#b0bec5"
+      style.font-size: 10
+    }
+    r4: "Booleans\ncut · union · intersect\nhalf_space · compound" {
+      style.fill: "#0f3460"
+      style.stroke: "#533483"
+      style.border-radius: 4
+      style.font-color: "#b0bec5"
+      style.font-size: 10
+    }
+    r5: "Wire + Edge\nbuild_from_curves\ntrim · queries" {
+      style.fill: "#0f3460"
+      style.stroke: "#533483"
+      style.border-radius: 4
+      style.font-color: "#b0bec5"
+      style.font-size: 10
+    }
+    r6: "Face + Shell\nbuild_from_wire\nsew · orient" {
+      style.fill: "#0f3460"
+      style.stroke: "#533483"
+      style.border-radius: 4
+      style.font-color: "#b0bec5"
+      style.font-size: 10
+    }
+    r7: "Curves 3D + 2D\nline · circle · bspline\nspirals · gradient" {
+      style.fill: "#0f3460"
+      style.stroke: "#533483"
+      style.border-radius: 4
+      style.font-color: "#b0bec5"
+      style.font-size: 10
+    }
+    r8: "Mesh + BRep\ntriangulate · wexbim\nbrep · projection" {
+      style.fill: "#0f3460"
+      style.stroke: "#533483"
+      style.border-radius: 4
+      style.font-color: "#b0bec5"
+      style.font-size: 10
+    }
+  }
+
+  occt: "OpenCASCADE 7.9.3 (vcpkg) \nTKernel · TKMath · TKBRep · TKBO · TKBool · TKPrim\nTKGeomAlgo · TKMesh · TKOffset · TKFillet · TKShHealing · TKHLR" {
+    style.fill: "#311b92"
+    style.stroke: "#7c4dff"
+    style.border-radius: 8
+    style.font-color: "#ffffff"
+    style.font-size: 11
+  }
+
+  api_h -> native_api {style.stroke: "#533483"; style.stroke-width: 2}
+  native_api -> occt: depends on {style.stroke: "#7c4dff"; style.stroke-width: 2}
+}
+
+# ══════════════════════════════════════════════
+#  VERTICAL CONNECTIONS
+# ══════════════════════════════════════════════
+scene -> services: uses engine {style.stroke: "#7c4dff"; style.stroke-width: 3}
+services -> factories: routes {style.stroke: "#64b5f6"; style.stroke-width: 2}
+factories -> shapes: returns {style.stroke: "#ff9800"; style.stroke-width: 2}
+shapes -> handles: owns {style.stroke: "#78909c"; style.stroke-width: 2}
+handles -> pinvoke: marshalled {style.stroke: "#ef5350"; style.stroke-width: 2}
+pinvoke -> native: DllImport {style.stroke: "#f44336"; style.stroke-width: 3}
