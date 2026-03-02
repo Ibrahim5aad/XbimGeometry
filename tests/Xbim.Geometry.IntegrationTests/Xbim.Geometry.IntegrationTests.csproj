@@ -613,6 +613,9 @@
 		<None Update="TestFiles\Regressions\LakeFault.ifc">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
+		<None Update="TestFiles\Regressions\Landscape.62995.ifc">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 
 	<ItemGroup>
