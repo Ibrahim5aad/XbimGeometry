@@ -199,7 +199,8 @@ namespace Xbim.Geometry.Engine.Factories
             ref double u2,
             ref bool sense)
         {
-            if (Math.Abs(u1 - u2) < _modelService.Precision)
+            double tolerance = isConic ? 1e-10 : _modelService.Precision;
+            if (Math.Abs(u1 - u2) < tolerance)
             {
                 if (isConic)
                 {
