@@ -29,5 +29,8 @@ namespace Xbim.Geometry.Engine.Internal
 
         [DllImport(NativeLibraryLoader.LibraryName, CallingConvention = CallingConvention.StdCall)]
         internal static extern int xbim_advanced_brep_destroy(IntPtr handle);
+
+        [DllImport(NativeLibraryLoader.LibraryName, CallingConvention = CallingConvention.StdCall)]
+        internal static extern void xbim_mesh_free(IntPtr handle);
     }
 }

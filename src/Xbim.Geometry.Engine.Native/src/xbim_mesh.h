@@ -181,6 +181,8 @@ public:
 
     void SaveIndicesAndNormals(FaceMeshIterator& faceIter);
     std::vector<unsigned char> Serialize() const;
+    int SerializedSize() const;
+    void SerializeInto(unsigned char* buf) const;
 
     int VertexCount() const { return pointInspector_.points_.Length(); }
     int FaceCount() const { return static_cast<int>(indicesPerFace_.size()); }
@@ -212,6 +214,13 @@ private:
     std::vector<std::vector<PackedNormal>> normalsPerFace_;
 
     static constexpr unsigned char VERSION = 1;
+};
+
+struct XbimMesh_
+{
+    WexBimMesh mesh;
+    bool hasCurves;
+    XbimMesh_(double tolerance, double scale) : mesh(tolerance, scale), hasCurves(false) {}
 };
 
 #pragma endregion

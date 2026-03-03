@@ -31,6 +31,27 @@ namespace Xbim.Geometry.Engine.Internal
         internal const int CSegHandle     = 2;
         internal const int CSegPolyline   = 3;
 
+        #region Native Value Types
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct XbimMeshParams
+        {
+            public double Tolerance;
+            public double LinearDeflection;
+            public double AngularDeflection;
+            public double Scale;
+            public int CheckEdges;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct XbimBoundingBox
+        {
+            public double MinX, MinY, MinZ;
+            public double MaxX, MaxY, MaxZ;
+        }
+
+        #endregion
+
         #region Error Handling
 
         [DllImport(Lib, CallingConvention = CC)]
@@ -1505,6 +1526,22 @@ namespace Xbim.Geometry.Engine.Internal
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern void xbim_buffer_free(IntPtr buffer);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_mesh_prepare(
+            NativeContextHandle ctx,
+            NativeShapeHandle shapeHandle,
+            in XbimMeshParams meshParams,
+            out NativeMeshHandle outMesh,
+            out int outBufferSize,
+            out int outHasCurves,
+            out XbimBoundingBox outBounds);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern unsafe int xbim_mesh_write(
+            NativeMeshHandle mesh,
+            byte* buffer,
+            int bufferSize);
 
         #endregion
 

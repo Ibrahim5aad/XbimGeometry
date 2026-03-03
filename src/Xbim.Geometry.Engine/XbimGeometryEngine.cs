@@ -366,7 +366,18 @@ namespace Xbim.Geometry.Engine
 
                 if (meshData.Length > 0)
                 {
-                    shapeGeom.BoundingBox = geometryObject.BoundingBox;
+                    if (!bounds.IsVoid)
+                    {
+                        var min = bounds.CornerMin;
+                        var max = bounds.CornerMax;
+                        shapeGeom.BoundingBox = new XbimRect3D(
+                            min.X, min.Y, min.Z,
+                            max.X - min.X, max.Y - min.Y, max.Z - min.Z);
+                    }
+                    else
+                    {
+                        shapeGeom.BoundingBox = geometryObject.BoundingBox;
+                    }
                     shapeGeom.LOD = XbimLOD.LOD_Unspecified;
                     shapeGeom.Format = storageType;
                 }

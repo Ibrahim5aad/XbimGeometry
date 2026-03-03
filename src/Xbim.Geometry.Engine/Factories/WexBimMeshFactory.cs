@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine.Internal;
@@ -60,24 +59,29 @@ namespace Xbim.Geometry.Engine.Factories
             var Shape = shape as XbimShape
                 ?? throw new ArgumentException("Shape must be an XbimShape instance.", nameof(shape));
 
-            int result = XbimGeometryNativeApi.xbim_mesh_create_wexbim(
+            var meshParams = new XbimGeometryNativeApi.XbimMeshParams
+            {
+                Tolerance = tolerance,
+                LinearDeflection = linearDeflection,
+                AngularDeflection = angularDeflection,
+                Scale = scale,
+                CheckEdges = 0
+            };
+
+            int result = XbimGeometryNativeApi.xbim_mesh_prepare(
                 _modelService.ContextHandle,
                 Shape.Handle,
-                tolerance,
-                linearDeflection,
-                angularDeflection,
-                scale,
-                0, // checkEdges = false
-                out IntPtr bufferPtr,
+                in meshParams,
+                out var meshHandle,
                 out int bufferSize,
                 out int nativeHasCurves,
-                out double minX, out double minY, out double minZ,
-                out double maxX, out double maxY, out double maxZ);
+                out var bbox);
 
-            if (result != 0 || bufferPtr == IntPtr.Zero)
+            if (result != 0 || meshHandle.IsInvalid)
             {
                 string error = XbimGeometryNativeApi.GetLastError();
                 _logger.LogWarning("WexBim mesh creation failed: {Error}", error);
+                meshHandle?.Dispose();
                 bounds = XAxisAlignedBoundingBox.Void;
                 hasCurves = false;
                 return Array.Empty<byte>();
@@ -85,17 +89,30 @@ namespace Xbim.Geometry.Engine.Factories
 
             try
             {
-                // Copy native buffer to managed byte array
                 var meshBytes = new byte[bufferSize];
-                Marshal.Copy(bufferPtr, meshBytes, 0, bufferSize);
+                unsafe
+                {
+                    fixed (byte* ptr = meshBytes)
+                    {
+                        int writeResult = XbimGeometryNativeApi.xbim_mesh_write(
+                            meshHandle, ptr, bufferSize);
+                        if (writeResult != 0)
+                        {
+                            string error = XbimGeometryNativeApi.GetLastError();
+                            throw new InvalidOperationException(
+                                $"WexBim mesh write failed: {error}");
+                        }
+                    }
+                }
                 hasCurves = nativeHasCurves != 0;
-                bounds = new XAxisAlignedBoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
-
+                bounds = new XAxisAlignedBoundingBox(
+                    bbox.MinX, bbox.MinY, bbox.MinZ,
+                    bbox.MaxX, bbox.MaxY, bbox.MaxZ);
                 return meshBytes;
             }
             finally
             {
-                XbimGeometryNativeApi.xbim_buffer_free(bufferPtr);
+                meshHandle.Dispose();
             }
         }
     }

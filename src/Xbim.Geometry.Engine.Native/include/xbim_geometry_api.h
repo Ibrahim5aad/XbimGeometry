@@ -37,6 +37,30 @@ typedef struct XbimCurve_*                  XbimCurveHandle;
 typedef struct XbimCurve2d_*                XbimCurve2dHandle;
 typedef struct XbimSurface_*                XbimSurfaceHandle;
 typedef struct XbimAdvancedBrepBuilder_*    XbimAdvancedBrepBuilderHandle;
+typedef struct XbimMesh_*                   XbimMeshHandle;
+
+#pragma endregion
+
+#pragma region Value Types
+
+/*
+ * Tessellation parameters for WexBim mesh creation.
+ */
+typedef struct {
+    double tolerance;
+    double linear_deflection;
+    double angular_deflection;
+    double scale;
+    int    check_edges;
+} XbimMeshParams;
+
+/*
+ * Axis-aligned bounding box as min/max corner coordinates.
+ */
+typedef struct {
+    double min_x, min_y, min_z;
+    double max_x, max_y, max_z;
+} XbimBoundingBox;
 
 #pragma endregion
 
@@ -3491,6 +3515,33 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_mesh_get_bounding_box(
  * Use this to release the buffer returned by xbim_mesh_create_wexbim().
  */
 XBIM_EXPORT void XBIM_CALL xbim_buffer_free(unsigned char* buffer);
+
+/*
+ * Split mesh API: prepare / write / free.
+ *
+ * Splits WexBim mesh creation into three phases to eliminate intermediate
+ * buffer copies. The caller allocates a managed byte array of the exact
+ * size returned by prepare, pins it, and passes it to write.
+ *
+ *   xbim_mesh_prepare  – tessellate, deduplicate, compute exact buffer size + bbox
+ *   xbim_mesh_write    – serialize directly into a caller-provided buffer
+ *   xbim_mesh_free     – release native mesh state
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_mesh_prepare(
+    XbimContextHandle       ctx,
+    XbimShapeHandle         shapeHandle,
+    const XbimMeshParams*   params,
+    XbimMeshHandle*         outMesh,
+    int*                    outBufferSize,
+    int*                    outHasCurves,
+    XbimBoundingBox*        outBounds);
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_mesh_write(
+    XbimMeshHandle      mesh,
+    unsigned char*      buffer,
+    int                 bufferSize);
+
+XBIM_EXPORT void XBIM_CALL xbim_mesh_free(XbimMeshHandle mesh);
 
 #pragma endregion
 

@@ -378,6 +378,179 @@ void WexBimMesh::writeTriangleIndicesWithNormals(std::vector<unsigned char>& buf
     }
 }
 
+static int indexSize(unsigned int numVertices)
+{
+    if (numVertices <= 0xFF) return 1;
+    if (numVertices <= 0xFFFF) return 2;
+    return 4;
+}
+
+int WexBimMesh::SerializedSize() const
+{
+    unsigned int numVertices = static_cast<unsigned int>(VertexCount());
+    int idxSz = indexSize(numVertices);
+
+    int size = 1               // version
+             + 4               // vertex count
+             + 4               // triangle count
+             + numVertices * 12 // vertices (float32 XYZ)
+             + 4;              // face count
+
+    int faceCount = FaceCount();
+    for (int fi = 0; fi < faceCount; ++fi)
+    {
+        const auto& faceNormals = normalsPerFace_[fi];
+        bool isPlanar = faceNormals.size() == 1;
+        int numTrisForFace = indicesPerFace_[fi].Length();
+
+        size += 4; // triCountField (positive or negative)
+        if (isPlanar)
+        {
+            size += 2; // packed normal
+            size += numTrisForFace * 3 * idxSz;
+        }
+        else
+        {
+            size += numTrisForFace * 3 * (idxSz + 2);
+        }
+    }
+
+    return size;
+}
+
+/* Write helpers for raw buffer output */
+template<typename T>
+static void writeValueRaw(unsigned char* buf, int& offset, const T& val)
+{
+    std::memcpy(buf + offset, &val, sizeof(T));
+    offset += sizeof(T);
+}
+
+static void writeTriangleIndicesRaw(unsigned char* buf, int& offset,
+                                     const Vec3Int& tri, unsigned int maxVertices)
+{
+    if (maxVertices <= 0xFF)
+    {
+        buf[offset++] = static_cast<unsigned char>(tri.x());
+        buf[offset++] = static_cast<unsigned char>(tri.y());
+        buf[offset++] = static_cast<unsigned char>(tri.z());
+    }
+    else if (maxVertices <= 0xFFFF)
+    {
+        writeValueRaw<uint16_t>(buf, offset, static_cast<uint16_t>(tri.x()));
+        writeValueRaw<uint16_t>(buf, offset, static_cast<uint16_t>(tri.y()));
+        writeValueRaw<uint16_t>(buf, offset, static_cast<uint16_t>(tri.z()));
+    }
+    else
+    {
+        writeValueRaw<int>(buf, offset, tri.x());
+        writeValueRaw<int>(buf, offset, tri.y());
+        writeValueRaw<int>(buf, offset, tri.z());
+    }
+}
+
+static void writeTriangleIndicesWithNormalsRaw(unsigned char* buf, int& offset,
+                                                const Vec3Int& tri,
+                                                const PackedNormal& a,
+                                                const PackedNormal& b,
+                                                const PackedNormal& c,
+                                                unsigned int maxVertices)
+{
+    if (maxVertices <= 0xFF)
+    {
+        buf[offset++] = static_cast<unsigned char>(tri.x());
+        buf[offset++] = a.bytes[0]; buf[offset++] = a.bytes[1];
+        buf[offset++] = static_cast<unsigned char>(tri.y());
+        buf[offset++] = b.bytes[0]; buf[offset++] = b.bytes[1];
+        buf[offset++] = static_cast<unsigned char>(tri.z());
+        buf[offset++] = c.bytes[0]; buf[offset++] = c.bytes[1];
+    }
+    else if (maxVertices <= 0xFFFF)
+    {
+        writeValueRaw<uint16_t>(buf, offset, static_cast<uint16_t>(tri.x()));
+        buf[offset++] = a.bytes[0]; buf[offset++] = a.bytes[1];
+        writeValueRaw<uint16_t>(buf, offset, static_cast<uint16_t>(tri.y()));
+        buf[offset++] = b.bytes[0]; buf[offset++] = b.bytes[1];
+        writeValueRaw<uint16_t>(buf, offset, static_cast<uint16_t>(tri.z()));
+        buf[offset++] = c.bytes[0]; buf[offset++] = c.bytes[1];
+    }
+    else
+    {
+        writeValueRaw<int>(buf, offset, tri.x());
+        buf[offset++] = a.bytes[0]; buf[offset++] = a.bytes[1];
+        writeValueRaw<int>(buf, offset, tri.y());
+        buf[offset++] = b.bytes[0]; buf[offset++] = b.bytes[1];
+        writeValueRaw<int>(buf, offset, tri.z());
+        buf[offset++] = c.bytes[0]; buf[offset++] = c.bytes[1];
+    }
+}
+
+void WexBimMesh::SerializeInto(unsigned char* buf) const
+{
+    int offset = 0;
+    unsigned int numVertices = static_cast<unsigned int>(VertexCount());
+    unsigned int numTriangles = static_cast<unsigned int>(TriangleCount());
+
+    // Version
+    writeValueRaw<unsigned char>(buf, offset, VERSION);
+
+    // Vertex count and triangle count
+    writeValueRaw<unsigned int>(buf, offset, numVertices);
+    writeValueRaw<unsigned int>(buf, offset, numTriangles);
+
+    // Vertices as float32 XYZ
+    for (int i = 0; i < pointInspector_.points_.Length(); ++i)
+    {
+        const gp_XYZ& v = pointInspector_.points_.Value(i);
+        float fx = static_cast<float>(v.X());
+        float fy = static_cast<float>(v.Y());
+        float fz = static_cast<float>(v.Z());
+        writeValueRaw<float>(buf, offset, fx);
+        writeValueRaw<float>(buf, offset, fy);
+        writeValueRaw<float>(buf, offset, fz);
+    }
+
+    // Face count
+    int faceCount = FaceCount();
+    writeValueRaw<int>(buf, offset, faceCount);
+
+    // Per-face data
+    for (int fi = 0; fi < faceCount; ++fi)
+    {
+        const auto& faceIndices = indicesPerFace_[fi];
+        const auto& faceNormals = normalsPerFace_[fi];
+        bool isPlanar = faceNormals.size() == 1;
+        int numTrisForFace = faceIndices.Length();
+
+        if (isPlanar)
+        {
+            writeValueRaw<int>(buf, offset, numTrisForFace);
+            writeValueRaw<PackedNormal>(buf, offset, faceNormals.front());
+        }
+        else
+        {
+            int negCount = -numTrisForFace;
+            writeValueRaw<int>(buf, offset, negCount);
+        }
+
+        auto normalIt = faceNormals.cbegin();
+        for (auto triIt = faceIndices.cbegin(); triIt != faceIndices.cend(); ++triIt)
+        {
+            if (isPlanar)
+            {
+                writeTriangleIndicesRaw(buf, offset, *triIt, numVertices);
+            }
+            else
+            {
+                const PackedNormal& a = *normalIt; ++normalIt;
+                const PackedNormal& b = *normalIt; ++normalIt;
+                const PackedNormal& c = *normalIt; ++normalIt;
+                writeTriangleIndicesWithNormalsRaw(buf, offset, *triIt, a, b, c, numVertices);
+            }
+        }
+    }
+}
+
 std::vector<unsigned char> WexBimMesh::Serialize() const
 {
     std::vector<unsigned char> buf;
@@ -705,6 +878,151 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_triangulate(
         xbim_set_error(msg.c_str());
         return XBIM_ERROR;
     }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * Split Mesh API: prepare / write / free
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_mesh_prepare(
+    XbimContextHandle       ctx,
+    XbimShapeHandle         shapeHandle,
+    const XbimMeshParams*   params,
+    XbimMeshHandle*         outMesh,
+    int*                    outBufferSize,
+    int*                    outHasCurves,
+    XbimBoundingBox*        outBounds)
+{
+    xbim_clear_error();
+
+    if (!ctx)
+    {
+        xbim_set_error("xbim_mesh_prepare: null context handle");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!shapeHandle)
+    {
+        xbim_set_error("xbim_mesh_prepare: null shape handle");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!params || !outMesh || !outBufferSize)
+    {
+        xbim_set_error("xbim_mesh_prepare: null output parameter");
+        return XBIM_INVALID_ARG;
+    }
+
+    const TopoDS_Shape& shape = shapeHandle->shape;
+    if (shape.IsNull())
+    {
+        xbim_set_error("xbim_mesh_prepare: shape is null");
+        return XBIM_NULL_SHAPE;
+    }
+
+    try
+    {
+        auto* meshState = new XbimMesh_(params->tolerance, params->scale);
+
+        BRepTools::Clean(shape);
+        BRepMesh_IncrementalMesh incrementalMesh(
+            shape, params->linear_deflection,
+            Standard_False, params->angular_deflection);
+
+        for (FaceMeshIterator faceIter(shape, params->check_edges != 0);
+             faceIter.More(); faceIter.Next())
+        {
+            if (faceIter.IsEmptyMesh())
+                continue;
+            if (!meshState->hasCurves)
+                meshState->hasCurves = faceIter.HasCurves;
+            meshState->mesh.SaveIndicesAndNormals(faceIter);
+        }
+
+        BRepTools::Clean(shape);
+
+        *outMesh = meshState;
+        *outBufferSize = meshState->mesh.SerializedSize();
+
+        if (outHasCurves)
+            *outHasCurves = meshState->hasCurves ? 1 : 0;
+
+        if (outBounds)
+        {
+            if (meshState->mesh.BndBox.IsValid())
+            {
+                outBounds->min_x = meshState->mesh.BndBox.CornerMin().x();
+                outBounds->min_y = meshState->mesh.BndBox.CornerMin().y();
+                outBounds->min_z = meshState->mesh.BndBox.CornerMin().z();
+                outBounds->max_x = meshState->mesh.BndBox.CornerMax().x();
+                outBounds->max_y = meshState->mesh.BndBox.CornerMax().y();
+                outBounds->max_z = meshState->mesh.BndBox.CornerMax().z();
+            }
+            else
+            {
+                *outBounds = XbimBoundingBox{0, 0, 0, 0, 0, 0};
+            }
+        }
+
+        return XBIM_OK;
+    }
+    catch (const Standard_Failure& e)
+    {
+        std::string msg = "xbim_mesh_prepare: OCCT error - ";
+        msg += e.GetMessageString() ? e.GetMessageString() : "unknown";
+        xbim_set_error(msg.c_str());
+        xbim_log_message(ctx, XBIM_LOG_ERROR, msg.c_str());
+        return XBIM_ERROR;
+    }
+    catch (const std::exception& e)
+    {
+        std::string msg = "xbim_mesh_prepare: C++ exception - ";
+        msg += e.what();
+        xbim_set_error(msg.c_str());
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_mesh_write(
+    XbimMeshHandle      mesh,
+    unsigned char*      buffer,
+    int                 bufferSize)
+{
+    xbim_clear_error();
+
+    if (!mesh)
+    {
+        xbim_set_error("xbim_mesh_write: null mesh handle");
+        return XBIM_INVALID_HANDLE;
+    }
+    if (!buffer)
+    {
+        xbim_set_error("xbim_mesh_write: null buffer");
+        return XBIM_INVALID_ARG;
+    }
+
+    int requiredSize = mesh->mesh.SerializedSize();
+    if (bufferSize < requiredSize)
+    {
+        xbim_set_error("xbim_mesh_write: buffer too small");
+        return XBIM_INVALID_ARG;
+    }
+
+    try
+    {
+        mesh->mesh.SerializeInto(buffer);
+        return XBIM_OK;
+    }
+    catch (const std::exception& e)
+    {
+        std::string msg = "xbim_mesh_write: exception - ";
+        msg += e.what();
+        xbim_set_error(msg.c_str());
+        return XBIM_ERROR;
+    }
+}
+
+XBIM_EXPORT void XBIM_CALL xbim_mesh_free(XbimMeshHandle mesh)
+{
+    delete mesh;
 }
 
 XBIM_EXPORT void XBIM_CALL xbim_buffer_free(unsigned char* buffer)
