@@ -52,6 +52,7 @@ namespace Xbim.Tessellator
         private readonly List<XbimTriangleEdge[]> _faultyTriangles = new List<XbimTriangleEdge[]>();
         private Dictionary<int, List<XbimTriangleEdge[]>> _faces;
         private readonly XbimContourVertexCollection _vertices;
+        private uint _triangleCount;
         
         double _minX = double.PositiveInfinity;
         double _minY = double.PositiveInfinity;
@@ -69,16 +70,7 @@ namespace Xbim.Tessellator
            
         }
 
-        public uint TriangleCount
-        {
-            get
-            {
-                uint triangleCount = 0;
-                foreach (var face in _faces.Values)
-                    triangleCount += (uint)face.Count;
-                return triangleCount;
-            }
-        }
+        public uint TriangleCount => _triangleCount;
         public IEnumerable<XbimTriangle> Triangles
         {
             get 
@@ -122,24 +114,23 @@ namespace Xbim.Tessellator
        
         private bool AddEdge(XbimTriangleEdge edge)
         {
-           
+
             var key = edge.Key;
-            if (!_lookupList.ContainsKey(key))
+            if (!_lookupList.TryGetValue(key, out var edges))
             {
-                var arr = new XbimTriangleEdge[2];
-                arr[0] = edge;
-                _lookupList[key] = arr;
+                edges = new XbimTriangleEdge[2];
+                edges[0] = edge;
+                _lookupList[key] = edges;
             }
             else
             {
-                var edges = _lookupList[key];
                 if (edges[1] != null)
                     return false; //we already have a pair
                 edges[1] = edge;
                 edges[0].AdjacentEdge = edge;
                 edge.AdjacentEdge = edges[0];
             }
-           
+
             return true;
         }
 
@@ -167,17 +158,20 @@ namespace Xbim.Tessellator
 
             //doing the extreme edge first should do all connected
 
-            foreach (var xbimEdges in _faces.Values.SelectMany(el => el).Where(e => !e[0].Frozen)) //check any rogue elements
+            foreach (var faceList in _faces.Values) //check any rogue elements
             {
-                if (!IsFacingOutward(xbimEdges[0]))
-                    xbimEdges[0].Reverse();
-                triangles = new List<XbimTriangleEdge[]> { new[] { xbimEdges[0], xbimEdges[0].NextEdge, xbimEdges[0].NextEdge.NextEdge } };
-                xbimEdges[0].Freeze();
-                do
+                foreach (var xbimEdges in faceList)
                 {
-                    triangles = UnifyConnectedTriangles(triangles);
-                } while (triangles.Any());
-
+                    if (xbimEdges[0].Frozen) continue;
+                    if (!IsFacingOutward(xbimEdges[0]))
+                        xbimEdges[0].Reverse();
+                    triangles = new List<XbimTriangleEdge[]> { new[] { xbimEdges[0], xbimEdges[0].NextEdge, xbimEdges[0].NextEdge.NextEdge } };
+                    xbimEdges[0].Freeze();
+                    do
+                    {
+                        triangles = UnifyConnectedTriangles(triangles);
+                    } while (triangles.Any());
+                }
             }
             BalanceNormals();
         }
@@ -227,8 +221,24 @@ namespace Xbim.Tessellator
             }
 
 
-            var edgesAtVertex = _faces.Values.SelectMany(el => el).SelectMany(e => e).Where(e => e != null).GroupBy(k => k.StartVertexIndex);
-            foreach (var edges in edgesAtVertex)
+            var edgesAtVertex = new Dictionary<int, List<XbimTriangleEdge>>();
+            foreach (var faceList in _faces.Values)
+            {
+                foreach (var triangle in faceList)
+                {
+                    foreach (var edge in triangle)
+                    {
+                        if (edge == null) continue;
+                        if (!edgesAtVertex.TryGetValue(edge.StartVertexIndex, out var edgeList))
+                        {
+                            edgeList = new List<XbimTriangleEdge>();
+                            edgesAtVertex[edge.StartVertexIndex] = edgeList;
+                        }
+                        edgeList.Add(edge);
+                    }
+                }
+            }
+            foreach (var edges in edgesAtVertex.Values)
             {               
                 //create a set of faces to divide the point into a set of connected faces               
                 var faceSet = new List<List<XbimTriangleEdge>>();//the first face set at this point
@@ -314,20 +324,35 @@ namespace Xbim.Tessellator
                     {
                         if (edge.Normal.IsValid)
                         {
-                            Vec3.AddTo(ref vertexNormal, ref edge.Normal);
-                        }                      
+                            var n = edge.Normal;
+                            Vec3.AddTo(ref vertexNormal, ref n);
+                        }
                     }
 
                     Vec3.Normalize(ref vertexNormal);
                     foreach (var edge in vertexEdges)
-                         edge.Normal = vertexNormal;                   
+                         edge.Normal = vertexNormal;
                 }
 
 
             }
            
             //now regroup faces
-            _faces = _faces.Values.SelectMany(v => v).GroupBy(t=>ComputeTrianglePackedNormalInt(t)).ToDictionary(k=>k.Key,v=>v.ToList());
+            var regrouped = new Dictionary<int, List<XbimTriangleEdge[]>>(_faces.Count);
+            foreach (var faceList in _faces.Values)
+            {
+                foreach (var triangle in faceList)
+                {
+                    var key = ComputeTrianglePackedNormalInt(triangle);
+                    if (!regrouped.TryGetValue(key, out var list))
+                    {
+                        list = new List<XbimTriangleEdge[]>();
+                        regrouped[key] = list;
+                    }
+                    list.Add(triangle);
+                }
+            }
+            _faces = regrouped;
            
         }
 
@@ -404,7 +429,7 @@ namespace Xbim.Tessellator
                 RemoveEdge(e2);
                 faulty = true;
             }
-            if (faulty) 
+            if (faulty)
                 FaultyTriangles.Add(edgeList);
             List<XbimTriangleEdge[]> triangleList;
             if (!_faces.TryGetValue(faceId, out triangleList))
@@ -413,6 +438,7 @@ namespace Xbim.Tessellator
                 _faces.Add(faceId, triangleList);
             }
             triangleList.Add(edgeList);
+            _triangleCount++;
             
         }
 
@@ -483,7 +509,7 @@ namespace Xbim.Tessellator
         /// <returns></returns>
         public int AddVertex(Vec3 v)
         {
-            if (!_vertices.Contains(v))
+            if (!_vertices.TryGetValue(v, out var existing))
             {
                 var pos = _vertices.Count;
                 _vertices.Add(v);
@@ -496,13 +522,13 @@ namespace Xbim.Tessellator
                 return pos;
             }
             else
-                return _vertices[v].Data;
+                return existing.Data;
         }
 
         public void AddVertex(Vec3 v, ref ContourVertex contourVertex)
         {
-            if (_vertices.Contains(v)) 
-                contourVertex = _vertices[v];
+            if (_vertices.TryGetValue(v, out var existing))
+                contourVertex = existing;
             else
             {
                 _vertices.Add(v, ref contourVertex);
@@ -572,7 +598,8 @@ public class XbimTriangleEdge
     public int StartVertexIndex;
     public XbimTriangleEdge NextEdge;
     public XbimTriangleEdge AdjacentEdge;
-    public Vec3 Normal;
+    private Vec3 _normal;
+    private XbimPackedNormal? _cachedPackedNormal;
     private bool _frozen;
     public int EndVertexIndex { get { return NextEdge.StartVertexIndex; } }
     public XbimTriangleEdge(int p1)
@@ -580,10 +607,16 @@ public class XbimTriangleEdge
         StartVertexIndex = p1;
     }
 
+    public Vec3 Normal
+    {
+        get => _normal;
+        set { _normal = value; _cachedPackedNormal = null; }
+    }
+
     public bool Frozen
     {
         get { return _frozen; }
-        
+
     }
 
     /// <summary>
@@ -593,12 +626,16 @@ public class XbimTriangleEdge
     {
         get
         {
-            
+
             if (AdjacentEdge!=null && Normal.IsValid && AdjacentEdge.NextEdge.Normal.IsValid)
-                return Vec3.Angle(ref Normal, ref AdjacentEdge.NextEdge.Normal);
+            {
+                var n1 = _normal;
+                var n2 = AdjacentEdge.NextEdge._normal;
+                return Vec3.Angle(ref n1, ref n2);
+            }
             return 0;
-        }    
-        
+        }
+
     }
 
 
@@ -613,7 +650,7 @@ public class XbimTriangleEdge
     public void Reverse()
     {
         if (!_frozen)
-        { 
+        {
             var p1 = StartVertexIndex;
             var p2 = NextEdge.StartVertexIndex;
             var p3 = NextEdge.NextEdge.StartVertexIndex;
@@ -625,7 +662,7 @@ public class XbimTriangleEdge
             NextEdge.NextEdge = this;
             NextEdge = prevEdge;
         }
-       
+
     }
 
     /// <summary>
@@ -661,7 +698,8 @@ public class XbimTriangleEdge
     {
         get
         {
-            return new XbimPackedNormal(Normal.X,Normal.Y,Normal.Z);
+            _cachedPackedNormal ??= new XbimPackedNormal(_normal.X, _normal.Y, _normal.Z);
+            return _cachedPackedNormal.Value;
         }
     }
 }

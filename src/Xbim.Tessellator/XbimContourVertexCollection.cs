@@ -35,5 +35,6 @@ namespace Xbim.Tessellator
             cv.Data = Count;
             base.Add(cv);
         }
+
     }
 }

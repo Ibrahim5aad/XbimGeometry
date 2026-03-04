@@ -538,10 +538,9 @@ namespace Xbim.Tessellator
 
             var faceCount = ifcFaces.Count;
             var triangulatedMesh = new XbimTriangulatedMesh(faceCount, precision);
+            var tess = new Tess();
             foreach (var ifcFace in ifcFaces)
             {
-                //improves performance and reduces memory load
-                var tess = new Tess();
                 var contours = new List<ContourVertex[]>(/*Count?*/);
                 foreach (var bound in ifcFace.Bounds) //build all the loops
                 {
@@ -575,7 +574,7 @@ namespace Xbim.Tessellator
                     contours.Add(contour);
                 }
 
-                if (contours.Any())
+                if (contours.Count > 0)
                 {
                     if (contours.Count == 1 && contours[0].Length == 3) //its a triangle just grab it
                     {

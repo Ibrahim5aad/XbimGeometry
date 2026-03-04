@@ -428,7 +428,7 @@ namespace Xbim.Tessellator
         }
     }
 
-    public struct XbimCartesianPoint3D : IIfcCartesianPoint
+    public class XbimCartesianPoint3D : IIfcCartesianPoint
     {
 
         public XbimCartesianPoint3D(double x, double y, double z)
