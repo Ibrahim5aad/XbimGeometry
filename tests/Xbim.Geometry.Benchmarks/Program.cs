@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime;
 using BenchmarkDotNet.Running;
 using Microsoft.Extensions.Logging;
 using Xbim.Common;
@@ -32,6 +33,15 @@ public class Program
             ProfileRun(file);
             return;
         }
+
+#if !OLD_ENGINE
+        if (args.Length > 0 && args[0] == "--compare")
+        {
+            var file = args.Length > 1 ? args[1] : "IfcExamples/SampleHouse4.ifc";
+            CompareRun(file);
+            return;
+        }
+#endif
 
         BenchmarkSwitcher
             .FromAssembly(typeof(Program).Assembly)
@@ -228,6 +238,121 @@ public class Program
 
         Console.WriteLine("\nDone.");
     }
+
+#if !OLD_ENGINE
+    /// <summary>
+    /// Side-by-side comparison of Xbim3DModelContextLegacy (batch) vs Xbim3DModelContext (streaming).
+    /// Measures both managed heap and process working set (native + managed).
+    /// Usage: dotnet run -c Release -- --compare [path-to-ifc]
+    /// </summary>
+    private static void CompareRun(string relativePath)
+    {
+        EngineSetup.EnsureInitialized();
+        var loggerFactory = LoggerFactory.Create(b => b
+            .SetMinimumLevel(LogLevel.Warning)
+            .AddConsole());
+
+        Console.WriteLine($"=== Batch vs Streaming Comparison: {relativePath} ===");
+        Console.WriteLine();
+
+        // ── Load model ──
+        var swLoad = Stopwatch.StartNew();
+        using var model = EngineSetup.OpenModel(relativePath);
+        swLoad.Stop();
+        Console.WriteLine($"Model loaded: {model.Instances.Count:N0} entities in {swLoad.Elapsed.TotalSeconds:F2}s");
+
+        var voidCount = model.Instances.OfType<IIfcRelVoidsElement>().Count();
+        var projCount = model.Instances.OfType<IIfcRelProjectsElement>().Count();
+        var voidedProducts = model.Instances.OfType<IIfcRelVoidsElement>()
+            .Select(v => v.RelatingBuildingElement.EntityLabel).Distinct().Count();
+        Console.WriteLine($"Voids: {voidCount} (affecting {voidedProducts} products), Projections: {projCount}");
+        Console.WriteLine();
+
+        var proc = Process.GetCurrentProcess();
+
+        // ── Helper to run a context and capture metrics ──
+        void RunContext(string label, Func<(bool success, int shapes, int geoms)> action)
+        {
+            // Force full GC + compaction to get a clean baseline
+            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true, true);
+            GC.WaitForPendingFinalizers();
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true, true);
+
+            proc.Refresh();
+            var wsBefore = proc.WorkingSet64;
+            var privateBefore = proc.PrivateMemorySize64;
+            var managedBefore = GC.GetTotalMemory(true);
+
+            var sw = Stopwatch.StartNew();
+            var (success, shapes, geoms) = action();
+            sw.Stop();
+
+            proc.Refresh();
+            var wsAfter = proc.WorkingSet64;
+            var privateAfter = proc.PrivateMemorySize64;
+            var managedAfter = GC.GetTotalMemory(false);
+
+            Console.WriteLine($"  {label}");
+            Console.WriteLine($"    Result:         {(success ? "OK" : "FAILED")}");
+            Console.WriteLine($"    Time:           {sw.Elapsed.TotalSeconds:F2}s ({sw.ElapsedMilliseconds:N0} ms)");
+            Console.WriteLine($"    Shapes:         {shapes:N0}");
+            Console.WriteLine($"    Geometries:     {geoms:N0}");
+            Console.WriteLine($"    Managed heap:   {managedAfter / (1024.0 * 1024):F1} MB (delta: {(managedAfter - managedBefore) / (1024.0 * 1024):+0.0;-0.0} MB)");
+            Console.WriteLine($"    Working set:    {wsAfter / (1024.0 * 1024):F1} MB (delta: {(wsAfter - wsBefore) / (1024.0 * 1024):+0.0;-0.0} MB)");
+            Console.WriteLine($"    Private bytes:  {privateAfter / (1024.0 * 1024):F1} MB (delta: {(privateAfter - privateBefore) / (1024.0 * 1024):+0.0;-0.0} MB)");
+            Console.WriteLine();
+        }
+
+        // ── Single-threaded ──
+        Console.WriteLine("══════════════════════════════════════════════════════");
+        Console.WriteLine("Single-threaded (MaxThreads=1)");
+        Console.WriteLine("══════════════════════════════════════════════════════");
+
+        RunContext("Legacy (Xbim3DModelContextLegacy)", () =>
+        {
+            var context = new Xbim3DModelContextLegacy(model, loggerFactory);
+            context.MaxThreads = 1;
+            var success = context.CreateContext();
+            return (success, context.ShapeInstances().Count(), context.ShapeGeometries().Count());
+        });
+
+        {
+            var context = new Xbim3DModelContext(model, loggerFactory);
+            context.MaxThreads = 1;
+            context.EnableDiagnostics = true;
+
+            RunContext("New (Xbim3DModelContext)", () =>
+            {
+                var success = context.CreateContext();
+                return (success, context.ShapeInstances().Count(), context.ShapeGeometries().Count());
+            });
+
+            context.PrintDiagnostics();
+        }
+
+        // ── Multi-threaded ──
+        Console.WriteLine("══════════════════════════════════════════════════════");
+        Console.WriteLine($"Multi-threaded (MaxThreads={Environment.ProcessorCount})");
+        Console.WriteLine("══════════════════════════════════════════════════════");
+
+        RunContext("Legacy (Xbim3DModelContextLegacy)", () =>
+        {
+            var context = new Xbim3DModelContextLegacy(model, loggerFactory);
+            var success = context.CreateContext();
+            return (success, context.ShapeInstances().Count(), context.ShapeGeometries().Count());
+        });
+
+        RunContext("New (Xbim3DModelContext)", () =>
+        {
+            var context = new Xbim3DModelContext(model, loggerFactory);
+            var success = context.CreateContext();
+            return (success, context.ShapeInstances().Count(), context.ShapeGeometries().Count());
+        });
+
+        Console.WriteLine("Done.");
+    }
+#endif
 
     /// <summary>
     /// Analyzes the IFC model composition — geometry types, products, voids, booleans, mapped items.

@@ -1,27 +1,24 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Numerics;
 
-namespace Xbim.Examples.Viewer.WexBim;
+namespace Xbim.Geometry.Scene;
 
 /// <summary>
-/// Reads a WexBIM binary file and produces a <see cref="SceneModel"/> for rendering.
-/// This is a standalone parser with no xbim library dependencies.
+/// Reads a WexBIM binary stream into a structured <see cref="WexBimScene"/> for rendering,
+/// inspection, and comparison.
 /// </summary>
 public static class WexBimFileReader
 {
-    /// <summary>
-    /// Magic number identifying a valid WexBIM file.
-    /// </summary>
     private const int WexBimMagic = 94132117;
-
-    /// <summary>
-    /// Quantization divisor for spherical normal encoding.
-    /// </summary>
     private const double PackSize = 252.0;
 
     /// <summary>
     /// Reads a WexBIM file from a file path.
     /// </summary>
-    public static SceneModel ReadFile(string path)
+    public static WexBimScene ReadFile(string path)
     {
         using var stream = File.OpenRead(path);
         return Read(stream);
@@ -30,7 +27,7 @@ public static class WexBimFileReader
     /// <summary>
     /// Reads a WexBIM file from an arbitrary stream.
     /// </summary>
-    public static SceneModel Read(Stream stream)
+    public static WexBimScene Read(Stream stream)
     {
         using var br = new BinaryReader(stream);
         return Read(br);
@@ -39,9 +36,9 @@ public static class WexBimFileReader
     /// <summary>
     /// Reads a WexBIM file from a BinaryReader.
     /// </summary>
-    public static SceneModel Read(BinaryReader br)
+    public static WexBimScene Read(BinaryReader br)
     {
-        var model = new SceneModel();
+        var scene = new WexBimScene();
 
         // --- Header ---
         int magic = br.ReadInt32();
@@ -49,14 +46,14 @@ public static class WexBimFileReader
             throw new InvalidDataException(
                 $"Not a valid WexBIM file. Expected magic {WexBimMagic}, got {magic}.");
 
-        model.Version = br.ReadByte();
+        scene.Version = br.ReadByte();
         int shapeCount = br.ReadInt32();
-        int _vertexCount = br.ReadInt32();   // total vertex count (informational)
-        int _triangleCount = br.ReadInt32(); // total triangle count (informational)
-        int _matrixCount = br.ReadInt32();   // total matrix count (informational)
+        scene.TotalVertexCount = br.ReadInt32();
+        scene.TotalTriangleCount = br.ReadInt32();
+        int _matrixCount = br.ReadInt32();
         int productCount = br.ReadInt32();
         int styleCount = br.ReadInt32();
-        model.OneMeter = br.ReadSingle();
+        scene.OneMeter = br.ReadSingle();
         short regionCount = br.ReadInt16();
 
         // --- Regions ---
@@ -69,9 +66,6 @@ public static class WexBimFileReader
             float cx = br.ReadSingle();
             float cy = br.ReadSingle();
             float cz = br.ReadSingle();
-
-            // Bounding box: 6 floats (minX, minY, minZ, maxX, maxY, maxZ)
-            // Stored as XbimRect3D: X, Y, Z, SizeX, SizeY, SizeZ
             float bx = br.ReadSingle();
             float by = br.ReadSingle();
             float bz = br.ReadSingle();
@@ -79,11 +73,10 @@ public static class WexBimFileReader
             float sy = br.ReadSingle();
             float sz = br.ReadSingle();
 
-            // XbimRect3D stores origin + size, so max = origin + size
             var bmin = new Vector3(bx, by, bz);
             var bmax = new Vector3(bx + sx, by + sy, bz + sz);
 
-            model.Regions.Add(new SceneRegion
+            scene.Regions.Add(new WexBimRegion
             {
                 Population = population,
                 Centre = new Vector3(cx, cy, cz),
@@ -95,13 +88,13 @@ public static class WexBimFileReader
             globalMax = Vector3.Max(globalMax, bmax);
         }
 
-        model.BoundsMin = regionCount > 0 ? globalMin : Vector3.Zero;
-        model.BoundsMax = regionCount > 0 ? globalMax : Vector3.Zero;
+        scene.BoundsMin = regionCount > 0 ? globalMin : Vector3.Zero;
+        scene.BoundsMax = regionCount > 0 ? globalMax : Vector3.Zero;
 
         // --- Styles ---
         for (int i = 0; i < styleCount; i++)
         {
-            model.Styles.Add(new SceneStyle
+            scene.Styles.Add(new WexBimStyle
             {
                 Id = br.ReadInt32(),
                 R = br.ReadSingle(),
@@ -116,8 +109,6 @@ public static class WexBimFileReader
         {
             int label = br.ReadInt32();
             short typeId = br.ReadInt16();
-
-            // Bounding box stored as XbimRect3D: X, Y, Z, SizeX, SizeY, SizeZ
             float bx = br.ReadSingle();
             float by = br.ReadSingle();
             float bz = br.ReadSingle();
@@ -125,7 +116,7 @@ public static class WexBimFileReader
             float sy = br.ReadSingle();
             float sz = br.ReadSingle();
 
-            model.Products.Add(new SceneProduct
+            scene.Products.Add(new WexBimProduct
             {
                 Label = label,
                 TypeId = typeId,
@@ -142,71 +133,85 @@ public static class WexBimFileReader
 
             if (repetition > 1)
             {
-                // Multi-instance shape: read all instance metadata first, then one shared triangulation
-                var instances = new (int productLabel, short typeId, int instanceLabel, int styleId, Matrix4x4 transform)[repetition];
+                var instances = new List<WexBimShapeInstance>(repetition);
                 for (int j = 0; j < repetition; j++)
                 {
-                    int productLabel = br.ReadInt32();
-                    short typeId = br.ReadInt16();
-                    int instanceLabel = br.ReadInt32();
-                    int styleId = br.ReadInt32();
-
-                    // 4x4 matrix stored as 16 doubles (row-major)
-                    var m = ReadMatrix4x4(br);
-                    instances[j] = (productLabel, typeId, instanceLabel, styleId, m);
+                    instances.Add(new WexBimShapeInstance
+                    {
+                        ProductLabel = br.ReadInt32(),
+                        TypeId = br.ReadInt16(),
+                        InstanceLabel = br.ReadInt32(),
+                        StyleId = br.ReadInt32(),
+                        Transform = ReadMatrix4x4(br)
+                    });
                 }
 
-                // Read the shared triangulation once
                 var meshData = ReadTriangulation(br);
 
-                // Create one SceneMesh per instance, sharing the same geometry but with different transforms
+                // Create one mesh per instance, sharing the same geometry
                 foreach (var inst in instances)
                 {
-                    if (meshData.positions.Length == 0) continue;
-                    model.Meshes.Add(new SceneMesh
+                    if (meshData.positions.Length > 0)
+                    {
+                        scene.Meshes.Add(new WexBimMesh
+                        {
+                            Positions = meshData.positions,
+                            Normals = meshData.normals,
+                            Indices = meshData.indices,
+                            StyleId = inst.StyleId,
+                            ProductLabel = inst.ProductLabel,
+                            Transform = inst.Transform
+                        });
+                    }
+                }
+
+                scene.Shapes.Add(new WexBimShape
+                {
+                    Instances = instances,
+                    VertexCount = meshData.positions.Length / 3,
+                    TriangleCount = meshData.indices.Length / 3
+                });
+            }
+            else
+            {
+                var instance = new WexBimShapeInstance
+                {
+                    ProductLabel = br.ReadInt32(),
+                    TypeId = br.ReadInt16(),
+                    InstanceLabel = br.ReadInt32(),
+                    StyleId = br.ReadInt32(),
+                    Transform = Matrix4x4.Identity
+                };
+
+                var meshData = ReadTriangulation(br);
+
+                if (meshData.positions.Length > 0)
+                {
+                    scene.Meshes.Add(new WexBimMesh
                     {
                         Positions = meshData.positions,
                         Normals = meshData.normals,
                         Indices = meshData.indices,
-                        StyleId = inst.styleId,
-                        ProductLabel = inst.productLabel,
-                        Transform = inst.transform
+                        StyleId = instance.StyleId,
+                        ProductLabel = instance.ProductLabel,
+                        Transform = Matrix4x4.Identity
                     });
                 }
-            }
-            else
-            {
-                // Single-instance shape: no transform matrix in the stream
-                int productLabel = br.ReadInt32();
-                short typeId = br.ReadInt16();
-                int instanceLabel = br.ReadInt32();
-                int styleId = br.ReadInt32();
 
-                var meshData = ReadTriangulation(br);
-                if (meshData.positions.Length == 0) continue;
-
-                model.Meshes.Add(new SceneMesh
+                scene.Shapes.Add(new WexBimShape
                 {
-                    Positions = meshData.positions,
-                    Normals = meshData.normals,
-                    Indices = meshData.indices,
-                    StyleId = styleId,
-                    ProductLabel = productLabel,
-                    Transform = Matrix4x4.Identity
+                    Instances = new List<WexBimShapeInstance> { instance },
+                    VertexCount = meshData.positions.Length / 3,
+                    TriangleCount = meshData.indices.Length / 3
                 });
             }
         }
 
-        return model;
+        return scene;
     }
 
-    /// <summary>
-    /// Reads a 4x4 transformation matrix stored as 16 doubles.
-    /// </summary>
     private static Matrix4x4 ReadMatrix4x4(BinaryReader br)
     {
-        // XbimMatrix3D stores as 16 doubles in row-major order:
-        // M11, M12, M13, M14, M21, M22, M23, M24, M31, M32, M33, M34, OffsetX, OffsetY, OffsetZ, M44
         float m11 = (float)br.ReadDouble();
         float m12 = (float)br.ReadDouble();
         float m13 = (float)br.ReadDouble();
@@ -219,9 +224,9 @@ public static class WexBimFileReader
         float m32 = (float)br.ReadDouble();
         float m33 = (float)br.ReadDouble();
         float m34 = (float)br.ReadDouble();
-        float m41 = (float)br.ReadDouble(); // OffsetX
-        float m42 = (float)br.ReadDouble(); // OffsetY
-        float m43 = (float)br.ReadDouble(); // OffsetZ
+        float m41 = (float)br.ReadDouble();
+        float m42 = (float)br.ReadDouble();
+        float m43 = (float)br.ReadDouble();
         float m44 = (float)br.ReadDouble();
 
         return new Matrix4x4(
@@ -232,37 +237,31 @@ public static class WexBimFileReader
     }
 
     /// <summary>
-    /// Reads a mesh triangulation block from the binary stream.
-    /// Returns flat arrays of positions, normals, and indices suitable for rendering.
+    /// Reads a mesh triangulation block and expands it into flat position, normal, and index arrays.
     /// </summary>
     private static (float[] positions, float[] normals, int[] indices) ReadTriangulation(BinaryReader br)
     {
-        byte version = br.ReadByte(); // mesh version
+        byte version = br.ReadByte();
         int vertexCount = br.ReadInt32();
         int triangleCount = br.ReadInt32();
 
         if (vertexCount == 0 && triangleCount == 0)
         {
-            // Fully empty mesh: only face count follows
-            br.ReadInt32(); // face count (expected 0)
+            br.ReadInt32(); // face count
             return (Array.Empty<float>(), Array.Empty<float>(), Array.Empty<int>());
         }
 
         if (triangleCount == 0)
         {
-            // Vertices present but no triangles — must still consume the vertex
-            // positions and face count to keep the stream aligned.
-            for (int i = 0; i < vertexCount * 3; i++) br.ReadSingle();
-            br.ReadInt32(); // face count (expected 0)
+            for (int j = 0; j < vertexCount * 3; j++) br.ReadSingle();
+            br.ReadInt32(); // face count
             return (Array.Empty<float>(), Array.Empty<float>(), Array.Empty<int>());
         }
 
-        // Read vertex positions: vertexCount * 3 floats
+        // Read vertex positions
         var positions = new float[vertexCount * 3];
-        for (int i = 0; i < vertexCount * 3; i++)
-        {
-            positions[i] = br.ReadSingle();
-        }
+        for (int j = 0; j < vertexCount * 3; j++)
+            positions[j] = br.ReadSingle();
 
         // Determine index reader based on vertex count
         Func<BinaryReader, int> readIndex;
@@ -273,12 +272,9 @@ public static class WexBimFileReader
         else
             readIndex = r => r.ReadInt32();
 
-        // Read faces
         int faceCount = br.ReadInt32();
 
-        // We'll collect expanded vertices (position + normal per index) because
-        // non-planar faces have per-vertex normals that differ from planar face normals.
-        // To support both, we expand all vertices with their associated normals.
+        // Expand vertices with per-vertex normals
         var expandedPositions = new List<float>(triangleCount * 9);
         var expandedNormals = new List<float>(triangleCount * 9);
         var expandedIndices = new List<int>(triangleCount * 3);
@@ -292,12 +288,10 @@ public static class WexBimFileReader
 
             if (isPlanar)
             {
-                // Read the single packed normal for this planar face
                 byte nu = br.ReadByte();
                 byte nv = br.ReadByte();
                 var normal = DecodeNormal(nu, nv);
 
-                // Read triangle indices
                 for (int t = 0; t < faceTriCount; t++)
                 {
                     for (int v = 0; v < 3; v++)
@@ -319,7 +313,6 @@ public static class WexBimFileReader
             }
             else
             {
-                // Non-planar: each vertex has its own packed normal
                 for (int t = 0; t < faceTriCount; t++)
                 {
                     for (int v = 0; v < 3; v++)
@@ -350,7 +343,6 @@ public static class WexBimFileReader
 
     /// <summary>
     /// Decodes a packed (u, v) normal into a unit vector using spherical coordinates.
-    /// Matches the encoding in WexBimMesh: lon = u/252 * 2*PI, lat = v/252 * PI.
     /// </summary>
     private static Vector3 DecodeNormal(byte u, byte v)
     {
@@ -363,4 +355,89 @@ public static class WexBimFileReader
 
         return new Vector3(x, y, z);
     }
+}
+
+/// <summary>
+/// Parsed WexBIM scene containing header, product, style, region, shape, and mesh data.
+/// </summary>
+public sealed class WexBimScene
+{
+    public byte Version { get; set; }
+    public float OneMeter { get; set; }
+    public int TotalVertexCount { get; set; }
+    public int TotalTriangleCount { get; set; }
+    public Vector3 BoundsMin { get; set; }
+    public Vector3 BoundsMax { get; set; }
+    public List<WexBimRegion> Regions { get; } = new();
+    public List<WexBimStyle> Styles { get; } = new();
+    public List<WexBimProduct> Products { get; } = new();
+    public List<WexBimShape> Shapes { get; } = new();
+
+    /// <summary>
+    /// Triangulated meshes with expanded positions, normals, and indices.
+    /// One mesh per shape instance, ready for rendering.
+    /// </summary>
+    public List<WexBimMesh> Meshes { get; } = new();
+
+    /// <summary>
+    /// Optional type name mapping populated from IFC model metadata after reading.
+    /// </summary>
+    public Dictionary<short, string> TypeNames { get; set; }
+
+    /// <summary>Total shape instances across all shapes.</summary>
+    public int TotalShapeInstances => Shapes.Sum(s => s.Instances.Count);
+}
+
+/// <summary>
+/// A triangulated mesh with positions, normals, and indices for a single shape instance.
+/// </summary>
+public sealed class WexBimMesh
+{
+    public float[] Positions { get; init; } = Array.Empty<float>();
+    public float[] Normals { get; init; } = Array.Empty<float>();
+    public int[] Indices { get; init; } = Array.Empty<int>();
+    public int StyleId { get; init; }
+    public int ProductLabel { get; init; }
+    public Matrix4x4 Transform { get; init; } = Matrix4x4.Identity;
+}
+
+public sealed class WexBimShape
+{
+    public List<WexBimShapeInstance> Instances { get; init; } = new();
+    public int VertexCount { get; init; }
+    public int TriangleCount { get; init; }
+}
+
+public sealed class WexBimShapeInstance
+{
+    public int ProductLabel { get; init; }
+    public short TypeId { get; init; }
+    public int InstanceLabel { get; init; }
+    public int StyleId { get; init; }
+    public Matrix4x4 Transform { get; init; } = Matrix4x4.Identity;
+}
+
+public readonly struct WexBimStyle
+{
+    public int Id { get; init; }
+    public float R { get; init; }
+    public float G { get; init; }
+    public float B { get; init; }
+    public float A { get; init; }
+}
+
+public readonly struct WexBimProduct
+{
+    public int Label { get; init; }
+    public short TypeId { get; init; }
+    public Vector3 BoundsMin { get; init; }
+    public Vector3 BoundsMax { get; init; }
+}
+
+public readonly struct WexBimRegion
+{
+    public int Population { get; init; }
+    public Vector3 Centre { get; init; }
+    public Vector3 BoundsMin { get; init; }
+    public Vector3 BoundsMax { get; init; }
 }

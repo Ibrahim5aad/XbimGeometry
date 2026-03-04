@@ -2,7 +2,6 @@ using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Xbim.Common;
-using Xbim.Examples.Viewer.WexBim;
 using Xbim.Ifc;
 using Xbim.Geometry.Scene;
 
@@ -45,7 +44,7 @@ internal sealed partial class MainViewModel : ObservableObject
     /// <summary>
     /// Raised when a new scene model has been loaded and is ready for rendering.
     /// </summary>
-    public event Action<SceneModel>? SceneLoaded;
+    public event Action<WexBimScene>? SceneLoaded;
 
     /// <summary>
     /// Raised when the user requests the camera to fit the scene.
@@ -64,11 +63,11 @@ internal sealed partial class MainViewModel : ObservableObject
             FileName = Path.GetFileName(path);
             var ext = Path.GetExtension(path);
 
-            SceneModel model;
+            WexBimScene model;
             if (IfcExtensions.Contains(ext))
             {
                 StatusText = $"Opening {FileName}...";
-                model = await Task.Run(() => ConvertIfcToSceneModel(path));
+                model = await Task.Run(() => ConvertIfcToWexBimScene(path));
             }
             else
             {
@@ -94,7 +93,7 @@ internal sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    private SceneModel ConvertIfcToSceneModel(string ifcPath)
+    private WexBimScene ConvertIfcToWexBimScene(string ifcPath)
     {
         using var ifcModel = IfcStore.Open(ifcPath);
         var context = new Xbim3DModelContext(ifcModel);

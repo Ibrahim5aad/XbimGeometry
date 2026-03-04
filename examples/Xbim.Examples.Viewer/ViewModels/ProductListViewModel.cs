@@ -4,6 +4,7 @@ using System.Numerics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Xbim.Examples.Viewer.WexBim;
+using Xbim.Geometry.Scene;
 
 namespace Xbim.Examples.Viewer.ViewModels;
 
@@ -61,7 +62,7 @@ internal sealed partial class ProductListViewModel : ObservableObject
     /// Groups products by their IFC type, sorted alphabetically by type name.
     /// Products with no resolvable type name are collected into an "Untyped" group at the end.
     /// </summary>
-    public void LoadProducts(SceneModel model)
+    public void LoadProducts(WexBimScene model)
     {
         Groups.Clear();
         SelectedProduct = null;
@@ -82,8 +83,8 @@ internal sealed partial class ProductListViewModel : ObservableObject
             return null;
         }
 
-        var typed = new List<SceneProduct>();
-        var untyped = new List<SceneProduct>();
+        var typed = new List<WexBimProduct>();
+        var untyped = new List<WexBimProduct>();
 
         foreach (var p in model.Products)
         {

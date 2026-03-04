@@ -1,11 +1,11 @@
 using System.Numerics;
 using Silk.NET.OpenGL;
-using Xbim.Examples.Viewer.WexBim;
+using Xbim.Geometry.Scene;
 
 namespace Xbim.Examples.Viewer.Rendering;
 
 /// <summary>
-/// Converts a <see cref="SceneModel"/> into GPU-ready draw batches grouped by style.
+/// Converts a <see cref="WexBimScene"/> into GPU-ready draw batches grouped by style.
 /// Meshes are merged per style with transforms baked into vertex data on the CPU.
 /// </summary>
 internal static class GlSceneBuilder
@@ -14,7 +14,7 @@ internal static class GlSceneBuilder
     /// Uploads a scene model to the GPU and returns a <see cref="GlScene"/>
     /// with opaque and transparent batches ready for rendering.
     /// </summary>
-    public static GlScene Build(GL gl, SceneModel model)
+    public static GlScene Build(GL gl, WexBimScene model)
     {
         var scene = new GlScene(gl)
         {
@@ -23,17 +23,17 @@ internal static class GlSceneBuilder
         };
 
         // Build a lookup from style id to RGBA
-        var styleLookup = new Dictionary<int, SceneStyle>();
+        var styleLookup = new Dictionary<int, WexBimStyle>();
         foreach (var style in model.Styles)
             styleLookup[style.Id] = style;
 
         // Group meshes by style id
-        var groups = new Dictionary<int, List<SceneMesh>>();
+        var groups = new Dictionary<int, List<WexBimMesh>>();
         foreach (var mesh in model.Meshes)
         {
             if (!groups.TryGetValue(mesh.StyleId, out var list))
             {
-                list = new List<SceneMesh>();
+                list = new List<WexBimMesh>();
                 groups[mesh.StyleId] = list;
             }
             list.Add(mesh);
@@ -82,7 +82,7 @@ internal static class GlSceneBuilder
     }
 
     private static StyleBatch CreateBatch(
-        GL gl, List<SceneMesh> meshes, float r, float g, float b, float a,
+        GL gl, List<WexBimMesh> meshes, float r, float g, float b, float a,
         List<(int productLabel, int startIndex, int indexCount)> productRanges)
     {
         // Calculate total sizes for pre-allocation

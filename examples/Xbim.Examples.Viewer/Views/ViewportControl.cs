@@ -6,7 +6,7 @@ using Avalonia.OpenGL.Controls;
 using Avalonia.Rendering;
 using Silk.NET.OpenGL;
 using Xbim.Examples.Viewer.Rendering;
-using Xbim.Examples.Viewer.WexBim;
+using Xbim.Geometry.Scene;
 
 namespace Xbim.Examples.Viewer.Views;
 
@@ -23,7 +23,7 @@ internal sealed class ViewportControl : OpenGlControlBase, ICustomHitTest
     private readonly OrbitCamera _camera = new();
 
     // Pending scene model to be built on the GL thread
-    private SceneModel? _pendingModel;
+    private WexBimScene? _pendingModel;
 
     // Mouse interaction state
     private bool _isOrbiting;
@@ -329,7 +329,7 @@ internal sealed class ViewportControl : OpenGlControlBase, ICustomHitTest
     /// This is safe to call from any thread; the actual GL work happens
     /// during the next render cycle.
     /// </summary>
-    public void LoadModel(SceneModel model)
+    public void LoadModel(WexBimScene model)
     {
         _pendingModel = model;
         RequestNextFrameRendering();
