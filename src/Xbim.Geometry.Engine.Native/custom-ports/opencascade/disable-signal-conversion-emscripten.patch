@@ -1,0 +1,15 @@
+diff --git a/adm/cmake/occt_defs_flags.cmake b/adm/cmake/occt_defs_flags.cmake
+index 1234567..abcdefg 100644
+--- a/adm/cmake/occt_defs_flags.cmake
++++ b/adm/cmake/occt_defs_flags.cmake
+@@ -40,5 +40,9 @@
+     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
+     set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -Wno-deprecated-declarations")
+   endif()
+-  add_definitions(-DOCC_CONVERT_SIGNALS)
++  # OCC_CONVERT_SIGNALS uses setjmp/longjmp for signal-to-exception conversion.
++  # This is incompatible with native WASM exception handling (-fwasm-exceptions).
++  if (NOT EMSCRIPTEN)
++    add_definitions(-DOCC_CONVERT_SIGNALS)
++  endif()
+ endif()

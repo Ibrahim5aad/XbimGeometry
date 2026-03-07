@@ -3,9 +3,6 @@
 
   <ItemGroup Condition="'$(RuntimeIdentifier)' == 'browser-wasm'">
     <NativeFileReference Include="$(MSBuildThisFileDirectory)native\*.a" />
-    <!-- Exclude compression libs already provided by the .NET WASM SDK -->
-    <NativeFileReference Remove="$(MSBuildThisFileDirectory)native\libbrotli*.a" />
-    <NativeFileReference Remove="$(MSBuildThisFileDirectory)native\libz.a" />
   </ItemGroup>
 
 </Project>

@@ -79,6 +79,19 @@
         "lhs": "${hostSystemName}",
         "rhs": "Linux"
       }
+    },
+    {
+      "name": "wasm32-release",
+      "displayName": "WebAssembly Release",
+      "inherits": "vcpkg-base",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-wasm",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "VCPKG_TARGET_TRIPLET": "wasm32-emscripten",
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/triplets/release",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "$env{EMSCRIPTEN_ROOT}/cmake/Modules/Platform/Emscripten.cmake"
+      }
     }
   ],
   "buildPresets": [
@@ -101,6 +114,11 @@
       "name": "linux-x64-debug",
       "configurePreset": "linux-x64-debug",
       "configuration": "Debug"
+    },
+    {
+      "name": "wasm32-release",
+      "configurePreset": "wasm32-release",
+      "configuration": "Release"
     }
   ]
 }

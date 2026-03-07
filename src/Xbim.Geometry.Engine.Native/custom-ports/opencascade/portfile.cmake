@@ -11,6 +11,9 @@ vcpkg_from_github(
         dependencies.patch
         install-include-dir.patch
         remove-vcpkg-enabling.patch
+        disable-signal-conversion-emscripten.patch
+        wasm-exceptions.patch
+        noop-mutex-emscripten.patch
 )
 
 if (VCPKG_LIBRARY_LINKAGE STREQUAL "dynamic")
@@ -29,8 +32,11 @@ vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
         vtk         USE_VTK
 )
 
-# USE_MMGR_TYPE is a string option, not boolean — handle separately
-if("jemalloc" IN_LIST FEATURES)
+# USE_MMGR_TYPE is a string option, not boolean — handle separately.
+# Emscripten does not support jemalloc — use native allocator (dlmalloc).
+if(VCPKG_CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    list(APPEND FEATURE_OPTIONS "-DUSE_MMGR_TYPE=NATIVE")
+elseif("jemalloc" IN_LIST FEATURES)
     list(APPEND FEATURE_OPTIONS "-DUSE_MMGR_TYPE=JEMALLOC")
 endif()
 

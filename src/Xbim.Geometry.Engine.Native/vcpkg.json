@@ -7,9 +7,16 @@
     {
       "name": "opencascade",
       "features": [
-        "freetype",
-        "jemalloc"
+        "freetype"
       ]
-    }
+    },
+    {
+      "name": "opencascade",
+      "features": [
+        "jemalloc"
+      ],
+      "platform": "!emscripten"
+    },
+    "manifold"
   ]
 }

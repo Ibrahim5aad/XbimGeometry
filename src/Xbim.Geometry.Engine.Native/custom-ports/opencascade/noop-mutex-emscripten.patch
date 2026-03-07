@@ -1,0 +1,43 @@
+diff --git a/src/Standard/Standard_Mutex.hxx b/src/Standard/Standard_Mutex.hxx
+--- a/src/Standard/Standard_Mutex.hxx
++++ b/src/Standard/Standard_Mutex.hxx
+@@ -175,5 +175,11 @@ inline void Standard_Mutex::Unlock()
+ {
+-#if (defined(_WIN32) || defined(__WIN32__))
++#ifdef __EMSCRIPTEN__
++  // No-op: TBB/OSD_ThreadPool parallelism is disabled in WASM builds,
++  // and real pthread mutexes deadlock on the browser main thread because
++  // Atomics.wait() is disallowed there.  Since there is no concurrent
++  // access to protect against, locking is unnecessary.
++  (void)0;
++#elif (defined(_WIN32) || defined(__WIN32__))
+   LeaveCriticalSection(&myMutex);
+ #else
+   pthread_mutex_unlock(&myMutex);
+diff --git a/src/Standard/Standard_Mutex.cxx b/src/Standard/Standard_Mutex.cxx
+--- a/src/Standard/Standard_Mutex.cxx
++++ b/src/Standard/Standard_Mutex.cxx
+@@ -16,6 +16,18 @@
+ #include <Standard_Mutex.hxx>
+ 
+ //=============================================
++#ifdef __EMSCRIPTEN__
++// On Emscripten, Standard_Mutex is a no-op.  TBB and OSD_ThreadPool
++// parallelism are disabled in WASM builds, so the mutexes only protect
++// against concurrent access that cannot occur.  Real pthread mutexes
++// deadlock on the browser main thread because Atomics.wait() is
++// disallowed there.
++Standard_Mutex::Standard_Mutex() {}
++Standard_Mutex::~Standard_Mutex() {}
++void Standard_Mutex::Lock() {}
++Standard_Boolean Standard_Mutex::TryLock() { return Standard_True; }
++void Standard_Mutex::DestroyCallback() {}
++#else
+ // Standard_Mutex::Standard_Mutex
+ //=============================================
+ 
+@@ -80,3 +92,4 @@ void Standard_Mutex::DestroyCallback()
+   UnregisterCallback();
+   Unlock();
+ }
++#endif // !__EMSCRIPTEN__

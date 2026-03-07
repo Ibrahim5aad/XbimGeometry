@@ -1,0 +1,16 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1234567..abcdefg 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -189,11 +189,6 @@
+   PROPERTIES GENERATED TRUE
+ )
+ 
+-# If it's an EMSCRIPTEN build, we're done
+-if(EMSCRIPTEN)
+-  return()
+-endif()
+-
+ # CMake exports
+ configure_file(
+   cmake/manifoldConfig.cmake.in

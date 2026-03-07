@@ -1,0 +1,23 @@
+diff --git a/adm/cmake/occt_defs_flags.cmake b/adm/cmake/occt_defs_flags.cmake
+--- a/adm/cmake/occt_defs_flags.cmake
++++ b/adm/cmake/occt_defs_flags.cmake
+@@ -30,8 +30,17 @@ if (MSVC)
+   # suppress warning on using portable non-secure functions in favor of non-portable secure ones
+   add_definitions (-D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_DEPRECATE)
+ else()
+-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
+-  set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fexceptions")
++  # Emscripten: use native WASM exception handling (-fwasm-exceptions) to
++  # match .NET 9's WASM runtime, which links with -fwasm-exceptions.
++  # The legacy JS-based -fexceptions emits __cxa_find_matching_catch_*
++  # symbols that conflict with WASM exception mode at link time.
++  if (EMSCRIPTEN)
++    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fwasm-exceptions")
++    set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fwasm-exceptions")
++  else()
++    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
++    set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fexceptions")
++  endif()
+   if (NOT CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+     set (CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fPIC")
