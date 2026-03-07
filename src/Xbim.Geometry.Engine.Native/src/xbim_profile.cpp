@@ -55,20 +55,30 @@
 
 #pragma region Profile Helpers
 
-static TopLoc_Location make_placement(
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ)
+static TopLoc_Location make_placement(const XbimAxis2Placement* p)
 {
     gp_Ax2 ax2(
-        gp_Pnt(originX, originY, originZ),
-        gp_Dir(zDirX, zDirY, zDirZ),
-        gp_Dir(xDirX, xDirY, xDirZ));
+        gp_Pnt(p->origin.x, p->origin.y, p->origin.z),
+        gp_Dir(p->z_axis.x, p->z_axis.y, p->z_axis.z),
+        gp_Dir(p->x_axis.x, p->x_axis.y, p->x_axis.z));
 
     gp_Trsf trsf;
     trsf.SetTransformation(gp_Ax3(ax2));
     trsf.Invert();
     return TopLoc_Location(trsf);
+}
+
+static TopLoc_Location make_placement(
+    double originX, double originY, double originZ,
+    double zDirX,   double zDirY,   double zDirZ,
+    double xDirX,   double xDirY,   double xDirZ)
+{
+    XbimAxis2Placement p = {
+        {originX, originY, originZ},
+        {zDirX, zDirY, zDirZ},
+        {xDirX, xDirY, xDirZ}
+    };
+    return make_placement(&p);
 }
 
 
@@ -147,6 +157,20 @@ static XbimResult make_profile_face(
     }
 
     return XBIM_OK;
+}
+
+static XbimResult make_profile_face(
+    XbimContextHandle ctx,
+    const TopoDS_Wire& wire,
+    const XbimAxis2Placement* placement,
+    XbimShapeHandle* outHandle,
+    const char* funcName)
+{
+    return make_profile_face(ctx, wire,
+        placement->origin.x, placement->origin.y, placement->origin.z,
+        placement->z_axis.x, placement->z_axis.y, placement->z_axis.z,
+        placement->x_axis.x, placement->x_axis.y, placement->x_axis.z,
+        outHandle, funcName);
 }
 
 #pragma endregion
@@ -512,9 +536,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rounded_rectangle(
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ishape(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
+    const XbimAxis2Placement* placement,
     double overallWidth, double overallDepth,
     double webThickness, double flangeThickness,
     double filletRadius,
@@ -599,10 +621,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ishape(
 
         wire.Closed(Standard_True);
 
-        return make_profile_face(ctx, wire,
-            originX, originY, originZ,
-            zDirX, zDirY, zDirZ,
-            xDirX, xDirY, xDirZ,
+        return make_profile_face(ctx, wire, placement,
             outHandle, "xbim_profile_build_ishape");
     }
     catch (const Standard_Failure& e)
@@ -617,9 +636,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ishape(
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_lshape(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
+    const XbimAxis2Placement* placement,
     double depth, double width, double thickness,
     double filletRadius, double edgeRadius, double legSlope,
     XbimShapeHandle* outHandle)
@@ -682,10 +699,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_lshape(
 
         wire.Closed(Standard_True);
 
-        return make_profile_face(ctx, wire,
-            originX, originY, originZ,
-            zDirX, zDirY, zDirZ,
-            xDirX, xDirY, xDirZ,
+        return make_profile_face(ctx, wire, placement,
             outHandle, "xbim_profile_build_lshape");
     }
     catch (const Standard_Failure& e)
@@ -700,9 +714,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_lshape(
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_tshape(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
+    const XbimAxis2Placement* placement,
     double depth, double flangeWidth,
     double webThickness, double flangeThickness,
     double filletRadius, double flangeEdgeRadius, double webEdgeRadius,
@@ -806,10 +818,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_tshape(
 
         wire.Closed(Standard_True);
 
-        return make_profile_face(ctx, wire,
-            originX, originY, originZ,
-            zDirX, zDirY, zDirZ,
-            xDirX, xDirY, xDirZ,
+        return make_profile_face(ctx, wire, placement,
             outHandle, "xbim_profile_build_tshape");
     }
     catch (const Standard_Failure& e)
@@ -824,9 +833,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_tshape(
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ushape(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
+    const XbimAxis2Placement* placement,
     double depth, double flangeWidth,
     double webThickness, double flangeThickness,
     double filletRadius, double edgeRadius, double flangeSlope,
@@ -896,10 +903,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ushape(
 
         wire.Closed(Standard_True);
 
-        return make_profile_face(ctx, wire,
-            originX, originY, originZ,
-            zDirX, zDirY, zDirZ,
-            xDirX, xDirY, xDirZ,
+        return make_profile_face(ctx, wire, placement,
             outHandle, "xbim_profile_build_ushape");
     }
     catch (const Standard_Failure& e)
@@ -914,9 +918,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ushape(
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_zshape(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
+    const XbimAxis2Placement* placement,
     double depth, double flangeWidth,
     double webThickness, double flangeThickness,
     double filletRadius, double edgeRadius,
@@ -977,10 +979,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_zshape(
 
         wire.Closed(Standard_True);
 
-        return make_profile_face(ctx, wire,
-            originX, originY, originZ,
-            zDirX, zDirY, zDirZ,
-            xDirX, xDirY, xDirZ,
+        return make_profile_face(ctx, wire, placement,
             outHandle, "xbim_profile_build_zshape");
     }
     catch (const Standard_Failure& e)
@@ -995,9 +994,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_zshape(
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_cshape(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
+    const XbimAxis2Placement* placement,
     double depth, double width, double wallThickness,
     double girth, double internalFilletRadius,
     XbimShapeHandle* outHandle)
@@ -1156,10 +1153,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_cshape(
 
         wire.Closed(Standard_True);
 
-        return make_profile_face(ctx, wire,
-            originX, originY, originZ,
-            zDirX, zDirY, zDirZ,
-            xDirX, xDirY, xDirZ,
+        return make_profile_face(ctx, wire, placement,
             outHandle, "xbim_profile_build_cshape");
     }
     catch (const Standard_Failure& e)
@@ -1174,9 +1168,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_cshape(
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_trapezium(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
+    const XbimAxis2Placement* placement,
     double bottomXDim, double topXDim, double yDim, double topXOffset,
     XbimShapeHandle* outHandle)
 {
@@ -1226,10 +1218,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_trapezium(
         TopoDS_Wire wire = polyMaker.Wire();
         wire.Closed(Standard_True);
 
-        return make_profile_face(ctx, wire,
-            originX, originY, originZ,
-            zDirX, zDirY, zDirZ,
-            xDirX, xDirY, xDirZ,
+        return make_profile_face(ctx, wire, placement,
             outHandle, "xbim_profile_build_trapezium");
     }
     catch (const Standard_Failure& e)
@@ -1244,15 +1233,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_trapezium(
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_asymmetric_ishape(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
-    double bottomFlangeWidth, double overallDepth,
-    double webThickness, double bottomFlangeThickness,
-    double topFlangeWidth, double topFlangeThickness,
-    double bottomFlangeFilletRadius, double topFlangeFilletRadius,
-    double bottomFlangeEdgeRadius, double topFlangeEdgeRadius,
-    double bottomFlangeSlope, double topFlangeSlope,
+    const XbimAxis2Placement* placement,
+    const XbimAsymmetricIShapeParams* params,
     XbimShapeHandle* outHandle)
 {
     xbim_clear_error();
@@ -1263,6 +1245,25 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_asymmetric_ishape(
         return XBIM_INVALID_ARG;
     }
     *outHandle = nullptr;
+
+    if (!params)
+    {
+        xbim_set_error("xbim_profile_build_asymmetric_ishape: params is NULL");
+        return XBIM_INVALID_ARG;
+    }
+
+    double bottomFlangeWidth       = params->bottom_flange_width;
+    double overallDepth            = params->overall_depth;
+    double webThickness            = params->web_thickness;
+    double bottomFlangeThickness   = params->bottom_flange_thickness;
+    double topFlangeWidth          = params->top_flange_width;
+    double topFlangeThickness      = params->top_flange_thickness;
+    double bottomFlangeFilletRadius = params->bottom_flange_fillet_radius;
+    double topFlangeFilletRadius   = params->top_flange_fillet_radius;
+    double bottomFlangeEdgeRadius  = params->bottom_flange_edge_radius;
+    double topFlangeEdgeRadius     = params->top_flange_edge_radius;
+    double bottomFlangeSlope       = params->bottom_flange_slope;
+    double topFlangeSlope          = params->top_flange_slope;
 
     if (bottomFlangeWidth <= 0.0 || overallDepth <= 0.0 ||
         webThickness <= 0.0 || bottomFlangeThickness <= 0.0 ||
@@ -1364,10 +1365,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_asymmetric_ishape(
 
         wire.Closed(Standard_True);
 
-        return make_profile_face(ctx, wire,
-            originX, originY, originZ,
-            zDirX, zDirY, zDirZ,
-            xDirX, xDirY, xDirZ,
+        return make_profile_face(ctx, wire, placement,
             outHandle, "xbim_profile_build_asymmetric_ishape");
     }
     catch (const Standard_Failure& e)
@@ -1385,9 +1383,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_asymmetric_ishape(
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rectangle_hollow(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
+    const XbimAxis2Placement* placement,
     double xDim,    double yDim,    double wallThickness,
     double innerFilletRadius, double outerFilletRadius,
     XbimShapeHandle* outHandle)
@@ -1520,10 +1516,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rectangle_hollow(
         TopoDS_Face face = faceMaker.Face();
 
         /* Apply placement transform */
-        TopLoc_Location loc = make_placement(
-            originX, originY, originZ,
-            zDirX, zDirY, zDirZ,
-            xDirX, xDirY, xDirZ);
+        TopLoc_Location loc = make_placement(placement);
         if (!loc.IsIdentity())
             face.Move(loc);
 

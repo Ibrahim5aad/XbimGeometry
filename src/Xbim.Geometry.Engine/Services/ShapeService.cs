@@ -96,13 +96,15 @@ namespace Xbim.Geometry.Engine.Services
             var native = shape as XbimShape
                 ?? throw new ArgumentException("Shape must be a XbimShape.", nameof(shape));
 
+            var matrix = new XbimGeometryNativeApi.XbimTransformMatrix
+            {
+                M11 = transformMatrix.M11, M12 = transformMatrix.M12, M13 = transformMatrix.M13, OffsetX = transformMatrix.OffsetX,
+                M21 = transformMatrix.M21, M22 = transformMatrix.M22, M23 = transformMatrix.M23, OffsetY = transformMatrix.OffsetY,
+                M31 = transformMatrix.M31, M32 = transformMatrix.M32, M33 = transformMatrix.M33, OffsetZ = transformMatrix.OffsetZ,
+                ScaleX = transformMatrix.ScaleX, ScaleY = transformMatrix.ScaleY, ScaleZ = transformMatrix.ScaleZ,
+            };
             int result = XbimGeometryNativeApi.xbim_shape_gtransform(
-                native.Handle,
-                transformMatrix.M11, transformMatrix.M12, transformMatrix.M13, transformMatrix.OffsetX,
-                transformMatrix.M21, transformMatrix.M22, transformMatrix.M23, transformMatrix.OffsetY,
-                transformMatrix.M31, transformMatrix.M32, transformMatrix.M33, transformMatrix.OffsetZ,
-                transformMatrix.ScaleX, transformMatrix.ScaleY, transformMatrix.ScaleZ,
-                out var transformedHandle);
+                native.Handle, in matrix, out var transformedHandle);
 
             if (result != 0)
                 throw new XbimGeometryServiceException(
@@ -218,13 +220,15 @@ namespace Xbim.Geometry.Engine.Services
                 ?? throw new ArgumentException("Shape must be a XbimShape.", nameof(shape));
 
             // Identity rotation + uniform scale via gp_GTrsf
+            var matrix = new XbimGeometryNativeApi.XbimTransformMatrix
+            {
+                M11 = 1, M12 = 0, M13 = 0, OffsetX = 0,
+                M21 = 0, M22 = 1, M23 = 0, OffsetY = 0,
+                M31 = 0, M32 = 0, M33 = 1, OffsetZ = 0,
+                ScaleX = scale, ScaleY = scale, ScaleZ = scale,
+            };
             int result = XbimGeometryNativeApi.xbim_shape_gtransform(
-                native.Handle,
-                1, 0, 0, 0,
-                0, 1, 0, 0,
-                0, 0, 1, 0,
-                scale, scale, scale,
-                out var scaledHandle);
+                native.Handle, in matrix, out var scaledHandle);
 
             if (result != 0)
                 throw new XbimGeometryServiceException(

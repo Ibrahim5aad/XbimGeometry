@@ -1,37 +1,25 @@
 <Project>
 
-  <!-- Copy native libraries from CMake build output after build.
-       NativeBuildConfig selects Debug or Release (default: match managed Configuration). -->
+  <!-- Copy native libraries from the cmake install staging directory after build.
+       Source: src/Xbim.Geometry.Engine/runtimes/{rid}/native/
+       Dest:   {OutputDir}/runtimes/{rid}/native/
+       Skipped for Blazor WASM — native code is statically linked via NativeFileReference. -->
   <PropertyGroup>
-    <NativeBuildConfig Condition="'$(NativeBuildConfig)' == ''">$(Configuration)</NativeBuildConfig>
-    <NativeBuildDir>$(MSBuildThisFileDirectory)..\src\Xbim.Geometry.Engine.Native\build\$(NativeBuildConfig)\</NativeBuildDir>
-    <LinuxNativeDir>$(MSBuildThisFileDirectory)..\src\Xbim.Geometry.Engine\runtimes\linux-x64\native\</LinuxNativeDir>
+    <NativeInstallDir>$(MSBuildThisFileDirectory)..\src\Xbim.Geometry.Engine\runtimes\</NativeInstallDir>
+    <NativeRid Condition="$([MSBuild]::IsOSPlatform('Windows'))">win-x64</NativeRid>
+    <NativeRid Condition="$([MSBuild]::IsOSPlatform('Linux'))">linux-x64</NativeRid>
+    <NativeRid Condition="$([MSBuild]::IsOSPlatform('OSX'))">osx-x64</NativeRid>
+    <NativeSourceDir>$(NativeInstallDir)$(NativeRid)\native\</NativeSourceDir>
   </PropertyGroup>
 
-  <!-- Windows: copy DLLs from CMake build output -->
-  <Target Name="CopyNativeDlls" AfterTargets="Build" Condition="Exists('$(NativeBuildDir)xbim_geometry_native.dll')">
-    <PropertyGroup>
-      <NativeOutputDir>$(TargetDir)runtimes\win-x64\native\</NativeOutputDir>
-    </PropertyGroup>
+  <Target Name="CopyNativeLibs" AfterTargets="Build"
+          Condition="'$(UsingMicrosoftNETSdkBlazorWebAssembly)' != 'true' AND '$(NativeRid)' != '' AND Exists('$(NativeSourceDir)')">
     <ItemGroup>
-      <NativeDlls Include="$(NativeBuildDir)*.dll" />
+      <NativeLibFiles Include="$(NativeSourceDir)*" />
     </ItemGroup>
-    <MakeDir Directories="$(NativeOutputDir)" />
-    <Copy SourceFiles="@(NativeDlls)" DestinationFolder="$(NativeOutputDir)" SkipUnchangedFiles="true" />
-    <Message Importance="high" Text="Copied native DLLs to $(NativeOutputDir)" />
-  </Target>
-
-  <!-- Linux: copy .so files from staged output -->
-  <Target Name="CopyNativeSo" AfterTargets="Build" Condition="Exists('$(LinuxNativeDir)libxbim_geometry_native.so')">
-    <PropertyGroup>
-      <NativeOutputDir>$(TargetDir)runtimes/linux-x64/native/</NativeOutputDir>
-    </PropertyGroup>
-    <ItemGroup>
-      <NativeSoFiles Include="$(LinuxNativeDir)*.so*" />
-    </ItemGroup>
-    <MakeDir Directories="$(NativeOutputDir)" />
-    <Copy SourceFiles="@(NativeSoFiles)" DestinationFolder="$(NativeOutputDir)" SkipUnchangedFiles="true" />
-    <Message Importance="high" Text="Copied native .so files to $(NativeOutputDir)" />
+    <MakeDir Directories="$(TargetDir)runtimes\$(NativeRid)\native\" />
+    <Copy SourceFiles="@(NativeLibFiles)" DestinationFolder="$(TargetDir)runtimes\$(NativeRid)\native\" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Copied native libraries to $(TargetDir)runtimes\$(NativeRid)\native\" />
   </Target>
 
 </Project>

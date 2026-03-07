@@ -14,13 +14,16 @@ extern "C" {
 
 #pragma region Export And Calling Convention Macros
 
-#if defined(_WIN32) || defined(_WIN64)
+#if defined(__EMSCRIPTEN__)
+    #define XBIM_EXPORT __attribute__((used))
+    #define XBIM_CALL
+#elif defined(_WIN32) || defined(_WIN64)
     #ifdef XBIM_BUILD_DLL
         #define XBIM_EXPORT __declspec(dllexport)
     #else
         #define XBIM_EXPORT __declspec(dllimport)
     #endif
-    #define XBIM_CALL __stdcall
+    #define XBIM_CALL __cdecl
 #else
     #define XBIM_EXPORT __attribute__((visibility("default")))
     #define XBIM_CALL
@@ -42,6 +45,49 @@ typedef struct XbimMesh_*                   XbimMeshHandle;
 #pragma endregion
 
 #pragma region Value Types
+
+typedef struct { double x, y, z; } XbimPoint3d;
+typedef struct { double x, y, z; } XbimDir3d;
+
+/*
+ * Axis-2 placement: origin point, Z-axis direction, and X-axis direction.
+ * Represents a coordinate system in 3D space (IFC IfcAxis2Placement3D).
+ */
+typedef struct {
+    XbimPoint3d origin;
+    XbimDir3d   z_axis;
+    XbimDir3d   x_axis;
+} XbimAxis2Placement;
+
+/*
+ * General affine transform matrix: 3x3 rotation/reflection, translation,
+ * and non-uniform scale factors.
+ */
+typedef struct {
+    double m11, m12, m13, offset_x;
+    double m21, m22, m23, offset_y;
+    double m31, m32, m33, offset_z;
+    double scale_x, scale_y, scale_z;
+} XbimTransformMatrix;
+
+/*
+ * Parameters for an asymmetric I-shape profile (IfcAsymmetricIShapeProfileDef).
+ * All fillet/edge/slope values are optional (pass 0 for none).
+ */
+typedef struct {
+    double bottom_flange_width;
+    double overall_depth;
+    double web_thickness;
+    double bottom_flange_thickness;
+    double top_flange_width;
+    double top_flange_thickness;
+    double bottom_flange_fillet_radius;
+    double top_flange_fillet_radius;
+    double bottom_flange_edge_radius;
+    double top_flange_edge_radius;
+    double bottom_flange_slope;
+    double top_flange_slope;
+} XbimAsymmetricIShapeParams;
 
 /*
  * Tessellation parameters for WexBim mesh creation.
@@ -494,23 +540,19 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_moved_by_axis2(
  * Apply a general affine transformation (gp_GTrsf) to a shape, producing a
  * new transformed shape. Supports non-uniform scaling via ScaleX/Y/Z.
  *
- * The 3x4 matrix (m11..m33 + offsets) encodes rotation/reflection and
- * translation. If scaleX, scaleY, and scaleZ are all non-zero, a separate
- * scale transform is multiplied in.
+ * The matrix encodes a 3x3 rotation/reflection, translation offsets,
+ * and non-uniform scale factors. If all scale factors are non-zero,
+ * a separate scale transform is multiplied in.
  *
- *   shapeHandle                 – source shape
- *   m11..m33, offsetX/Y/Z      – 3x4 affine matrix
- *   scaleX, scaleY, scaleZ     – non-uniform scale factors (0 = no scale)
- *   outHandle                  – receives the new transformed shape handle
+ *   shapeHandle – source shape
+ *   matrix      – affine transform matrix (3x3 + offsets + scale)
+ *   outHandle   – receives the new transformed shape handle
  *
  * Returns XBIM_OK on success.
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_gtransform(
     XbimShapeHandle shapeHandle,
-    double m11, double m12, double m13, double offsetX,
-    double m21, double m22, double m23, double offsetY,
-    double m31, double m32, double m33, double offsetZ,
-    double scaleX, double scaleY, double scaleZ,
+    const XbimTransformMatrix* matrix,
     XbimShapeHandle* outHandle);
 
 #pragma endregion
@@ -963,9 +1005,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rounded_rectangle(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ishape(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
+    const XbimAxis2Placement* placement,
     double overallWidth, double overallDepth,
     double webThickness, double flangeThickness,
     double filletRadius,
@@ -991,9 +1031,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ishape(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_lshape(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
+    const XbimAxis2Placement* placement,
     double depth, double width, double thickness,
     double filletRadius, double edgeRadius, double legSlope,
     XbimShapeHandle* outHandle);
@@ -1021,9 +1059,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_lshape(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_tshape(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
+    const XbimAxis2Placement* placement,
     double depth, double flangeWidth,
     double webThickness, double flangeThickness,
     double filletRadius, double flangeEdgeRadius, double webEdgeRadius,
@@ -1051,9 +1087,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_tshape(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ushape(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
+    const XbimAxis2Placement* placement,
     double depth, double flangeWidth,
     double webThickness, double flangeThickness,
     double filletRadius, double edgeRadius, double flangeSlope,
@@ -1079,9 +1113,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_ushape(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_zshape(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
+    const XbimAxis2Placement* placement,
     double depth, double flangeWidth,
     double webThickness, double flangeThickness,
     double filletRadius, double edgeRadius,
@@ -1109,9 +1141,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_zshape(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_cshape(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
+    const XbimAxis2Placement* placement,
     double depth, double width, double wallThickness,
     double girth, double internalFilletRadius,
     XbimShapeHandle* outHandle);
@@ -1135,9 +1165,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_cshape(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_trapezium(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
+    const XbimAxis2Placement* placement,
     double bottomXDim, double topXDim, double yDim, double topXOffset,
     XbimShapeHandle* outHandle);
 
@@ -1168,15 +1196,8 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_trapezium(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_asymmetric_ishape(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
-    double bottomFlangeWidth, double overallDepth,
-    double webThickness, double bottomFlangeThickness,
-    double topFlangeWidth, double topFlangeThickness,
-    double bottomFlangeFilletRadius, double topFlangeFilletRadius,
-    double bottomFlangeEdgeRadius, double topFlangeEdgeRadius,
-    double bottomFlangeSlope, double topFlangeSlope,
+    const XbimAxis2Placement* placement,
+    const XbimAsymmetricIShapeParams* params,
     XbimShapeHandle* outHandle);
 
 #pragma endregion
@@ -1204,9 +1225,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_asymmetric_ishape(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_profile_build_rectangle_hollow(
     XbimContextHandle ctx,
-    double originX, double originY, double originZ,
-    double zDirX,   double zDirY,   double zDirZ,
-    double xDirX,   double xDirY,   double xDirZ,
+    const XbimAxis2Placement* placement,
     double xDim,    double yDim,    double wallThickness,
     double innerFilletRadius, double outerFilletRadius,
     XbimShapeHandle* outHandle);
@@ -1604,16 +1623,12 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build(
  */
 XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_polygonal_bounded(
     XbimContextHandle ctx,
-    double surfaceOriginX, double surfaceOriginY, double surfaceOriginZ,
-    double surfaceZDirX,   double surfaceZDirY,   double surfaceZDirZ,
-    double surfaceXDirX,   double surfaceXDirY,   double surfaceXDirZ,
+    const XbimAxis2Placement* surfacePlacement,
     int    agreementFlag,
     const double* boundaryPointsX,
     const double* boundaryPointsY,
     int    boundaryPointCount,
-    double boundaryOriginX, double boundaryOriginY, double boundaryOriginZ,
-    double boundaryZDirX,   double boundaryZDirY,   double boundaryZDirZ,
-    double boundaryXDirX,   double boundaryXDirY,   double boundaryXDirZ,
+    const XbimAxis2Placement* boundaryPlacement,
     XbimShapeHandle*  outHandle);
 
 #pragma endregion
@@ -4506,6 +4521,221 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_projection_get_outline(
  * Passing NULL is a safe no-op.
  */
 XBIM_EXPORT void XBIM_CALL xbim_projection_free_buffer(double* buffer);
+
+#pragma endregion
+
+#pragma region Manifold Mesh Booleans
+
+/*
+ * Opaque handle to a Manifold mesh object.
+ * Used for performing fast mesh boolean operations on triangle meshes.
+ */
+typedef struct XbimManifoldMesh_* XbimManifoldMeshHandle;
+
+/*
+ * Create a manifold mesh from raw vertex positions and triangle indices.
+ *
+ * positions:  interleaved float array [x0,y0,z0, x1,y1,z1, ...]
+ * numVerts:   number of vertices (positions array length = numVerts * 3)
+ * indices:    triangle index array [i0,i1,i2, i3,i4,i5, ...]
+ * numTris:    number of triangles (indices array length = numTris * 3)
+ * outHandle:  receives the created mesh handle
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_manifold_mesh_create(
+    const float* positions, int numVerts,
+    const unsigned int* indices, int numTris,
+    XbimManifoldMeshHandle* outHandle);
+
+/*
+ * Boolean difference: result = body - tool.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_manifold_boolean_cut(
+    XbimManifoldMeshHandle body, XbimManifoldMeshHandle tool,
+    XbimManifoldMeshHandle* outHandle);
+
+/*
+ * Boolean union: result = body + tool.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_manifold_boolean_union(
+    XbimManifoldMeshHandle body, XbimManifoldMeshHandle tool,
+    XbimManifoldMeshHandle* outHandle);
+
+/*
+ * Batch cut: result = body - union(tools[0..numTools-1]).
+ * Unions all tools first, then performs a single difference.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_manifold_boolean_cut_multi(
+    XbimManifoldMeshHandle body,
+    XbimManifoldMeshHandle* tools, int numTools,
+    XbimManifoldMeshHandle* outHandle);
+
+/*
+ * Apply a 3x4 affine transform (row-major: 3 rows of [rx ry rz tx]).
+ * The 12 doubles are: m[0..2] = row 0, m[3..5] = row 1, m[6..8] = row 2,
+ * m[9..11] = translation.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_manifold_mesh_transform(
+    XbimManifoldMeshHandle mesh, const double* matrix3x4,
+    XbimManifoldMeshHandle* outHandle);
+
+/*
+ * Extract raw mesh data from a manifold mesh handle.
+ * The caller must free the returned buffers via xbim_buffer_free_float
+ * and xbim_buffer_free_uint respectively.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_manifold_mesh_get_data(
+    XbimManifoldMeshHandle mesh,
+    int* outNumVerts, int* outNumTris,
+    float** outPositions, unsigned int** outIndices);
+
+/*
+ * Get the axis-aligned bounding box of a manifold mesh.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_manifold_mesh_bounding_box(
+    XbimManifoldMeshHandle mesh,
+    double* outMinX, double* outMinY, double* outMinZ,
+    double* outMaxX, double* outMaxY, double* outMaxZ);
+
+/*
+ * Check whether the mesh represents a valid 2-manifold.
+ * Returns XBIM_TRUE if valid, XBIM_FALSE otherwise.
+ */
+XBIM_EXPORT int XBIM_CALL xbim_manifold_mesh_is_valid(
+    XbimManifoldMeshHandle mesh);
+
+/*
+ * Destroy a manifold mesh handle and free its resources.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_manifold_mesh_destroy(
+    XbimManifoldMeshHandle handle);
+
+/*
+ * Free a float buffer returned by xbim_manifold_mesh_get_data.
+ * Passing NULL is a safe no-op.
+ */
+XBIM_EXPORT void XBIM_CALL xbim_buffer_free_float(float* buffer);
+
+/*
+ * Free an unsigned int buffer returned by xbim_manifold_mesh_get_data.
+ * Passing NULL is a safe no-op.
+ */
+XBIM_EXPORT void XBIM_CALL xbim_buffer_free_uint(unsigned int* buffer);
+
+#pragma endregion
+
+#pragma region Mesh Builders
+
+/*
+ * Row-major 3x4 affine transform for mesh builder operations.
+ * Columns represent axes: X=(r[0],r[4],r[8]), Y=(r[1],r[5],r[9]),
+ * Z=(r[2],r[6],r[10]), Origin=(r[3],r[7],r[11]).
+ */
+typedef struct {
+    double r[12];
+} XbimMat3x4;
+
+/*
+ * Axis-aligned bounding box defined by min and max corners.
+ */
+typedef struct {
+    XbimPoint3d min;
+    XbimPoint3d max;
+} XbimBBox;
+
+/*
+ * Profile contour data for extrusion mesh building.
+ * Points are interleaved 2D coordinates: [x0,y0, x1,y1, ...].
+ */
+typedef struct {
+    const double* outer_points;     /* 2D outer contour (CCW), interleaved x,y */
+    int           outer_count;      /* number of vertices in outer contour */
+    const double* inner_points;     /* packed 2D inner contours (CW each), NULL if none */
+    const int*    inner_sizes;      /* vertex count per inner contour, NULL if none */
+    int           num_inners;       /* number of inner contours (0 if none) */
+} XbimProfileContours;
+
+/*
+ * Parameters for building an extruded solid mesh.
+ */
+typedef struct {
+    XbimProfileContours profile;
+    XbimDir3d           extrusion_dir;  /* extrusion direction in local coords */
+    double              depth;          /* extrusion depth (must be positive) */
+    const XbimMat3x4*   placement;      /* local-to-world transform, NULL = identity */
+} XbimExtrusionParams;
+
+/*
+ * Parameters for building a planar half-space clipping solid.
+ */
+typedef struct {
+    XbimPoint3d  plane_origin;
+    XbimDir3d    plane_normal;     /* normalized */
+    XbimDir3d    plane_x_axis;    /* normalized, perpendicular to normal */
+    int          agreement_flag;   /* 1 = material on -N side, 0 = +N side */
+    XbimBBox     body_bbox;        /* body bounding box (used to size the solid) */
+} XbimHalfSpaceParams;
+
+/*
+ * Parameters for building a polygonal bounded half-space clipping solid.
+ */
+typedef struct {
+    XbimPoint3d         plane_origin;
+    XbimDir3d           plane_normal;
+    int                 agreement_flag;
+    const double*       polygon_points;    /* 2D boundary polygon, interleaved x,y */
+    int                 polygon_count;     /* number of polygon vertices */
+    const XbimMat3x4*   boundary_placement; /* boundary local-to-world transform */
+    XbimBBox            body_bbox;
+} XbimPolyHalfSpaceParams;
+
+/*
+ * Build an extruded solid mesh from a 2D profile with optional holes.
+ * Returns a ManifoldMeshHandle ready for boolean operations.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_manifold_mesh_extrude(
+    const XbimExtrusionParams* params,
+    XbimManifoldMeshHandle* outHandle);
+
+/*
+ * Build a planar half-space clipping solid as a large box on the material side
+ * of a plane. The box extends well beyond the body bounding box.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_manifold_mesh_halfspace(
+    const XbimHalfSpaceParams* params,
+    XbimManifoldMeshHandle* outHandle);
+
+/*
+ * Build a polygonal bounded half-space clipping solid as an extruded polygon
+ * prism on the material side of a plane.
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_manifold_mesh_halfspace_polygonal(
+    const XbimPolyHalfSpaceParams* params,
+    XbimManifoldMeshHandle* outHandle);
+
+/*
+ * Parameters for building an extruded solid with 2D profile subtraction.
+ * Opening profiles are already transformed to the body's local 2D profile
+ * coordinate system by the caller. The native function subtracts all opening
+ * profiles from the body profile using Clipper2, then extrudes the result.
+ */
+typedef struct {
+    XbimProfileContours   body_profile;
+    const XbimProfileContours* opening_profiles; /* array of opening profiles in body's 2D space */
+    int                   num_openings;
+    XbimDir3d             extrusion_dir;  /* body extrusion direction in local coords */
+    double                depth;          /* body extrusion depth */
+    const XbimMat3x4*     placement;      /* body local-to-world transform, NULL = identity */
+} XbimCoplanarSubtractParams;
+
+/*
+ * Build an extruded solid mesh after subtracting opening profiles in 2D.
+ * Uses Clipper2 (via Manifold CrossSection) for the 2D boolean, then extrudes
+ * the resulting cross-section. Much faster than 3D mesh booleans for coplanar
+ * extrusions (walls with window/door openings).
+ */
+XBIM_EXPORT XbimResult XBIM_CALL xbim_manifold_mesh_extrude_with_openings(
+    const XbimCoplanarSubtractParams* params,
+    XbimManifoldMeshHandle* outHandle);
 
 #pragma endregion
 

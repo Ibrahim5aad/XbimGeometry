@@ -41,7 +41,9 @@ namespace Xbim.Geometry.Engine.Internal
         private static string BuildRuntimeIdentifier()
         {
             string os;
-            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (OperatingSystem.IsBrowser())
+                os = "browser";
+            else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 os = "win";
             else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 os = "linux";

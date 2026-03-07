@@ -553,4 +553,37 @@ XbimResult XBIM_CALL xbim_debug_dump_stl(
     return XBIM_OK;
 }
 
+#else /* !XBIM_DEBUG_VIZ — provide no-op stubs so the linker resolves these symbols */
+
+#include "xbim_error.h"
+
+extern "C" {
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_debug_view_shape(XbimShapeHandle)
+{
+    xbim_set_error("xbim_debug_view_shape: not available in release builds");
+    return XBIM_ERROR;
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_debug_view_shapes(
+    XbimShapeHandle*, int, const double*, const double*, const double*)
+{
+    xbim_set_error("xbim_debug_view_shapes: not available in release builds");
+    return XBIM_ERROR;
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_debug_dump_brep(XbimShapeHandle, const char*)
+{
+    xbim_set_error("xbim_debug_dump_brep: not available in release builds");
+    return XBIM_ERROR;
+}
+
+XBIM_EXPORT XbimResult XBIM_CALL xbim_debug_dump_stl(XbimShapeHandle, const char*, double)
+{
+    xbim_set_error("xbim_debug_dump_stl: not available in release builds");
+    return XBIM_ERROR;
+}
+
+} /* extern "C" */
+
 #endif /* XBIM_DEBUG_VIZ */

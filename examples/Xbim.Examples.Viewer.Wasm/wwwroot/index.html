@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>xbim Viewer</title>
+    <base href="/" />
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://esm.sh/three@0.172.0",
+        "three/": "https://esm.sh/three@0.172.0/"
+      }
+    }
+    </script>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+      body { background: #1a1a2e; color: #e0e0e0; }
+
+      /* ── App shell ── */
+      #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+      #app > main { display: contents; }
+      .toolbar {
+        display: flex; align-items: center; gap: 12px;
+        height: 48px; padding: 0 16px;
+        background: #16213e; border-bottom: 1px solid #0f3460;
+        flex-shrink: 0; z-index: 10;
+      }
+      .toolbar .brand { font-weight: 600; font-size: 15px; color: #fff; letter-spacing: 0.3px; white-space: nowrap; }
+      .toolbar .brand span { color: #4cc9f0; }
+      .toolbar .sep { width: 1px; height: 24px; background: #0f3460; }
+      .toolbar .status-text { font-size: 13px; color: #4cc9f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+      .main-area { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+
+      /* ── Sidebar ── */
+      .sidebar {
+        width: 260px; flex-shrink: 0;
+        background: #16213e; border-right: 1px solid #0f3460;
+        display: flex; flex-direction: column;
+        overflow-y: auto;
+      }
+      .sidebar-section { padding: 14px 16px; border-bottom: 1px solid #0f3460; }
+      .sidebar-section h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: #7b8794; margin-bottom: 8px; }
+      .sidebar .stat { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
+      .sidebar .stat .label { color: #7b8794; }
+      .sidebar .stat .value { color: #e0e0e0; font-variant-numeric: tabular-nums; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+      .sidebar table { width: 100%; font-size: 12px; border-collapse: collapse; }
+      .sidebar th { text-align: left; color: #7b8794; font-weight: 500; padding: 4px 0; border-bottom: 1px solid #0f3460; }
+      .sidebar td { padding: 3px 0; }
+      .sidebar td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+
+      /* ── Viewport ── */
+      .viewport { flex: 1; position: relative; background: #0a0a1a; min-width: 0; min-height: 0; overflow: hidden; }
+      #viewer-canvas { position: absolute; inset: 0; display: block; }
+
+      /* ── Overlay states ── */
+      .viewport-overlay {
+        position: absolute; inset: 0;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        pointer-events: none; z-index: 5;
+      }
+      .viewport-overlay.clickable { pointer-events: auto; cursor: pointer; }
+      .viewport-overlay .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.4; }
+      .viewport-overlay .text { font-size: 14px; color: #7b8794; }
+      .viewport-overlay .subtext { font-size: 12px; color: #4a5568; margin-top: 4px; }
+
+      /* ── Stage progress ── */
+      .stage-list { margin-top: 16px; text-align: left; min-width: 240px; }
+      .stage-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
+      .stage-item.done { color: #4cc9f0; }
+      .stage-item.active { color: #e0e0e0; }
+      .stage-item.pending { color: #4a5568; }
+      .stage-icon { width: 16px; text-align: center; font-size: 12px; flex-shrink: 0; }
+      .stage-name { flex: 1; }
+      .stage-time { font-variant-numeric: tabular-nums; font-size: 12px; opacity: 0.7; }
+
+      .spinner {
+        width: 32px; height: 32px; border: 3px solid #0f3460; border-top-color: #4cc9f0;
+        border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* ── Buttons ── */
+      .btn {
+        padding: 6px 14px; border: none; border-radius: 4px; font-size: 13px;
+        cursor: pointer; font-family: inherit; transition: background 0.15s;
+      }
+      .btn-primary { background: #4cc9f0; color: #1a1a2e; font-weight: 600; }
+      .btn-primary:hover { background: #7ad7f5; }
+      .btn-ghost { background: transparent; color: #7b8794; border: 1px solid #0f3460; }
+      .btn-ghost:hover { background: #0f3460; color: #e0e0e0; }
+
+      .file-input-wrapper { position: relative; overflow: hidden; display: inline-block; }
+      .file-input-wrapper input[type="file"] {
+        position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0;
+      }
+
+      /* ── Error ── */
+      .error-bar {
+        padding: 8px 16px; background: #5c1a1a; color: #f87171;
+        font-size: 13px; border-bottom: 1px solid #7f1d1d;
+      }
+
+      /* ── Blazor loading ── */
+      .blazor-loading { display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; }
+      .blazor-loading .spinner { width: 40px; height: 40px; }
+      .blazor-loading .text { margin-top: 16px; font-size: 14px; color: #7b8794; }
+
+      #blazor-error-ui { display: none; }
+
+      /* ── Responsive ── */
+      @media (max-width: 900px) {
+        .main-area { flex-direction: column-reverse; }
+        .sidebar {
+          width: 100%; max-height: 160px; flex-shrink: 0;
+          border-right: none; border-top: 1px solid #0f3460;
+          flex-direction: row; overflow-x: auto; overflow-y: hidden;
+        }
+        .sidebar-section { min-width: 200px; border-bottom: none; border-right: 1px solid #0f3460; }
+      }
+      @media (max-width: 600px) {
+        .toolbar { gap: 8px; padding: 0 10px; height: 44px; }
+        .toolbar .brand { font-size: 13px; }
+        .toolbar .sep { display: none; }
+        .sidebar { max-height: 120px; }
+        .sidebar-section { padding: 10px 12px; min-width: 170px; }
+      }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="blazor-loading">
+            <div class="spinner"></div>
+            <div class="text">Loading xbim engine...</div>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+    </div>
+    <script src="_framework/blazor.webassembly.js" autostart="false"></script>
+    <script>
+        Blazor.start().catch(function(err) { console.error('Blazor failed:', err); });
+    </script>
+    <script type="module" src="js/viewer.js"></script>
+    <script>
+        function downloadFile(fileName, bytes) {
+            var blob = new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

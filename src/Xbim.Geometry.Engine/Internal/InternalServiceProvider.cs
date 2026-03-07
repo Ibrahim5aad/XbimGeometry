@@ -30,14 +30,20 @@ namespace Xbim.Geometry.Engine.Internal
             services.AddXbimToolkit(opt => opt.AddGeometryServices());
             ServiceProvider = services.BuildServiceProvider();
 
-            var warning = @$"NOTE: The xbim InternalServices are being used. This fallback service provider has no logging support. To see xbim logs logging ensure you provide a LoggerFactory to {typeof(XbimServices).FullName} at startup - or provide an existing ServiceProvider to the XbimServices. e.g.
+            // Only warn when the consuming application has not configured XbimServices.
+            // When properly configured, the GetService/GetLoggerFactory methods delegate to
+            // XbimServices.Current first and this fallback provider is never actually used.
+            if (!XbimServices.Current.IsConfigured)
+            {
+                var warning = @$"NOTE: The xbim InternalServices are being used. This fallback service provider has no logging support. To see xbim logs logging ensure you provide a LoggerFactory to {typeof(XbimServices).FullName} at startup - or provide an existing ServiceProvider to the XbimServices. e.g.
 
 XbimServices.Current.ConfigureServices(s => s.AddXbimToolkit(c => c.AddLoggerFactory(loggerFactory)));
 // or
 XbimServices.Current.UseExternalServiceProvider(serviceProvider);";
 
-            Debug.WriteLine(warning);
-            Console.Error.WriteLine(warning);
+                Debug.WriteLine(warning);
+                Console.WriteLine(warning);
+            }
         }
         private static Lazy<InternalServiceProvider> lazySingleton = new Lazy<InternalServiceProvider>(() => new InternalServiceProvider());
 

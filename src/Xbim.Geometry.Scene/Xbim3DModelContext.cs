@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Xbim.Common;
@@ -14,7 +15,9 @@ using Xbim.Common.Exceptions;
 using Xbim.Common.Geometry;
 using Xbim.Geometry.Abstractions;
 using Xbim.Geometry.Engine;
+using Xbim.Geometry.Engine.Handles;
 using Xbim.Geometry.Engine.Internal;
+using Xbim.Geometry.Engine.Services;
 using Xbim.Geometry.Exceptions;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Geometry.Scene.Clustering;
@@ -82,6 +85,20 @@ namespace Xbim.Geometry.Scene
             /// </summary>
             internal readonly ConcurrentDictionary<int, IXShape> FeaturedBodiesCache = new();
 
+            /// <summary>
+            /// Cache for directly-tessellated voided product body meshes.
+            /// Used by the Manifold mesh boolean fast path. Keyed by shape entity label.
+            /// </summary>
+            internal readonly ConcurrentDictionary<int, (float[] Positions, uint[] Indices, XbimRect3D Bounds)>
+                MeshBodiesCache = new();
+
+            /// <summary>
+            /// Cache for directly-tessellated feature element meshes (openings/projections).
+            /// Used by the Manifold mesh boolean fast path. Keyed by shape entity label.
+            /// </summary>
+            internal readonly ConcurrentDictionary<int, (float[] Positions, uint[] Indices, XbimRect3D Bounds)>
+                MeshFeaturesCache = new();
+
             private bool _disposed;
 
             public void Dispose()
@@ -94,6 +111,8 @@ namespace Xbim.Geometry.Scene
                 foreach (var kvp in FeaturedBodiesCache)
                     (kvp.Value as IDisposable)?.Dispose();
                 FeaturedBodiesCache.Clear();
+                MeshBodiesCache.Clear();
+                MeshFeaturesCache.Clear();
                 GC.SuppressFinalize(this);
             }
         }
@@ -162,6 +181,13 @@ namespace Xbim.Geometry.Scene
         /// Delegate for per-element control of meshing behaviour and deflection.
         /// </summary>
         public MeshingBehaviourSetter CustomMeshingBehaviour;
+
+        /// <summary>
+        /// When true (default), uses Manifold mesh booleans for directly-tessellated
+        /// shapes before falling back to OCCT BRep booleans.
+        /// Set to false to force all boolean operations through the OCCT BRep path.
+        /// </summary>
+        public bool EnableManifoldBooleans { get; set; } = true;
 
         /// <summary>
         /// Maximum number of threads for parallel processing. Values &lt;= 0 use the default.
@@ -289,6 +315,12 @@ namespace Xbim.Geometry.Scene
             _contexts = new IfcRepresentationContextCollection();
             foreach (var context in contexts)
                 _contexts.Add(context);
+
+            // In WASM, Web Worker threads are heavyweight and the pre-allocated pool is small.
+            // Limit parallelism to avoid exhausting the pool (which causes deadlocks because
+            // new workers require an async round-trip through the browser event loop).
+            if (RuntimeInformation.OSArchitecture == Architecture.Wasm)
+                MaxThreads = Math.Clamp(Environment.ProcessorCount, 1, 4);
         }
 
         #endregion
@@ -330,7 +362,7 @@ namespace Xbim.Geometry.Scene
             DynamicDeflectionSettings dynamicDeflectionSettings,
             CancellationToken cancellationToken)
         {
-            _logger.LogTrace("Starting streaming context creation");
+            _logger.LogTrace("Starting context creation");
 
             if (_contexts == null || _engine == null)
             {
@@ -380,8 +412,8 @@ namespace Xbim.Geometry.Scene
                 PrepareMapGeometryReferences(state, progDelegate);
 
             // Phase 3: Process featured products (boolean operations)
-            _logger.LogTrace("Starting ProcessFeaturedProducts");
             HashSet<int> processed;
+            _logger.LogTrace("Starting ProcessFeaturedProducts");
             using (_diag.TrackPhase("ProcessFeaturedProducts"))
                 processed = ProcessFeaturedProducts(state, progDelegate, geometryTransaction);
 
@@ -408,7 +440,7 @@ namespace Xbim.Geometry.Scene
             progDelegate?.Invoke(101, "WriteRegionsToDb");
 
             geometryTransaction.Commit();
-            _logger.LogTrace("Streaming context creation complete");
+            _logger.LogTrace("Context creation complete");
             return true;
         }
 
@@ -465,6 +497,7 @@ namespace Xbim.Geometry.Scene
             var precision = _model.ModelFactors.Precision;
             var deflection = _model.ModelFactors.DeflectionTolerance;
             var deflectionAngle = _model.ModelFactors.DeflectionAngle;
+            var manifoldService = EnableManifoldBooleans ? new ManifoldMeshBooleanService() : null;
 
             progDelegate?.Invoke(-1, "WriteShapeGeometries (" + state.ProductShapeIds.Count + " shapes)");
 
@@ -522,15 +555,64 @@ namespace Xbim.Geometry.Scene
 
                     XbimShapeGeometry shapeGeom = null;
                     IXShape builtShape = null;
+                    bool canDirectTessellate = xbimTessellator.CanMesh(shape);
 
-                    // Fast path: direct tessellation for already-triangulated geometry
-                    // (but not for feature/voided shapes that need BRep for booleans)
-                    if (!generateBREPs && !isFeatureElement && !isVoidedProduct && xbimTessellator.CanMesh(shape))
+                    // Mesh-based boolean clipping fast path
+                    if (manifoldService != null && !generateBREPs && !canDirectTessellate
+                        && shape is IIfcBooleanClippingResult clippingResult)
+                    {
+                        using (_diag.Track(DiagOp.ManifoldClipping))
+                        {
+                            try
+                            {
+                                var resolver = new BooleanClippingMeshResolver(xbimTessellator);
+                                var meshResult = resolver.TryResolve(clippingResult);
+                                if (meshResult != null)
+                                {
+                                    shapeGeom = xbimTessellator.SerializeRawMeshToBinary(
+                                        meshResult.Value.Positions, meshResult.Value.Indices, shape.EntityLabel);
+
+                                    // Cache for Manifold voided-product path if needed
+                                    if (isVoidedProduct && !isFeatureElement)
+                                        state.MeshBodiesCache.TryAdd(shapeId,
+                                            (meshResult.Value.Positions, meshResult.Value.Indices, meshResult.Value.Bounds));
+                                    if (isFeatureElement)
+                                        state.MeshFeaturesCache.TryAdd(shapeId,
+                                            (meshResult.Value.Positions, meshResult.Value.Indices, meshResult.Value.Bounds));
+                                }
+                            }
+                            catch
+                            {
+                                // Serialization or mesh issue — fall through to BRep path
+                                shapeGeom = null;
+                            }
+                        }
+                    }
+
+                    // Fast path: direct tessellation (now includes voided/feature shapes)
+                    if (shapeGeom == null && !generateBREPs && canDirectTessellate)
                     {
                         using (_diag.Track(DiagOp.DirectTessellation))
-                            shapeGeom = xbimTessellator.Mesh(shape);
+                        {
+                            if (isVoidedProduct || isFeatureElement)
+                            {
+                                // Build intermediate mesh and cache raw data for Manifold booleans
+                                var rawMesh = xbimTessellator.MeshToTriangulatedMesh((IIfcRepresentationItem)shape);
+                                shapeGeom = xbimTessellator.SerializeMeshToBinary(rawMesh, shape.EntityLabel);
+                                var meshData = XbimTessellator.ExtractRawMesh(rawMesh);
+
+                                if (isFeatureElement)
+                                    state.MeshFeaturesCache.TryAdd(shapeId, meshData);
+                                if (isVoidedProduct && !isFeatureElement)
+                                    state.MeshBodiesCache.TryAdd(shapeId, meshData);
+                            }
+                            else
+                            {
+                                shapeGeom = xbimTessellator.Mesh(shape);
+                            }
+                        }
                     }
-                    else
+                    else if (shapeGeom == null)
                     {
                         // Full path: build BRep via engine, then mesh
                         try
@@ -711,6 +793,8 @@ namespace Xbim.Geometry.Scene
             var shapeFactory = _modelServices.ShapeFactory;
             var meshFactory = _modelServices.WexBimMeshFactory;
             var mf = _model.ModelFactors;
+            var manifoldService = new ManifoldMeshBooleanService();
+            var xbimTessellator = new XbimTessellator(_model, XbimGeometryType.PolyhedronBinary);
 
             Parallel.ForEach(state.OpeningsAndProjections, state.ParallelOptions, elementToFeatureGroup =>
             {
@@ -770,6 +854,19 @@ namespace Xbim.Geometry.Scene
                         }
                     }
 
+                    // === Mesh Boolean Fast Path ===
+                    // Try Manifold mesh booleans before falling back to OCCT BRep booleans.
+                    // This works when both the body and all features have cached mesh data
+                    // (i.e., they were directly tessellated during WriteShapeGeometries).
+                    if (EnableManifoldBooleans &&
+                        TryManifoldBooleans(state, element, elementToFeatureGroup, behaviour,
+                            manifoldService, xbimTessellator, contextId, styleId, txn))
+                    {
+                        processed.TryAdd(element.EntityLabel, 0);
+                        return; // mesh boolean succeeded, skip BRep path
+                    }
+
+                    // === BRep Boolean Path (fallback) ===
                     // Step 4: Get body BRep (from cache or rebuild from IFC)
                     var disposeBag = new List<IDisposable>();
                     try
@@ -936,6 +1033,617 @@ namespace Xbim.Geometry.Scene
                 if (product.Representation.Representations.Any(r => IsInContext(r) && r.IsBodyRepresentation(BodyRepresentations)))
                     WriteProductShape(state, product, true, txn);
             });
+        }
+
+        #endregion
+
+        #region Manifold mesh boolean fast path
+
+        /// <summary>
+        /// Returns the single IIfcExtrudedAreaSolid from a product's body representation,
+        /// or null if the representation has mapped items, multiple items, tapered extrusions,
+        /// or non-extrusion geometry.
+        /// </summary>
+        private IIfcExtrudedAreaSolid GetSingleExtrusion(IIfcProduct product)
+        {
+            var reps = product.Representation?.Representations?
+                .Where(r => IsInContext(r) && r.IsBodyRepresentation(BodyRepresentations));
+            if (reps == null) return null;
+
+            IIfcExtrudedAreaSolid found = null;
+            foreach (var rep in reps)
+            {
+                foreach (var item in rep.Items)
+                {
+                    if (item is IIfcMappedItem) return null;
+                    if (item is IIfcGeometricSet) continue;
+                    if (!(item is IIfcExtrudedAreaSolid ext) || item is IIfcExtrudedAreaSolidTapered)
+                        return null;
+                    if (found != null) return null; // more than one item
+                    found = ext;
+                }
+            }
+            return found;
+        }
+
+        /// <summary>
+        /// Attempts 2D profile subtraction for coplanar extrusions. When a body and all its
+        /// openings are simple extrusions with parallel directions, subtracts the opening
+        /// profiles in 2D (using Clipper2 via Manifold CrossSection), then extrudes the result.
+        /// Much faster than 3D mesh booleans for the common wall+openings case.
+        /// </summary>
+        private bool TryCoplanarProfileSubtraction(
+            StreamingState state, IIfcElement element,
+            IEnumerable<IIfcFeatureElement> features,
+            MeshingBehaviourResult behaviour,
+            XbimTessellator xbimTessellator,
+            int contextId, int styleId,
+            IGeometryStoreInitialiser txn)
+        {
+            if (!behaviour.HasFlag(MeshingBehaviourResult.PerformSubtractions))
+                return false;
+
+            var bodyExtrusion = GetSingleExtrusion(element);
+            if (bodyExtrusion == null) return false;
+
+            double angTol = element.Model.ModelFactors.DeflectionAngle;
+            if (!ProfilePolygonBuilder.CanBuildPolygons(bodyExtrusion.SweptArea))
+                return false;
+
+            // Compute body world transform: solidPosition first, then elementPlacement
+            var bodyPlacement = XbimPlacementTree.GetTransform(
+                element, state.PlacementTree, _engine, _logger);
+            var bodySolidMat = bodyExtrusion.Position != null
+                ? bodyExtrusion.Position.ToMatrix3D()
+                : XbimMatrix3D.Identity;
+            var bodyWorldMat = XbimMatrix3D.Multiply(bodySolidMat, bodyPlacement);
+
+            // Body extrusion direction in world space
+            var bdr = bodyExtrusion.ExtrudedDirection.DirectionRatios;
+            var bodyDirLocal = new XbimVector3D(
+                bdr[0], bdr[1], bdr.Count > 2 ? bdr[2] : 0);
+            var bodyDirWorld = bodyWorldMat.Transform(bodyDirLocal).Normalized();
+
+            // Check every feature: must be a subtraction with a coplanar extrusion
+            var openings = new List<(IIfcExtrudedAreaSolid extrusion, XbimMatrix3D openingWorldMat)>();
+
+            foreach (var feature in features)
+            {
+                if (!(feature is IIfcFeatureElementSubtraction))
+                    return false; // has a projection, bail out
+
+                var openingExtrusion = GetSingleExtrusion(feature);
+                if (openingExtrusion == null) return false;
+                if (!ProfilePolygonBuilder.CanBuildPolygons(openingExtrusion.SweptArea))
+                    return false;
+
+                var openingPlacement = XbimPlacementTree.GetTransform(
+                    feature, state.PlacementTree, _engine, _logger);
+                var openingSolidMat = openingExtrusion.Position != null
+                    ? openingExtrusion.Position.ToMatrix3D()
+                    : XbimMatrix3D.Identity;
+                var openingWorldMat = XbimMatrix3D.Multiply(openingSolidMat, openingPlacement);
+
+                var odr = openingExtrusion.ExtrudedDirection.DirectionRatios;
+                var openingDirLocal = new XbimVector3D(
+                    odr[0], odr[1], odr.Count > 2 ? odr[2] : 0);
+                var openingDirWorld = openingWorldMat.Transform(openingDirLocal).Normalized();
+
+                double crossLen = XbimVector3D.CrossProduct(bodyDirWorld, openingDirWorld).Length;
+                if (crossLen > 0.01) return false; // not parallel
+
+                openings.Add((openingExtrusion, openingWorldMat));
+            }
+
+            if (openings.Count == 0) return false;
+
+            try
+            {
+                return ExecuteCoplanarSubtraction(
+                    state, bodyExtrusion, bodyWorldMat, angTol,
+                    openings, xbimTessellator, element,
+                    contextId, styleId, txn);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool ExecuteCoplanarSubtraction(
+            StreamingState state,
+            IIfcExtrudedAreaSolid bodyExtrusion,
+            XbimMatrix3D bodyWorldMat,
+            double angTol,
+            List<(IIfcExtrudedAreaSolid extrusion, XbimMatrix3D openingWorldMat)> openings,
+            XbimTessellator xbimTessellator,
+            IIfcElement element,
+            int contextId, int styleId,
+            IGeometryStoreInitialiser txn)
+        {
+            // Build body profile (with profile position applied)
+            var bodyPolygons = ProfilePolygonBuilder.BuildPolygons(bodyExtrusion.SweptArea, angTol);
+            var bodyOuter = bodyPolygons.Outer;
+            var bodyInners = bodyPolygons.Inners;
+            if (bodyExtrusion.SweptArea is IIfcParameterizedProfileDef bp && bp.Position != null)
+            {
+                bodyOuter = ProfilePolygonBuilder.ApplyProfilePosition(bodyOuter, bp.Position);
+                if (bodyInners != null)
+                    for (int h = 0; h < bodyInners.Length; h++)
+                        bodyInners[h] = ProfilePolygonBuilder.ApplyProfilePosition(bodyInners[h], bp.Position);
+            }
+
+            // Flatten body profile
+            var flatBodyOuter = FlattenProfile(bodyOuter);
+            FlattenInners(bodyInners, out var flatBodyInners, out var bodyInnerSizes, out int bodyNumInners);
+
+            // Inverse of body world transform for coordinate conversion
+            var bodyWorldMatInv = bodyWorldMat;
+            bodyWorldMatInv.Invert();
+
+            // Build opening profiles transformed to body's 2D profile space
+            int numOpenings = openings.Count;
+            var openingContours = new XbimGeometryNativeApi.XbimProfileContours[numOpenings];
+            var pinHandles = new List<GCHandle>();
+
+            try
+            {
+                // Pin body arrays
+                var bodyOuterPin = GCHandle.Alloc(flatBodyOuter, GCHandleType.Pinned);
+                pinHandles.Add(bodyOuterPin);
+                GCHandle bodyInnersPin = default, bodySizesPin = default;
+                if (flatBodyInners != null)
+                {
+                    bodyInnersPin = GCHandle.Alloc(flatBodyInners, GCHandleType.Pinned);
+                    pinHandles.Add(bodyInnersPin);
+                    bodySizesPin = GCHandle.Alloc(bodyInnerSizes, GCHandleType.Pinned);
+                    pinHandles.Add(bodySizesPin);
+                }
+
+                for (int oi = 0; oi < numOpenings; oi++)
+                {
+                    var (openingExtrusion, openingWorldMat) = openings[oi];
+                    var openingToBody = XbimMatrix3D.Multiply(openingWorldMat, bodyWorldMatInv);
+
+                    var openingPolygons = ProfilePolygonBuilder.BuildPolygons(openingExtrusion.SweptArea, angTol);
+                    var openingOuter = openingPolygons.Outer;
+                    if (openingExtrusion.SweptArea is IIfcParameterizedProfileDef op && op.Position != null)
+                        openingOuter = ProfilePolygonBuilder.ApplyProfilePosition(openingOuter, op.Position);
+
+                    // Transform opening outer to body's 2D profile space
+                    var transformedOuter = new (double X, double Y)[openingOuter.Length];
+                    for (int i = 0; i < openingOuter.Length; i++)
+                    {
+                        var p3d = openingToBody.Transform(
+                            new XbimPoint3D(openingOuter[i].X, openingOuter[i].Y, 0));
+                        transformedOuter[i] = (p3d.X, p3d.Y);
+                    }
+
+                    var flatOpOuter = FlattenProfile(transformedOuter);
+                    var opOuterPin = GCHandle.Alloc(flatOpOuter, GCHandleType.Pinned);
+                    pinHandles.Add(opOuterPin);
+
+                    // Opening inners (rare but handle them)
+                    IntPtr opInnersPtr = IntPtr.Zero, opSizesPtr = IntPtr.Zero;
+                    int opNumInners = 0;
+
+                    if (openingPolygons.Inners?.Length > 0)
+                    {
+                        var openingInners = openingPolygons.Inners;
+                        if (openingExtrusion.SweptArea is IIfcParameterizedProfileDef oip && oip.Position != null)
+                            for (int h = 0; h < openingInners.Length; h++)
+                                openingInners[h] = ProfilePolygonBuilder.ApplyProfilePosition(openingInners[h], oip.Position);
+
+                        // Transform inners to body space
+                        for (int h = 0; h < openingInners.Length; h++)
+                        {
+                            var inner = openingInners[h];
+                            var transformed = new (double X, double Y)[inner.Length];
+                            for (int i = 0; i < inner.Length; i++)
+                            {
+                                var p3d = openingToBody.Transform(
+                                    new XbimPoint3D(inner[i].X, inner[i].Y, 0));
+                                transformed[i] = (p3d.X, p3d.Y);
+                            }
+                            openingInners[h] = transformed;
+                        }
+
+                        FlattenInners(openingInners, out var flatOpInners, out var opInnerSizes, out opNumInners);
+                        if (flatOpInners != null)
+                        {
+                            var opInnersPin = GCHandle.Alloc(flatOpInners, GCHandleType.Pinned);
+                            pinHandles.Add(opInnersPin);
+                            opInnersPtr = opInnersPin.AddrOfPinnedObject();
+                            var opSizesPin = GCHandle.Alloc(opInnerSizes, GCHandleType.Pinned);
+                            pinHandles.Add(opSizesPin);
+                            opSizesPtr = opSizesPin.AddrOfPinnedObject();
+                        }
+                    }
+
+                    openingContours[oi] = new XbimGeometryNativeApi.XbimProfileContours
+                    {
+                        OuterPoints = opOuterPin.AddrOfPinnedObject(),
+                        OuterCount = transformedOuter.Length,
+                        InnerPoints = opInnersPtr,
+                        InnerSizes = opSizesPtr,
+                        NumInners = opNumInners
+                    };
+                }
+
+                // Pin the array of opening contour structs
+                var contoursPin = GCHandle.Alloc(openingContours, GCHandleType.Pinned);
+                pinHandles.Add(contoursPin);
+
+                // Body extrusion direction and depth
+                var dir = bodyExtrusion.ExtrudedDirection;
+                double extDirX = dir.DirectionRatios[0];
+                double extDirY = dir.DirectionRatios[1];
+                double extDirZ = dir.DirectionRatios.Count > 2 ? dir.DirectionRatios[2] : 0;
+
+                // Body placement
+                XbimGeometryNativeApi.XbimMat3x4 placementMat = default;
+                bool hasPlacement = bodyExtrusion.Position != null;
+                if (hasPlacement)
+                {
+                    ExtrusionMeshBuilder.GetSolidAxes(bodyExtrusion.Position,
+                        out double ox, out double oy, out double oz,
+                        out double xx, out double xy, out double xz,
+                        out double yx, out double yy, out double yz,
+                        out double zx, out double zy, out double zz);
+                    placementMat = new XbimGeometryNativeApi.XbimMat3x4(
+                        xx, yx, zx, ox,
+                        xy, yy, zy, oy,
+                        xz, yz, zz, oz);
+                }
+
+                GCHandle placementPin = default;
+                if (hasPlacement)
+                {
+                    placementPin = GCHandle.Alloc(placementMat, GCHandleType.Pinned);
+                    pinHandles.Add(placementPin);
+                }
+
+                // We pass the body element placement as a separate transform on the native result.
+                // The native function builds in the solid's local coordinate system; we apply
+                // the element placement afterward by transforming the output mesh.
+                // Actually, the native extrude function already applies the solid position
+                // via the placement parameter, but we need the element placement too.
+                // Instead: pass the FULL world placement to native (solid * element).
+                // But wait: the native function's placement parameter is for the solid Position
+                // (maps profile XY + extrusion dir to 3D). The element placement is an additional
+                // outer transform. Let's keep the solid position in the native params (same as
+                // xbim_manifold_mesh_extrude) and apply the element placement to the result.
+
+                var p = new XbimGeometryNativeApi.XbimCoplanarSubtractParams
+                {
+                    BodyProfile = new XbimGeometryNativeApi.XbimProfileContours
+                    {
+                        OuterPoints = bodyOuterPin.AddrOfPinnedObject(),
+                        OuterCount = bodyOuter.Length,
+                        InnerPoints = bodyInnersPin.IsAllocated ? bodyInnersPin.AddrOfPinnedObject() : IntPtr.Zero,
+                        InnerSizes = bodySizesPin.IsAllocated ? bodySizesPin.AddrOfPinnedObject() : IntPtr.Zero,
+                        NumInners = bodyNumInners
+                    },
+                    OpeningProfiles = contoursPin.AddrOfPinnedObject(),
+                    NumOpenings = numOpenings,
+                    ExtDirX = extDirX,
+                    ExtDirY = extDirY,
+                    ExtDirZ = extDirZ,
+                    Depth = (double)bodyExtrusion.Depth,
+                    Placement = placementPin.IsAllocated ? placementPin.AddrOfPinnedObject() : IntPtr.Zero
+                };
+
+                int rc = XbimGeometryNativeApi.xbim_manifold_mesh_extrude_with_openings(in p, out var handle);
+                if (rc != 0) return false;
+
+                using (handle)
+                {
+                    // Apply element placement to the mesh
+                    var elemPlacement = XbimPlacementTree.GetTransform(
+                        element, state.PlacementTree, _engine, _logger);
+
+                    var meshData = ManifoldMeshBooleanService.ExtractMeshData(handle);
+                    if (meshData == null) return false;
+
+                    var currentMesh = meshData.Value;
+                    if (!elemPlacement.IsIdentity)
+                        currentMesh = ManifoldMeshBooleanService.Transform(currentMesh, elemPlacement);
+
+                    return WriteResultMesh(currentMesh, xbimTessellator, element, contextId, styleId, txn);
+                }
+            }
+            finally
+            {
+                foreach (var pin in pinHandles)
+                    if (pin.IsAllocated) pin.Free();
+            }
+        }
+
+        private static double[] FlattenProfile((double X, double Y)[] points)
+        {
+            var flat = new double[points.Length * 2];
+            for (int i = 0; i < points.Length; i++)
+            {
+                flat[i * 2] = points[i].X;
+                flat[i * 2 + 1] = points[i].Y;
+            }
+            return flat;
+        }
+
+        private static void FlattenInners((double X, double Y)[][] inners,
+            out double[] flatInners, out int[] innerSizes, out int numInners)
+        {
+            flatInners = null;
+            innerSizes = null;
+            numInners = 0;
+            if (inners == null || inners.Length == 0) return;
+
+            numInners = inners.Length;
+            innerSizes = new int[numInners];
+            int totalPts = 0;
+            for (int h = 0; h < numInners; h++)
+            {
+                innerSizes[h] = inners[h].Length;
+                totalPts += inners[h].Length;
+            }
+
+            flatInners = new double[totalPts * 2];
+            int offset = 0;
+            for (int h = 0; h < numInners; h++)
+            {
+                for (int i = 0; i < inners[h].Length; i++)
+                {
+                    flatInners[offset++] = inners[h][i].X;
+                    flatInners[offset++] = inners[h][i].Y;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Attempts to perform boolean operations using Manifold mesh booleans.
+        /// Returns true if successful; false means the caller should fall back to OCCT BRep booleans.
+        /// </summary>
+        private bool TryManifoldBooleans(StreamingState state, IIfcElement element,
+            IGrouping<IIfcElement, IIfcFeatureElement> features,
+            MeshingBehaviourResult behaviour,
+            ManifoldMeshBooleanService manifoldService,
+            XbimTessellator xbimTessellator,
+            int contextId, int styleId,
+            IGeometryStoreInitialiser txn)
+        {
+            // Try 2D profile subtraction first (fastest path for coplanar extrusions)
+            if (TryCoplanarProfileSubtraction(state, element, features, behaviour,
+                    xbimTessellator, contextId, styleId, txn))
+                return true;
+
+            // Collect body mesh data from cache
+            var bodyMeshData = CollectBodyMeshData(state, element);
+            if (bodyMeshData == null) return false;
+
+            // Collect and transform feature mesh data
+            var openingMeshes = new List<ManifoldMeshBooleanService.MeshData>();
+            var projectionMeshes = new List<ManifoldMeshBooleanService.MeshData>();
+
+            foreach (var feature in features)
+            {
+                // Look up the cached mesh for this feature's representation items
+                var featureMesh = CollectFeatureMeshData(state, feature);
+                if (featureMesh == null) return false; // missing mesh data, fall back
+
+                // Transform feature mesh to world coordinates
+                var featurePlacement = XbimPlacementTree.GetTransform(feature, state.PlacementTree, _engine, _logger);
+                var transformedMesh = ManifoldMeshBooleanService.Transform(
+                    featureMesh.Value, featurePlacement);
+
+                if (feature is IIfcFeatureElementSubtraction)
+                {
+                    // Skip openings whose bounding box doesn't intersect the body
+                    if (!BoundsIntersect(bodyMeshData.Value.Bounds, transformedMesh.Bounds))
+                        continue;
+                    openingMeshes.Add(transformedMesh);
+                }
+                else
+                    projectionMeshes.Add(transformedMesh);
+            }
+
+            var currentMesh = bodyMeshData.Value;
+
+            // Perform union with projections
+            if (behaviour.HasFlag(MeshingBehaviourResult.PerformAdditions) && projectionMeshes.Count > 0)
+            {
+                foreach (var proj in projectionMeshes)
+                {
+                    ManifoldMeshBooleanService.MeshData? unionResult;
+                    using (_diag.Track(DiagOp.ManifoldUnion))
+                        unionResult = manifoldService.Union(currentMesh, proj);
+                    if (unionResult == null) return false; // Manifold failed
+                    currentMesh = unionResult.Value;
+                }
+            }
+
+            // Perform subtraction of openings
+            if (behaviour.HasFlag(MeshingBehaviourResult.PerformSubtractions) && openingMeshes.Count > 0)
+            {
+                ManifoldMeshBooleanService.MeshData? cutResult;
+                using (_diag.Track(DiagOp.ManifoldCut))
+                    cutResult = manifoldService.Cut(currentMesh, openingMeshes);
+                if (cutResult == null) return false; // Manifold failed
+                currentMesh = cutResult.Value;
+            }
+
+            return WriteResultMesh(currentMesh, xbimTessellator, element, contextId, styleId, txn);
+        }
+
+        private static bool BoundsIntersect(XbimRect3D a, XbimRect3D b)
+        {
+            return a.X < b.X + b.SizeX && a.X + a.SizeX > b.X
+                && a.Y < b.Y + b.SizeY && a.Y + a.SizeY > b.Y
+                && a.Z < b.Z + b.SizeZ && a.Z + a.SizeZ > b.Z;
+        }
+
+        private bool WriteResultMesh(
+            ManifoldMeshBooleanService.MeshData mesh,
+            XbimTessellator xbimTessellator,
+            IIfcElement element,
+            int contextId, int styleId,
+            IGeometryStoreInitialiser txn)
+        {
+            XbimShapeGeometry shapeGeometry;
+            try
+            {
+                shapeGeometry = xbimTessellator.SerializeRawMeshToBinary(
+                    mesh.Positions, mesh.Indices, element.EntityLabel);
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (shapeGeometry?.ShapeData == null || shapeGeometry.ShapeData.Length == 0)
+                return false;
+
+            var bbox = shapeGeometry.BoundingBox;
+            if (bbox.SizeX >= 1e100) return false;
+
+            shapeGeometry.IfcShapeLabel = element.EntityLabel;
+
+            var instanceTransform = XbimMatrix3D.Identity;
+            if (shapeGeometry.LocalShapeDisplacement != default)
+            {
+                instanceTransform = XbimMatrix3D.CreateTranslation(
+                    shapeGeometry.LocalShapeDisplacement.Value);
+            }
+
+            var shapeInstance = new XbimShapeInstance
+            {
+                IfcProductLabel = element.EntityLabel,
+                ShapeGeometryLabel = 0,
+                StyleLabel = styleId,
+                RepresentationType = XbimGeometryRepresentationType.OpeningsAndAdditionsIncluded,
+                RepresentationContext = contextId,
+                IfcTypeId = _model.Metadata.ExpressTypeId(element),
+                Transformation = instanceTransform,
+                BoundingBox = bbox
+            };
+
+            shapeInstance.ShapeGeometryLabel = txn.AddShapeGeometry(shapeGeometry);
+            txn.AddShapeInstance(shapeInstance, shapeInstance.ShapeGeometryLabel);
+            return true;
+        }
+
+        /// <summary>
+        /// Collects body mesh data for a voided product from MeshBodiesCache.
+        /// Resolves mapped items and applies cumulative transforms.
+        /// Returns null if any body part is missing from the cache.
+        /// </summary>
+        private ManifoldMeshBooleanService.MeshData? CollectBodyMeshData(
+            StreamingState state, IIfcProduct product)
+        {
+            var placement = XbimPlacementTree.GetTransform(product, state.PlacementTree, _engine, _logger);
+
+            var reps = product.Representation?.Representations?
+                .Where(r => IsInContext(r) && r.IsBodyRepresentation(BodyRepresentations));
+            if (reps == null) return null;
+
+            var leafItems = new List<(IIfcGeometricRepresentationItem item, XbimMatrix3D transform)>();
+            foreach (var rep in reps)
+                CollectLeafRepItems(rep.Items, placement, leafItems);
+
+            if (leafItems.Count == 0) return null;
+
+            ManifoldMeshBooleanService.MeshData? combined = null;
+            var manifoldService = new ManifoldMeshBooleanService();
+
+            foreach (var (item, transform) in leafItems)
+            {
+                if (!state.MeshBodiesCache.TryGetValue(item.EntityLabel, out var cached))
+                    return null; // not in mesh cache, fall back to BRep
+
+                var mesh = new ManifoldMeshBooleanService.MeshData(cached.Positions, cached.Indices, cached.Bounds);
+
+                if (!transform.IsIdentity)
+                    mesh = ManifoldMeshBooleanService.Transform(mesh, transform);
+
+                if (combined == null)
+                {
+                    combined = mesh;
+                }
+                else
+                {
+                    var unionResult = manifoldService.Union(combined.Value, mesh);
+                    if (unionResult == null) return null;
+                    combined = unionResult;
+                }
+            }
+
+            return combined;
+        }
+
+        /// <summary>
+        /// Collects feature mesh data for a feature element from MeshFeaturesCache.
+        /// Returns null if the feature is missing from the mesh cache.
+        /// </summary>
+        private ManifoldMeshBooleanService.MeshData? CollectFeatureMeshData(
+            StreamingState state, IIfcProduct feature)
+        {
+            // Look up representation items for this feature
+            var reps = feature.Representation?.Representations?
+                .Where(r => IsInContext(r) && r.IsBodyRepresentation(BodyRepresentations));
+            if (reps == null) return null;
+
+            ManifoldMeshBooleanService.MeshData? combined = null;
+            var manifoldService = new ManifoldMeshBooleanService();
+
+            foreach (var rep in reps)
+            {
+                foreach (var item in rep.Items.Where(i => !(i is IIfcGeometricSet)))
+                {
+                    var entityLabel = item.EntityLabel;
+                    if (item is IIfcMappedItem map)
+                    {
+                        // For mapped items, look up source items
+                        foreach (var srcItem in map.MappingSource.MappedRepresentation.Items
+                            .OfType<IIfcGeometricRepresentationItem>()
+                            .Where(i => !(i is IIfcGeometricSet)))
+                        {
+                            entityLabel = srcItem.EntityLabel;
+                            if (!state.MeshFeaturesCache.TryGetValue(entityLabel, out var cached))
+                                return null;
+
+                            var mesh = new ManifoldMeshBooleanService.MeshData(
+                                cached.Positions, cached.Indices, cached.Bounds);
+
+                            if (combined == null)
+                                combined = mesh;
+                            else
+                            {
+                                var u = manifoldService.Union(combined.Value, mesh);
+                                if (u == null) return null;
+                                combined = u;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (!state.MeshFeaturesCache.TryGetValue(entityLabel, out var cached))
+                            return null;
+
+                        var mesh = new ManifoldMeshBooleanService.MeshData(
+                            cached.Positions, cached.Indices, cached.Bounds);
+
+                        if (combined == null)
+                            combined = mesh;
+                        else
+                        {
+                            var u = manifoldService.Union(combined.Value, mesh);
+                            if (u == null) return null;
+                            combined = u;
+                        }
+                    }
+                }
+            }
+
+            return combined;
         }
 
         #endregion

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using Xbim.Common.Geometry;
 using Xbim.Geometry.Engine.Handles;
 
 namespace Xbim.Geometry.Engine.Internal
@@ -12,7 +13,10 @@ namespace Xbim.Geometry.Engine.Internal
     internal static partial class XbimGeometryNativeApi
     {
         private const string Lib = NativeLibraryLoader.LibraryName;
-        private const CallingConvention CC = CallingConvention.StdCall;
+        // Cdecl is the only calling convention supported by WASM.  On x64
+        // Windows __stdcall and __cdecl produce identical code, so Cdecl
+        // works correctly on all our targets (win-x64, linux-x64, wasm32).
+        private const CallingConvention CC = CallingConvention.Cdecl;
 
         static XbimGeometryNativeApi()
         {
@@ -32,6 +36,64 @@ namespace Xbim.Geometry.Engine.Internal
         internal const int CSegPolyline   = 3;
 
         #region Native Value Types
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct XbimPoint3d
+        {
+            public double X, Y, Z;
+            public XbimPoint3d(double x, double y, double z) { X = x; Y = y; Z = z; }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct XbimDir3d
+        {
+            public double X, Y, Z;
+            public XbimDir3d(double x, double y, double z) { X = x; Y = y; Z = z; }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct XbimAxis2Placement
+        {
+            public XbimPoint3d Origin;
+            public XbimDir3d ZAxis;
+            public XbimDir3d XAxis;
+
+            public XbimAxis2Placement(
+                double ox, double oy, double oz,
+                double zx, double zy, double zz,
+                double xx, double xy, double xz)
+            {
+                Origin = new XbimPoint3d(ox, oy, oz);
+                ZAxis = new XbimDir3d(zx, zy, zz);
+                XAxis = new XbimDir3d(xx, xy, xz);
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct XbimTransformMatrix
+        {
+            public double M11, M12, M13, OffsetX;
+            public double M21, M22, M23, OffsetY;
+            public double M31, M32, M33, OffsetZ;
+            public double ScaleX, ScaleY, ScaleZ;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct XbimAsymmetricIShapeParams
+        {
+            public double BottomFlangeWidth;
+            public double OverallDepth;
+            public double WebThickness;
+            public double BottomFlangeThickness;
+            public double TopFlangeWidth;
+            public double TopFlangeThickness;
+            public double BottomFlangeFilletRadius;
+            public double TopFlangeFilletRadius;
+            public double BottomFlangeEdgeRadius;
+            public double TopFlangeEdgeRadius;
+            public double BottomFlangeSlope;
+            public double TopFlangeSlope;
+        }
 
         [StructLayout(LayoutKind.Sequential)]
         internal struct XbimMeshParams
@@ -234,10 +296,7 @@ namespace Xbim.Geometry.Engine.Internal
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_shape_gtransform(
             NativeShapeHandle shapeHandle,
-            double m11, double m12, double m13, double offsetX,
-            double m21, double m22, double m23, double offsetY,
-            double m31, double m32, double m33, double offsetZ,
-            double scaleX, double scaleY, double scaleZ,
+            in XbimTransformMatrix matrix,
             out NativeShapeHandle outHandle);
 
         #endregion
@@ -420,9 +479,7 @@ namespace Xbim.Geometry.Engine.Internal
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_profile_build_ishape(
             NativeContextHandle ctx,
-            double originX, double originY, double originZ,
-            double zDirX, double zDirY, double zDirZ,
-            double xDirX, double xDirY, double xDirZ,
+            in XbimAxis2Placement placement,
             double overallWidth, double overallDepth,
             double webThickness, double flangeThickness,
             double filletRadius,
@@ -431,9 +488,7 @@ namespace Xbim.Geometry.Engine.Internal
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_profile_build_lshape(
             NativeContextHandle ctx,
-            double originX, double originY, double originZ,
-            double zDirX, double zDirY, double zDirZ,
-            double xDirX, double xDirY, double xDirZ,
+            in XbimAxis2Placement placement,
             double depth, double width, double thickness,
             double filletRadius, double edgeRadius, double legSlope,
             out NativeShapeHandle outHandle);
@@ -441,9 +496,7 @@ namespace Xbim.Geometry.Engine.Internal
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_profile_build_tshape(
             NativeContextHandle ctx,
-            double originX, double originY, double originZ,
-            double zDirX, double zDirY, double zDirZ,
-            double xDirX, double xDirY, double xDirZ,
+            in XbimAxis2Placement placement,
             double depth, double flangeWidth,
             double webThickness, double flangeThickness,
             double filletRadius, double flangeEdgeRadius, double webEdgeRadius,
@@ -453,9 +506,7 @@ namespace Xbim.Geometry.Engine.Internal
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_profile_build_ushape(
             NativeContextHandle ctx,
-            double originX, double originY, double originZ,
-            double zDirX, double zDirY, double zDirZ,
-            double xDirX, double xDirY, double xDirZ,
+            in XbimAxis2Placement placement,
             double depth, double flangeWidth,
             double webThickness, double flangeThickness,
             double filletRadius, double edgeRadius, double flangeSlope,
@@ -464,9 +515,7 @@ namespace Xbim.Geometry.Engine.Internal
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_profile_build_zshape(
             NativeContextHandle ctx,
-            double originX, double originY, double originZ,
-            double zDirX, double zDirY, double zDirZ,
-            double xDirX, double xDirY, double xDirZ,
+            in XbimAxis2Placement placement,
             double depth, double flangeWidth,
             double webThickness, double flangeThickness,
             double filletRadius, double edgeRadius,
@@ -475,9 +524,7 @@ namespace Xbim.Geometry.Engine.Internal
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_profile_build_cshape(
             NativeContextHandle ctx,
-            double originX, double originY, double originZ,
-            double zDirX, double zDirY, double zDirZ,
-            double xDirX, double xDirY, double xDirZ,
+            in XbimAxis2Placement placement,
             double depth, double width, double wallThickness,
             double girth, double internalFilletRadius,
             out NativeShapeHandle outHandle);
@@ -485,32 +532,21 @@ namespace Xbim.Geometry.Engine.Internal
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_profile_build_trapezium(
             NativeContextHandle ctx,
-            double originX, double originY, double originZ,
-            double zDirX, double zDirY, double zDirZ,
-            double xDirX, double xDirY, double xDirZ,
+            in XbimAxis2Placement placement,
             double bottomXDim, double topXDim, double yDim, double topXOffset,
             out NativeShapeHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_profile_build_asymmetric_ishape(
             NativeContextHandle ctx,
-            double originX, double originY, double originZ,
-            double zDirX, double zDirY, double zDirZ,
-            double xDirX, double xDirY, double xDirZ,
-            double bottomFlangeWidth, double overallDepth,
-            double webThickness, double bottomFlangeThickness,
-            double topFlangeWidth, double topFlangeThickness,
-            double bottomFlangeFilletRadius, double topFlangeFilletRadius,
-            double bottomFlangeEdgeRadius, double topFlangeEdgeRadius,
-            double bottomFlangeSlope, double topFlangeSlope,
+            in XbimAxis2Placement placement,
+            in XbimAsymmetricIShapeParams shapeParams,
             out NativeShapeHandle outHandle);
 
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_profile_build_rectangle_hollow(
             NativeContextHandle ctx,
-            double originX, double originY, double originZ,
-            double zDirX, double zDirY, double zDirZ,
-            double xDirX, double xDirY, double xDirZ,
+            in XbimAxis2Placement placement,
             double xDim, double yDim, double wallThickness,
             double innerFilletRadius, double outerFilletRadius,
             out NativeShapeHandle outHandle);
@@ -660,16 +696,12 @@ namespace Xbim.Geometry.Engine.Internal
         [DllImport(Lib, CallingConvention = CC)]
         internal static extern int xbim_halfspace_build_polygonal_bounded(
             NativeContextHandle ctx,
-            double surfaceOriginX, double surfaceOriginY, double surfaceOriginZ,
-            double surfaceZDirX, double surfaceZDirY, double surfaceZDirZ,
-            double surfaceXDirX, double surfaceXDirY, double surfaceXDirZ,
+            in XbimAxis2Placement surfacePlacement,
             int agreementFlag,
             [MarshalAs(UnmanagedType.LPArray)] double[] boundaryPointsX,
             [MarshalAs(UnmanagedType.LPArray)] double[] boundaryPointsY,
             int boundaryPointCount,
-            double boundaryOriginX, double boundaryOriginY, double boundaryOriginZ,
-            double boundaryZDirX, double boundaryZDirY, double boundaryZDirZ,
-            double boundaryXDirX, double boundaryXDirY, double boundaryXDirZ,
+            in XbimAxis2Placement boundaryPlacement,
             out NativeShapeHandle outHandle);
 
         #endregion
@@ -1948,12 +1980,169 @@ namespace Xbim.Geometry.Engine.Internal
         internal static extern void xbim_projection_free_buffer(IntPtr buffer);
 
         #endregion
+
+        #region Manifold Mesh Booleans
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern unsafe int xbim_manifold_mesh_create(
+            float* positions, int numVerts,
+            uint* indices, int numTris,
+            out NativeManifoldMeshHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_manifold_boolean_cut(
+            NativeManifoldMeshHandle body, NativeManifoldMeshHandle tool,
+            out NativeManifoldMeshHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_manifold_boolean_union(
+            NativeManifoldMeshHandle body, NativeManifoldMeshHandle tool,
+            out NativeManifoldMeshHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_manifold_boolean_cut_multi(
+            NativeManifoldMeshHandle body,
+            [MarshalAs(UnmanagedType.LPArray)] IntPtr[] tools, int numTools,
+            out NativeManifoldMeshHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern unsafe int xbim_manifold_mesh_transform(
+            NativeManifoldMeshHandle mesh, double* matrix3x4,
+            out NativeManifoldMeshHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_manifold_mesh_get_data(
+            NativeManifoldMeshHandle mesh,
+            out int outNumVerts, out int outNumTris,
+            out IntPtr outPositions, out IntPtr outIndices);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_manifold_mesh_bounding_box(
+            NativeManifoldMeshHandle mesh,
+            out double outMinX, out double outMinY, out double outMinZ,
+            out double outMaxX, out double outMaxY, out double outMaxZ);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_manifold_mesh_is_valid(
+            NativeManifoldMeshHandle mesh);
+
+        #endregion
+
+        #region Mesh Builders
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct XbimMat3x4
+        {
+            // Row-major 3x4: [Xx Yx Zx Ox, Xy Yy Zy Oy, Xz Yz Zz Oz]
+            public double R0, R1, R2, R3;
+            public double R4, R5, R6, R7;
+            public double R8, R9, R10, R11;
+
+            public XbimMat3x4(
+                double xx, double yx, double zx, double ox,
+                double xy, double yy, double zy, double oy,
+                double xz, double yz, double zz, double oz)
+            {
+                R0 = xx; R1 = yx; R2 = zx; R3 = ox;
+                R4 = xy; R5 = yy; R6 = zy; R7 = oy;
+                R8 = xz; R9 = yz; R10 = zz; R11 = oz;
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct XbimBBox
+        {
+            public double MinX, MinY, MinZ;
+            public double MaxX, MaxY, MaxZ;
+
+            public XbimBBox(XbimRect3D rect)
+            {
+                MinX = rect.X; MinY = rect.Y; MinZ = rect.Z;
+                MaxX = rect.X + rect.SizeX;
+                MaxY = rect.Y + rect.SizeY;
+                MaxZ = rect.Z + rect.SizeZ;
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct XbimProfileContours
+        {
+            public IntPtr OuterPoints;   // double* interleaved x,y
+            public int OuterCount;
+            public IntPtr InnerPoints;   // double* packed inner contours
+            public IntPtr InnerSizes;    // int* vertex count per inner
+            public int NumInners;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct XbimExtrusionParams
+        {
+            public XbimProfileContours Profile;
+            public double ExtDirX, ExtDirY, ExtDirZ;
+            public double Depth;
+            public IntPtr Placement; // XbimMat3x4*, NULL = identity
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct XbimHalfSpaceParams
+        {
+            public double PlaneOx, PlaneOy, PlaneOz;
+            public double PlaneNx, PlaneNy, PlaneNz;
+            public double PlaneAx, PlaneAy, PlaneAz;
+            public int AgreementFlag;
+            public XbimBBox BodyBBox;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct XbimPolyHalfSpaceParams
+        {
+            public double PlaneOx, PlaneOy, PlaneOz;
+            public double PlaneNx, PlaneNy, PlaneNz;
+            public int AgreementFlag;
+            public IntPtr PolygonPoints; // double* interleaved x,y
+            public int PolygonCount;
+            public IntPtr BoundaryPlacement; // XbimMat3x4*
+            public XbimBBox BodyBBox;
+        }
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_manifold_mesh_extrude(
+            in XbimExtrusionParams p,
+            out NativeManifoldMeshHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_manifold_mesh_halfspace(
+            in XbimHalfSpaceParams p,
+            out NativeManifoldMeshHandle outHandle);
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_manifold_mesh_halfspace_polygonal(
+            in XbimPolyHalfSpaceParams p,
+            out NativeManifoldMeshHandle outHandle);
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct XbimCoplanarSubtractParams
+        {
+            public XbimProfileContours BodyProfile;
+            public IntPtr OpeningProfiles; // XbimProfileContours*
+            public int NumOpenings;
+            public double ExtDirX, ExtDirY, ExtDirZ;
+            public double Depth;
+            public IntPtr Placement; // XbimMat3x4*, NULL = identity
+        }
+
+        [DllImport(Lib, CallingConvention = CC)]
+        internal static extern int xbim_manifold_mesh_extrude_with_openings(
+            in XbimCoplanarSubtractParams p,
+            out NativeManifoldMeshHandle outHandle);
+
+        #endregion
     }
 
     /// <summary>
     /// Managed delegate matching the native XbimLogCallback signature.
     /// Must be kept alive (prevent GC) while the native code may invoke it.
     /// </summary>
-    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     internal delegate void XbimLogCallback(int level, [MarshalAs(UnmanagedType.LPStr)] string message);
 }

@@ -54,6 +54,13 @@ public static class WexBimFileReader
         int productCount = br.ReadInt32();
         int styleCount = br.ReadInt32();
         scene.OneMeter = br.ReadSingle();
+        if (scene.Version >= 4)
+        {
+            scene.Wcs = new Vector3(
+                (float)br.ReadDouble(),
+                (float)br.ReadDouble(),
+                (float)br.ReadDouble());
+        }
         short regionCount = br.ReadInt16();
 
         // --- Regions ---
@@ -126,88 +133,90 @@ public static class WexBimFileReader
         }
 
         // --- Shapes ---
-        for (int i = 0; i < shapeCount; i++)
+        if (scene.Version >= 3)
         {
-            int repetition = br.ReadInt32();
-            if (repetition < 1) continue;
-
-            if (repetition > 1)
+            // v3+ uses per-region geometry blocks with byte-length-prefixed mesh data
+            for (int r = 0; r < regionCount; r++)
             {
-                var instances = new List<WexBimShapeInstance>(repetition);
-                for (int j = 0; j < repetition; j++)
-                {
-                    instances.Add(new WexBimShapeInstance
-                    {
-                        ProductLabel = br.ReadInt32(),
-                        TypeId = br.ReadInt16(),
-                        InstanceLabel = br.ReadInt32(),
-                        StyleId = br.ReadInt32(),
-                        Transform = ReadMatrix4x4(br)
-                    });
-                }
+                int geomCount = br.ReadInt32();
+                for (int g = 0; g < geomCount; g++)
+                    ReadShapeGroup(br, scene);
+            }
+        }
+        else
+        {
+            // v1/v2: flat shape list with inline triangulation
+            for (int i = 0; i < shapeCount; i++)
+                ReadShapeGroup(br, scene);
+        }
 
-                var meshData = ReadTriangulation(br);
+        return scene;
+    }
 
-                // Create one mesh per instance, sharing the same geometry
-                foreach (var inst in instances)
-                {
-                    if (meshData.positions.Length > 0)
-                    {
-                        scene.Meshes.Add(new WexBimMesh
-                        {
-                            Positions = meshData.positions,
-                            Normals = meshData.normals,
-                            Indices = meshData.indices,
-                            StyleId = inst.StyleId,
-                            ProductLabel = inst.ProductLabel,
-                            Transform = inst.Transform
-                        });
-                    }
-                }
+    private static void ReadShapeGroup(BinaryReader br, WexBimScene scene)
+    {
+        int repetition = br.ReadInt32();
+        if (repetition < 1) return;
 
-                scene.Shapes.Add(new WexBimShape
-                {
-                    Instances = instances,
-                    VertexCount = meshData.positions.Length / 3,
-                    TriangleCount = meshData.indices.Length / 3
-                });
+        bool readTransforms = repetition > 1;
+
+        var instances = new List<WexBimShapeInstance>(repetition);
+        for (int j = 0; j < repetition; j++)
+        {
+            instances.Add(new WexBimShapeInstance
+            {
+                ProductLabel = br.ReadInt32(),
+                TypeId = br.ReadInt16(),
+                InstanceLabel = br.ReadInt32(),
+                StyleId = br.ReadInt32(),
+                Transform = readTransforms ? ReadMatrix4x4(br) : Matrix4x4.Identity
+            });
+        }
+
+        // v3+ prefixes geometry data with a byte length
+        (float[] positions, float[] normals, int[] indices) meshData;
+        if (scene.Version >= 3)
+        {
+            int dataLength = br.ReadInt32();
+            if (dataLength == 0)
+            {
+                meshData = (Array.Empty<float>(), Array.Empty<float>(), Array.Empty<int>());
             }
             else
             {
-                var instance = new WexBimShapeInstance
-                {
-                    ProductLabel = br.ReadInt32(),
-                    TypeId = br.ReadInt16(),
-                    InstanceLabel = br.ReadInt32(),
-                    StyleId = br.ReadInt32(),
-                    Transform = Matrix4x4.Identity
-                };
+                byte[] geomBytes = br.ReadBytes(dataLength);
+                using var ms = new MemoryStream(geomBytes);
+                using var gbr = new BinaryReader(ms);
+                meshData = ReadTriangulation(gbr);
+            }
+        }
+        else
+        {
+            meshData = ReadTriangulation(br);
+        }
 
-                var meshData = ReadTriangulation(br);
-
-                if (meshData.positions.Length > 0)
+        foreach (var inst in instances)
+        {
+            if (meshData.positions.Length > 0)
+            {
+                scene.Meshes.Add(new WexBimMesh
                 {
-                    scene.Meshes.Add(new WexBimMesh
-                    {
-                        Positions = meshData.positions,
-                        Normals = meshData.normals,
-                        Indices = meshData.indices,
-                        StyleId = instance.StyleId,
-                        ProductLabel = instance.ProductLabel,
-                        Transform = Matrix4x4.Identity
-                    });
-                }
-
-                scene.Shapes.Add(new WexBimShape
-                {
-                    Instances = new List<WexBimShapeInstance> { instance },
-                    VertexCount = meshData.positions.Length / 3,
-                    TriangleCount = meshData.indices.Length / 3
+                    Positions = meshData.positions,
+                    Normals = meshData.normals,
+                    Indices = meshData.indices,
+                    StyleId = inst.StyleId,
+                    ProductLabel = inst.ProductLabel,
+                    Transform = inst.Transform
                 });
             }
         }
 
-        return scene;
+        scene.Shapes.Add(new WexBimShape
+        {
+            Instances = instances,
+            VertexCount = meshData.positions.Length / 3,
+            TriangleCount = meshData.indices.Length / 3
+        });
     }
 
     private static Matrix4x4 ReadMatrix4x4(BinaryReader br)
@@ -364,6 +373,7 @@ public sealed class WexBimScene
 {
     public byte Version { get; set; }
     public float OneMeter { get; set; }
+    public Vector3 Wcs { get; set; }
     public int TotalVertexCount { get; set; }
     public int TotalTriangleCount { get; set; }
     public Vector3 BoundsMin { get; set; }

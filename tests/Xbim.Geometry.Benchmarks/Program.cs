@@ -41,6 +41,13 @@ public class Program
             CompareRun(file);
             return;
         }
+
+        if (args.Length > 0 && args[0] == "--manifold")
+        {
+            var file = args.Length > 1 ? args[1] : "IfcExamples/Dormitory-ALL-IFC.ifc";
+            ManifoldBenchmarkRun(file);
+            return;
+        }
 #endif
 
         BenchmarkSwitcher
@@ -351,6 +358,111 @@ public class Program
         });
 
         Console.WriteLine("Done.");
+    }
+
+    /// <summary>
+    /// Compares CreateContext performance with Manifold mesh booleans enabled vs disabled (OCCT-only).
+    /// Usage: dotnet run -c Release -- --manifold [path-to-ifc]
+    /// </summary>
+    private static void ManifoldBenchmarkRun(string relativePath)
+    {
+        EngineSetup.EnsureInitialized();
+        var loggerFactory = LoggerFactory.Create(b => b
+            .SetMinimumLevel(LogLevel.Warning)
+            .AddConsole());
+
+        Console.WriteLine($"=== Manifold Mesh Booleans Benchmark: {relativePath} ===");
+        Console.WriteLine();
+
+        // ── Load model ──
+        var swLoad = Stopwatch.StartNew();
+        using var model = EngineSetup.OpenModel(relativePath);
+        swLoad.Stop();
+        Console.WriteLine($"Model loaded: {model.Instances.Count:N0} entities in {swLoad.Elapsed.TotalSeconds:F2}s");
+
+        var voidCount = model.Instances.OfType<IIfcRelVoidsElement>().Count();
+        var voidedProducts = model.Instances.OfType<IIfcRelVoidsElement>()
+            .Select(v => v.RelatingBuildingElement.EntityLabel).Distinct().Count();
+        Console.WriteLine($"Voids: {voidCount} (affecting {voidedProducts} products)");
+        Console.WriteLine();
+
+        var proc = Process.GetCurrentProcess();
+
+        // ── Helper to run a context and capture metrics ──
+        (bool success, int shapes, int geoms, double seconds) RunContext(
+            string label, bool enableManifold, int maxThreads, bool printDiagnostics)
+        {
+            // Force full GC for a clean baseline
+            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true, true);
+            GC.WaitForPendingFinalizers();
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, true, true);
+
+            proc.Refresh();
+            var wsBefore = proc.WorkingSet64;
+            var managedBefore = GC.GetTotalMemory(true);
+
+            var context = new Xbim3DModelContext(model, loggerFactory);
+            context.EnableManifoldBooleans = enableManifold;
+            context.EnableDiagnostics = true;
+            if (maxThreads > 0) context.MaxThreads = maxThreads;
+
+            var sw = Stopwatch.StartNew();
+            var success = context.CreateContext();
+            sw.Stop();
+
+            proc.Refresh();
+            var wsAfter = proc.WorkingSet64;
+            var managedAfter = GC.GetTotalMemory(false);
+
+            var shapes = context.ShapeInstances().Count();
+            var geoms = context.ShapeGeometries().Count();
+
+            Console.WriteLine($"  {label}");
+            Console.WriteLine($"    Result:         {(success ? "OK" : "FAILED")}");
+            Console.WriteLine($"    Time:           {sw.Elapsed.TotalSeconds:F2}s ({sw.ElapsedMilliseconds:N0} ms)");
+            Console.WriteLine($"    Shapes:         {shapes:N0}");
+            Console.WriteLine($"    Geometries:     {geoms:N0}");
+            Console.WriteLine($"    Managed heap:   {managedAfter / (1024.0 * 1024):F1} MB (delta: {(managedAfter - managedBefore) / (1024.0 * 1024):+0.0;-0.0} MB)");
+            Console.WriteLine($"    Working set:    {wsAfter / (1024.0 * 1024):F1} MB (delta: {(wsAfter - wsBefore) / (1024.0 * 1024):+0.0;-0.0} MB)");
+
+            if (printDiagnostics)
+                context.PrintDiagnostics();
+
+            Console.WriteLine();
+            return (success, shapes, geoms, sw.Elapsed.TotalSeconds);
+        }
+
+        // ── Single-threaded (isolates CPU overhead) ──
+        Console.WriteLine("══════════════════════════════════════════════════════");
+        Console.WriteLine("Single-threaded (MaxThreads=1)");
+        Console.WriteLine("══════════════════════════════════════════════════════");
+
+        var occtOnly1T = RunContext("OCCT-only booleans (Manifold disabled)", enableManifold: false, maxThreads: 1, printDiagnostics: true);
+        var manifold1T = RunContext("Manifold mesh booleans (enabled)", enableManifold: true, maxThreads: 1, printDiagnostics: true);
+
+        // ── Multi-threaded ──
+        Console.WriteLine("══════════════════════════════════════════════════════");
+        Console.WriteLine($"Multi-threaded (MaxThreads={Environment.ProcessorCount})");
+        Console.WriteLine("══════════════════════════════════════════════════════");
+
+        var occtOnlyMT = RunContext("OCCT-only booleans (Manifold disabled)", enableManifold: false, maxThreads: 0, printDiagnostics: false);
+        var manifoldMT = RunContext("Manifold mesh booleans (enabled)", enableManifold: true, maxThreads: 0, printDiagnostics: false);
+
+        // ── Summary ──
+        Console.WriteLine("══════════════════════════════════════════════════════");
+        Console.WriteLine("Summary");
+        Console.WriteLine("══════════════════════════════════════════════════════");
+        Console.WriteLine($"  Single-threaded: OCCT={occtOnly1T.seconds:F2}s  Manifold={manifold1T.seconds:F2}s  Speedup={occtOnly1T.seconds / manifold1T.seconds:F2}x");
+        Console.WriteLine($"  Multi-threaded:  OCCT={occtOnlyMT.seconds:F2}s  Manifold={manifoldMT.seconds:F2}s  Speedup={occtOnlyMT.seconds / manifoldMT.seconds:F2}x");
+        Console.WriteLine();
+
+        if (manifold1T.shapes != occtOnly1T.shapes)
+            Console.WriteLine($"  WARNING: Shape count mismatch! OCCT={occtOnly1T.shapes} Manifold={manifold1T.shapes}");
+        if (manifold1T.geoms != occtOnly1T.geoms)
+            Console.WriteLine($"  Note: Geometry count differs (OCCT={occtOnly1T.geoms} Manifold={manifold1T.geoms}) — expected if Manifold produces different mesh topology");
+
+        Console.WriteLine("\nDone.");
     }
 #endif
 

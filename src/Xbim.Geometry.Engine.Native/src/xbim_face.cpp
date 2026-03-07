@@ -1332,6 +1332,43 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_face_normal_at_point(
     }
 }
 
+XBIM_EXPORT int XBIM_CALL xbim_face_is_facing_away(
+    XbimShapeHandle faceHandle,
+    double          dirX,
+    double          dirY,
+    double          dirZ)
+{
+    if (!faceHandle || faceHandle->shape.IsNull())
+        return 0;
+    if (faceHandle->shape.ShapeType() != TopAbs_FACE)
+        return 0;
+
+    try
+    {
+        const TopoDS_Face& face = TopoDS::Face(faceHandle->shape);
+        BRepGProp_Face prop(face);
+
+        double u1, u2, v1, v2;
+        prop.Bounds(u1, u2, v1, v2);
+        double uMid = (u1 + u2) / 2.0;
+        double vMid = (v1 + v2) / 2.0;
+
+        gp_Pnt centre;
+        gp_Vec faceNormal;
+        prop.Normal(uMid, vMid, centre, faceNormal);
+
+        if (faceNormal.Magnitude() < Precision::Confusion())
+            return 0;
+
+        gp_Vec dir(dirX, dirY, dirZ);
+        return faceNormal.Dot(dir) < 0.0 ? 1 : 0;
+    }
+    catch (...)
+    {
+        return 0;
+    }
+}
+
 #pragma endregion
 
 #pragma region Face Modification

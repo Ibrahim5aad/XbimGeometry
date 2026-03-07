@@ -4,6 +4,7 @@ using System.IO;
 using Xbim.Common;
 using Xbim.Ifc;
 using Xbim.Geometry.Scene;
+using Xbim.Tessellator;
 
 namespace Xbim.Examples.WexBimConverter;
 
@@ -36,19 +37,51 @@ internal class Program
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Error: {ex.Message}");
+            Console.Error.WriteLine(ex.StackTrace);
             return 1;
         }
     }
 
     static void Convert(string inputPath, string outputPath)
     {
-        var sw = Stopwatch.StartNew();
-
         Console.WriteLine($"Opening {Path.GetFileName(inputPath)}...");
         using var model = IfcStore.Open(inputPath);
         Console.WriteLine($"  Schema: {model.SchemaVersion}, entities: {model.Instances.Count}");
 
-        Console.WriteLine("Creating geometry context...");
+        // --- Run 1: WITHOUT extrusion fast path (full OCCT for all shapes) ---
+        Console.WriteLine();
+        Console.WriteLine("=== WITHOUT extrusion fast path (OCCT only) ===");
+        XbimTessellator.EnableExtrusionFastPath = false;
+        var timeWithout = RunCreateContext(model);
+
+        // --- Run 2: WITH extrusion fast path ---
+        Console.WriteLine();
+        Console.WriteLine("=== WITH extrusion fast path ===");
+        XbimTessellator.EnableExtrusionFastPath = true;
+        var timeWith = RunCreateContext(model);
+
+        // --- Save the fast-path result ---
+        Console.WriteLine();
+        Console.WriteLine($"Saving WexBIM to {Path.GetFileName(outputPath)}...");
+        using (var fs = File.Create(outputPath))
+        using (var bw = new BinaryWriter(fs))
+        {
+            model.SaveAsWexBim(bw);
+        }
+        var fileSize = new FileInfo(outputPath).Length;
+        Console.WriteLine($"  {fileSize / 1024.0:F0} KB written.");
+
+        // --- Summary ---
+        Console.WriteLine();
+        Console.WriteLine("=== BENCHMARK SUMMARY ===");
+        Console.WriteLine($"  OCCT only:          {timeWithout.TotalSeconds,8:F2}s");
+        Console.WriteLine($"  With fast extrusion: {timeWith.TotalSeconds,8:F2}s");
+        double speedup = timeWithout.TotalSeconds / timeWith.TotalSeconds;
+        Console.WriteLine($"  Speedup:             {speedup:F2}x");
+    }
+
+    static TimeSpan RunCreateContext(IModel model)
+    {
         var context = new Xbim3DModelContext(model);
 
         ReportProgressDelegate progress = (percent, message) =>
@@ -56,19 +89,12 @@ internal class Program
             Console.Write($"\r  [{percent,3}%] {message,-40}");
         };
 
+        var sw = Stopwatch.StartNew();
         context.CreateContext(progress);
-        Console.WriteLine(); // newline after progress
-
-        Console.WriteLine($"Saving WexBIM to {Path.GetFileName(outputPath)}...");
-        using (var fs = File.Create(outputPath))
-        using (var bw = new BinaryWriter(fs))
-        {
-            model.SaveAsWexBim(bw);
-        }
-
         sw.Stop();
-        var fileSize = new FileInfo(outputPath).Length;
-        Console.WriteLine($"Done in {sw.Elapsed.TotalSeconds:F1}s — {fileSize / 1024.0:F0} KB written.");
+        Console.WriteLine();
+        Console.WriteLine($"  CreateContext: {sw.Elapsed.TotalSeconds:F2}s");
+        return sw.Elapsed;
     }
 
     static void PrintUsage()

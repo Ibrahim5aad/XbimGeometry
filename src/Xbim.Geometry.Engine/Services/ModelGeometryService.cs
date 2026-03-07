@@ -164,6 +164,14 @@ namespace Xbim.Geometry.Engine.Services
             // Create or replace the native context
             _contextHandle?.Dispose();
 
+            // WASM: native→managed callbacks via [UnmanagedFunctionPointer] delegates
+            // are not supported — the Mono WASM runtime requires all reverse P/Invoke
+            // trampolines to be statically registered at build time.  Pass null to
+            // disable the native log callback; managed-side logging still works.
+            var logCallback = OperatingSystem.IsBrowser()
+                ? null
+                : _loggingService.Callback;
+
             int result = XbimGeometryNativeApi.xbim_context_create(
                 precision,
                 oneMeter,
@@ -172,7 +180,7 @@ namespace Xbim.Geometry.Engine.Services
                 radianFactor,
                 _timeout,
                 _minimumGap,
-                _loggingService.Callback,
+                logCallback,
                 out var newHandle);
 
             if (result != 0)

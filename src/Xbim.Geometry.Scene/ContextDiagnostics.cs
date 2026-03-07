@@ -19,8 +19,10 @@ internal sealed class ContextDiagnostics
     // ── Accumulators (thread-safe via Interlocked) ──
     private long _createTicks, _meshTicks, _directTessTicks;
     private long _boolUnionTicks, _boolCutTicks, _triangTicks;
+    private long _manifoldCutTicks, _manifoldUnionTicks, _manifoldClippingTicks;
     private int _createCount, _meshCount, _directTessCount;
     private int _boolUnionCount, _boolCutCount, _triangCount;
+    private int _manifoldCutCount, _manifoldUnionCount, _manifoldClippingCount;
     private int _createFailCount;
     private readonly ConcurrentDictionary<string, (long ticks, int count)> _createByType = new();
     private readonly ConcurrentDictionary<string, (long ticks, int count)> _meshByType = new();
@@ -91,6 +93,9 @@ internal sealed class ContextDiagnostics
         WriteOp(w, "XbimTessellator.Mesh",        _directTessTicks,  _directTessCount,  ticksToMs);
         WriteOp(w, "Boolean Union",               _boolUnionTicks,   _boolUnionCount,   ticksToMs);
         WriteOp(w, "Boolean Cut",                 _boolCutTicks,     _boolCutCount,     ticksToMs);
+        WriteOp(w, "Manifold Cut",               _manifoldCutTicks, _manifoldCutCount, ticksToMs);
+        WriteOp(w, "Manifold Union",             _manifoldUnionTicks, _manifoldUnionCount, ticksToMs);
+        WriteOp(w, "Manifold Clipping",          _manifoldClippingTicks, _manifoldClippingCount, ticksToMs);
         WriteOp(w, "WriteTriangulation",          _triangTicks,      _triangCount,      ticksToMs);
 
         WriteByType(w, "Engine.Create by IFC type (top 15)", _createByType, ticksToMs);
@@ -118,6 +123,18 @@ internal sealed class ContextDiagnostics
             case DiagOp.DirectTessellation:
                 Interlocked.Add(ref _directTessTicks, elapsedTicks);
                 Interlocked.Increment(ref _directTessCount);
+                break;
+            case DiagOp.ManifoldCut:
+                Interlocked.Add(ref _manifoldCutTicks, elapsedTicks);
+                Interlocked.Increment(ref _manifoldCutCount);
+                break;
+            case DiagOp.ManifoldUnion:
+                Interlocked.Add(ref _manifoldUnionTicks, elapsedTicks);
+                Interlocked.Increment(ref _manifoldUnionCount);
+                break;
+            case DiagOp.ManifoldClipping:
+                Interlocked.Add(ref _manifoldClippingTicks, elapsedTicks);
+                Interlocked.Increment(ref _manifoldClippingCount);
                 break;
         }
     }
@@ -220,5 +237,8 @@ internal enum DiagOp
     BooleanUnion,
     BooleanCut,
     Triangulation,
-    DirectTessellation
+    DirectTessellation,
+    ManifoldCut,
+    ManifoldUnion,
+    ManifoldClipping
 }

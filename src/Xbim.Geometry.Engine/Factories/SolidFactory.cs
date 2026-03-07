@@ -1465,12 +1465,17 @@ namespace Xbim.Geometry.Engine.Factories
                     out bXx, out bXy, out bXz);
             }
 
+            var surfacePlacement = new XbimGeometryNativeApi.XbimAxis2Placement(
+                surfOx, surfOy, surfOz, surfZx, surfZy, surfZz, surfXx, surfXy, surfXz);
+            var boundaryPlacement = new XbimGeometryNativeApi.XbimAxis2Placement(
+                bOx, bOy, bOz, bZx, bZy, bZz, bXx, bXy, bXz);
+
             int result = XbimGeometryNativeApi.xbim_halfspace_build_polygonal_bounded(
                 ContextHandle,
-                surfOx, surfOy, surfOz, surfZx, surfZy, surfZz, surfXx, surfXy, surfXz,
+                in surfacePlacement,
                 agreementFlag,
                 xCoords, yCoords, pointCount,
-                bOx, bOy, bOz, bZx, bZy, bZz, bXx, bXy, bXz,
+                in boundaryPlacement,
                 out var outHandle);
 
             if (result != 0)

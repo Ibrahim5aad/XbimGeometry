@@ -314,10 +314,7 @@ namespace Xbim.Geometry.Engine.Factories
                 throw new XbimGeometryServiceException(
                     $"RectangleHollowProfileDef #{hollowProfile.EntityLabel} has zero or negative wall thickness.");
 
-            BuildProfilePlacement(hollowProfile.Position,
-                out double ox, out double oy, out double oz,
-                out double zx, out double zy, out double zz,
-                out double xx, out double xy, out double xz);
+            var placement = BuildProfilePlacementStruct(hollowProfile.Position);
 
             double innerFillet = hollowProfile.InnerFilletRadius.HasValue
                 ? (double)hollowProfile.InnerFilletRadius.Value : 0.0;
@@ -325,8 +322,7 @@ namespace Xbim.Geometry.Engine.Factories
                 ? (double)hollowProfile.OuterFilletRadius.Value : 0.0;
 
             int result = XbimGeometryNativeApi.xbim_profile_build_rectangle_hollow(
-                ContextHandle,
-                ox, oy, oz, zx, zy, zz, xx, xy, xz,
+                ContextHandle, placement,
                 hollowProfile.XDim, hollowProfile.YDim, hollowProfile.WallThickness,
                 innerFillet, outerFillet,
                 out var NativeShapeHandle);
@@ -397,17 +393,13 @@ namespace Xbim.Geometry.Engine.Factories
                 throw new XbimGeometryServiceException(
                     $"IShapeProfileDef #{iProfile.EntityLabel} has zero or negative dimensions.");
 
-            BuildProfilePlacement(iProfile.Position,
-                out double ox, out double oy, out double oz,
-                out double zx, out double zy, out double zz,
-                out double xx, out double xy, out double xz);
+            var placement = BuildProfilePlacementStruct(iProfile.Position);
 
             double filletRadius = iProfile.FilletRadius.HasValue
                 ? (double)iProfile.FilletRadius.Value : 0.0;
 
             int result = XbimGeometryNativeApi.xbim_profile_build_ishape(
-                ContextHandle,
-                ox, oy, oz, zx, zy, zz, xx, xy, xz,
+                ContextHandle, placement,
                 iProfile.OverallWidth, iProfile.OverallDepth,
                 iProfile.WebThickness, iProfile.FlangeThickness,
                 filletRadius,
@@ -428,35 +420,32 @@ namespace Xbim.Geometry.Engine.Factories
                 throw new XbimGeometryServiceException(
                     $"AsymmetricIShapeProfileDef #{asymProfile.EntityLabel} has zero or negative dimensions.");
 
-            BuildProfilePlacement(asymProfile.Position,
-                out double ox, out double oy, out double oz,
-                out double zx, out double zy, out double zz,
-                out double xx, out double xy, out double xz);
-
-            double topFlangeThickness = asymProfile.TopFlangeThickness.HasValue
-                ? (double)asymProfile.TopFlangeThickness.Value : 0.0;
-            double bottomFilletRadius = asymProfile.BottomFlangeFilletRadius.HasValue
-                ? (double)asymProfile.BottomFlangeFilletRadius.Value : 0.0;
-            double topFilletRadius = asymProfile.TopFlangeFilletRadius.HasValue
-                ? (double)asymProfile.TopFlangeFilletRadius.Value : 0.0;
-            double bottomEdgeRadius = asymProfile.BottomFlangeEdgeRadius.HasValue
-                ? (double)asymProfile.BottomFlangeEdgeRadius.Value : 0.0;
-            double topEdgeRadius = asymProfile.TopFlangeEdgeRadius.HasValue
-                ? (double)asymProfile.TopFlangeEdgeRadius.Value : 0.0;
-            double bottomSlope = asymProfile.BottomFlangeSlope.HasValue
-                ? (double)asymProfile.BottomFlangeSlope.Value : 0.0;
-            double topSlope = asymProfile.TopFlangeSlope.HasValue
-                ? (double)asymProfile.TopFlangeSlope.Value : 0.0;
+            var placement = BuildProfilePlacementStruct(asymProfile.Position);
+            var shapeParams = new XbimGeometryNativeApi.XbimAsymmetricIShapeParams
+            {
+                BottomFlangeWidth = asymProfile.BottomFlangeWidth,
+                OverallDepth = asymProfile.OverallDepth,
+                WebThickness = asymProfile.WebThickness,
+                BottomFlangeThickness = asymProfile.BottomFlangeThickness,
+                TopFlangeWidth = asymProfile.TopFlangeWidth,
+                TopFlangeThickness = asymProfile.TopFlangeThickness.HasValue
+                    ? (double)asymProfile.TopFlangeThickness.Value : 0.0,
+                BottomFlangeFilletRadius = asymProfile.BottomFlangeFilletRadius.HasValue
+                    ? (double)asymProfile.BottomFlangeFilletRadius.Value : 0.0,
+                TopFlangeFilletRadius = asymProfile.TopFlangeFilletRadius.HasValue
+                    ? (double)asymProfile.TopFlangeFilletRadius.Value : 0.0,
+                BottomFlangeEdgeRadius = asymProfile.BottomFlangeEdgeRadius.HasValue
+                    ? (double)asymProfile.BottomFlangeEdgeRadius.Value : 0.0,
+                TopFlangeEdgeRadius = asymProfile.TopFlangeEdgeRadius.HasValue
+                    ? (double)asymProfile.TopFlangeEdgeRadius.Value : 0.0,
+                BottomFlangeSlope = asymProfile.BottomFlangeSlope.HasValue
+                    ? (double)asymProfile.BottomFlangeSlope.Value : 0.0,
+                TopFlangeSlope = asymProfile.TopFlangeSlope.HasValue
+                    ? (double)asymProfile.TopFlangeSlope.Value : 0.0,
+            };
 
             int result = XbimGeometryNativeApi.xbim_profile_build_asymmetric_ishape(
-                ContextHandle,
-                ox, oy, oz, zx, zy, zz, xx, xy, xz,
-                asymProfile.BottomFlangeWidth, asymProfile.OverallDepth,
-                asymProfile.WebThickness, asymProfile.BottomFlangeThickness,
-                asymProfile.TopFlangeWidth, topFlangeThickness,
-                bottomFilletRadius, topFilletRadius,
-                bottomEdgeRadius, topEdgeRadius,
-                bottomSlope, topSlope,
+                ContextHandle, placement, shapeParams,
                 out var NativeShapeHandle);
 
             if (result != 0)
@@ -472,10 +461,7 @@ namespace Xbim.Geometry.Engine.Factories
                 throw new XbimGeometryServiceException(
                     $"LShapeProfileDef #{lProfile.EntityLabel} has zero or negative dimensions.");
 
-            BuildProfilePlacement(lProfile.Position,
-                out double ox, out double oy, out double oz,
-                out double zx, out double zy, out double zz,
-                out double xx, out double xy, out double xz);
+            var placement = BuildProfilePlacementStruct(lProfile.Position);
 
             double width = lProfile.Width.HasValue ? (double)lProfile.Width.Value : 0.0;
             double filletRadius = lProfile.FilletRadius.HasValue
@@ -486,8 +472,7 @@ namespace Xbim.Geometry.Engine.Factories
                 ? (double)lProfile.LegSlope.Value : 0.0;
 
             int result = XbimGeometryNativeApi.xbim_profile_build_lshape(
-                ContextHandle,
-                ox, oy, oz, zx, zy, zz, xx, xy, xz,
+                ContextHandle, placement,
                 lProfile.Depth, width, lProfile.Thickness,
                 filletRadius, edgeRadius, legSlope,
                 out var NativeShapeHandle);
@@ -506,10 +491,7 @@ namespace Xbim.Geometry.Engine.Factories
                 throw new XbimGeometryServiceException(
                     $"TShapeProfileDef #{tProfile.EntityLabel} has zero or negative dimensions.");
 
-            BuildProfilePlacement(tProfile.Position,
-                out double ox, out double oy, out double oz,
-                out double zx, out double zy, out double zz,
-                out double xx, out double xy, out double xz);
+            var placement = BuildProfilePlacementStruct(tProfile.Position);
 
             double filletRadius = tProfile.FilletRadius.HasValue
                 ? (double)tProfile.FilletRadius.Value : 0.0;
@@ -523,8 +505,7 @@ namespace Xbim.Geometry.Engine.Factories
                 ? (double)tProfile.WebSlope.Value : 0.0;
 
             int result = XbimGeometryNativeApi.xbim_profile_build_tshape(
-                ContextHandle,
-                ox, oy, oz, zx, zy, zz, xx, xy, xz,
+                ContextHandle, placement,
                 tProfile.Depth, tProfile.FlangeWidth,
                 tProfile.WebThickness, tProfile.FlangeThickness,
                 filletRadius, flangeEdgeRadius, webEdgeRadius,
@@ -545,10 +526,7 @@ namespace Xbim.Geometry.Engine.Factories
                 throw new XbimGeometryServiceException(
                     $"UShapeProfileDef #{uProfile.EntityLabel} has zero or negative dimensions.");
 
-            BuildProfilePlacement(uProfile.Position,
-                out double ox, out double oy, out double oz,
-                out double zx, out double zy, out double zz,
-                out double xx, out double xy, out double xz);
+            var placement = BuildProfilePlacementStruct(uProfile.Position);
 
             double filletRadius = uProfile.FilletRadius.HasValue
                 ? (double)uProfile.FilletRadius.Value : 0.0;
@@ -558,8 +536,7 @@ namespace Xbim.Geometry.Engine.Factories
                 ? (double)uProfile.FlangeSlope.Value : 0.0;
 
             int result = XbimGeometryNativeApi.xbim_profile_build_ushape(
-                ContextHandle,
-                ox, oy, oz, zx, zy, zz, xx, xy, xz,
+                ContextHandle, placement,
                 uProfile.Depth, uProfile.FlangeWidth,
                 uProfile.WebThickness, uProfile.FlangeThickness,
                 filletRadius, edgeRadius, flangeSlope,
@@ -579,10 +556,7 @@ namespace Xbim.Geometry.Engine.Factories
                 throw new XbimGeometryServiceException(
                     $"ZShapeProfileDef #{zProfile.EntityLabel} has zero or negative dimensions.");
 
-            BuildProfilePlacement(zProfile.Position,
-                out double ox, out double oy, out double oz,
-                out double zx, out double zy, out double zz,
-                out double xx, out double xy, out double xz);
+            var placement = BuildProfilePlacementStruct(zProfile.Position);
 
             double filletRadius = zProfile.FilletRadius.HasValue
                 ? (double)zProfile.FilletRadius.Value : 0.0;
@@ -590,8 +564,7 @@ namespace Xbim.Geometry.Engine.Factories
                 ? (double)zProfile.EdgeRadius.Value : 0.0;
 
             int result = XbimGeometryNativeApi.xbim_profile_build_zshape(
-                ContextHandle,
-                ox, oy, oz, zx, zy, zz, xx, xy, xz,
+                ContextHandle, placement,
                 zProfile.Depth, zProfile.FlangeWidth,
                 zProfile.WebThickness, zProfile.FlangeThickness,
                 filletRadius, edgeRadius,
@@ -610,18 +583,14 @@ namespace Xbim.Geometry.Engine.Factories
                 throw new XbimGeometryServiceException(
                     $"CShapeProfileDef #{cProfile.EntityLabel} has zero or negative dimensions.");
 
-            BuildProfilePlacement(cProfile.Position,
-                out double ox, out double oy, out double oz,
-                out double zx, out double zy, out double zz,
-                out double xx, out double xy, out double xz);
+            var placement = BuildProfilePlacementStruct(cProfile.Position);
 
             double girth = cProfile.Girth;
             double internalFilletRadius = cProfile.InternalFilletRadius.HasValue
                 ? (double)cProfile.InternalFilletRadius.Value : 0.0;
 
             int result = XbimGeometryNativeApi.xbim_profile_build_cshape(
-                ContextHandle,
-                ox, oy, oz, zx, zy, zz, xx, xy, xz,
+                ContextHandle, placement,
                 cProfile.Depth, cProfile.Width, cProfile.WallThickness,
                 girth, internalFilletRadius,
                 out var NativeShapeHandle);
@@ -639,14 +608,10 @@ namespace Xbim.Geometry.Engine.Factories
                 throw new XbimGeometryServiceException(
                     $"TrapeziumProfileDef #{trapProfile.EntityLabel} has zero or negative dimensions.");
 
-            BuildProfilePlacement(trapProfile.Position,
-                out double ox, out double oy, out double oz,
-                out double zx, out double zy, out double zz,
-                out double xx, out double xy, out double xz);
+            var placement = BuildProfilePlacementStruct(trapProfile.Position);
 
             int result = XbimGeometryNativeApi.xbim_profile_build_trapezium(
-                ContextHandle,
-                ox, oy, oz, zx, zy, zz, xx, xy, xz,
+                ContextHandle, placement,
                 trapProfile.BottomXDim, trapProfile.TopXDim,
                 trapProfile.YDim, trapProfile.TopXOffset,
                 out var NativeShapeHandle);
@@ -1076,6 +1041,16 @@ namespace Xbim.Geometry.Engine.Factories
                 throw new XbimGeometryNotSupportedException(
                     $"Unsupported profile placement type: {position.GetType().Name}");
             }
+        }
+
+        internal static XbimGeometryNativeApi.XbimAxis2Placement BuildProfilePlacementStruct(
+            IIfcAxis2Placement position)
+        {
+            BuildProfilePlacement(position,
+                out double ox, out double oy, out double oz,
+                out double zx, out double zy, out double zz,
+                out double xx, out double xy, out double xz);
+            return new XbimGeometryNativeApi.XbimAxis2Placement(ox, oy, oz, zx, zy, zz, xx, xy, xz);
         }
 
         #endregion

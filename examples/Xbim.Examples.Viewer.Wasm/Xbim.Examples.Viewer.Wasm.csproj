@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <SignAssembly>false</SignAssembly>
+    <WasmBuildNative>true</WasmBuildNative>
+    <WasmEnableThreads>true</WasmEnableThreads>
+    <!-- Pre-allocate Web Workers so scene creation Parallel.ForEach doesn't stall waiting for
+         async worker creation.  Must be >= MaxThreads used by Xbim3DModelContext. -->
+    <WasmWorkerPoolSize>4</WasmWorkerPoolSize>
+    <!-- OCCT static data requires more linear memory than the default 43 MB. -->
+    <EmccInitialHeapSize>268435456</EmccInitialHeapSize>
+    <EmccMaximumHeapSize>1073741824</EmccMaximumHeapSize>
+    <!-- wasm-opt (Binaryen) crashes on Windows with large WASM binaries (stack overflow).
+         -O1 skips wasm-opt inside emcc; WasmNativeStrip=false skips the post-link pass. -->
+    <EmccLinkOptimizationFlag>-O1</EmccLinkOptimizationFlag>
+    <WasmNativeStrip>false</WasmNativeStrip>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Xbim.Geometry.Engine\Xbim.Geometry.Engine.csproj" />
+    <ProjectReference Include="..\..\src\Xbim.Geometry.Scene\Xbim.Geometry.Scene.csproj" />
+    <ProjectReference Include="..\..\src\Xbim.Tessellator\Xbim.Tessellator.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.3" PrivateAssets="all" />
+    <PackageReference Include="Xbim.Essentials" Version="6.0.568" />
+  </ItemGroup>
+
+  <!-- Native WASM archives — statically linked into dotnet.wasm by the Blazor build tools.
+       Run 'scripts/build-wasm.sh' to stage all .a files to wasm/native/.
+       Exclude brotli and zlib: the .NET multithread WASM runtime ships its own copies
+       and linking duplicates causes "function signature mismatch" at startup. -->
+  <ItemGroup>
+    <NativeFileReference Include="..\..\src\Xbim.Geometry.Engine\wasm\native\*.a" />
+    <NativeFileReference Remove="..\..\src\Xbim.Geometry.Engine\wasm\native\libbrotli*.a" />
+    <NativeFileReference Remove="..\..\src\Xbim.Geometry.Engine\wasm\native\libz.a" />
+  </ItemGroup>
+
+</Project>

@@ -1028,10 +1028,7 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_unify_domain(
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_gtransform(
     XbimShapeHandle shapeHandle,
-    double m11, double m12, double m13, double offsetX,
-    double m21, double m22, double m23, double offsetY,
-    double m31, double m32, double m33, double offsetZ,
-    double scaleX, double scaleY, double scaleZ,
+    const XbimTransformMatrix* matrix,
     XbimShapeHandle* outHandle)
 {
     xbim_clear_error();
@@ -1053,29 +1050,34 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_shape_gtransform(
         xbim_set_error("xbim_shape_gtransform: shape is null");
         return XBIM_NULL_SHAPE;
     }
+    if (!matrix)
+    {
+        xbim_set_error("xbim_shape_gtransform: matrix is NULL");
+        return XBIM_INVALID_ARG;
+    }
 
     try
     {
         gp_GTrsf trsf;
-        trsf.SetValue(1, 1, m11);
-        trsf.SetValue(1, 2, m12);
-        trsf.SetValue(1, 3, m13);
-        trsf.SetValue(1, 4, offsetX);
-        trsf.SetValue(2, 1, m21);
-        trsf.SetValue(2, 2, m22);
-        trsf.SetValue(2, 3, m23);
-        trsf.SetValue(2, 4, offsetY);
-        trsf.SetValue(3, 1, m31);
-        trsf.SetValue(3, 2, m32);
-        trsf.SetValue(3, 3, m33);
-        trsf.SetValue(3, 4, offsetZ);
+        trsf.SetValue(1, 1, matrix->m11);
+        trsf.SetValue(1, 2, matrix->m12);
+        trsf.SetValue(1, 3, matrix->m13);
+        trsf.SetValue(1, 4, matrix->offset_x);
+        trsf.SetValue(2, 1, matrix->m21);
+        trsf.SetValue(2, 2, matrix->m22);
+        trsf.SetValue(2, 3, matrix->m23);
+        trsf.SetValue(2, 4, matrix->offset_y);
+        trsf.SetValue(3, 1, matrix->m31);
+        trsf.SetValue(3, 2, matrix->m32);
+        trsf.SetValue(3, 3, matrix->m33);
+        trsf.SetValue(3, 4, matrix->offset_z);
 
-        if (scaleX != 0 && scaleY != 0 && scaleZ != 0)
+        if (matrix->scale_x != 0 && matrix->scale_y != 0 && matrix->scale_z != 0)
         {
             gp_GTrsf scale;
-            scale.SetValue(1, 1, scaleX);
-            scale.SetValue(2, 2, scaleY);
-            scale.SetValue(3, 3, scaleZ);
+            scale.SetValue(1, 1, matrix->scale_x);
+            scale.SetValue(2, 2, matrix->scale_y);
+            scale.SetValue(3, 3, matrix->scale_z);
             trsf = trsf.Multiplied(scale);
         }
 

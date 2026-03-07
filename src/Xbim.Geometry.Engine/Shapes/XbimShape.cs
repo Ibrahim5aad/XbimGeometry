@@ -242,13 +242,15 @@ namespace Xbim.Geometry.Engine.Shapes
         private XbimShape ApplyMatrix(XbimMatrix3D m)
         {
             // scale is baked into the rotation part
+            var matrix = new XbimGeometryNativeApi.XbimTransformMatrix
+            {
+                M11 = m.M11, M12 = m.M21, M13 = m.M31, OffsetX = m.OffsetX,
+                M21 = m.M12, M22 = m.M22, M23 = m.M32, OffsetY = m.OffsetY,
+                M31 = m.M13, M32 = m.M23, M33 = m.M33, OffsetZ = m.OffsetZ,
+                ScaleX = 1, ScaleY = 1, ScaleZ = 1,
+            };
             int result = XbimGeometryNativeApi.xbim_shape_gtransform(
-                Handle,
-                m.M11, m.M21, m.M31, m.OffsetX,
-                m.M12, m.M22, m.M32, m.OffsetY,
-                m.M13, m.M23, m.M33, m.OffsetZ,
-                1, 1, 1,
-                out var transformedHandle);
+                Handle, in matrix, out var transformedHandle);
 
             if (result != 0)
                 throw new XbimGeometryServiceException(

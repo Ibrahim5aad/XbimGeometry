@@ -20,7 +20,7 @@ namespace Xbim.Geometry.Engine.Diagnostics
     public static class DebugViz
     {
         private const string Lib = NativeLibraryLoader.LibraryName;
-        private const CallingConvention CC = CallingConvention.StdCall;
+        private const CallingConvention CC = CallingConvention.Cdecl;
 
         [DllImport(Lib, CallingConvention = CC)]
         private static extern int xbim_debug_view_shape(NativeShapeHandle shape);

@@ -772,16 +772,12 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build(
 
 XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_polygonal_bounded(
     XbimContextHandle ctx,
-    double surfaceOriginX, double surfaceOriginY, double surfaceOriginZ,
-    double surfaceZDirX,   double surfaceZDirY,   double surfaceZDirZ,
-    double surfaceXDirX,   double surfaceXDirY,   double surfaceXDirZ,
+    const XbimAxis2Placement* surfacePlacement,
     int    agreementFlag,
     const double* boundaryPointsX,
     const double* boundaryPointsY,
     int    boundaryPointCount,
-    double boundaryOriginX, double boundaryOriginY, double boundaryOriginZ,
-    double boundaryZDirX,   double boundaryZDirY,   double boundaryZDirZ,
-    double boundaryXDirX,   double boundaryXDirY,   double boundaryXDirZ,
+    const XbimAxis2Placement* boundaryPlacement,
     XbimShapeHandle*  outHandle)
 {
     xbim_clear_error();
@@ -802,9 +798,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_polygonal_bounded(
     TopoDS_Face baseFace;
     gp_Pnt pointInMaterial;
     if (!build_halfspace_face_and_point(ctx, XBIM_SURFACE_PLANE,
-            surfaceOriginX, surfaceOriginY, surfaceOriginZ,
-            surfaceZDirX, surfaceZDirY, surfaceZDirZ,
-            surfaceXDirX, surfaceXDirY, surfaceXDirZ,
+            surfacePlacement->origin.x, surfacePlacement->origin.y, surfacePlacement->origin.z,
+            surfacePlacement->z_axis.x, surfacePlacement->z_axis.y, surfacePlacement->z_axis.z,
+            surfacePlacement->x_axis.x, surfacePlacement->x_axis.y, surfacePlacement->x_axis.z,
             0.0, agreementFlag, ctx->oneMeter, ctx->precision,
             baseFace, pointInMaterial))
     {
@@ -885,9 +881,9 @@ XBIM_EXPORT XbimResult XBIM_CALL xbim_halfspace_build_polygonal_bounded(
         subtractionBody.Move(shiftDown);
 
         // Move to boundary position
-        gp_Pnt bndOrigin(boundaryOriginX, boundaryOriginY, boundaryOriginZ);
-        gp_Dir bndZDir(boundaryZDirX, boundaryZDirY, boundaryZDirZ);
-        gp_Dir bndXDir(boundaryXDirX, boundaryXDirY, boundaryXDirZ);
+        gp_Pnt bndOrigin(boundaryPlacement->origin.x, boundaryPlacement->origin.y, boundaryPlacement->origin.z);
+        gp_Dir bndZDir(boundaryPlacement->z_axis.x, boundaryPlacement->z_axis.y, boundaryPlacement->z_axis.z);
+        gp_Dir bndXDir(boundaryPlacement->x_axis.x, boundaryPlacement->x_axis.y, boundaryPlacement->x_axis.z);
         gp_Ax3 fromAx3(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0));
         gp_Ax3 toAx3(gp_Ax2(bndOrigin, bndZDir, bndXDir));
         gp_Trsf bndTrsf;

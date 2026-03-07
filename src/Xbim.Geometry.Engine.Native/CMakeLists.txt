@@ -134,33 +134,11 @@ if(EMSCRIPTEN)
     install(TARGETS xbim_geometry_native
         ARCHIVE DESTINATION "wasm/native"
     )
-    # Install only the OCCT and third-party static archives we actually link.
-    # This avoids shipping ~40 unused OCCT modules (OCAF, viewer, extra data
-    # exchange formats) that would bloat the WASM package.
-    set(_wasm_deps
-        # OCCT — must match XBIM_OCCT_LIBS above
-        libTKernel.a libTKMath.a libTKG2d.a libTKG3d.a libTKGeomBase.a
-        libTKBRep.a libTKTopAlgo.a libTKGeomAlgo.a libTKShHealing.a
-        libTKBO.a libTKBool.a libTKPrim.a libTKMesh.a libTKOffset.a
-        libTKFillet.a libTKHLR.a libTKXSBase.a libTKDESTEP.a
-        # OCCT transitive deps needed at link time
-        libTKDE.a
-        # Manifold
-        libmanifold.a
-        # Manifold transitive deps
-        libClipper2.a libClipper2Z.a
-    )
-    set(_vcpkg_lib_dir "${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
+    # Also install OCCT and third-party static archives so the consumer
+    # can reference a single directory instead of reaching into build-wasm/.
     install(CODE "
-        set(_libs \"${_wasm_deps}\")
-        foreach(_lib \${_libs})
-            set(_path \"${_vcpkg_lib_dir}/\${_lib}\")
-            if(EXISTS \"\${_path}\")
-                file(INSTALL \"\${_path}\" DESTINATION \"\${CMAKE_INSTALL_PREFIX}/wasm/native\")
-            else()
-                message(WARNING \"WASM dependency not found: \${_path}\")
-            endif()
-        endforeach()
+        file(GLOB _vcpkg_libs \"${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib/*.a\")
+        file(INSTALL \${_vcpkg_libs} DESTINATION \"\${CMAKE_INSTALL_PREFIX}/wasm/native\")
     ")
 elseif(WIN32)
     set(XBIM_RID "win-x64")
