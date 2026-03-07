@@ -4,7 +4,7 @@
     <id>Xbim.Geometry.Engine.Native.runtime.win-x64</id>
     <version>$version$</version>
     <title>Xbim Geometry Engine Native Runtime (Windows x64)</title>
-    <description>Windows x64 native binaries (OpenCASCADE 7.9 + xbim geometry engine) for Xbim.Geometry.Engine. This package is not intended to be referenced directly — it is a dependency of Xbim.Geometry.Engine.</description>
+    <description>Windows x64 native binaries (OpenCASCADE 7.9 + xbim geometry engine) for Xbim.Geometry.Engine. Add this package alongside Xbim.Geometry.Engine when targeting Windows x64.</description>
     <authors>Steve Lockley, Martin Cerny and XBIMTeam Contributors</authors>
     <license type="expression">CDDL-1.0</license>
     <projectUrl>https://github.com/xBimTeam/XbimGeometry</projectUrl>

@@ -13,7 +13,7 @@ on:
         description: 'Platform to build'
         type: choice
         default: 'all'
-        options: [all, linux, windows]
+        options: [all, linux, windows, wasm]
 
 env:
   BUILD_CONFIG: Release
@@ -148,4 +148,62 @@ jobs:
         with:
           name: native-${{ matrix.rid }}
           path: src/Xbim.Geometry.Engine/runtimes/${{ matrix.rid }}/native/
+          retention-days: 14
+
+  build-wasm:
+    if: >-
+      github.event_name != 'workflow_dispatch'
+      || inputs.platform == 'all'
+      || inputs.platform == 'wasm'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Install wasm-tools workload
+        run: dotnet workload install wasm-tools
+
+      - name: Install native build tools
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+          vcpkgDirectory: '${{ github.workspace }}/vcpkg'
+          doNotCache: true
+        env:
+          VCPKG_BINARY_SOURCES: clear
+
+      - name: Cache vcpkg installed packages
+        uses: actions/cache@v4
+        with:
+          path: src/Xbim.Geometry.Engine.Native/build-wasm/vcpkg_installed
+          key: vcpkg-installed-wasm32-${{ env.VCPKG_COMMIT }}-${{ hashFiles('src/Xbim.Geometry.Engine.Native/vcpkg.json', 'src/Xbim.Geometry.Engine.Native/vcpkg-configuration.json', 'src/Xbim.Geometry.Engine.Native/custom-ports/**', 'src/Xbim.Geometry.Engine.Native/triplets/release/*.cmake') }}
+
+      - name: Build WASM native library
+        shell: bash
+        run: ./scripts/build-wasm.sh
+        env:
+          VCPKG_BINARY_SOURCES: clear
+
+      - name: Verify staged WASM archives
+        shell: bash
+        run: |
+          echo "=== Staged WASM archives ==="
+          ls -lh src/Xbim.Geometry.Engine/wasm/native/*.a | head -20
+          echo "Total archives: $(ls src/Xbim.Geometry.Engine/wasm/native/*.a | wc -l)"
+
+      - name: Upload WASM native binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-browser-wasm
+          path: src/Xbim.Geometry.Engine/wasm/native/
           retention-days: 14

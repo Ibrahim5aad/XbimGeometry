@@ -25,6 +25,11 @@ namespace Xbim.Geometry.Engine.Internal
         /// </summary>
         internal static void EnsureLoaded()
         {
+            // Blazor WASM: native symbols are statically linked into dotnet.wasm,
+            // the default P/Invoke resolver handles them without a custom resolver.
+            if (OperatingSystem.IsBrowser())
+                return;
+
             if (Interlocked.CompareExchange(ref _initialized, 1, 0) != 0)
                 return;
 
@@ -60,13 +65,15 @@ namespace Xbim.Geometry.Engine.Internal
                 return handle;
 
             // Build a diagnostic message that includes the OS-level load error
+            string rid = PlatformInfo.RuntimeIdentifier;
+            string packageHint = $"Xbim.Geometry.Engine.Native.runtime.{rid}";
             string loadError = GetLoadErrorDetail(ridPath ?? basePath);
 
             throw new DllNotFoundException(
                 $"Unable to load native library '{LibraryName}'. " +
+                $"Add the NuGet package '{packageHint}' for your platform. " +
                 $"Expected at: {ridPath ?? "(unknown RID path)"} or {basePath}. " +
-                $"Platform: {PlatformInfo.RuntimeIdentifier}, " +
-                $"Architecture: {PlatformInfo.ProcessArchitecture}" +
+                $"Platform: {rid}, Architecture: {PlatformInfo.ProcessArchitecture}" +
                 (loadError.Length > 0 ? $". Load error: {loadError}" : ""));
         }
 

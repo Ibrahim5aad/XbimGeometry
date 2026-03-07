@@ -41,41 +41,17 @@
   </ItemGroup>
 
   <!--
-    Native library packaging: two modes controlled by IncludeNativeRuntimeDependencies.
-
-    CI pack (IncludeNativeRuntimeDependencies=true):
-      Natives live in separate runtime NuGet packages. This package declares
-      dependencies on them so NuGet resolves the correct runtimes/{rid}/native/ at build time.
-
-    Local dev (default):
-      'cmake install' stages binaries into runtimes/{rid}/native/ inside this project dir.
-      The Content items below serve both dotnet pack (Pack=true) and project-reference consumers
-      (CopyToOutputDirectory=PreserveNewest propagates transitively).
+    Local dev: 'cmake install' stages binaries into runtimes/{rid}/native/ inside
+    this project dir. The Content items below propagate them to consuming projects.
   -->
-
-  <!-- CI pack: depend on per-platform native runtime packages -->
-  <ItemGroup Condition="'$(IncludeNativeRuntimeDependencies)' == 'true'">
-    <PackageReference Include="Xbim.Geometry.Engine.Native.runtime.win-x64" Version="$(Version)" PrivateAssets="none" />
-    <PackageReference Include="Xbim.Geometry.Engine.Native.runtime.linux-x64" Version="$(Version)" PrivateAssets="none" />
-  </ItemGroup>
-
-  <!-- Local dev: staged by 'cmake install', serves both dotnet pack and project-reference consumers -->
-  <ItemGroup Condition="'$(IncludeNativeRuntimeDependencies)' != 'true'">
+  <ItemGroup>
     <Content Include="runtimes\**\*"
              Condition="Exists('$(MSBuildThisFileDirectory)runtimes\')"
-             Pack="true"
-             PackagePath="runtimes\"
+             Pack="false"
              Link="runtimes\%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest"
              Visible="false" />
   </ItemGroup>
 
-  <!--
-    Include buildTransitive .targets so consuming projects automatically get
-    native libraries copied to their output directories.
-  -->
-  <ItemGroup>
-    <None Include="buildTransitive\Xbim.Geometry.Engine.targets" Pack="true" PackagePath="buildTransitive\" Condition="Exists('buildTransitive\Xbim.Geometry.Engine.targets')" />
-  </ItemGroup>
 
 </Project>

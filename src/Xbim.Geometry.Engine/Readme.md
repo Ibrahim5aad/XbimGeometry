@@ -13,6 +13,28 @@ Part of the [xBIM Toolkit](https://docs.xbim.net/) for working with Industry Fou
 - Profile and curve processing (composite curves, trimmed curves, B-splines)
 - Full model geometry context creation via `Xbim3DModelContext`
 
+## Installation
+
+This package contains the managed engine only. You must also install the native runtime package for your target platform:
+
+**Windows x64**
+```
+dotnet add package Xbim.Geometry.Engine
+dotnet add package Xbim.Geometry.Engine.Native.runtime.win-x64
+```
+
+**Linux x64**
+```
+dotnet add package Xbim.Geometry.Engine
+dotnet add package Xbim.Geometry.Engine.Native.runtime.linux-x64
+```
+
+**Blazor WebAssembly**
+```
+dotnet add package Xbim.Geometry.Engine
+dotnet add package Xbim.Geometry.Engine.Native.runtime.browser-wasm
+```
+
 ## Usage
 
 ```csharp

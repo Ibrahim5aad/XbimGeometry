@@ -90,6 +90,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh run download ${{ steps.ci-run.outputs.RUN_ID }} -n native-linux-x64 -D staging/runtimes/linux-x64/native/
 
+      - name: Download WASM native binaries
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh run download ${{ steps.ci-run.outputs.RUN_ID }} -n native-browser-wasm -D staging/wasm/native/
+
       # ── NuGet CLI (needs Mono on Linux) ─────────────────────────────
       - name: Install Mono
         run: sudo apt-get update && sudo apt-get install -y mono-complete
@@ -117,6 +123,17 @@ jobs:
             -OutputDirectory packages
         shell: bash
 
+      - name: Copy WASM targets to staging
+        run: cp nuget/Xbim.Geometry.Engine.Native.runtime.browser-wasm.targets staging/
+
+      - name: Pack WASM runtime package
+        run: |
+          nuget pack nuget/Xbim.Geometry.Engine.Native.runtime.browser-wasm.nuspec \
+            -BasePath staging \
+            -Version ${{ steps.version.outputs.VERSION }} \
+            -OutputDirectory packages
+        shell: bash
+
       # ── Pack Abstractions package ─────────────────────────────────────
       - name: Build Abstractions project
         run: |
@@ -131,22 +148,17 @@ jobs:
             -p:Version=${{ steps.version.outputs.VERSION }} \
             -o packages
 
-      # ── Pack managed Engine package with runtime deps ──────────────────
-      - name: Register local package source
-        run: dotnet nuget add source ${{ github.workspace }}/packages --name local
-
+      # ── Pack managed Engine package ───────────────────────────────────
       - name: Build Engine project
         run: |
           dotnet build src/Xbim.Geometry.Engine/Xbim.Geometry.Engine.csproj \
             -c ${{ env.BUILD_CONFIG }} \
-            -p:IncludeNativeRuntimeDependencies=true \
             -p:Version=${{ steps.version.outputs.VERSION }}
 
       - name: Pack Engine package
         run: |
           dotnet pack src/Xbim.Geometry.Engine/Xbim.Geometry.Engine.csproj \
             -c ${{ env.BUILD_CONFIG }} --no-build \
-            -p:IncludeNativeRuntimeDependencies=true \
             -p:Version=${{ steps.version.outputs.VERSION }} \
             -o packages
 
