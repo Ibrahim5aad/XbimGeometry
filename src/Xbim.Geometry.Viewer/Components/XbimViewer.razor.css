@@ -1,0 +1,29 @@
+.xbim-viewer {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--xbim-bg, #0d1117);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: var(--xbim-text, #c9d1d9);
+}
+
+.xbim-ui {
+    flex-shrink: 0;
+    z-index: 1;
+}
+
+.xbim-viewport {
+    flex: 1;
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.xbim-viewport canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+}

@@ -1,6 +1,4 @@
-// WexBIM Loader for Three.js
-// Adapted from https://github.com/Ibrahim5aad/wex-threejs
-import * as THREE from "three";
+import * as THREE from "three/webgpu";
 
 class BinaryReader {
   constructor(arrayBuffer) {
@@ -111,7 +109,6 @@ export class WexBIMLoader {
         }
       }
     } else {
-      // v1/v2: flat shape list, triangulation is inline (no byte-length prefix)
       for (let i = 0; i < numShapes; i++) {
         const shapes = this._parseShape(reader, version);
         const geomData = this._parseGeometry(reader);
@@ -154,7 +151,7 @@ export class WexBIMLoader {
     for (let i = 0; i < count; i++) {
       const label = reader.readInt32();
       const type = reader.readInt16();
-      reader.readFloat32Array(6); // bbox
+      reader.readFloat32Array(6);
       this.productMaps[label] = { type };
     }
   }
@@ -194,9 +191,8 @@ export class WexBIMLoader {
     const numTris = reader.readInt32();
 
     if (numVerts <= 0 || numTris <= 0) {
-      // Skip remaining vertex data if present
       for (let i = 0; i < numVerts * 3; i++) reader.readFloat32();
-      reader.readInt32(); // faceCount
+      reader.readInt32();
       return { vertices: new Float32Array(0), indices: new Uint32Array(0), normals: new Float32Array(0) };
     }
 

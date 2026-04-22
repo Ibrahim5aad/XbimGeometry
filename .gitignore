@@ -32,6 +32,7 @@ CMakeUserPresets.json
 
 # Staged native libraries (created by cmake --install for NuGet packaging)
 **/runtimes/*/native/
+**/wasm/native/
 
 # Roslyn cache directories
 *.ide/

@@ -1,0 +1,402 @@
+/* ── Panel container with animated positioning ── */
+.xbim-panel {
+    position: absolute;
+    z-index: 100;
+    background: var(--xbim-panel-bg, rgba(22, 33, 62, 0.95));
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--xbim-panel-border, #0f3460);
+    border-radius: 10px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    font-family: inherit;
+    color: var(--xbim-text, #e0e0e0);
+    transition: top 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                right 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                width 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                max-width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+/* ── Centered state (no models) ── */
+.xbim-panel.centered {
+    top: 50%;
+    right: 50%;
+    transform: translate(50%, -50%);
+    width: 90%;
+    max-width: 440px;
+}
+
+/* ── Docked state (has models or loading) ── */
+.xbim-panel.docked {
+    top: 16px;
+    right: 16px;
+    transform: translate(0, 0);
+    width: 280px;
+    max-width: 280px;
+}
+
+/* ── Header ── */
+.xbim-panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--xbim-panel-border, #0f3460);
+}
+
+.xbim-panel-header h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+.xbim-panel-header.compact {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+}
+
+.xbim-panel-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--xbim-text-muted, #7b8794);
+}
+
+/* ── Icon buttons ── */
+.xbim-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--xbim-text-muted, #7b8794);
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    padding: 0;
+    font-family: inherit;
+}
+
+.xbim-icon-btn:hover {
+    background: var(--xbim-active-bg, rgba(255, 255, 255, 0.08));
+    color: var(--xbim-accent, #4cc9f0);
+}
+
+.xbim-icon-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.xbim-icon-btn.eye.off {
+    opacity: 0.4;
+}
+
+.xbim-icon-btn.remove:hover {
+    color: var(--xbim-error, #f87171);
+}
+
+/* ── Model list ── */
+.xbim-model-list {
+    display: flex;
+    flex-direction: column;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.xbim-model-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-bottom: 1px solid color-mix(in srgb, var(--xbim-panel-border, #0f3460) 50%, transparent);
+    transition: background 0.1s;
+}
+
+.xbim-model-row:hover {
+    background: var(--xbim-active-bg, rgba(255, 255, 255, 0.03));
+}
+
+.xbim-model-row:last-child {
+    border-bottom: none;
+}
+
+.xbim-model-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.82rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Tabs ── */
+.xbim-panel-tabs {
+    display: flex;
+    border-bottom: 2px solid var(--xbim-panel-border, #0f3460);
+    padding: 0 20px;
+}
+
+.xbim-tab {
+    padding: 10px 16px;
+    border: none;
+    background: transparent;
+    color: var(--xbim-text-muted, #7b8794);
+    font-size: 0.82rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.15s;
+}
+
+.xbim-tab:hover {
+    color: var(--xbim-accent, #4cc9f0);
+}
+
+.xbim-tab.active {
+    color: var(--xbim-accent, #4cc9f0);
+    border-bottom-color: var(--xbim-accent, #4cc9f0);
+}
+
+/* ── Body ── */
+.xbim-panel-body {
+    padding: 16px 20px;
+    max-height: 380px;
+    overflow-y: auto;
+}
+
+.xbim-tab-content {
+    animation: xbimFadeIn 0.2s ease;
+}
+
+@keyframes xbimFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Demo list ── */
+.xbim-demo-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.xbim-demo-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--xbim-btn-bg, rgba(26, 26, 46, 0.6));
+    border: 1px solid var(--xbim-panel-border, #0f3460);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+    color: inherit;
+}
+
+.xbim-demo-item:hover:not(:disabled) {
+    border-color: var(--xbim-accent, #4cc9f0);
+    background: var(--xbim-btn-hover-bg, rgba(28, 39, 68, 0.8));
+}
+
+.xbim-demo-item:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.xbim-demo-item.loading {
+    border-color: var(--xbim-accent, #4cc9f0);
+    background: var(--xbim-active-bg, rgba(76, 201, 240, 0.06));
+}
+
+.xbim-demo-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: var(--xbim-active-bg, rgba(76, 201, 240, 0.1));
+    border-radius: 6px;
+    color: var(--xbim-accent, #4cc9f0);
+    flex-shrink: 0;
+}
+
+.xbim-demo-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.xbim-demo-name {
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.xbim-demo-desc {
+    font-size: 0.75rem;
+    color: var(--xbim-text-muted, #7b8794);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 1px;
+}
+
+.xbim-demo-arrow {
+    color: var(--xbim-text-muted, #7b8794);
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+
+.xbim-demo-item:hover:not(:disabled) .xbim-demo-arrow {
+    color: var(--xbim-accent, #4cc9f0);
+    transform: translateX(2px);
+}
+
+/* ── File drop zone ── */
+.xbim-drop-zone {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 24px 16px;
+    border: 2px dashed var(--xbim-panel-border, #0f3460);
+    border-radius: 8px;
+    background: var(--xbim-btn-bg, rgba(26, 26, 46, 0.4));
+    color: var(--xbim-text-muted, #7b8794);
+    transition: all 0.15s;
+    cursor: pointer;
+}
+
+.xbim-drop-zone:hover {
+    border-color: var(--xbim-accent, #4cc9f0);
+    background: var(--xbim-btn-hover-bg, rgba(28, 39, 68, 0.5));
+    color: var(--xbim-btn-text, #b0b8c4);
+}
+
+.xbim-drop-zone.compact {
+    padding: 14px 12px;
+    gap: 4px;
+}
+
+.xbim-drop-text {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.xbim-drop-formats {
+    display: flex;
+    gap: 4px;
+    font-size: 0.7rem;
+}
+
+.xbim-drop-formats span {
+    padding: 1px 6px;
+    background: var(--xbim-active-bg, rgba(76, 201, 240, 0.1));
+    color: var(--xbim-accent, #4cc9f0);
+    border-radius: 3px;
+}
+
+.xbim-file-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+}
+
+/* ── Add section (docked inline picker) ── */
+.xbim-add-section {
+    padding: 10px 14px;
+    border-top: 1px solid var(--xbim-panel-border, #0f3460);
+    animation: xbimFadeIn 0.2s ease;
+}
+
+/* ── Progress ── */
+.xbim-panel-progress {
+    padding: 10px 14px;
+    border-top: 1px solid color-mix(in srgb, var(--xbim-panel-border, #0f3460) 50%, transparent);
+}
+
+.xbim-progress-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--xbim-btn-text, #b0b8c4);
+}
+
+.xbim-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--xbim-panel-border, #0f3460);
+    border-top-color: var(--xbim-accent, #4cc9f0);
+    border-radius: 50%;
+    animation: xbimSpin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes xbimSpin {
+    to { transform: rotate(360deg); }
+}
+
+.xbim-progress-track {
+    margin-top: 6px;
+    height: 3px;
+    background: var(--xbim-panel-border, #0f3460);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.xbim-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--xbim-accent, #4cc9f0), color-mix(in srgb, var(--xbim-accent, #4cc9f0) 70%, white));
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+/* ── Error ── */
+.xbim-panel-error {
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    color: var(--xbim-error, #f87171);
+    cursor: pointer;
+    border-top: 1px solid color-mix(in srgb, var(--xbim-error, #f87171) 15%, transparent);
+    background: color-mix(in srgb, var(--xbim-error, #f87171) 5%, transparent);
+}
+
+/* ── Scrollbar ── */
+.xbim-model-list::-webkit-scrollbar,
+.xbim-panel-body::-webkit-scrollbar {
+    width: 5px;
+}
+
+.xbim-model-list::-webkit-scrollbar-track,
+.xbim-panel-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.xbim-model-list::-webkit-scrollbar-thumb,
+.xbim-panel-body::-webkit-scrollbar-thumb {
+    background: var(--xbim-panel-border, #0f3460);
+    border-radius: 3px;
+}
+
+/* ── Mobile ── */
+@media (max-width: 480px) {
+    .xbim-panel.centered {
+        width: 95%;
+    }
+
+    .xbim-panel.docked {
+        width: 260px;
+        max-width: 260px;
+    }
+}

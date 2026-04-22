@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <SignAssembly>false</SignAssembly>
@@ -25,6 +26,7 @@
     <ProjectReference Include="..\..\src\Xbim.Geometry.Engine\Xbim.Geometry.Engine.csproj" />
     <ProjectReference Include="..\..\src\Xbim.Geometry.Scene\Xbim.Geometry.Scene.csproj" />
     <ProjectReference Include="..\..\src\Xbim.Tessellator\Xbim.Tessellator.csproj" />
+    <ProjectReference Include="..\..\src\Xbim.Geometry.Viewer\Xbim.Geometry.Viewer.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -48,7 +48,7 @@ namespace Xbim.Tessellator
                     return false;
             }
         }
-
+      
         public static ProfilePolygons BuildPolygons(IIfcProfileDef profile, double angularTolerance)
         {
             switch (profile)

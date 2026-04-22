@@ -1,0 +1,274 @@
+@implements IAsyncDisposable
+@inject IServiceProvider ServiceProvider
+
+<CascadingValue Value="this" IsFixed="true">
+    <div class="xbim-viewer @Class" style="@_computedStyle">
+        <div class="xbim-ui">
+            @ChildContent
+        </div>
+        <div class="xbim-viewport">
+            <canvas id="@_canvasId"></canvas>
+        </div>
+    </div>
+</CascadingValue>
+
+@code {
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+
+    /// <summary>Content rendered above the viewport (toolbars, panels, etc.).</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Inline style applied to the root container.</summary>
+    [Parameter] public string? Style { get; set; }
+
+    /// <summary>CSS class appended to the root container.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    /// <summary>Viewport background color (CSS color string).</summary>
+    [Parameter] public string BackgroundColor { get; set; } = "#0a0a1a";
+
+    /// <summary>Fires when a model finishes loading.</summary>
+    [Parameter] public EventCallback<LoadedModel> OnModelLoaded { get; set; }
+
+    /// <summary>Fires when a model is removed.</summary>
+    [Parameter] public EventCallback<int> OnModelRemoved { get; set; }
+
+    /// <summary>Fires on viewer errors.</summary>
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private XbimViewerInterop? _interop;
+    private ViewerThemeService? _themeService;
+    private string? _viewerId;
+    private readonly string _canvasId = $"xbim-canvas-{Guid.NewGuid():N}";
+    private readonly Dictionary<int, LoadedModel> _loadedModels = new();
+    private int _nextModelId = 1;
+    private int _pendingStreamModelId;
+    private string _computedStyle = "";
+
+    public bool IsInitialized => _viewerId is not null;
+    public IReadOnlyDictionary<int, LoadedModel> LoadedModels => _loadedModels;
+
+    protected override void OnInitialized()
+    {
+        _themeService = ServiceProvider.GetService<ViewerThemeService>();
+        if (_themeService is not null)
+            _themeService.OnThemeChanged += OnThemeChanged;
+        RebuildStyle();
+    }
+
+    protected override void OnParametersSet() => RebuildStyle();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await EnsureInitializedAsync();
+            }
+            catch (Exception ex)
+            {
+                await OnError.InvokeAsync(ex.Message);
+            }
+        }
+    }
+
+    private async void OnThemeChanged()
+    {
+        RebuildStyle();
+        if (_themeService is not null && _viewerId is not null && _interop is not null)
+        {
+            try { await _interop.SetBackgroundColorAsync(_viewerId, _themeService.BackgroundColor); }
+            catch { /* component may be disposed */ }
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void RebuildStyle()
+    {
+        var vars = _themeService?.GetCssVariables();
+        if (vars is { Count: > 0 })
+        {
+            var cssVars = string.Join("; ", vars.Select(kv => $"{kv.Key}: {kv.Value}"));
+            _computedStyle = string.IsNullOrEmpty(Style) ? cssVars : $"{Style}; {cssVars}";
+        }
+        else
+        {
+            _computedStyle = Style ?? "";
+        }
+    }
+
+    /// <summary>Load a WexBIM model from a stream.</summary>
+    public async Task<LoadedModel> LoadWexBimAsync(Stream data, string name, long? sizeBytes = null)
+    {
+        await EnsureInitializedAsync();
+        var modelId = _nextModelId++;
+        using var streamRef = new DotNetStreamReference(data);
+        await _interop!.LoadWexBimAsync(_viewerId!, streamRef, modelId);
+        var model = new LoadedModel
+        {
+            Id = modelId,
+            Name = name,
+            Source = name,
+            SourceType = ModelSourceType.File,
+            SizeBytes = sizeBytes
+        };
+        _loadedModels[model.Id] = model;
+        await OnModelLoaded.InvokeAsync(model);
+        return model;
+    }
+
+    /// <summary>Load a WexBIM model from a URL.</summary>
+    public async Task<LoadedModel> LoadWexBimFromUrlAsync(string url, string? name = null)
+    {
+        await EnsureInitializedAsync();
+        var modelId = _nextModelId++;
+        await _interop!.LoadWexBimFromUrlAsync(_viewerId!, url, modelId);
+        var model = new LoadedModel
+        {
+            Id = modelId,
+            Name = name ?? Path.GetFileNameWithoutExtension(url),
+            Source = url,
+            SourceType = ModelSourceType.Url
+        };
+        _loadedModels[model.Id] = model;
+        await OnModelLoaded.InvokeAsync(model);
+        return model;
+    }
+
+    /// <summary>Fit camera to show all visible models.</summary>
+    public async Task FitAllAsync()
+    {
+        if (_viewerId is null || _interop is null) return;
+        await _interop.FitAllAsync(_viewerId);
+    }
+
+    /// <summary>Switch between perspective and orthographic projection.</summary>
+    public async Task SetProjectionAsync(bool orthographic)
+    {
+        if (_viewerId is null || _interop is null) return;
+        await _interop.SetProjectionAsync(_viewerId, orthographic);
+    }
+
+    /// <summary>Get the current projection mode.</summary>
+    public async Task<string> GetProjectionAsync()
+    {
+        if (_viewerId is null || _interop is null) return "perspective";
+        return await _interop.GetProjectionAsync(_viewerId);
+    }
+
+    /// <summary>Toggle visibility of a loaded model.</summary>
+    public async Task SetModelVisibleAsync(int modelId, bool visible)
+    {
+        if (_viewerId is null || _interop is null) return;
+        await _interop.SetModelVisibleAsync(_viewerId, modelId, visible);
+        if (_loadedModels.TryGetValue(modelId, out var model))
+            model.IsVisible = visible;
+    }
+
+    /// <summary>Remove a model from the scene and dispose its resources.</summary>
+    public async Task RemoveModelAsync(int modelId)
+    {
+        if (_viewerId is null || _interop is null) return;
+        await _interop.RemoveModelAsync(_viewerId, modelId);
+        _loadedModels.Remove(modelId);
+        await OnModelRemoved.InvokeAsync(modelId);
+    }
+
+    /// <summary>Clear all models from the scene.</summary>
+    public async Task ClearAsync()
+    {
+        if (_viewerId is not null && _interop is not null)
+        {
+            await _interop.ClearSceneAsync(_viewerId);
+            _loadedModels.Clear();
+        }
+    }
+
+    // ── Streaming API ──
+
+    /// <summary>Begin a new streaming session. Returns the model ID for the new model.</summary>
+    public async Task<int> StreamBeginAsync()
+    {
+        await EnsureInitializedAsync();
+        _pendingStreamModelId = _nextModelId++;
+        await _interop!.StreamBeginAsync(_viewerId!, _pendingStreamModelId);
+        return _pendingStreamModelId;
+    }
+
+    /// <summary>Register the streamed model after streaming completes.</summary>
+    public async Task<LoadedModel> RegisterStreamedModelAsync(string name, long? sizeBytes = null)
+    {
+        var model = new LoadedModel
+        {
+            Id = _pendingStreamModelId,
+            Name = name,
+            Source = name,
+            SourceType = ModelSourceType.File,
+            SizeBytes = sizeBytes
+        };
+        _loadedModels[model.Id] = model;
+        await OnModelLoaded.InvokeAsync(model);
+        return model;
+    }
+
+    /// <summary>Send stream header with model bounds and product count.</summary>
+    public async Task StreamHeaderAsync(float oneMeter,
+        float bx, float by, float bz, float sx, float sy, float sz, int productCount)
+    {
+        await _interop!.StreamHeaderAsync(_viewerId!, oneMeter, bx, by, bz, sx, sy, sz, productCount);
+    }
+
+    /// <summary>Register a material style.</summary>
+    public async Task StreamStyleAsync(int id, float r, float g, float b, float a)
+    {
+        await _interop!.StreamStyleAsync(_viewerId!, id, r, g, b, a);
+    }
+
+    /// <summary>Send a mesh geometry buffer.</summary>
+    public async Task StreamGeometryAsync(int id, Stream meshData)
+    {
+        using var streamRef = new DotNetStreamReference(meshData);
+        await _interop!.StreamGeometryAsync(_viewerId!, id, streamRef);
+    }
+
+    /// <summary>Send a product instance with transform and bounding box.</summary>
+    public async Task StreamInstanceAsync(int productLabel, int typeId, int geometryId, int styleId,
+        double[] transform, float bx, float by, float bz, float sx, float sy, float sz)
+    {
+        await _interop!.StreamInstanceAsync(_viewerId!, productLabel, typeId, geometryId, styleId,
+            transform, bx, by, bz, sx, sy, sz);
+    }
+
+    /// <summary>Signal end of streaming; fits camera and adds grid.</summary>
+    public async Task StreamCompleteAsync()
+    {
+        await _interop!.StreamCompleteAsync(_viewerId!);
+    }
+
+    private async Task EnsureInitializedAsync()
+    {
+        if (_viewerId is not null) return;
+        _interop ??= new XbimViewerInterop(JS);
+        _viewerId = await _interop.InitViewerAsync(_canvasId);
+        var bg = _themeService?.BackgroundColor ?? BackgroundColor;
+        await _interop.SetBackgroundColorAsync(_viewerId, bg);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_themeService is not null)
+            _themeService.OnThemeChanged -= OnThemeChanged;
+
+        if (_viewerId is not null && _interop is not null)
+        {
+            try { await _interop.DisposeViewerAsync(_viewerId); }
+            catch { /* component may already be removed from DOM */ }
+        }
+        if (_interop is not null)
+        {
+            try { await _interop.DisposeAsync(); }
+            catch { }
+        }
+    }
+}

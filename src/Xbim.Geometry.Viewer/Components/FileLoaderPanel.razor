@@ -1,0 +1,393 @@
+@inject IServiceProvider ServiceProvider
+
+@{
+    var hasModels = Viewer?.LoadedModels.Count > 0;
+    var isDocked = hasModels || _loading;
+    var panelClass = isDocked ? "docked" : "centered";
+}
+
+<div class="xbim-panel @panelClass">
+    @if (isDocked)
+    {
+        @* ── Docked: model list + optional add UI ── *@
+        <div class="xbim-panel-header compact">
+            <span class="xbim-panel-title">Models</span>
+            <button type="button" class="xbim-icon-btn" @onclick="ToggleAdding" title="Add model" disabled="@_loading">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+            </button>
+        </div>
+
+        @if (Viewer is not null)
+        {
+            <div class="xbim-model-list">
+                @foreach (var kv in Viewer.LoadedModels)
+                {
+                    var model = kv.Value;
+                    <div class="xbim-model-row">
+                        <button type="button"
+                                class="xbim-icon-btn eye @(!model.IsVisible ? "off" : "")"
+                                @onclick="() => ToggleVisibilityAsync(model)"
+                                title="@(model.IsVisible ? "Hide" : "Show")">
+                            @if (model.IsVisible)
+                            {
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            }
+                            else
+                            {
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                            }
+                        </button>
+                        <span class="xbim-model-name" title="@model.Name">@model.Name</span>
+                        <button type="button" class="xbim-icon-btn remove" @onclick="() => RemoveModelAsync(model)" title="Remove">
+                            <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                                <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (_loading)
+        {
+            <div class="xbim-panel-progress">
+                <div class="xbim-progress-row">
+                    <div class="xbim-spinner"></div>
+                    <span>@(_statusMessage ?? "Loading...")</span>
+                </div>
+                @if (_progress > 0)
+                {
+                    <div class="xbim-progress-track">
+                        <div class="xbim-progress-bar" style="width: @(_progress)%"></div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (_adding && !_loading)
+        {
+            <div class="xbim-add-section">
+                <div class="xbim-drop-zone compact">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    <div class="xbim-drop-text">Choose file</div>
+                    <div class="xbim-drop-formats">
+                        @if (_ifcService is not null)
+                        {
+                            <span>.ifc</span>
+                            <span>.ifczip</span>
+                        }
+                        <span>.wexbim</span>
+                    </div>
+                    <InputFile OnChange="HandleFileSelected"
+                               accept="@GetAcceptedFormats()"
+                               disabled="@_loading"
+                               class="xbim-file-input" />
+                </div>
+            </div>
+        }
+
+        @if (_error is not null)
+        {
+            <div class="xbim-panel-error" @onclick="() => _error = null">
+                <span>@_error</span>
+            </div>
+        }
+    }
+    else
+    {
+        @* ── Centered: full file loader dialog ── *@
+        <div class="xbim-panel-header">
+            <h3>Load Model</h3>
+        </div>
+
+        <div class="xbim-panel-tabs">
+            @if (DemoModels is { Count: > 0 })
+            {
+                <button class="xbim-tab @(_activeTab == "demo" ? "active" : "")"
+                        @onclick='() => _activeTab = "demo"'>
+                    Demo Models
+                </button>
+            }
+            <button class="xbim-tab @(_activeTab == "local" ? "active" : "")"
+                    @onclick='() => _activeTab = "local"'>
+                Local File
+            </button>
+        </div>
+
+        <div class="xbim-panel-body">
+            @if (_activeTab == "demo" && DemoModels is { Count: > 0 })
+            {
+                <div class="xbim-tab-content">
+                    <div class="xbim-demo-list">
+                        @foreach (var demo in DemoModels)
+                        {
+                            var d = demo;
+                            <button type="button"
+                                    class="xbim-demo-item @(_loading && _loadingSource == d.Name ? "loading" : "")"
+                                    @onclick="() => LoadDemoAsync(d)"
+                                    disabled="@_loading">
+                                <div class="xbim-demo-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                                        <polyline points="9 22 9 12 15 12 15 22"/>
+                                    </svg>
+                                </div>
+                                <div class="xbim-demo-info">
+                                    <div class="xbim-demo-name">@d.Name</div>
+                                    @if (!string.IsNullOrEmpty(d.Description))
+                                    {
+                                        <div class="xbim-demo-desc">@d.Description</div>
+                                    }
+                                </div>
+                                <div class="xbim-demo-arrow">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                                    </svg>
+                                </div>
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+            else if (_activeTab == "local")
+            {
+                <div class="xbim-tab-content">
+                    <div class="xbim-drop-zone">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        <div class="xbim-drop-text">Choose a file or drag it here</div>
+                        <div class="xbim-drop-formats">
+                            @if (_ifcService is not null)
+                            {
+                                <span>.ifc</span>
+                                <span>.ifczip</span>
+                            }
+                            <span>.wexbim</span>
+                        </div>
+                        <InputFile OnChange="HandleFileSelected"
+                                   accept="@GetAcceptedFormats()"
+                                   disabled="@_loading"
+                                   class="xbim-file-input" />
+                    </div>
+                </div>
+            }
+
+            @if (_error is not null)
+            {
+                <div class="xbim-panel-error" @onclick="() => _error = null">
+                    <span>@_error</span>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private IIfcProcessingService? _ifcService;
+
+    [CascadingParameter] public XbimViewer? Viewer { get; set; }
+
+    [Parameter] public long MaxFileSize { get; set; } = 500 * 1024 * 1024;
+    [Parameter] public List<DemoModel>? DemoModels { get; set; }
+    [Parameter] public EventCallback<LoadedModel> OnModelLoaded { get; set; }
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private string _activeTab = "local";
+    private bool _loading;
+    private bool _adding;
+    private int _progress;
+    private string? _statusMessage;
+    private string? _error;
+    private string? _loadingSource;
+
+    protected override void OnInitialized()
+    {
+        _ifcService = ServiceProvider.GetService<IIfcProcessingService>();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (DemoModels is { Count: > 0 } && _activeTab == "local" && !_loading)
+            _activeTab = "demo";
+    }
+
+    public void SetProgress(int percent, string? message = null)
+    {
+        _progress = percent;
+        if (message is not null) _statusMessage = message;
+        StateHasChanged();
+    }
+
+    private void ToggleAdding() => _adding = !_adding;
+
+    private string GetAcceptedFormats()
+        => _ifcService is not null ? ".ifc,.ifczip,.wexbim" : ".wexbim";
+
+    private static ModelFormat DetectFormat(string fileName)
+    {
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        return ext switch
+        {
+            ".ifc" => ModelFormat.Ifc,
+            ".ifczip" => ModelFormat.IfcZip,
+            _ => ModelFormat.Wexbim
+        };
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB"];
+        double size = bytes;
+        int i = 0;
+        while (size >= 1024 && i < units.Length - 1) { size /= 1024; i++; }
+        return $"{size:0.##} {units[i]}";
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null) return;
+
+        var format = DetectFormat(file.Name);
+        var isIfc = format is ModelFormat.Ifc or ModelFormat.IfcZip;
+        _error = null;
+
+        if (isIfc && _ifcService is null)
+        {
+            _error = "IFC processing is not available. Please load a .wexbim file.";
+            await OnError.InvokeAsync(_error);
+            return;
+        }
+
+        try
+        {
+            // Read file fully into memory BEFORE setting _loading.
+            // Setting _loading docks the panel which destroys the InputFile element;
+            // the stream reads via JS interop through that element, so it must stay alive.
+            using var ms = new MemoryStream();
+            await using (var stream = file.OpenReadStream(MaxFileSize))
+            {
+                await stream.CopyToAsync(ms);
+            }
+            ms.Position = 0;
+
+            // Now safe to dock — file data is in memory
+            _loading = true;
+            _adding = false;
+            _progress = 0;
+            _loadingSource = file.Name;
+            _statusMessage = isIfc ? "Opening IFC model..." : "Loading WexBIM...";
+            StateHasChanged();
+            await Task.Yield();
+
+            if (isIfc)
+                await ProcessIfcAsync(ms, file.Name);
+            else
+                await LoadWexBimAsync(ms, file.Name, file.Size);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            await OnError.InvokeAsync(_error);
+        }
+        finally
+        {
+            _loading = false;
+            _progress = 0;
+            _statusMessage = null;
+            _loadingSource = null;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadDemoAsync(DemoModel demo)
+    {
+        if (Viewer is null) return;
+        _error = null;
+        _loading = true;
+        _loadingSource = demo.Name;
+        _statusMessage = "Downloading model...";
+        StateHasChanged();
+
+        try
+        {
+            var model = await Viewer.LoadWexBimFromUrlAsync(demo.Url, demo.Name);
+            await OnModelLoaded.InvokeAsync(model);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            await OnError.InvokeAsync(_error);
+        }
+        finally
+        {
+            _loading = false;
+            _loadingSource = null;
+            _statusMessage = null;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadWexBimAsync(Stream data, string fileName, long? sizeBytes)
+    {
+        if (Viewer is null) return;
+        _statusMessage = "Loading into viewer...";
+        _progress = 90;
+        StateHasChanged();
+
+        var name = Path.GetFileNameWithoutExtension(fileName);
+        var model = await Viewer.LoadWexBimAsync(data, name, sizeBytes);
+        await OnModelLoaded.InvokeAsync(model);
+    }
+
+    private async Task ProcessIfcAsync(Stream data, string fileName)
+    {
+        if (Viewer is null || _ifcService is null) return;
+        _statusMessage = "Opening IFC model...";
+        _progress = 5;
+        StateHasChanged();
+
+        var progress = new Progress<IfcProcessingProgress>(p =>
+        {
+            _statusMessage = p.Stage;
+            _progress = p.Percent;
+            StateHasChanged();
+        });
+
+        var result = await _ifcService.ProcessAsync(data, fileName, Viewer, progress);
+
+        var name = Path.GetFileNameWithoutExtension(fileName);
+        var model = await Viewer.RegisterStreamedModelAsync(name, result.WexBimData?.Length);
+        await OnModelLoaded.InvokeAsync(model);
+    }
+
+    private async Task ToggleVisibilityAsync(LoadedModel model)
+    {
+        if (Viewer is null) return;
+        await Viewer.SetModelVisibleAsync(model.Id, !model.IsVisible);
+        StateHasChanged();
+    }
+
+    private async Task RemoveModelAsync(LoadedModel model)
+    {
+        if (Viewer is null) return;
+        await Viewer.RemoveModelAsync(model.Id);
+        StateHasChanged();
+    }
+}

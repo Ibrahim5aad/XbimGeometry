@@ -1,0 +1,140 @@
+@namespace Xbim.Geometry.Viewer.Components
+
+<div class="xbim-toolbar xbim-toolbar-@PosClass xbim-toolbar-@AlignClass @Class">
+    @if (Items is not null)
+    {
+        @foreach (var item in Items)
+        {
+            if (item is ToolbarSeparator sep)
+            {
+                <div class="xbim-toolbar-sep @sep.CssClass"></div>
+            }
+            else if (item is ToolbarGroup group)
+            {
+                <div class="xbim-toolbar-group @group.CssClass" title="@group.Tooltip">
+                    @if (!string.IsNullOrEmpty(group.Label))
+                    {
+                        <div class="xbim-toolbar-group-label">@group.Label</div>
+                    }
+                    <div class="xbim-toolbar-group-items">
+                        @foreach (var child in group.Items)
+                        {
+                            @RenderItem(child)
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                @RenderItem(item)
+            }
+        }
+    }
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public List<ToolbarItemBase>? Items { get; set; }
+    [Parameter] public ToolbarPosition Position { get; set; } = ToolbarPosition.Bottom;
+    [Parameter] public ToolbarAlignment Alignment { get; set; } = ToolbarAlignment.Center;
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string PosClass => Position.ToString().ToLowerInvariant();
+    private string AlignClass => Alignment.ToString().ToLowerInvariant();
+
+    private HashSet<string> _openDropdowns = new();
+
+    private RenderFragment RenderItem(ToolbarItemBase item) => __builder =>
+    {
+        if (item is ToolbarToggle toggle)
+        {
+            var icon = toggle.IsActive && !string.IsNullOrEmpty(toggle.ActiveIcon) ? toggle.ActiveIcon : toggle.Icon;
+            var tip = toggle.IsActive && !string.IsNullOrEmpty(toggle.ActiveTooltip) ? toggle.ActiveTooltip : toggle.Tooltip;
+            <button type="button"
+                    class="xbim-toolbar-btn xbim-toolbar-toggle @toggle.CssClass @(toggle.IsActive ? "active" : "")"
+                    title="@tip"
+                    disabled="@toggle.Disabled"
+                    @onclick="async () => await HandleToggle(toggle)">
+                @if (!string.IsNullOrEmpty(icon))
+                {
+                    @((MarkupString)icon)
+                }
+            </button>
+        }
+        else if (item is ToolbarDropdown dropdown)
+        {
+            <div class="xbim-toolbar-dropdown @dropdown.CssClass">
+                <button type="button"
+                        class="xbim-toolbar-btn xbim-toolbar-dropdown-btn"
+                        title="@dropdown.Tooltip"
+                        disabled="@dropdown.Disabled"
+                        @onclick="() => ToggleDropdown(dropdown.Id)">
+                    @if (!string.IsNullOrEmpty(dropdown.Icon))
+                    {
+                        @((MarkupString)dropdown.Icon)
+                    }
+                    @if (!string.IsNullOrEmpty(dropdown.Label))
+                    {
+                        <span class="xbim-toolbar-label">@dropdown.Label</span>
+                    }
+                    <svg class="xbim-toolbar-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </button>
+                @if (_openDropdowns.Contains(dropdown.Id))
+                {
+                    <div class="xbim-toolbar-dropdown-menu show">
+                        @foreach (var di in dropdown.Items)
+                        {
+                            var d = di;
+                            <button type="button"
+                                    class="xbim-toolbar-dropdown-item"
+                                    disabled="@d.Disabled"
+                                    @onclick="async () => { await d.OnClick.InvokeAsync(); CloseAllDropdowns(); }">
+                                @if (!string.IsNullOrEmpty(d.Icon))
+                                {
+                                    @((MarkupString)d.Icon)
+                                }
+                                @if (!string.IsNullOrEmpty(d.Label))
+                                {
+                                    <span>@d.Label</span>
+                                }
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+        }
+        else if (item is ToolbarButton button)
+        {
+            <button type="button"
+                    class="xbim-toolbar-btn @button.CssClass"
+                    title="@button.Tooltip"
+                    disabled="@button.Disabled"
+                    @onclick="async () => await button.OnClick.InvokeAsync()">
+                @if (!string.IsNullOrEmpty(button.Icon))
+                {
+                    @((MarkupString)button.Icon)
+                }
+            </button>
+        }
+    };
+
+    private async Task HandleToggle(ToolbarToggle toggle)
+    {
+        toggle.IsActive = !toggle.IsActive;
+        await toggle.OnToggle.InvokeAsync(toggle.IsActive);
+    }
+
+    private void ToggleDropdown(string id)
+    {
+        if (!_openDropdowns.Remove(id))
+        {
+            _openDropdowns.Clear();
+            _openDropdowns.Add(id);
+        }
+    }
+
+    private void CloseAllDropdowns() => _openDropdowns.Clear();
+}

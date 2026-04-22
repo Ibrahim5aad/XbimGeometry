@@ -1,253 +1,53 @@
 @page "/"
-@using System.Diagnostics
-@using System.Threading.Tasks
-@using Microsoft.JSInterop
-@using Xbim.Ifc
-@using Xbim.Ifc4.Interfaces
-@using Microsoft.Extensions.Logging.Abstractions;
-@using Xbim.Common.Configuration;
-@using Xbim.Geometry.Scene;
+@inject ViewerThemeService ThemeService
 
-<div class="toolbar">
-    <div class="brand"><span>xbim</span> Viewer</div>
-    <div class="sep"></div>
-    <div class="file-input-wrapper">
-        <button class="btn btn-primary" disabled="@_busy">Open IFC</button>
-        <InputFile OnChange="OnFileSelected" accept=".ifc,.ifczip,.ifcxml" disabled="@_busy" />
-    </div>
-    @if (_result is not null)
-    {
-        <button class="btn btn-ghost" @onclick="Download">Download .wexbim</button>
-    }
-    @if (_busy)
-    {
-        <span class="status-text">@StageNames[_currentStage]...</span>
-    }
-</div>
-
-@if (_error is not null)
-{
-    <div class="error-bar">@_error</div>
-}
-
-<div class="main-area">
-    @if (_result is not null)
-    {
-        <div class="sidebar">
-            <div class="sidebar-section">
-                <h4>Model Info</h4>
-                <div class="stat"><span class="label">File</span><span class="value">@(_fileName).ifc</span></div>
-                <div class="stat"><span class="label">Products</span><span class="value">@_result.TotalProducts</span></div>
-                <div class="stat"><span class="label">WexBIM size</span><span class="value">@((_result.WexBimBytes.Length / 1024.0).ToString("F0")) KB</span></div>
-                <div class="stat"><span class="label">Total time</span><span class="value">@_elapsed</span></div>
-            </div>
-            <div class="sidebar-section">
-                <h4>Timing</h4>
-                @foreach (var stage in _completedStages)
-                {
-                    <div class="stat"><span class="label">@stage.Name</span><span class="value">@FormatTime(stage.Elapsed)</span></div>
-                }
-            </div>
-            <div class="sidebar-section">
-                <h4>Products</h4>
-                <table>
-                    <thead><tr><th>Type</th><th>Count</th></tr></thead>
-                    <tbody>
-                        @foreach (var g in _result.TypeGroups)
-                        {
-                            <tr><td>@g.TypeName</td><td>@g.Count</td></tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    }
-
-    <div class="viewport">
-        <canvas id="viewer-canvas"></canvas>
-
-        @if (!_busy && _result is null)
-        {
-            <div class="viewport-overlay">
-                <div class="icon">&#x1F4C1;</div>
-                <div class="text">Open an IFC file</div>
-                <div class="subtext">Geometry is processed entirely in the browser using a WebAssembly build for the xbim engine</div>
-            </div>
-        }
-        else if (_busy)
-        {
-            <div class="viewport-overlay">
-                <div class="spinner"></div>
-                <div class="stage-list">
-                    @for (int i = 0; i < StageNames.Length; i++)
-                    {
-                        var idx = i;
-                        var isDone = idx < _completedStages.Count;
-                        var isActive = idx == _currentStage && !isDone;
-                        <div class="stage-item @(isDone ? "done" : isActive ? "active" : "pending")">
-                            <span class="stage-icon">@(isDone ? "\u2713" : isActive ? "\u25CF" : "\u25CB")</span>
-                            <span class="stage-name">@StageNames[idx]</span>
-                            @if (isDone)
-                            {
-                                <span class="stage-time">@FormatTime(_completedStages[idx].Elapsed)</span>
-                            }
-                        </div>
-                    }
-                </div>
-            </div>
-        }
-    </div>
-</div>
+<XbimViewer @ref="_viewer" Style="width: 100%; height: 100dvh;">
+    <FileLoaderPanel DemoModels="_demos" />
+    <ViewerToolbar Items="_toolbarItems" Position="ToolbarPosition.Bottom" Alignment="ToolbarAlignment.Center" />
+</XbimViewer>
 
 @code {
-    [Inject] private IJSRuntime JS { get; set; } = default!;
+    private XbimViewer _viewer = default!;
+    private List<ToolbarItemBase> _toolbarItems = default!;
+    private bool _isOrtho;
 
-    private bool _busy;
-    private string? _error;
-    private string? _elapsed;
-    private string? _fileName;
-    private ConversionResult? _result;
-    private bool _viewerInitialized;
-    private int _currentStage;
-    private readonly List<(string Name, TimeSpan Elapsed)> _completedStages = new();
+    private readonly List<DemoModel> _demos =
+    [
+        new() { Name = "Duplex House", Url = "models/duplex.wexbim", Description = "Two-storey residential building" },
+    ];
 
-    private static readonly string[] StageNames =
+    protected override void OnInitialized()
     {
-        "Reading file",
-        "Opening IFC model",
-        "Processing geometry",
-        "Creating WexBIM",
-        "Building 3D scene"
-    };
-
-    private const long MaxFileSize = 200 * 1024 * 1024;
-
-    private async Task OnFileSelected(InputFileChangeEventArgs e)
-    {
-        _error = null;
-        _result = null;
-        _busy = true;
-        _completedStages.Clear();
-        _currentStage = 0;
-        _fileName = Path.GetFileNameWithoutExtension(e.File.Name);
-        var totalSw = Stopwatch.StartNew();
-        var stageSw = Stopwatch.StartNew();
-        string? tempPath = null;
-
-        StateHasChanged();
-        await Task.Delay(1);
-
-        try
-        {
-            // Stage 0: Read file
-            using var ms = new MemoryStream();
-            using (var uploadStream = e.File.OpenReadStream(MaxFileSize))
+        _toolbarItems =
+        [
+            new ToolbarButton
             {
-                await uploadStream.CopyToAsync(ms);
-            }
-            ms.Position = 0;
-            _completedStages.Add(("Read file", stageSw.Elapsed));
-
-            // Stage 1: Open IFC model
-            _currentStage = 1;
-            stageSw.Restart();
-            StateHasChanged();
-            await Task.Delay(1);
-
-            tempPath = Path.Combine(Path.GetTempPath(), e.File.Name);
-            File.WriteAllBytes(tempPath, ms.ToArray());
-            using var model = IfcStore.Open(tempPath);
-            _completedStages.Add(("Open model", stageSw.Elapsed));
-
-            // Stage 2: Process geometry
-            _currentStage = 2;
-            stageSw.Restart();
-            StateHasChanged();
-            await Task.Delay(1);
-
-            var context = new Xbim3DModelContext(model);
-            await context.CreateContextAsync(generateBREPs: false);
-            _completedStages.Add(("Process geometry", stageSw.Elapsed));
-
-            // Stage 3: Create WexBIM
-            _currentStage = 3;
-            stageSw.Restart();
-            StateHasChanged();
-            await Task.Delay(1);
-
-            var shapeInstances = context.ShapeInstances();
-            var productLabels = new HashSet<int>(
-                shapeInstances.Select(s => s.IfcProductLabel));
-
-            var typeGroups = model.Instances.OfType<IIfcProduct>()
-                .Where(p => productLabels.Contains(p.EntityLabel))
-                .GroupBy(p => p.ExpressType.ExpressName)
-                .Select(g => new TypeGroup(StripIfcPrefix(g.Key), g.Count()))
-                .OrderByDescending(g => g.Count)
-                .ThenBy(g => g.TypeName)
-                .ToList();
-
-            using var output = new MemoryStream();
-            using (var bw = new BinaryWriter(output, System.Text.Encoding.UTF8, leaveOpen: true))
+                Icon = ViewerIcons.Home,
+                Tooltip = "Fit all",
+                OnClick = EventCallback.Factory.Create(this, async () => await _viewer.FitAllAsync())
+            },
+            new ToolbarSeparator(),
+            new ToolbarToggle
             {
-                model.SaveAsWexBim(bw);
-            }
-
-            _result = new ConversionResult(output.ToArray(), productLabels.Count, typeGroups);
-            _completedStages.Add(("Create WexBIM", stageSw.Elapsed));
-
-            // Stage 4: Build 3D scene
-            _currentStage = 4;
-            stageSw.Restart();
-            StateHasChanged();
-            await Task.Delay(1);
-
-            await LoadViewer();
-            _completedStages.Add(("Build 3D scene", stageSw.Elapsed));
-
-            totalSw.Stop();
-            _elapsed = FormatTime(totalSw.Elapsed);
-            _busy = false;
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            _error = ex.Message;
-            _busy = false;
-        }
-        finally
-        {
-            if (tempPath != null && File.Exists(tempPath))
-                File.Delete(tempPath);
-        }
+                Icon = ViewerIcons.Orthographic,
+                ActiveIcon = ViewerIcons.Perspective,
+                Tooltip = "Switch to orthographic",
+                ActiveTooltip = "Switch to perspective",
+                OnToggle = EventCallback.Factory.Create<bool>(this, async (ortho) =>
+                {
+                    _isOrtho = ortho;
+                    await _viewer.SetProjectionAsync(ortho);
+                })
+            },
+            new ToolbarSeparator(),
+            new ToolbarToggle
+            {
+                Icon = ViewerIcons.Moon,
+                ActiveIcon = ViewerIcons.Sun,
+                Tooltip = "Switch to light theme",
+                ActiveTooltip = "Switch to dark theme",
+                OnToggle = EventCallback.Factory.Create<bool>(this, _ => ThemeService.Toggle())
+            },
+        ];
     }
-
-    private async Task LoadViewer()
-    {
-        if (_result is null) return;
-
-        if (!_viewerInitialized)
-        {
-            await JS.InvokeVoidAsync("xbimViewer.init", "viewer-canvas");
-            _viewerInitialized = true;
-        }
-
-        using var streamRef = new DotNetStreamReference(new MemoryStream(_result.WexBimBytes));
-        await JS.InvokeVoidAsync("xbimViewer.loadWexBim", streamRef);
-    }
-
-    private static string FormatTime(TimeSpan ts)
-        => ts.TotalSeconds >= 1 ? $"{ts.TotalSeconds:F1}s" : $"{ts.TotalMilliseconds:F0}ms";
-
-    private static string StripIfcPrefix(string name)
-        => name.StartsWith("Ifc", StringComparison.Ordinal) ? name.Substring(3) : name;
-
-    private async Task Download()
-    {
-        if (_result is null) return;
-        await JS.InvokeVoidAsync("downloadFile", $"{_fileName}.wexbim", _result.WexBimBytes);
-    }
-
-    private sealed record ConversionResult(byte[] WexBimBytes, int TotalProducts, List<TypeGroup> TypeGroups);
-    private sealed record TypeGroup(string TypeName, int Count);
 }

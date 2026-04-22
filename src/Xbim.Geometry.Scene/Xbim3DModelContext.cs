@@ -8,6 +8,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Xbim.Common;
 using Xbim.Common.Configuration;
@@ -70,6 +71,12 @@ namespace Xbim.Geometry.Scene
             internal Dictionary<int, int> SurfaceStyles;
             internal Dictionary<IIfcRepresentationContext, ConcurrentQueue<XbimBBoxClusterElement>> Clusters;
             internal ParallelOptions ParallelOptions;
+
+            /// <summary>
+            /// When set, geometry and instance events are pushed to this channel writer
+            /// for live streaming during CreateContext. Null for the non-streaming path.
+            /// </summary>
+            internal ChannelWriter<SinkEvent> SinkChannel;
 
             /// <summary>
             /// Cache for feature element shapes (openings/projections). These are shared across
@@ -360,7 +367,8 @@ namespace Xbim.Geometry.Scene
             bool generateBREPs,
             Func<XbimTriangulatedMesh, int, XbimTriangulatedMesh> postTessellationCallback,
             DynamicDeflectionSettings dynamicDeflectionSettings,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            ChannelWriter<SinkEvent> sinkChannel = null)
         {
             _logger.LogTrace("Starting context creation");
 
@@ -385,6 +393,7 @@ namespace Xbim.Geometry.Scene
             }
 
             using var state = new StreamingState();
+            state.SinkChannel = sinkChannel;
 
             state.ParallelOptions = new ParallelOptions();
             if (MaxThreads > 0)
@@ -400,6 +409,10 @@ namespace Xbim.Geometry.Scene
                     return false;
             }
             progDelegate?.Invoke(101, "Initialise");
+
+            // Emit header and styles to the streaming channel (before any geometries)
+            if (sinkChannel != null)
+                EmitHeaderAndStyles(state);
 
             // Phase 1: Mesh all unique shape geometries
             _logger.LogTrace("Starting WriteShapeGeometries");
@@ -442,6 +455,301 @@ namespace Xbim.Geometry.Scene
             geometryTransaction.Commit();
             _logger.LogTrace("Context creation complete");
             return true;
+        }
+
+        /// <summary>
+        /// Creates the geometry context and streams results to the sink as they are produced.
+        /// The processing pipeline and the sink consumer run concurrently — geometries and
+        /// instances appear in the viewer as soon as they are tessellated or boolean-resolved,
+        /// rather than waiting for the entire model to complete. The geometry store is still
+        /// fully populated for subsequent WexBIM export.
+        /// </summary>
+        public async Task<bool> CreateContextStreamingAsync(
+            ISceneStreamSink sink,
+            bool adjustWcs = true,
+            bool generateBREPs = false,
+            ReportProgressDelegate progDelegate = null,
+            CancellationToken cancellationToken = default)
+        {
+            var channel = Channel.CreateUnbounded<SinkEvent>(new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = false
+            });
+
+            // Producer: runs the 5-phase pipeline on a thread-pool thread,
+            // writing geometry/instance events into the channel as they complete.
+            var producerTask = Task.Run(() =>
+            {
+                try
+                {
+                    return CreateContextCore(
+                        progDelegate: progDelegate,
+                        adjustWcs: adjustWcs,
+                        generateBREPs: generateBREPs,
+                        postTessellationCallback: null,
+                        dynamicDeflectionSettings: null,
+                        cancellationToken: cancellationToken,
+                        sinkChannel: channel.Writer);
+                }
+                finally
+                {
+                    channel.Writer.Complete();
+                }
+            }, cancellationToken);
+
+            // Consumer: reads channel events and dispatches to the sink.
+            // Runs concurrently on the async context while the producer fills the channel.
+            await SinkEventConsumer.ConsumeAsync(channel.Reader, sink, cancellationToken);
+
+            var success = await producerTask;
+            await sink.Complete();
+            return success;
+        }
+
+        /// <summary>
+        /// Streams the already-created geometry context to a sink for progressive rendering.
+        /// Call this after <see cref="CreateContextAsync"/> has completed successfully.
+        /// Each geometry and instance is emitted individually, yielding to the caller
+        /// between items so a viewer can render progressively.
+        /// </summary>
+        public async Task StreamToSinkAsync(ISceneStreamSink sink, CancellationToken ct = default)
+        {
+            await StreamFromStore(sink, ct);
+        }
+
+        /// <summary>
+        /// Emits the header and all styles to the streaming channel before geometry processing begins.
+        /// Styles include both explicit surface styles and synthetic type-default styles.
+        /// </summary>
+        private void EmitHeaderAndStyles(StreamingState state)
+        {
+            var ch = state.SinkChannel;
+            var mf = _model.ModelFactors;
+
+            var productCount = _model.Instances.OfType<IIfcProduct>()
+                .Count(p => p.Representation != null);
+
+            ch.TryWrite(SinkEvent.ForHeader(new StreamHeader(
+                (float)mf.OneMeter, 0, 0, 0, XbimRect3D.Empty, productCount)));
+
+            var emitted = new HashSet<int>();
+
+            // Positive styles (from surface style map)
+            foreach (var styleLabel in state.SurfaceStyles.Values.Where(v => v > 0))
+            {
+                if (emitted.Add(styleLabel))
+                {
+                    var (r, g, b, a) = ResolveStyleColor(styleLabel);
+                    ch.TryWrite(SinkEvent.ForStyle(styleLabel, r, g, b, a));
+                }
+            }
+
+            // Synthetic type-default styles (negative type IDs)
+            var colourMap = new Xbim.Ifc.XbimColourMap();
+            var typeIds = _model.Instances.OfType<IIfcProduct>()
+                .Where(p => p.Representation != null)
+                .Select(p => _model.Metadata.ExpressTypeId(p))
+                .Distinct();
+
+            foreach (var typeId in typeIds)
+            {
+                int styleKey = -typeId;
+                if (emitted.Add(styleKey))
+                {
+                    var typeName = _model.Metadata.GetType(typeId)?.Name;
+                    var colour = typeName != null ? colourMap[typeName] : Xbim.Ifc.XbimColour.DefaultColour;
+                    ch.TryWrite(SinkEvent.ForStyle(styleKey,
+                        (float)colour.Red, (float)colour.Green, (float)colour.Blue, (float)colour.Alpha));
+                }
+            }
+        }
+
+        private async Task StreamFromStore(ISceneStreamSink sink, CancellationToken ct)
+        {
+            var mf = _model.ModelFactors;
+
+            // Compute model bounds from the largest region
+            var estimatedBounds = XbimRect3D.Empty;
+            var largestRegion = GetLargestRegion();
+            if (largestRegion != null)
+            {
+                estimatedBounds = new XbimRect3D(
+                    largestRegion.Centre.X - largestRegion.Size.X / 2,
+                    largestRegion.Centre.Y - largestRegion.Size.Y / 2,
+                    largestRegion.Centre.Z - largestRegion.Size.Z / 2,
+                    largestRegion.Size.X, largestRegion.Size.Y, largestRegion.Size.Z);
+            }
+
+            var productCount = _model.Instances.OfType<IIfcProduct>()
+                .Count(p => p.Representation != null);
+
+            await sink.WriteHeader(new StreamHeader(
+                (float)mf.OneMeter, 0, 0, 0, estimatedBounds, productCount));
+
+            using var reader = _model.GeometryStore.BeginRead();
+
+            // Filter to only renderable instances:
+            // - OpeningsAndAdditionsIncluded = final boolean-result shapes (the visible ones)
+            // - Skip OpeningsAndAdditionsOnly = raw opening/projection element geometry
+            // - Skip OpeningsAndAdditionsExcluded = pre-boolean body shapes (superseded)
+            var visibleInstances = reader.ShapeInstances
+                .Where(i => i.RepresentationType == XbimGeometryRepresentationType.OpeningsAndAdditionsIncluded)
+                .ToList();
+
+            // Match the WexBIM writer's style resolution:
+            // - StyleLabel > 0 → resolve from IIfcSurfaceStyle entity
+            // - StyleLabel <= 0 → use negative IfcTypeId as synthetic style key,
+            //   resolved via XbimColourMap (default colours per IFC product type)
+            var colourMap = new Xbim.Ifc.XbimColourMap();
+            var emittedStyles = new HashSet<int>();
+            foreach (var inst in visibleInstances)
+            {
+                int styleKey = inst.StyleLabel > 0
+                    ? inst.StyleLabel
+                    : -inst.IfcTypeId;
+
+                if (emittedStyles.Add(styleKey))
+                {
+                    if (styleKey > 0)
+                    {
+                        var (r, g, b, a) = ResolveStyleColor(styleKey);
+                        await sink.WriteStyle(styleKey, r, g, b, a);
+                    }
+                    else
+                    {
+                        var typeName = _model.Metadata.GetType((short)Math.Abs(styleKey))?.Name;
+                        var colour = typeName != null ? colourMap[typeName] : Xbim.Ifc.XbimColour.DefaultColour;
+                        await sink.WriteStyle(styleKey,
+                            (float)colour.Red, (float)colour.Green, (float)colour.Blue, (float)colour.Alpha);
+                    }
+                }
+            }
+
+            // Emit only geometries referenced by visible instances
+            var referencedGeometries = new HashSet<int>(visibleInstances.Select(i => i.ShapeGeometryLabel));
+            foreach (var geom in reader.ShapeGeometries)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (!referencedGeometries.Contains(geom.ShapeLabel)) continue;
+                var meshBytes = ((IXbimShapeGeometryData)geom).ShapeData;
+                if (meshBytes == null || meshBytes.Length == 0) continue;
+                await sink.WriteGeometry(geom.ShapeLabel, meshBytes, geom.BoundingBox);
+            }
+
+            // Emit instances — one by one so the viewer can render progressively
+            foreach (var inst in visibleInstances)
+            {
+                ct.ThrowIfCancellationRequested();
+                int styleKey = inst.StyleLabel > 0
+                    ? inst.StyleLabel
+                    : -inst.IfcTypeId;
+
+                await sink.WriteInstance(new SceneInstance(
+                    inst.IfcProductLabel,
+                    inst.IfcTypeId,
+                    inst.ShapeGeometryLabel,
+                    styleKey,
+                    inst.Transformation,
+                    inst.BoundingBox));
+            }
+
+            await sink.Complete();
+        }
+
+        private (float r, float g, float b, float a) ResolveStyleColor(int styleLabel)
+        {
+            var entity = _model.Instances[styleLabel];
+
+            // StyleLabel typically points to an IIfcSurfaceStyle — look inside its Styles
+            // collection for the shading/rendering element that carries the colour.
+            if (entity is IIfcSurfaceStyle surfaceStyle)
+            {
+                var shading = surfaceStyle.Styles
+                    .OfType<IIfcSurfaceStyleShading>()
+                    .FirstOrDefault();
+                if (shading?.SurfaceColour != null)
+                    return ExtractColor(shading);
+            }
+
+            // Fallback: direct shading entity (unlikely but defensive)
+            if (entity is IIfcSurfaceStyleShading directShading && directShading.SurfaceColour != null)
+                return ExtractColor(directShading);
+
+            return (0.8f, 0.8f, 0.8f, 1f);
+        }
+
+        private static (float r, float g, float b, float a) ExtractColor(IIfcSurfaceStyleShading shading)
+        {
+            var c = shading.SurfaceColour;
+            float r = (float)c.Red;
+            float g = (float)c.Green;
+            float b = (float)c.Blue;
+            float a = 1f;
+            if (shading is IIfcSurfaceStyleRendering rendering && rendering.Transparency.HasValue)
+                a = 1f - (float)rendering.Transparency.Value;
+            return (r, g, b, a);
+        }
+
+        private static IIfcSurfaceStyle ResolveMaterialSurfaceStyle(IIfcMaterialSelect matSelect)
+        {
+            var materials = new List<IIfcMaterial>();
+            switch (matSelect)
+            {
+                case IIfcMaterial m:
+                    materials.Add(m);
+                    break;
+                case IIfcMaterialList ml:
+                    materials.AddRange(ml.Materials);
+                    break;
+                case IIfcMaterialLayerSetUsage mlsu:
+                    materials.AddRange(mlsu.ForLayerSet.MaterialLayers
+                        .Where(l => l.Material != null).Select(l => l.Material));
+                    break;
+                case IIfcMaterialLayerSet mls:
+                    materials.AddRange(mls.MaterialLayers
+                        .Where(l => l.Material != null).Select(l => l.Material));
+                    break;
+                case IIfcMaterialLayer ml2:
+                    if (ml2.Material != null) materials.Add(ml2.Material);
+                    break;
+                case IIfcMaterialConstituentSet mcs:
+                    materials.AddRange(mcs.MaterialConstituents
+                        .Where(c => c.Material != null).Select(c => c.Material));
+                    break;
+                case IIfcMaterialConstituent mc:
+                    if (mc.Material != null) materials.Add(mc.Material);
+                    break;
+                case IIfcMaterialProfileSetUsage mpsu:
+                    materials.AddRange(mpsu.ForProfileSet.MaterialProfiles
+                        .Where(p => p.Material != null).Select(p => p.Material));
+                    break;
+                case IIfcMaterialProfileSet mps:
+                    materials.AddRange(mps.MaterialProfiles
+                        .Where(p => p.Material != null).Select(p => p.Material));
+                    break;
+                case IIfcMaterialProfile mp:
+                    if (mp.Material != null) materials.Add(mp.Material);
+                    break;
+            }
+
+            foreach (var mat in materials)
+            {
+                foreach (var rep in mat.HasRepresentation.OfType<IIfcMaterialDefinitionRepresentation>())
+                {
+                    foreach (var styledRep in rep.Representations.OfType<IIfcStyledRepresentation>())
+                    {
+                        var surfaceStyle = styledRep.Items
+                            .OfType<IIfcStyledItem>()
+                            .SelectMany(si => si.Styles.SelectMany(s => s.SurfaceStyles))
+                            .FirstOrDefault();
+                        if (surfaceStyle != null)
+                            return surfaceStyle;
+                    }
+                }
+            }
+
+            return null;
         }
 
         #endregion
@@ -518,6 +826,9 @@ namespace Xbim.Geometry.Scene
                             LocalShapeDisplacement = shapeGeom.LocalShapeDisplacement
                         };
                         state.ShapeLookup.TryAdd(grid.EntityLabel, refCounter);
+
+                        state.SinkChannel?.TryWrite(SinkEvent.ForGeometry(
+                            refCounter.GeometryId, ((IXbimShapeGeometryData)shapeGeom).ShapeData, shapeGeom.BoundingBox));
                     }
                 }
             }
@@ -594,21 +905,30 @@ namespace Xbim.Geometry.Scene
                     {
                         using (_diag.Track(DiagOp.DirectTessellation))
                         {
-                            if (isVoidedProduct || isFeatureElement)
+                            try
                             {
-                                // Build intermediate mesh and cache raw data for Manifold booleans
-                                var rawMesh = xbimTessellator.MeshToTriangulatedMesh((IIfcRepresentationItem)shape);
-                                shapeGeom = xbimTessellator.SerializeMeshToBinary(rawMesh, shape.EntityLabel);
-                                var meshData = XbimTessellator.ExtractRawMesh(rawMesh);
+                                if (isVoidedProduct || isFeatureElement)
+                                {
+                                    var meshData = XbimTessellator.ExtractRawMesh(
+                                        xbimTessellator.MeshToTriangulatedMesh(shape));
+                                    shapeGeom = xbimTessellator.SerializeRawMeshToBinary(
+                                        meshData.Positions, meshData.Indices, shape.EntityLabel);
 
-                                if (isFeatureElement)
-                                    state.MeshFeaturesCache.TryAdd(shapeId, meshData);
-                                if (isVoidedProduct && !isFeatureElement)
-                                    state.MeshBodiesCache.TryAdd(shapeId, meshData);
+                                    if (isFeatureElement)
+                                        state.MeshFeaturesCache.TryAdd(shapeId, meshData);
+                                    if (isVoidedProduct && !isFeatureElement)
+                                        state.MeshBodiesCache.TryAdd(shapeId, meshData);
+                                }
+                                else
+                                {
+                                    shapeGeom = xbimTessellator.Mesh(shape);
+                                }
                             }
-                            else
+                            catch (Exception ex)
                             {
-                                shapeGeom = xbimTessellator.Mesh(shape);
+                                _logger.LogWarning("Direct tessellation failed for #{0}=({1}): {2}",
+                                    shape.EntityLabel, shape.GetType().Name, ex.Message);
+                                shapeGeom = null;
                             }
                         }
                     }
@@ -703,6 +1023,10 @@ namespace Xbim.Geometry.Scene
                         GetStyleId(state.SurfaceStyles, shapeGeom.IfcShapeLabel, out int styleLabel);
                         reference.StyleLabel = styleLabel;
                         state.ShapeLookup.TryAdd(shapeGeom.IfcShapeLabel, reference);
+
+                        // Emit geometry to streaming channel
+                        state.SinkChannel?.TryWrite(SinkEvent.ForGeometry(
+                            reference.GeometryId, ((IXbimShapeGeometryData)shapeGeom).ShapeData, shapeGeom.BoundingBox));
                     }
 
                     // Progress reporting
@@ -979,6 +1303,9 @@ namespace Xbim.Geometry.Scene
 
                             shapeInstance.ShapeGeometryLabel = txn.AddShapeGeometry(shapeGeometry);
                             txn.AddShapeInstance(shapeInstance, shapeInstance.ShapeGeometryLabel);
+
+                            // Emit boolean result to streaming channel
+                            EmitGeometryAndInstance(state, shapeInstance, meshData, bbox);
                         }
 
                         processed.TryAdd(element.EntityLabel, 0);
@@ -1021,7 +1348,7 @@ namespace Xbim.Geometry.Scene
 
                     WriteShapeInstanceToStore(instance.GeometryId, instance.StyleLabel, intContext, grid,
                         placementTransform, instance.BoundingBox,
-                        XbimGeometryRepresentationType.OpeningsAndAdditionsIncluded, txn);
+                        XbimGeometryRepresentationType.OpeningsAndAdditionsIncluded, txn, state);
                 }
             }
 
@@ -1349,7 +1676,7 @@ namespace Xbim.Geometry.Scene
                     if (!elemPlacement.IsIdentity)
                         currentMesh = ManifoldMeshBooleanService.Transform(currentMesh, elemPlacement);
 
-                    return WriteResultMesh(currentMesh, xbimTessellator, element, contextId, styleId, txn);
+                    return WriteResultMesh(state, currentMesh, xbimTessellator, element, contextId, styleId, txn);
                 }
             }
             finally
@@ -1471,7 +1798,7 @@ namespace Xbim.Geometry.Scene
                 currentMesh = cutResult.Value;
             }
 
-            return WriteResultMesh(currentMesh, xbimTessellator, element, contextId, styleId, txn);
+            return WriteResultMesh(state, currentMesh, xbimTessellator, element, contextId, styleId, txn);
         }
 
         private static bool BoundsIntersect(XbimRect3D a, XbimRect3D b)
@@ -1482,6 +1809,7 @@ namespace Xbim.Geometry.Scene
         }
 
         private bool WriteResultMesh(
+            StreamingState state,
             ManifoldMeshBooleanService.MeshData mesh,
             XbimTessellator xbimTessellator,
             IIfcElement element,
@@ -1528,7 +1856,30 @@ namespace Xbim.Geometry.Scene
 
             shapeInstance.ShapeGeometryLabel = txn.AddShapeGeometry(shapeGeometry);
             txn.AddShapeInstance(shapeInstance, shapeInstance.ShapeGeometryLabel);
+
+            // Emit boolean result to streaming channel
+            EmitGeometryAndInstance(state, shapeInstance, ((IXbimShapeGeometryData)shapeGeometry).ShapeData, bbox);
+
             return true;
+        }
+
+        /// <summary>
+        /// Emits a geometry and instance event to the streaming channel for a boolean result.
+        /// Called from both the BRep and Manifold boolean paths.
+        /// </summary>
+        private static void EmitGeometryAndInstance(
+            StreamingState state, XbimShapeInstance inst, byte[] meshData, XbimRect3D bbox)
+        {
+            var ch = state.SinkChannel;
+            if (ch == null) return;
+
+            ch.TryWrite(SinkEvent.ForGeometry(inst.ShapeGeometryLabel, meshData, bbox));
+
+            int styleKey = inst.StyleLabel > 0 ? inst.StyleLabel : -inst.IfcTypeId;
+            ch.TryWrite(SinkEvent.ForInstance(new SceneInstance(
+                inst.IfcProductLabel, inst.IfcTypeId,
+                inst.ShapeGeometryLabel, styleKey,
+                inst.Transformation, inst.BoundingBox)));
         }
 
         /// <summary>
@@ -1878,7 +2229,7 @@ namespace Xbim.Geometry.Scene
                             shapesInstances.Add(
                                 WriteShapeInstanceToStore(mappedGeometryReference.GeometryId,
                                     mappedGeometryReference.StyleLabel, contextId, product,
-                                    trans, mappedGeometryReference.BoundingBox, repType, txn));
+                                    trans, mappedGeometryReference.BoundingBox, repType, txn, state));
 
                             if (!(product is IIfcOpeningElement))
                             {
@@ -1907,7 +2258,7 @@ namespace Xbim.Geometry.Scene
 
                         shapesInstances.Add(
                             WriteShapeInstanceToStore(instance.GeometryId, instance.StyleLabel, contextId,
-                                product, trans, instance.BoundingBox, repType, txn));
+                                product, trans, instance.BoundingBox, repType, txn, state));
 
                         if (!(product is IIfcOpeningElement))
                         {
@@ -1923,7 +2274,8 @@ namespace Xbim.Geometry.Scene
 
         private XbimShapeInstance WriteShapeInstanceToStore(int shapeLabel, int styleLabel, int ctxtId,
             IIfcProduct product, XbimMatrix3D placementTransform, XbimRect3D bounds,
-            XbimGeometryRepresentationType repType, IGeometryStoreInitialiser txn)
+            XbimGeometryRepresentationType repType, IGeometryStoreInitialiser txn,
+            StreamingState state = null)
         {
             var shapeInstance = new XbimShapeInstance
             {
@@ -1944,6 +2296,16 @@ namespace Xbim.Geometry.Scene
             catch (Exception e)
             {
                 LogError(e, _model.Instances[product.EntityLabel], "Failed to create geometry, {0}", e.Message);
+            }
+
+            // Emit to streaming channel for visible (final) instances only
+            if (state?.SinkChannel != null &&
+                repType == XbimGeometryRepresentationType.OpeningsAndAdditionsIncluded)
+            {
+                int styleKey = styleLabel > 0 ? styleLabel : -shapeInstance.IfcTypeId;
+                state.SinkChannel.TryWrite(SinkEvent.ForInstance(new SceneInstance(
+                    shapeInstance.IfcProductLabel, shapeInstance.IfcTypeId,
+                    shapeLabel, styleKey, placementTransform, bounds)));
             }
 
             return shapeInstance;
