@@ -14,7 +14,10 @@ It provides geometric and topological operations for IFC building models — boo
 
 | Package | Description |
 |---------|-------------|
-| **Xbim.Geometry.Engine** | Core geometry engine — boolean operations, solid/shell/face building, tessellation. Automatically pulls in the native runtime packages for your platform. |
+| **Xbim.Geometry.Engine** | Core geometry engine — boolean operations, solid/shell/face building, tessellation. Requires a companion native runtime package (see below). |
+| **Xbim.Geometry.Engine.Native.runtime.win-x64** | Native binaries for Windows x64. |
+| **Xbim.Geometry.Engine.Native.runtime.linux-x64** | Native binaries for Linux x64. |
+| **Xbim.Geometry.Engine.Native.runtime.browser-wasm** | Native binaries for Blazor WebAssembly. |
 | **Xbim.Geometry.Scene** | 3D scene construction from IFC models — `Xbim3DModelContext`, WexBIM export, placement trees, mesh layers. |
 | **Xbim.Tessellator** | Standalone managed tessellator for pre-meshed IFC representations (`IfcTriangulatedFaceSet`, `IfcFacetedBrep`, etc.) without requiring the native engine. |
 | **Xbim.Geometry.Abstractions** | Interfaces and abstractions (`IXShape`, `IXSolid`, `IXCurve`, etc.) shared across geometry packages. |
@@ -48,7 +51,18 @@ dotnet add package Xbim.Geometry.Scene --prerelease
 dotnet add package Xbim.Geometry.Engine --prerelease
 ```
 
-Native binaries for Windows and Linux are pulled in automatically via runtime packages.
+You also need to explicitly install the native runtime package for your target platform:
+
+```bash
+# Windows x64
+dotnet add package Xbim.Geometry.Engine.Native.runtime.win-x64 --prerelease
+
+# Linux x64
+dotnet add package Xbim.Geometry.Engine.Native.runtime.linux-x64 --prerelease
+
+# Blazor WebAssembly
+dotnet add package Xbim.Geometry.Engine.Native.runtime.browser-wasm --prerelease
+```
 
 > **Note:** `--store-password-in-clear-text` is required on Linux/macOS. On Windows you can omit it.
 
