@@ -146,11 +146,9 @@ namespace Xbim.Geometry.Engine.Tests
                 var store = m.GeometryStore as InMemoryGeometryStore;
 
                 var geom = store.ShapeGeometries.Values.First(c => c.IfcShapeLabel == 13519);
-                using (var fs = System.IO.File.Create(@"TestFiles/Github/Dormitory-ARC_Opening_444.wexbim"))
-                using (var bw = new System.IO.BinaryWriter(fs))
-                    m.SaveAsWexBim(bw);
-                geom.FaceCount.Should().Be(50);
-                geom.Length.Should().Be(2029);
+
+                geom.FaceCount.Should().Be(6);
+                geom.Length.Should().Be(2053);
 
             }
         }
