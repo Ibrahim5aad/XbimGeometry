@@ -190,7 +190,7 @@ jobs:
 
       - name: Build WASM native library
         shell: bash
-        run: ./scripts/build-wasm.sh
+        run: bash scripts/build-wasm.sh
         env:
           VCPKG_BINARY_SOURCES: clear
 

@@ -174,9 +174,11 @@ if(NOT EMSCRIPTEN)
         ")
     else()
         # On Linux, vcpkg keeps .so files in its own lib directory — they are not
-        # copied to the build output like Windows DLLs. Copy them from vcpkg.
+        # copied to the build output like Windows DLLs. Copy every shared library
+        # so all runtime dependencies (OCCT TK*, manifold, freetype, …) land
+        # next to libxbim_geometry_native.so, which resolves them via RPATH=$ORIGIN.
         install(CODE "
-            file(GLOB _vcpkg_libs \"${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib/libTK*.so*\")
+            file(GLOB _vcpkg_libs \"${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib/*.so*\")
             file(INSTALL \${_vcpkg_libs} DESTINATION \"\${CMAKE_INSTALL_PREFIX}/runtimes/${XBIM_RID}/native\")
         ")
     endif()
