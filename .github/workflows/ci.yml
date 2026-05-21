@@ -156,7 +156,9 @@ jobs:
       || inputs.platform == 'all'
       || inputs.platform == 'wasm'
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # Cold OCCT WASM build (release-only) runs ~50 min; 90 gives margin to finish
+    # once and seed the vcpkg_installed cache. Warm runs are ~10 min.
+    timeout-minutes: 90
 
     steps:
       - name: Checkout

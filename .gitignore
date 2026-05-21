@@ -28,6 +28,11 @@ BenchmarkDotNet.Artifacts/
 # vcpkg
 vcpkg_installed/
 vcpkg/
+
+# vcpkg custom triplets live in 'debug'/'release' subfolders whose names collide
+# with the [Dd]ebug/ and [Rr]elease/ build-output rules above — keep them tracked.
+!src/Xbim.Geometry.Engine.Native/triplets/debug/
+!src/Xbim.Geometry.Engine.Native/triplets/release/
 CMakeUserPresets.json
 
 # Staged native libraries (created by cmake --install for NuGet packaging)
